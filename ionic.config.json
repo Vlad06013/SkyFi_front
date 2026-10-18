@@ -1,0 +1,7 @@
+{
+  "name": "skyfi-temp",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "vue-vite"
+}
