@@ -32,7 +32,7 @@ export interface TracksResponse {
 }
 
 export interface ExternalTrack {
-    id: string;
+    id: number;
     title: string;
     artist: string;
     description: string | null;
@@ -49,13 +49,33 @@ export interface ExternalSearchResponse {
 
 export interface AudioFile {
     url: string;
-    filename: string;
-    size_bytes: number | null;
-    format: string | null;
+    filename?: string;
+    size_bytes?: number | null;
+    format?: string | null;
 }
 
-interface AudioResponse {
-    data: AudioFile;
+/**
+ * Получить ответ со ссылкой на аудиофайл.
+ *
+ * API возвращает:
+ * {
+ *   "url": "http://127.0.0.1:8080/storage/tracks/uploads/..."
+ * }
+ */
+export async function getTrackAudio(
+    trackId: number,
+): Promise<AudioFile> {
+    const response = await http.get(
+        `/tracks/${trackId}/audio`,
+    );
+
+    const result = response.data?.data ?? response.data;
+
+    if (!result?.url) {
+        throw new Error('API не вернул ссылку на аудиофайл');
+    }
+
+    return result as AudioFile;
 }
 
 /**
@@ -68,21 +88,8 @@ export async function getTracks(): Promise<TracksResponse> {
 }
 
 /**
- * Получить прямую ссылку на аудиофайл из Internet Archive.
- *
- * identifier — идентификатор записи Internet Archive,
- * например Classical_Sampler-9615.
+ * Поиск внешних треков.
  */
-export async function getTrackAudio(
-    identifier: string,
-): Promise<AudioFile> {
-    const response = await http.get<AudioResponse>(
-        `/search/${encodeURIComponent(identifier)}/audio`,
-    );
-
-    return response.data.data;
-}
-
 export async function searchExternalTracks(
     query: string,
     limit = 20,
@@ -113,7 +120,11 @@ export async function getFavorites(): Promise<{
  */
 export async function addFavorite(
     trackId: number,
-): Promise<{ message: string; is_favorite: boolean; track_id: number }> {
+): Promise<{
+    message: string;
+    is_favorite: boolean;
+    track_id: number;
+}> {
     const response = await http.post(
         `/favorites/${trackId}`,
     );
@@ -150,7 +161,11 @@ export async function addExternalFavorite(
  */
 export async function removeFavorite(
     trackId: number,
-): Promise<{ message: string; is_favorite: boolean; track_id: number }> {
+): Promise<{
+    message: string;
+    is_favorite: boolean;
+    track_id: number;
+}> {
     const response = await http.delete(
         `/favorites/${trackId}`,
     );
@@ -163,7 +178,10 @@ export async function removeFavorite(
  */
 export async function checkFavorite(
     trackId: number,
-): Promise<{ is_favorite: boolean; track_id: number }> {
+): Promise<{
+    is_favorite: boolean;
+    track_id: number;
+}> {
     const response = await http.get(
         `/favorites/${trackId}/check`,
     );
