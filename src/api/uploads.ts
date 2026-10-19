@@ -1,4 +1,9 @@
+import axios from 'axios';
 import { http } from '@/api/http';
+
+// ============================================
+// ТИПЫ
+// ============================================
 
 export interface UploadTrackPayload {
     title: string;
@@ -34,18 +39,22 @@ export interface UploadedTrack {
     status: string;
     source_type: string;
     album_id: number | null;
+
     artists: Array<{
         id: number;
         name: string;
     }>;
+
     album: {
         id: number;
         title: string;
     } | null;
+
     genres: Array<{
         id: number;
         name: string;
     }>;
+
     files: UploadedTrackFile[];
 }
 
@@ -54,59 +63,242 @@ export interface UploadTrackResponse {
     data: UploadedTrack;
 }
 
-/**
- * Загрузить музыкальный трек.
- */
+// ============================================
+// ЗАГРУЗКА МУЗЫКАЛЬНОГО ТРЕКА
+// ============================================
+
 export async function uploadTrack(
     payload: UploadTrackPayload,
     onProgress?: (progress: number) => void,
 ): Promise<UploadTrackResponse> {
+    // ========================================
+    // ПРОВЕРКА ДАННЫХ
+    // ========================================
+
+    const title = payload.title.trim();
+
+    if (!title) {
+        throw new Error('Укажи название трека.');
+    }
+
+    if (!(payload.audio instanceof File)) {
+        throw new Error('Необходимо выбрать аудиофайл.');
+    }
+
+    if (payload.audio.size === 0) {
+        throw new Error('Выбранный аудиофайл пуст.');
+    }
+
+    // ========================================
+    // ФОРМИРОВАНИЕ MULTIPART/FORM-DATA
+    // ========================================
+
     const formData = new FormData();
 
-    formData.append('title', payload.title.trim());
-    formData.append('audio', payload.audio);
+    formData.append('title', title);
 
-    if (payload.description?.trim()) {
-        formData.append('description', payload.description.trim());
-    }
-
-    if (payload.artist_id !== undefined) {
-        formData.append('artist_id', String(payload.artist_id));
-    } else if (payload.artist_name?.trim()) {
-        formData.append('artist_name', payload.artist_name.trim());
-    }
-
-    if (payload.album_id !== undefined) {
-        formData.append('album_id', String(payload.album_id));
-    } else if (payload.album_title?.trim()) {
-        formData.append('album_title', payload.album_title.trim());
-    }
-
-    if (payload.genre_id !== undefined) {
-        formData.append('genre_id', String(payload.genre_id));
-    } else if (payload.genre_name?.trim()) {
-        formData.append('genre_name', payload.genre_name.trim());
-    }
-
-    const response = await http.post<UploadTrackResponse>(
-        '/tracks/upload',
-        formData,
-        {
-            timeout: 300000,
-
-            onUploadProgress(event) {
-                if (!event.total || !onProgress) {
-                    return;
-                }
-
-                const percent = Math.round(
-                    (event.loaded / event.total) * 100,
-                );
-
-                onProgress(Math.min(percent, 100));
-            },
-        },
+    formData.append(
+        'audio',
+        payload.audio,
+        payload.audio.name,
     );
 
-    return response.data;
+    if (payload.description?.trim()) {
+        formData.append(
+            'description',
+            payload.description.trim(),
+        );
+    }
+
+    // Исполнитель
+    if (payload.artist_id !== undefined) {
+        formData.append(
+            'artist_id',
+            String(payload.artist_id),
+        );
+    } else if (payload.artist_name?.trim()) {
+        formData.append(
+            'artist_name',
+            payload.artist_name.trim(),
+        );
+    }
+
+    // Альбом
+    if (payload.album_id !== undefined) {
+        formData.append(
+            'album_id',
+            String(payload.album_id),
+        );
+    } else if (payload.album_title?.trim()) {
+        formData.append(
+            'album_title',
+            payload.album_title.trim(),
+        );
+    }
+
+    // Жанр
+    if (payload.genre_id !== undefined) {
+        formData.append(
+            'genre_id',
+            String(payload.genre_id),
+        );
+    } else if (payload.genre_name?.trim()) {
+        formData.append(
+            'genre_name',
+            payload.genre_name.trim(),
+        );
+    }
+
+    // ========================================
+    // ПРОВЕРКА FORMDATA
+    // ========================================
+
+    const audioEntry = formData.get('audio');
+
+    if (
+        !(audioEntry instanceof File) ||
+        audioEntry.size === 0
+    ) {
+        throw new Error(
+            'Не удалось добавить аудиофайл в запрос.',
+        );
+    }
+
+    console.log('Загрузка трека:', {
+        title,
+        fileName: audioEntry.name,
+        fileSize: audioEntry.size,
+        fileType: audioEntry.type,
+        formDataKeys: Array.from(formData.keys()),
+    });
+
+    // ========================================
+    // ОТПРАВКА НА СЕРВЕР
+    // ========================================
+
+    try {
+        const response = await http.post<UploadTrackResponse>(
+            '/tracks/upload',
+            formData,
+            {
+                timeout: 300000,
+
+                onUploadProgress(event) {
+                    if (!event.total || !onProgress) {
+                        return;
+                    }
+
+                    const percent = Math.round(
+                        (event.loaded / event.total) * 100,
+                    );
+
+                    onProgress(
+                        Math.min(100, Math.max(0, percent)),
+                    );
+                },
+            },
+        );
+
+        console.log(
+            'Трек успешно загружен:',
+            response.data,
+        );
+
+        return response.data;
+    } catch (error: unknown) {
+        // ====================================
+        // ОБРАБОТКА ОШИБОК AXIOS
+        // ====================================
+
+        if (axios.isAxiosError(error)) {
+            const status = error.response?.status;
+            const responseData = error.response?.data;
+
+            console.error('Ошибка загрузки трека:', {
+                status,
+                statusText: error.response?.statusText,
+                message: error.message,
+                response: responseData,
+                validationErrors: responseData?.errors,
+            });
+
+            if (status === 422) {
+                const validationErrors = responseData?.errors;
+
+                if (
+                    validationErrors &&
+                    typeof validationErrors === 'object'
+                ) {
+                    const messages: string[] = [];
+
+                    for (const [field, errors] of Object.entries(
+                        validationErrors as Record<string, unknown>,
+                    )) {
+                        const fieldMessages = Array.isArray(errors)
+                            ? errors
+                            : [errors];
+
+                        for (const message of fieldMessages) {
+                            if (typeof message === 'string') {
+                                messages.push(
+                                    `${field}: ${message}`,
+                                );
+                            }
+                        }
+                    }
+
+                    if (messages.length > 0) {
+                        throw new Error(
+                            `Ошибка проверки данных: ${messages.join('; ')}`,
+                        );
+                    }
+                }
+
+                throw new Error(
+                    responseData?.message ||
+                    'Сервер отклонил данные трека. Проверь обязательные поля.',
+                );
+            }
+
+            if (status === 401) {
+                throw new Error(
+                    'Для загрузки музыки необходимо войти в аккаунт.',
+                );
+            }
+
+            if (status === 403) {
+                throw new Error(
+                    'У тебя нет разрешения на загрузку музыки.',
+                );
+            }
+
+            if (status === 413) {
+                throw new Error(
+                    'Файл слишком большой.',
+                );
+            }
+
+            if (!error.response) {
+                throw new Error(
+                    'Не удалось подключиться к серверу. Проверь соединение.',
+                );
+            }
+
+            throw new Error(
+                responseData?.message ||
+                `Ошибка сервера: ${status ?? 'неизвестный статус'}.`,
+            );
+        }
+
+        // ====================================
+        // НЕИЗВЕСТНАЯ ОШИБКА
+        // ====================================
+
+        console.error(
+            'Непредвиденная ошибка загрузки трека:',
+            error,
+        );
+
+        throw error;
+    }
 }

@@ -1,5 +1,7 @@
 <template>
   <ion-page>
+    <AppNavigation />
+
     <ion-content
         :fullscreen="true"
         class="library-content"
@@ -701,15 +703,9 @@
 import './library.css';
 import { useLibrary } from './library';
 
-import {
-  IonContent,
-  IonPage,
-  IonIcon,
-  IonSpinner,
-} from '@ionic/vue';
-
+import { IonContent, IonPage, IonIcon, IonSpinner } from '@ionic/vue';
 import AudioPlayer from '@/components/player/AudioPlayer.vue';
-
+import AppNavigation from '@/components/AppNavigation.vue';
 const {
   tabs,
   activeTab,
@@ -758,5 +754,3 @@ const {
   peopleOutline,
 } = useLibrary();
 </script>
-
-<style src="./library.css"></style>

@@ -353,20 +353,10 @@
 
       <!-- Нижний музыкальный плеер -->
       <AudioPlayer />
-
-      <!-- Мобильная навигация -->
-      <nav class="mobile-nav">
-        <button
-            v-for="item in menu.slice(0, 4)"
-            :key="item.id"
-            :class="{ active: activeMenu === item.id }"
-            @click="navigateTo(item.id)"
-        >
-          <span>{{ item.icon }}</span>
-          <small>{{ item.label }}</small>
-        </button>
-      </nav>
     </ion-content>
+
+    <!-- Единая навигация SkyFi -->
+    <AppNavigation />
   </ion-page>
 </template>
 
@@ -374,6 +364,7 @@
 import { IonPage, IonContent } from '@ionic/vue';
 
 import AudioPlayer from '@/components/player/AudioPlayer.vue';
+import AppNavigation from '@/components/AppNavigation.vue';
 
 import { useHome } from './home';
 

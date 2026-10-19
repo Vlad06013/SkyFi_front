@@ -3,12 +3,17 @@ import { defineStore } from 'pinia';
 
 import {
     getTrackAudio,
+    addFavorite,
+    removeFavorite,
+    checkFavorite,
     type Track as ApiTrack,
 } from '@/api/tracks';
 
-export const usePlayerStore = defineStore('player', () => {
+import { useAuthStore } from '@/stores/auth';
+
+const usePlayerStore = defineStore('player', () => {
     // ============================================
-    // СОСТОЯНИЕ
+    // ТИПЫ
     // ============================================
 
     type PlayerTrack = {
@@ -17,8 +22,14 @@ export const usePlayerStore = defineStore('player', () => {
         artist: string;
         cover?: string;
         symbol?: string;
-        source?: string;
     };
+
+    // ============================================
+    // СОСТОЯНИЕ
+    // ============================================
+
+    const auth = useAuthStore();
+
     const queue = ref<ApiTrack[]>([]);
 
     const currentTrackIndex = ref(-1);
@@ -48,6 +59,10 @@ export const usePlayerStore = defineStore('player', () => {
 
     let playbackRequestId = 0;
 
+    // Идентификаторы запросов избранного.
+    let favoriteCheckRequestId = 0;
+    let favoriteToggleRequestId = 0;
+
     // ============================================
     // ГРОМКОСТЬ
     // ============================================
@@ -65,7 +80,9 @@ export const usePlayerStore = defineStore('player', () => {
             return;
         }
 
-        progress.value = audio.currentTime || 0;
+        progress.value = Number.isFinite(audio.currentTime)
+            ? audio.currentTime
+            : 0;
     });
 
     audio.addEventListener('loadedmetadata', () => {
@@ -94,29 +111,186 @@ export const usePlayerStore = defineStore('player', () => {
         isPlaying.value = false;
         progress.value = audioDuration.value;
 
-        void playNext();
+        if (currentTrackIndex.value < queue.value.length - 1) {
+            void playNext();
+        }
     });
 
+    audio.addEventListener('error', () => {
+        isPlaying.value = false;
+    });
+
+    // ============================================
+    // ОЧЕРЕДЬ
+    // ============================================
 
     /**
      * Установить очередь воспроизведения.
      */
     function setQueue(tracks: ApiTrack[]): void {
         queue.value = [...tracks];
+
+        if (!currentTrack.value) {
+            currentTrackIndex.value = -1;
+            return;
+        }
+
+        currentTrackIndex.value = queue.value.findIndex(
+            (track) =>
+                String(track.id) === String(currentTrack.value?.id),
+        );
     }
 
     /**
-     * Переключить на следующий трек.
+     * Очистить очередь воспроизведения.
      */
+    function clearQueue(): void {
+        console.trace('[Player] Вызван clearQueue()');
+
+        queue.value = [];
+        currentTrackIndex.value = -1;
+    }
+
+    /**
+     * Найти индекс трека в очереди.
+     */
+    function findTrackIndex(track: ApiTrack): number {
+        return queue.value.findIndex(
+            (item) => String(item.id) === String(track.id),
+        );
+    }
+
+    // ============================================
+    // ИЗБРАННОЕ
+    // ============================================
+
+    /**
+     * Проверить, находится ли трек в избранном.
+     *
+     * Используем идентификатор запроса, чтобы ответ
+     * для предыдущего трека не перезаписал состояние
+     * текущего.
+     */
+    async function updateFavoriteState(
+        trackId: number | string | null,
+    ): Promise<void> {
+        const requestId = ++favoriteCheckRequestId;
+
+        if (trackId === null) {
+            liked.value = false;
+            return;
+        }
+
+        if (typeof trackId !== 'number') {
+            liked.value = false;
+            return;
+        }
+
+        if (!auth.user) {
+            liked.value = false;
+            return;
+        }
+
+        try {
+            const response = await checkFavorite(trackId);
+
+            if (requestId !== favoriteCheckRequestId) {
+                return;
+            }
+
+            if (
+                String(currentTrack.value?.id) !== String(trackId)
+            ) {
+                return;
+            }
+
+            liked.value = response.is_favorite;
+        } catch (error) {
+            if (requestId !== favoriteCheckRequestId) {
+                return;
+            }
+
+            console.error(
+                '[Player] Не удалось проверить избранное:',
+                error,
+            );
+
+            liked.value = false;
+        }
+    }
+
+    /**
+     * Добавить текущий трек в избранное
+     * или удалить его из избранного.
+     */
+    async function toggleFavorite(): Promise<void> {
+        const track = currentTrack.value;
+
+        if (
+            !track ||
+            favoriteLoading.value ||
+            typeof track.id !== 'number'
+        ) {
+            return;
+        }
+
+        if (!auth.user) {
+            console.warn(
+                '[Player] Для работы с избранным необходимо авторизоваться.',
+            );
+            return;
+        }
+
+        const trackId = track.id;
+        const wasLiked = liked.value;
+
+        const requestId = ++favoriteToggleRequestId;
+
+        favoriteLoading.value = true;
+
+        try {
+            const response = wasLiked
+                ? await removeFavorite(trackId)
+                : await addFavorite(trackId);
+
+            // Не меняем лайк, если запрос уже устарел
+            // или пользователь переключился на другой трек.
+            if (requestId !== favoriteToggleRequestId) {
+                return;
+            }
+
+            if (
+                String(currentTrack.value?.id) !== String(trackId)
+            ) {
+                return;
+            }
+
+            liked.value = response.is_favorite;
+        } catch (error) {
+            console.error(
+                '[Player] Ошибка изменения избранного:',
+                error,
+            );
+        } finally {
+            if (requestId === favoriteToggleRequestId) {
+                favoriteLoading.value = false;
+            }
+        }
+    }
+
+    // ============================================
+    // СЛЕДУЮЩИЙ ТРЕК
+    // ============================================
+
     async function playNext(): Promise<void> {
-        if (!queue.value.length) {
+        if (isLoading.value || queue.value.length === 0) {
             return;
         }
 
         const nextIndex = currentTrackIndex.value + 1;
 
-        // В конце очереди останавливаем воспроизведение.
         if (nextIndex >= queue.value.length) {
+            audio.pause();
             isPlaying.value = false;
             return;
         }
@@ -124,15 +298,17 @@ export const usePlayerStore = defineStore('player', () => {
         await playTrack(queue.value[nextIndex]);
     }
 
-    /**
-     * Переключить на предыдущий трек.
-     */
+    // ============================================
+    // ПРЕДЫДУЩИЙ ТРЕК
+    // ============================================
+
     async function playPrevious(): Promise<void> {
-        if (!queue.value.length) {
+        if (isLoading.value || queue.value.length === 0) {
             return;
         }
 
-        // Если трек играет больше 3 секунд, начинаем его сначала.
+        // Если текущий трек играет больше 3 секунд,
+        // начинаем его сначала.
         if (audio.currentTime > 3) {
             seekAudio(0);
             return;
@@ -148,20 +324,35 @@ export const usePlayerStore = defineStore('player', () => {
         await playTrack(queue.value[previousIndex]);
     }
 
-
     // ============================================
     // ВОСПРОИЗВЕДЕНИЕ
     // ============================================
 
     async function playTrack(track: ApiTrack): Promise<void> {
-
-        const index = queue.value.findIndex(
-            (item) => item.id === track.id,
-        );
-
-        if (index !== -1) {
-            currentTrackIndex.value = index;
+        if (!track) {
+            return;
         }
+
+        // Если очередь пуста, добавляем выбранный трек.
+        if (queue.value.length === 0) {
+            console.warn(
+                '[Player] Очередь пуста при выборе трека:',
+                track.title,
+            );
+
+            queue.value = [track];
+        }
+
+        const index = findTrackIndex(track);
+
+        currentTrackIndex.value = index;
+
+        console.log('[Player] Выбран трек:', track.title);
+        console.log('[Player] ID трека:', track.id);
+        console.log('[Player] Индекс:', index);
+        console.log('[Player] Размер очереди:', queue.value.length);
+
+        // Отменяем предыдущие запросы воспроизведения.
         const requestId = ++playbackRequestId;
 
         currentTrack.value = {
@@ -175,7 +366,12 @@ export const usePlayerStore = defineStore('player', () => {
             symbol: '♫',
         };
 
+        // Сбрасываем состояние избранного и проверяем
+        // его для нового трека.
         liked.value = false;
+
+        void updateFavoriteState(track.id);
+
         isPlaying.value = false;
         isLoading.value = true;
 
@@ -190,29 +386,37 @@ export const usePlayerStore = defineStore('player', () => {
         try {
             const audioFile = await getTrackAudio(track.id);
 
+            // Если пользователь выбрал другой трек,
+            // игнорируем устаревший запрос.
             if (requestId !== playbackRequestId) {
                 return;
             }
 
+            if (!audioFile?.url) {
+                throw new Error(
+                    'Сервер не вернул ссылку на аудиофайл.',
+                );
+            }
 
-            // Устанавливаем адрес файла.
             audio.src = audioFile.url;
-            audio.volume = volume.value / 100;
 
-            // Запускаем загрузку аудио.
+            audio.volume = Math.max(
+                0,
+                Math.min(100, volume.value),
+            ) / 100;
+
             audio.load();
 
-
             await audio.play();
-
-        } catch (err) {
+        } catch (error) {
             if (requestId !== playbackRequestId) {
                 return;
             }
 
-            console.error('Ошибка воспроизведения:', err);
-            console.error('Audio error:', audio.error);
-            console.error('Audio src:', audio.currentSrc || audio.src);
+            console.error(
+                '[Player] Ошибка воспроизведения трека:',
+                error,
+            );
 
             isPlaying.value = false;
         } finally {
@@ -227,7 +431,17 @@ export const usePlayerStore = defineStore('player', () => {
     // ============================================
 
     async function togglePlay(): Promise<void> {
-        if (!currentTrack.value || isLoading.value) {
+        if (isLoading.value) {
+            return;
+        }
+
+        if (!currentTrack.value) {
+            const firstTrack = queue.value[0];
+
+            if (firstTrack) {
+                await playTrack(firstTrack);
+            }
+
             return;
         }
 
@@ -235,7 +449,12 @@ export const usePlayerStore = defineStore('player', () => {
             try {
                 await audio.play();
             } catch (error) {
-                console.error('Ошибка воспроизведения:', error);
+                console.error(
+                    '[Player] Ошибка продолжения воспроизведения:',
+                    error,
+                );
+
+                isPlaying.value = false;
             }
         } else {
             audio.pause();
@@ -260,7 +479,9 @@ export const usePlayerStore = defineStore('player', () => {
         );
 
         audio.currentTime = target;
+
         progress.value = target;
+
         isSeeking.value = false;
     }
 
@@ -280,6 +501,10 @@ export const usePlayerStore = defineStore('player', () => {
         return `${minutes}:${String(remainder).padStart(2, '0')}`;
     }
 
+    // ============================================
+    // ПРОГРЕСС
+    // ============================================
+
     const progressPercent = computed(() => {
         if (audioDuration.value <= 0) {
             return 0;
@@ -291,20 +516,68 @@ export const usePlayerStore = defineStore('player', () => {
         );
     });
 
+    // ============================================
+    // СИНХРОНИЗАЦИЯ ИЗБРАННОГО
+    // ============================================
+
+    watch(
+        () => currentTrack.value?.id,
+        (trackId) => {
+            if (trackId == null) {
+                liked.value = false;
+                favoriteCheckRequestId++;
+                return;
+            }
+
+            void updateFavoriteState(trackId);
+        },
+    );
+
+    // ============================================
+    // ЭКСПОРТ
+    // ============================================
+
     return {
+        // Очередь
+        queue,
+        currentTrackIndex,
+        setQueue,
+        clearQueue,
+
+        // Текущий трек
         currentTrack,
+
+        // Состояние воспроизведения
         isPlaying,
         isLoading,
+
+        // Прогресс и время
         progress,
         audioDuration,
+        progressPercent,
+
+        // Громкость
         volume,
+
+        // Избранное
         liked,
         favoriteLoading,
+        updateFavoriteState,
+        toggleFavorite,
+
+        // Перемотка
         isSeeking,
-        progressPercent,
-        playTrack,
-        togglePlay,
         seekAudio,
+
+        // Управление воспроизведением
+        playTrack,
+        playNext,
+        playPrevious,
+        togglePlay,
+
+        // Форматирование
         formatTime,
     };
 });
+
+export default usePlayerStore;

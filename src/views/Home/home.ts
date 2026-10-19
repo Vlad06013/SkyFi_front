@@ -1,16 +1,13 @@
 import { useRouter } from 'vue-router';
-import { usePlayerStore } from '@/stores/player';
+import usePlayerStore from '@/stores/player';
 import { useAuthStore } from '@/stores/auth';
 
 import {
     getTracks,
-    getTrackAudio,
-    searchExternalTracks,
     addFavorite,
     removeFavorite,
     checkFavorite,
     type Track as ApiTrack,
-    type ExternalTrack,
 } from '@/api/tracks';
 
 import {
@@ -26,14 +23,11 @@ import {
 // ============================================
 
 type PlayerTrack = {
-    id: string | number;
+    id: number | string;
     title: string;
     artist: string;
     cover?: string;
     symbol?: string;
-    tag?: string;
-    audioUrl?: string;
-    archiveIdentifier?: string;
 };
 
 // ============================================
@@ -59,53 +53,10 @@ export function useHome() {
     const activeMenu = ref('home');
 
     // ========================================
-    // СОСТОЯНИЕ ПРИЛОЖЕНИЯ
+    // СОСТОЯНИЕ СТРАНИЦЫ
     // ========================================
 
     const search = ref('');
-
-    const currentTrack = ref<PlayerTrack | null>(null);
-
-    const isPlaying = ref(false);
-
-    const liked = ref(false);
-
-    const favoriteLoading = ref(false);
-
-    const progress = ref(0);
-
-    const audioDuration = ref(0);
-
-    const isSeeking = ref(false);
-
-    const seekPosition = ref(0);
-
-    const volume = ref(70);
-
-    const profileMenuOpen = ref(false);
-
-    const loggingOut = ref(false);
-
-    const logoutError = ref('');
-
-    let favoriteRequestId = 0;
-
-    // ========================================
-    // АУДИО
-    // ========================================
-
-    const audio = new Audio();
-
-    audio.preload = 'metadata';
-    audio.volume = volume.value / 100;
-
-    watch(volume, (value) => {
-        audio.volume = Math.max(0, Math.min(100, value)) / 100;
-    });
-
-    // ========================================
-    // ТРЕКИ
-    // ========================================
 
     const tracks = ref<ApiTrack[]>([]);
 
@@ -113,98 +64,160 @@ export function useHome() {
 
     const tracksError = ref('');
 
-    const externalTracks = ref<ExternalTrack[]>([]);
+    // ========================================
+    // ИЗБРАННОЕ
+    // ========================================
 
-    const externalSearchLoading = ref(false);
+    const liked = ref(false);
 
-    const externalSearchError = ref('');
+    const favoriteLoading = ref(false);
 
-    const filteredTracks = computed(() => {
-        return search.value.trim()
-            ? externalTracks.value
-            : tracks.value;
+    let favoriteRequestId = 0;
+
+    // ========================================
+    // ПРОФИЛЬ
+    // ========================================
+
+    const profileMenuOpen = ref(false);
+
+    const loggingOut = ref(false);
+
+    const logoutError = ref('');
+
+    // ========================================
+    // СОСТОЯНИЕ ПЛЕЕРА
+    // ========================================
+
+    /*
+     * Все состояние воспроизведения хранится
+     * в player store.
+     *
+     * Home не создаёт отдельный экземпляр Audio
+     * и не дублирует очередь воспроизведения.
+     */
+
+    const currentTrack = computed<PlayerTrack | null>(() => {
+        const track = player.currentTrack;
+
+        if (!track) {
+            return null;
+        }
+
+        return {
+            id: track.id,
+            title: track.title,
+            artist: track.artist,
+            cover: track.cover,
+            symbol: track.symbol ?? '♫',
+        };
+    });
+
+    const isPlaying = computed(() => {
+        return player.isPlaying;
+    });
+
+    const isLoading = computed(() => {
+        return player.isLoading;
+    });
+
+    const progress = computed(() => {
+        return player.progress;
+    });
+
+    const audioDuration = computed(() => {
+        return player.audioDuration;
+    });
+
+    const volume = computed({
+        get: () => player.volume,
+
+        set: (value: number) => {
+            player.volume = Math.max(
+                0,
+                Math.min(100, value),
+            );
+        },
+    });
+
+    const progressPercent = computed(() => {
+        return player.progressPercent;
     });
 
     // ========================================
-    // ПОИСК
+    // ПОИСК ПО КАТАЛОГУ SKYFI
     // ========================================
 
-    let searchTimeout: ReturnType<typeof setTimeout> | undefined;
-
-    let searchRequestId = 0;
-
-    async function performExternalSearch(
-        query: string,
-    ): Promise<void> {
-        const normalizedQuery = query.trim();
-
-        if (!normalizedQuery) {
-            externalTracks.value = [];
-            externalSearchError.value = '';
-            externalSearchLoading.value = false;
-            return;
+    function getTrackArtist(track: ApiTrack): string {
+        if (!track.artists || track.artists.length === 0) {
+            return 'Неизвестный исполнитель';
         }
 
-        const requestId = ++searchRequestId;
-
-        externalSearchLoading.value = true;
-        externalSearchError.value = '';
-
-        try {
-            const response = await searchExternalTracks(
-                normalizedQuery,
-                20,
-            );
-
-            if (requestId !== searchRequestId) {
-                return;
-            }
-
-            externalTracks.value = response.data ?? [];
-        } catch (error) {
-            if (requestId !== searchRequestId) {
-                return;
-            }
-
-            console.error(
-                'Ошибка поиска Internet Archive:',
-                error,
-            );
-
-            externalSearchError.value =
-                'Не удалось выполнить поиск музыки. Попробуй ещё раз.';
-
-            externalTracks.value = [];
-        } finally {
-            if (requestId === searchRequestId) {
-                externalSearchLoading.value = false;
-            }
-        }
+        return (
+            track.artists
+                .map((artist) => artist.name)
+                .filter(Boolean)
+                .join(', ') || 'Неизвестный исполнитель'
+        );
     }
 
-    watch(search, (value) => {
-        if (searchTimeout) {
-            clearTimeout(searchTimeout);
-        }
-
-        const query = value.trim();
+    const filteredTracks = computed(() => {
+        const query = search.value
+            .trim()
+            .toLocaleLowerCase();
 
         if (!query) {
-            searchRequestId++;
-
-            externalTracks.value = [];
-
-            externalSearchError.value = '';
-
-            externalSearchLoading.value = false;
-
-            return;
+            return tracks.value;
         }
 
-        searchTimeout = setTimeout(() => {
-            void performExternalSearch(query);
-        }, 400);
+        return tracks.value.filter((track) => {
+            const title = track.title
+                ?.toLocaleLowerCase() ?? '';
+
+            const artists = getTrackArtist(track)
+                .toLocaleLowerCase();
+
+            return (
+                title.includes(query) ||
+                artists.includes(query)
+            );
+        });
     });
+
+    watch(search, (value) => {
+        activeMenu.value = value.trim()
+            ? 'search'
+            : 'home';
+    });
+
+    // ========================================
+    // ЗАГРУЗКА ТРЕКОВ
+    // ========================================
+
+    async function loadTracks(): Promise<void> {
+        tracksLoading.value = true;
+        tracksError.value = '';
+
+        try {
+            const response = await getTracks();
+
+            tracks.value = response.data ?? [];
+
+            // Передаём весь каталог в глобальный плеер.
+            player.setQueue(tracks.value);
+
+            console.log(
+                '[Home] Загружено треков:',
+                tracks.value.length,
+            );
+        } catch (error) {
+            console.error('[Home] Ошибка загрузки треков:', error);
+
+            tracksError.value = 'Не удалось загрузить треки';
+            tracks.value = [];
+        } finally {
+            tracksLoading.value = false;
+        }
+    }
 
     // ========================================
     // ИЗБРАННОЕ
@@ -229,8 +242,8 @@ export function useHome() {
             }
 
             if (
-                !currentTrack.value ||
-                String(currentTrack.value.id) !== String(track.id)
+                String(player.currentTrack?.id) !==
+                String(track.id)
             ) {
                 return;
             }
@@ -258,10 +271,6 @@ export function useHome() {
         }
 
         if (typeof track.id !== 'number') {
-            console.info(
-                'Избранное доступно для треков из каталога SkyFi.',
-            );
-
             return;
         }
 
@@ -287,8 +296,8 @@ export function useHome() {
             }
 
             if (
-                currentTrack.value &&
-                String(currentTrack.value.id) === String(trackId)
+                String(player.currentTrack?.id) ===
+                String(trackId)
             ) {
                 liked.value = !wasLiked;
             }
@@ -299,94 +308,6 @@ export function useHome() {
             );
         } finally {
             favoriteLoading.value = false;
-        }
-    }
-
-    // ========================================
-    // ОБРАБОТЧИКИ АУДИО
-    // ========================================
-
-    function handleTimeUpdate(): void {
-        if (isSeeking.value) {
-            return;
-        }
-
-        if (!Number.isFinite(audio.currentTime)) {
-            return;
-        }
-
-        progress.value = audio.currentTime;
-    }
-
-    function handleLoadedMetadata(): void {
-        audioDuration.value =
-            Number.isFinite(audio.duration) && audio.duration > 0
-                ? audio.duration
-                : 0;
-
-        if (!isSeeking.value) {
-            progress.value = audio.currentTime || 0;
-        }
-    }
-
-    function handleDurationChange(): void {
-        audioDuration.value =
-            Number.isFinite(audio.duration) && audio.duration > 0
-                ? audio.duration
-                : 0;
-    }
-
-    function handlePlay(): void {
-        isPlaying.value = true;
-    }
-
-    function handlePause(): void {
-        isPlaying.value = false;
-    }
-
-    function handleEnded(): void {
-        isPlaying.value = false;
-        progress.value = audioDuration.value;
-    }
-
-    function handleAudioError(): void {
-        isPlaying.value = false;
-
-        console.error(
-            'Не удалось загрузить или воспроизвести аудиофайл.',
-        );
-    }
-
-    // ========================================
-    // ЗАГРУЗКА ТРЕКОВ
-    // ========================================
-
-    async function loadTracks(): Promise<void> {
-        tracksLoading.value = true;
-
-        tracksError.value = '';
-
-        try {
-            const response = await getTracks();
-
-            tracks.value = response.data ?? [];
-
-            console.log(
-                'Загруженные треки SkyFi:',
-                tracks.value,
-            );
-        } catch (error) {
-            console.error(
-                'Ошибка загрузки треков:',
-                error,
-            );
-
-            tracksError.value =
-                'Не удалось загрузить треки. Проверь подключение и попробуй ещё раз.';
-
-            tracks.value = [];
-        } finally {
-            tracksLoading.value = false;
         }
     }
 
@@ -484,102 +405,7 @@ export function useHome() {
     }
 
     // ========================================
-    // ВОСПРОИЗВЕДЕНИЕ АУДИО
-    // ========================================
-
-    async function playAudio(url: string): Promise<void> {
-        if (!url) {
-            console.warn(
-                'Не указана ссылка на аудиофайл.',
-            );
-
-            return;
-        }
-
-        audio.pause();
-
-        isSeeking.value = false;
-
-        seekPosition.value = 0;
-
-        progress.value = 0;
-
-        audioDuration.value = 0;
-
-        audio.src = url;
-
-        audio.volume = volume.value / 100;
-
-        try {
-            await audio.play();
-        } catch (error) {
-            isPlaying.value = false;
-
-            console.error(
-                'Ошибка воспроизведения:',
-                error,
-            );
-        }
-    }
-
-    // async function playExternalTrack(
-    //     track: ExternalTrack,
-    // ): Promise<void> {
-    //     const trackId = track.id;
-    //
-    //     favoriteRequestId++;
-    //
-    //     liked.value = false;
-    //
-    //     currentTrack.value = {
-    //         id: trackId,
-    //         title: track.title,
-    //         artist: track.artist || 'Неизвестный исполнитель',
-    //         archiveIdentifier: track.id,
-    //         cover: 'cover-purple',
-    //         symbol: '♫',
-    //     };
-    //
-    //     progress.value = 0;
-    //
-    //     seekPosition.value = 0;
-    //
-    //     audioDuration.value = 0;
-    //
-    //     isSeeking.value = false;
-    //
-    //     try {
-    //         const audioFile = await getTrackAudio(track.id);
-    //
-    //         if (
-    //             String(currentTrack.value?.id) !== String(trackId)
-    //         ) {
-    //             return;
-    //         }
-    //
-    //         if (!audioFile?.url) {
-    //             throw new Error(
-    //                 'Сервер не вернул ссылку на аудиофайл.',
-    //             );
-    //         }
-    //
-    //         await playAudio(audioFile.url);
-    //     } catch (error) {
-    //         console.error(
-    //             'Ошибка воспроизведения трека Internet Archive:',
-    //             error,
-    //         );
-    //
-    //         if (
-    //             String(currentTrack.value?.id) === String(trackId)
-    //         ) {
-    //             isPlaying.value = false;
-    //         }
-    //     }
-    // }
-
-    // ========================================
-    // ВОСПРОИЗВЕДЕНИЕ ТРЕКОВ SKYFI
+    // ВОСПРОИЗВЕДЕНИЕ
     // ========================================
 
     async function playTrack(track: ApiTrack): Promise<void> {
@@ -587,7 +413,7 @@ export function useHome() {
             await player.playTrack(track);
         } catch (error) {
             console.error(
-                'Ошибка воспроизведения трека SkyFi:',
+                'Ошибка воспроизведения трека:',
                 error,
             );
         }
@@ -598,32 +424,51 @@ export function useHome() {
     // ========================================
 
     async function togglePlay(): Promise<void> {
-        if (!currentTrack.value) {
-            // if (
-            //     search.value.trim() &&
-            //     externalTracks.value.length > 0
-            // ) {
-            //     await playExternalTrack(
-            //         externalTracks.value[0],
-            //     );
-            // } else if (tracks.value.length > 0) {
-                await playTrack(tracks.value[0]);
-            // }
+        try {
+            if (!player.currentTrack) {
+                const firstTrack = filteredTracks.value[0];
 
-            return;
-        }
+                if (!firstTrack) {
+                    return;
+                }
 
-        if (audio.paused) {
-            try {
-                await audio.play();
-            } catch (error) {
-                console.error(
-                    'Ошибка продолжения воспроизведения:',
-                    error,
-                );
+                /*
+                 * playTrack устанавливает текущий трек
+                 * и запускает воспроизведение.
+                 */
+
+                await playTrack(firstTrack);
+
+                return;
             }
-        } else {
-            audio.pause();
+
+            await player.togglePlay();
+        } catch (error) {
+            console.error(
+                'Ошибка переключения воспроизведения:',
+                error,
+            );
+        }
+    }
+
+    // ========================================
+    // ПРЕДЫДУЩИЙ / СЛЕДУЮЩИЙ ТРЕК
+    // ========================================
+
+    async function nextTrack(
+        direction: number,
+    ): Promise<void> {
+        try {
+            if (direction > 0) {
+                await player.playNext();
+            } else if (direction < 0) {
+                await player.playPrevious();
+            }
+        } catch (error) {
+            console.error(
+                'Ошибка переключения трека:',
+                error,
+            );
         }
     }
 
@@ -638,91 +483,20 @@ export function useHome() {
             return;
         }
 
-        isSeeking.value = true;
-
         const value = Number(target.value);
 
-        seekPosition.value = Math.max(
-            0,
-            Math.min(value, audioDuration.value || 0),
-        );
+        if (!Number.isFinite(value)) {
+            return;
+        }
 
-        progress.value = seekPosition.value;
+        player.progress = Math.max(
+            0,
+            Math.min(value, player.audioDuration || 0),
+        );
     }
 
     function seekAudio(): void {
-        if (
-            !Number.isFinite(audio.duration) ||
-            audio.duration <= 0
-        ) {
-            isSeeking.value = false;
-
-            return;
-        }
-
-        const targetTime = Math.max(
-            0,
-            Math.min(progress.value, audio.duration),
-        );
-
-        audio.currentTime = targetTime;
-
-        progress.value = targetTime;
-
-        seekPosition.value = targetTime;
-
-        isSeeking.value = false;
-    }
-
-    // ========================================
-    // ПРЕДЫДУЩИЙ / СЛЕДУЮЩИЙ ТРЕК
-    // ========================================
-
-    async function nextTrack(
-        direction: number,
-    ): Promise<void> {
-        const playlist: (ApiTrack | ExternalTrack)[] =
-            search.value.trim()
-                ? externalTracks.value
-                : tracks.value;
-
-        if (playlist.length === 0) {
-            return;
-        }
-
-        const currentIndex = playlist.findIndex(
-            (track) =>
-                String(track.id) ===
-                String(currentTrack.value?.id),
-        );
-
-        let nextIndex: number;
-
-        if (currentIndex === -1) {
-            nextIndex =
-                direction > 0
-                    ? 0
-                    : playlist.length - 1;
-        } else {
-            nextIndex =
-                (
-                    currentIndex +
-                    direction +
-                    playlist.length
-                ) % playlist.length;
-        }
-
-        const next = playlist[nextIndex];
-
-        if (!next) {
-            return;
-        }
-
-        // if ('source' in next) {
-        //     await playExternalTrack(next as ExternalTrack);
-        // } else {
-            await playTrack(next as ApiTrack);
-        // }
+        player.seekAudio(player.progress);
     }
 
     // ========================================
@@ -744,46 +518,41 @@ export function useHome() {
     }
 
     // ========================================
+    // СИНХРОНИЗАЦИЯ ИЗБРАННОГО
+    // ========================================
+
+    watch(
+        () => player.currentTrack?.id,
+        async (trackId) => {
+            if (trackId == null) {
+                liked.value = false;
+
+                favoriteRequestId++;
+
+                return;
+            }
+
+            const track = tracks.value.find(
+                (item) =>
+                    String(item.id) === String(trackId),
+            );
+
+            if (track) {
+                await updateFavoriteState(track);
+            } else {
+                liked.value = false;
+
+                favoriteRequestId++;
+            }
+        },
+    );
+
+    // ========================================
     // ИНИЦИАЛИЗАЦИЯ
     // ========================================
 
     onMounted(() => {
         void loadTracks();
-
-        audio.addEventListener(
-            'timeupdate',
-            handleTimeUpdate,
-        );
-
-        audio.addEventListener(
-            'loadedmetadata',
-            handleLoadedMetadata,
-        );
-
-        audio.addEventListener(
-            'durationchange',
-            handleDurationChange,
-        );
-
-        audio.addEventListener(
-            'play',
-            handlePlay,
-        );
-
-        audio.addEventListener(
-            'pause',
-            handlePause,
-        );
-
-        audio.addEventListener(
-            'ended',
-            handleEnded,
-        );
-
-        audio.addEventListener(
-            'error',
-            handleAudioError,
-        );
 
         document.addEventListener(
             'click',
@@ -801,12 +570,6 @@ export function useHome() {
     // ========================================
 
     onBeforeUnmount(() => {
-        if (searchTimeout) {
-            clearTimeout(searchTimeout);
-        }
-
-        searchRequestId++;
-
         favoriteRequestId++;
 
         document.removeEventListener(
@@ -819,66 +582,31 @@ export function useHome() {
             handleEscape,
         );
 
-        audio.removeEventListener(
-            'timeupdate',
-            handleTimeUpdate,
-        );
-
-        audio.removeEventListener(
-            'loadedmetadata',
-            handleLoadedMetadata,
-        );
-
-        audio.removeEventListener(
-            'durationchange',
-            handleDurationChange,
-        );
-
-        audio.removeEventListener(
-            'play',
-            handlePlay,
-        );
-
-        audio.removeEventListener(
-            'pause',
-            handlePause,
-        );
-
-        audio.removeEventListener(
-            'ended',
-            handleEnded,
-        );
-
-        audio.removeEventListener(
-            'error',
-            handleAudioError,
-        );
-
-        audio.pause();
-
-        audio.removeAttribute('src');
-
-        audio.load();
+        /*
+         * Не останавливаем глобальный плеер:
+         * музыка должна продолжать играть при переходах
+         * между страницами приложения.
+         */
     });
 
     // ========================================
-    // ЭКСПОРТ ДАННЫХ ДЛЯ ШАБЛОНА
+    // ЭКСПОРТ ДЛЯ ШАБЛОНА
     // ========================================
 
     return {
         // Авторизация
         auth,
 
-        // Плеер и состояние
+        // Плеер
         currentTrack,
         isPlaying,
+        isLoading,
         liked,
         favoriteLoading,
         progress,
         audioDuration,
-        isSeeking,
-        seekPosition,
         volume,
+        progressPercent,
 
         // Меню
         menu,
@@ -888,23 +616,17 @@ export function useHome() {
         search,
         filteredTracks,
 
-        // Локальные треки
+        // Каталог
         tracks,
         tracksLoading,
         tracksError,
-
-        // Внешние треки
-        externalTracks,
-        externalSearchLoading,
-        externalSearchError,
 
         // Профиль
         profileMenuOpen,
         loggingOut,
         logoutError,
 
-        // Поиск и загрузка
-        performExternalSearch,
+        // Загрузка
         loadTracks,
 
         // Избранное
@@ -917,14 +639,12 @@ export function useHome() {
         openLibrary,
         logout,
 
-        // Аудио
-        playAudio,
-        // playExternalTrack,
+        // Управление плеером
         playTrack,
         togglePlay,
+        nextTrack,
         onSeekInput,
         seekAudio,
-        nextTrack,
 
         // Форматирование
         formatTime,

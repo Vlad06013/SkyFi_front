@@ -28,7 +28,8 @@ import {
     type Track,
 } from '@/api/tracks';
 
-import { usePlayerStore } from '@/stores/player';
+import usePlayerStore from '@/stores/player';
+import { uploadTrack as uploadTrackApi } from '@/api/uploads';
 
 // ============================================
 // ТИПЫ
@@ -85,31 +86,28 @@ export function useLibrary() {
         return currentTrackId.value === track.id;
     }
 
-    async function playTrack(track: Track): Promise<void> {
-        const playerStore = player as unknown as {
-            playTrack?: (track: Track) => void | Promise<void>;
-            setCurrentTrack?: (track: Track) => void | Promise<void>;
-        };
+    async function playTrack(track: ApiTrack): Promise<void> {
+        if (!track) {
+            return;
+        }
 
         try {
-            if (typeof playerStore.playTrack === 'function') {
-                await playerStore.playTrack(track);
-                return;
-            }
+            // Передаём в плеер весь список треков библиотеки.
+            player.setQueue(tracks.value);
 
-            if (typeof playerStore.setCurrentTrack === 'function') {
-                await playerStore.setCurrentTrack(track);
-                return;
-            }
-
-            console.warn(
-                'Не найден метод воспроизведения в stores/player.ts.',
+            // Запускаем выбранный трек.
+            await player.playTrack(track);
+        } catch (error) {
+            console.error(
+                'Ошибка воспроизведения трека:',
+                error,
             );
-        } catch (err) {
-            console.error('Ошибка воспроизведения трека:', err);
         }
     }
 
+    async function playTrackFromList(track: ApiTrack): Promise<void> {
+        await playTrack(track);
+    }
     // ============================================
     // БИБЛИОТЕКА
     // ============================================
@@ -371,8 +369,8 @@ export function useLibrary() {
     }
 
     // ============================================
-    // ОТПРАВКА МУЗЫКИ НА СЕРВЕР
-    // ============================================
+// ОТПРАВКА МУЗЫКИ НА СЕРВЕР
+// ============================================
 
     async function uploadTrack(): Promise<void> {
         if (uploading.value) {
@@ -383,6 +381,10 @@ export function useLibrary() {
         uploadError.value = '';
 
         clearFieldErrors();
+
+        // ========================================
+        // ВАЛИДАЦИЯ ФОРМЫ
+        // ========================================
 
         if (!uploadForm.title.trim()) {
             fieldErrors.title = 'Укажи название трека.';
@@ -398,42 +400,46 @@ export function useLibrary() {
 
         if (!selectedFile.value) {
             fieldErrors.audio = 'Выбери аудиофайл.';
+        } else if (selectedFile.value.size === 0) {
+            fieldErrors.audio = 'Выбранный аудиофайл пуст.';
         }
 
         if (Object.keys(fieldErrors).length > 0) {
             return;
         }
 
-        const formData = new FormData();
+        // После проверки файл гарантированно выбран.
+        const audioFile = selectedFile.value;
 
-        formData.append('title', uploadForm.title.trim());
-        formData.append('artist_name', uploadForm.artist_name.trim());
-        formData.append('genre_name', uploadForm.genre_name.trim());
-
-        if (uploadForm.album_title.trim()) {
-            formData.append('album_title', uploadForm.album_title.trim());
+        if (!audioFile) {
+            return;
         }
-
-        if (uploadForm.description.trim()) {
-            formData.append('description', uploadForm.description.trim());
-        }
-
-        formData.append('audio', selectedFile.value!);
 
         uploading.value = true;
 
         try {
-            const response = await http.post<UploadResponse>(
-                '/tracks/upload',
-                formData,
-                {
-                    timeout: 120000,
-                },
-            );
+            // ========================================
+            // ЗАГРУЗКА ЧЕРЕЗ API-МОДУЛЬ
+            // ========================================
 
-            const uploadedTrack =
-                response.data?.data ??
-                response.data?.track;
+            console.log('Отправка аудиофайла:', {
+                name: audioFile.name,
+                size: audioFile.size,
+                type: audioFile.type,
+            });
+
+            const response = await uploadTrackApi({
+                title: uploadForm.title.trim(),
+                artist_name: uploadForm.artist_name.trim(),
+                genre_name: uploadForm.genre_name.trim(),
+                album_title: uploadForm.album_title.trim() || undefined,
+                description: uploadForm.description.trim() || undefined,
+                audio: audioFile,
+            });
+
+            const uploadedTrack = response.data;
+
+            console.log('Трек успешно загружен:', uploadedTrack);
 
             uploadSuccess.value = true;
 
@@ -442,12 +448,6 @@ export function useLibrary() {
             await loadLibrary();
 
             activeTab.value = 'upload';
-
-            if (!uploadedTrack) {
-                console.info(
-                    'Трек загружен. Сервер не вернул объект созданного трека.',
-                );
-            }
         } catch (err: unknown) {
             console.error('Ошибка загрузки трека:', err);
 
@@ -488,6 +488,8 @@ export function useLibrary() {
                         response.data?.message ||
                         'Сервер не смог обработать загрузку. Попробуй ещё раз.';
                 }
+            } else if (err instanceof Error) {
+                uploadError.value = err.message;
             } else {
                 uploadError.value =
                     'Произошла непредвиденная ошибка. Попробуй ещё раз.';
@@ -496,6 +498,7 @@ export function useLibrary() {
             uploading.value = false;
         }
     }
+
 
     // ============================================
     // АЛЬБОМЫ
@@ -673,6 +676,8 @@ export function useLibrary() {
         isCurrentTrack,
         playerIsPlaying,
         playTrack,
+        playTrackFromList,
+
         playAlbum,
         playArtist,
 

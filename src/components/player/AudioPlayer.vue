@@ -1,5 +1,6 @@
 <template>
   <footer class="player">
+    <!-- Информация о текущем треке -->
     <div class="now-playing">
       <div
           v-if="player.currentTrack"
@@ -34,34 +35,75 @@
           !player.currentTrack ||
           typeof player.currentTrack.id !== 'number'
         "
-          aria-label="Избранное"
+          :aria-label="
+          player.liked
+            ? 'Убрать из избранного'
+            : 'Добавить в избранное'
+        "
+          :aria-pressed="player.liked"
+          type="button"
+          @click="player.toggleFavorite()"
       >
         {{ player.liked ? '♥' : '♡' }}
       </button>
     </div>
 
+    <!-- Центральное управление -->
     <div class="player-center">
       <div class="player-controls">
-        <button aria-label="Предыдущий трек" disabled>
+        <!-- Предыдущий трек -->
+        <button
+            type="button"
+            aria-label="Предыдущий трек"
+            :disabled="
+            player.isLoading ||
+            !player.currentTrack ||
+            player.currentTrackIndex < 0
+          "
+            @click="player.playPrevious()"
+        >
           |◀
         </button>
 
+        <!-- Play / Pause -->
         <button
             class="play-button"
+            type="button"
             :disabled="player.isLoading || !player.currentTrack"
             :aria-label="player.isPlaying ? 'Пауза' : 'Воспроизвести'"
+            :title="player.isPlaying ? 'Пауза' : 'Воспроизвести'"
             @click="player.togglePlay()"
         >
-          {{ player.isLoading ? '…' : player.isPlaying ? 'Ⅱ' : '▶' }}
+          {{
+            player.isLoading
+                ? '…'
+                : player.isPlaying
+                    ? 'Ⅱ'
+                    : '▶'
+          }}
         </button>
 
-        <button aria-label="Следующий трек" disabled>
+        <!-- Следующий трек -->
+        <button
+            type="button"
+            aria-label="Следующий трек"
+            :disabled="
+            player.isLoading ||
+            !player.currentTrack ||
+            player.currentTrackIndex < 0 ||
+            player.currentTrackIndex >= player.queue.length - 1
+          "
+            @click="player.playNext()"
+        >
           ▶|
         </button>
       </div>
 
+      <!-- Прогресс воспроизведения -->
       <div class="progress-row">
-        <span>{{ player.formatTime(player.progress) }}</span>
+        <span>
+          {{ player.formatTime(player.progress) }}
+        </span>
 
         <input
             v-model.number="player.progress"
@@ -74,16 +116,26 @@
             '--range-progress': `${player.progressPercent}%`,
           }"
             aria-label="Позиция воспроизведения"
+            :disabled="
+            !player.currentTrack ||
+            player.audioDuration <= 0 ||
+            player.isLoading
+          "
             @pointerdown="player.isSeeking = true"
+            @pointerup="player.seekAudio(player.progress)"
+            @pointercancel="player.seekAudio(player.progress)"
             @change="player.seekAudio(player.progress)"
         />
 
-        <span>{{ player.formatTime(player.audioDuration) }}</span>
+        <span>
+          {{ player.formatTime(player.audioDuration) }}
+        </span>
       </div>
     </div>
 
+    <!-- Громкость -->
     <div class="player-right">
-      <span>♫</span>
+      <span aria-hidden="true">♫</span>
 
       <input
           v-model.number="player.volume"
@@ -101,49 +153,80 @@
 </template>
 
 <script setup lang="ts">
-import { usePlayerStore } from '@/stores/player';
+import usePlayerStore from '@/stores/player';
 
 const player = usePlayerStore();
 </script>
 
 <style scoped>
-/* =========================
+/* ========================================
    НИЖНИЙ АУДИОПЛЕЕР
-========================= */
+======================================== */
 
 .player {
   position: fixed;
-  inset: auto 0 0;
-  z-index: 20;
+
+  /*
+   * Боковая навигация занимает 236px.
+   * Плеер начинается справа от неё.
+   */
+  left: 236px;
+  right: 0;
+  bottom: 0;
+
+  z-index: 900;
+
   min-height: 91px;
+  box-sizing: border-box;
+
   display: grid;
-  grid-template-columns: 1fr 1.1fr 1fr;
+  grid-template-columns:
+    minmax(0, 1fr)
+    minmax(0, 1.1fr)
+    minmax(0, 1fr);
+
   align-items: center;
   gap: 20px;
+
   padding: 13px 27px;
+
   border-top: 1px solid #ffffff12;
+
   background: rgba(17, 18, 27, 0.97);
   backdrop-filter: blur(20px);
 }
 
-/* Информация о текущем треке */
+/* ========================================
+   ТЕКУЩИЙ ТРЕК
+======================================== */
 
 .now-playing {
   display: flex;
   align-items: center;
   gap: 11px;
+
   min-width: 0;
 }
 
 .mini-cover {
-  width: 49px;
-  height: 49px;
   display: grid;
   place-items: center;
+
   flex-shrink: 0;
+
+  width: 49px;
+  height: 49px;
+
   border-radius: 8px;
+
   color: white;
   font-size: 22px;
+
+  background: linear-gradient(
+      135deg,
+      #7658bc,
+      #32244e
+  );
 }
 
 .mini-empty {
@@ -151,12 +234,14 @@ const player = usePlayerStore();
 }
 
 .now-info {
+  flex: 1;
   min-width: 0;
 }
 
 .now-info strong,
 .now-info span {
   display: block;
+
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -169,29 +254,50 @@ const player = usePlayerStore();
 
 .now-info span {
   margin-top: 6px;
+
   color: #85899c;
   font-size: 10px;
 }
 
-/* Кнопка избранного */
+/* ========================================
+   ИЗБРАННОЕ
+======================================== */
 
 .heart-button {
+  flex-shrink: 0;
+
   border: 0;
+  padding: 4px;
+
   background: transparent;
+
   color: #9295a8;
+
   cursor: pointer;
   font-size: 22px;
+
+  transition:
+      color 0.2s,
+      transform 0.2s;
 }
 
-.heart-button:hover {
+.heart-button:hover:not(:disabled) {
   color: #d5c5ff;
+  transform: scale(1.1);
 }
 
 .heart-button.liked {
   color: #e88bae;
 }
 
-/* Центральная область */
+.heart-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ========================================
+   ЦЕНТРАЛЬНОЕ УПРАВЛЕНИЕ
+======================================== */
 
 .player-center {
   min-width: 0;
@@ -202,56 +308,103 @@ const player = usePlayerStore();
   align-items: center;
   justify-content: center;
   gap: 21px;
+
   margin-bottom: 9px;
 }
 
 .player-controls button {
+  display: grid;
+  place-items: center;
+
+  min-width: 24px;
+  min-height: 28px;
+
   border: 0;
+  padding: 0;
+
   background: transparent;
+
   color: #9295a8;
+
   cursor: pointer;
   font-size: 13px;
-  transition: color 0.2s;
+
+  transition:
+      color 0.2s,
+      transform 0.2s,
+      opacity 0.2s;
 }
 
-.player-controls button:hover {
+.player-controls button:hover:not(:disabled) {
   color: #d0c2ff;
+  transform: scale(1.08);
 }
+
+.player-controls button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Кнопка воспроизведения */
 
 .player-controls .play-button {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
+
+  min-width: 34px;
+  min-height: 34px;
+
   border-radius: 50%;
+
   background: #b8a2ff;
   color: #1b1428;
+
   font-size: 13px;
+
+  transition:
+      background 0.2s,
+      transform 0.2s;
 }
 
-.player-controls .play-button:hover {
+.player-controls .play-button:hover:not(:disabled) {
   background: #c9baff;
   color: #1b1428;
+
+  transform: scale(1.06);
 }
 
-/* Прогресс воспроизведения */
+.player-controls .play-button:disabled {
+  opacity: 0.5;
+}
+
+/* ========================================
+   ПРОГРЕСС
+======================================== */
 
 .progress-row {
   display: flex;
   align-items: center;
   gap: 10px;
+
   width: 100%;
+  min-width: 0;
 }
 
 .progress-row > span {
   flex-shrink: 0;
+
   min-width: 35px;
-  font-size: 11px;
+
   color: #9292a8;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
 .progress-row > span:last-child {
   text-align: right;
 }
+
+/* Общий стиль ползунков */
 
 .progress,
 .player-right input {
@@ -261,6 +414,7 @@ const player = usePlayerStore();
   -webkit-appearance: none;
 
   display: block;
+
   min-width: 0;
   width: 100%;
   height: 5px;
@@ -283,7 +437,12 @@ const player = usePlayerStore();
   cursor: pointer;
 }
 
-/* Ползунок: Chrome, Safari, Edge */
+.progress:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Chrome, Safari, Edge */
 
 .progress::-webkit-slider-thumb,
 .player-right input::-webkit-slider-thumb {
@@ -308,7 +467,7 @@ const player = usePlayerStore();
   transform: scale(1.15);
 }
 
-/* Ползунок: Firefox */
+/* Firefox */
 
 .progress::-moz-range-thumb,
 .player-right input::-moz-range-thumb {
@@ -334,26 +493,35 @@ const player = usePlayerStore();
 .progress::-moz-range-track,
 .player-right input::-moz-range-track {
   height: 5px;
+
   border: none;
   border-radius: 999px;
+
   background: transparent;
 }
 
-/* Фокус с клавиатуры */
+/* Фокус клавиатуры */
 
 .progress:focus-visible,
-.player-right input:focus-visible {
+.player-right input:focus-visible,
+.player-controls button:focus-visible,
+.heart-button:focus-visible {
   outline: 2px solid #a78bfa80;
   outline-offset: 5px;
 }
 
-/* Громкость */
+/* ========================================
+   ГРОМКОСТЬ
+======================================== */
 
 .player-right {
   display: flex;
   align-items: center;
   justify-content: end;
   gap: 12px;
+
+  min-width: 0;
+
   color: #9a9caf;
 }
 
@@ -364,18 +532,23 @@ const player = usePlayerStore();
 .player-right input {
   width: 110px;
   max-width: 100%;
+
   flex: 0 1 110px;
 }
 
-/* =========================
-   АДАПТИВНОСТЬ ПЛЕЕРА
-========================= */
+/* ========================================
+   ПЛАНШЕТЫ
+======================================== */
 
-/* Планшеты */
-
-@media (max-width: 1050px) {
+@media (max-width: 1050px) and (min-width: 701px) {
   .player {
-    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    padding-right: 18px;
+    padding-left: 18px;
+
+    grid-template-columns:
+      minmax(0, 1fr)
+      minmax(0, 1fr);
   }
 
   .player-right {
@@ -383,20 +556,46 @@ const player = usePlayerStore();
   }
 }
 
-/* Мобильные устройства */
+/* ========================================
+   МОБИЛЬНЫЕ УСТРОЙСТВА
+======================================== */
 
-@media (max-width: 650px) {
+@media (max-width: 700px) {
   .player {
-    bottom: 61px;
+    /*
+     * На телефоне боковая навигация скрыта,
+     * нижняя навигация занимает 72px.
+     */
+    left: 0;
+    right: 0;
+    bottom: 72px;
+
     min-height: 73px;
-    grid-template-columns: minmax(0, 1fr) auto;
+
+    grid-template-columns:
+      minmax(0, 1fr)
+      auto;
+
     gap: 8px;
+
     padding: 10px 14px;
   }
 
   .mini-cover {
     width: 42px;
     height: 42px;
+  }
+
+  .now-playing {
+    gap: 8px;
+  }
+
+  .now-info strong {
+    font-size: 11px;
+  }
+
+  .now-info span {
+    font-size: 9px;
   }
 
   .heart-button {
@@ -410,16 +609,69 @@ const player = usePlayerStore();
   }
 
   .player-controls {
-    margin: 0;
     gap: 12px;
+    margin: 0;
   }
 
-  .player-controls button:first-child {
-    display: none;
+  .player-controls button {
+    font-size: 12px;
+  }
+
+  .player-controls .play-button {
+    width: 34px;
+    height: 34px;
+
+    min-width: 34px;
+    min-height: 34px;
   }
 
   .progress-row {
     display: none;
+  }
+
+  .player-right {
+    display: none;
+  }
+}
+
+/* ========================================
+   ОЧЕНЬ УЗКИЕ ЭКРАНЫ
+======================================== */
+
+@media (max-width: 380px) {
+  .player {
+    padding-right: 9px;
+    padding-left: 9px;
+    gap: 5px;
+  }
+
+  .mini-cover {
+    width: 36px;
+    height: 36px;
+  }
+
+  .player-controls {
+    gap: 7px;
+  }
+
+  .player-controls .play-button {
+    width: 30px;
+    height: 30px;
+
+    min-width: 30px;
+    min-height: 30px;
+  }
+}
+
+/* ========================================
+   ДОСТУПНОСТЬ
+======================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .player *,
+  .player *::before,
+  .player *::after {
+    transition-duration: 0.01ms !important;
   }
 }
 </style>
