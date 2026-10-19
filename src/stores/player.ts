@@ -435,6 +435,7 @@ const usePlayerStore = defineStore('player', () => {
             return;
         }
 
+        // Если трек ещё не выбран, запускаем первый из очереди.
         if (!currentTrack.value) {
             const firstTrack = queue.value[0];
 
@@ -445,12 +446,27 @@ const usePlayerStore = defineStore('player', () => {
             return;
         }
 
+        // Если источник аудио отсутствует, повторно получаем ссылку
+        // через API и запускаем воспроизведение.
+        if (!audio.src || audio.src === window.location.href) {
+            const track = queue.value.find(
+                (item) =>
+                    String(item.id) === String(currentTrack.value?.id),
+            );
+
+            if (track) {
+                await playTrack(track);
+            }
+
+            return;
+        }
+
         if (audio.paused) {
             try {
                 await audio.play();
             } catch (error) {
                 console.error(
-                    '[Player] Ошибка продолжения воспроизведения:',
+                    '[Player] Ошибка запуска воспроизведения:',
                     error,
                 );
 

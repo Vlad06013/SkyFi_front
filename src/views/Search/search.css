@@ -1,0 +1,742 @@
+.skyfi-content {
+    --background: #0b0d12;
+    color: #f5f7fa;
+}
+
+.search-layout {
+    width: 100%;
+    max-width: 1050px;
+    margin: 0 auto;
+    padding: 42px 36px 120px;
+    box-sizing: border-box;
+}
+
+.search-header {
+    margin-bottom: 28px;
+}
+
+.eyebrow {
+    color: #a78bfa;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+}
+
+h1 {
+    color: #f5f7fa;
+    font-size: clamp(30px, 5vw, 42px);
+    font-weight: 800;
+    letter-spacing: -1.5px;
+    margin: 0;
+}
+
+.subtitle {
+    color: #9296a7;
+    margin: 10px 0 0;
+    font-size: 14px;
+}
+
+/* =========================================
+   СТРОКА ПОИСКА
+========================================= */
+
+.search-box {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+
+    height: 60px;
+    padding: 0 19px;
+
+    background: #171a23;
+    border: 1px solid #292d3b;
+    border-radius: 17px;
+
+    transition: border-color 0.2s;
+}
+
+.search-box:focus-within {
+    border-color: #8b5cf6;
+}
+
+.search-box > ion-icon {
+    color: #a78bfa;
+    font-size: 22px;
+    flex-shrink: 0;
+}
+
+.search-box input {
+    flex: 1;
+    width: 0;
+
+    background: transparent;
+    color: #f5f7fa;
+
+    border: 0;
+    outline: none;
+
+    font-size: 15px;
+}
+
+.search-box input::placeholder {
+    color: #777c8d;
+}
+
+.clear-button,
+.row-play,
+.mini-play {
+    display: grid;
+    place-items: center;
+
+    border: 0;
+    cursor: pointer;
+}
+
+.clear-button {
+    background: transparent;
+    color: #a4a7b5;
+    font-size: 20px;
+}
+
+/* =========================================
+   ФИЛЬТРЫ
+========================================= */
+
+.filters {
+    display: flex;
+    gap: 9px;
+    flex-wrap: wrap;
+    margin: 22px 0 34px;
+}
+
+.filter {
+    padding: 10px 17px;
+
+    color: #a5a8b7;
+    background: #171a23;
+
+    border: 1px solid #292d3b;
+    border-radius: 12px;
+
+    font-size: 13px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition:
+            background 0.2s,
+            border-color 0.2s,
+            color 0.2s;
+}
+
+.filter:hover {
+    border-color: #8b5cf6;
+}
+
+.filter.active {
+    background: #8b5cf6;
+    border-color: #8b5cf6;
+    color: white;
+}
+
+/* =========================================
+   ЗАГОЛОВКИ СЕКЦИЙ
+========================================= */
+
+h2 {
+    color: #f5f7fa;
+    font-size: 19px;
+    font-weight: 750;
+    letter-spacing: -0.3px;
+    margin: 0 0 18px;
+}
+
+.section-heading {
+    margin-top: 38px;
+}
+
+/* =========================================
+   ПОПУЛЯРНЫЕ ЗАПРОСЫ
+========================================= */
+
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    background: #171a23;
+    border: 1px solid #292d3b;
+    border-radius: 12px;
+
+    padding: 12px 15px;
+
+    color: #d7d9e2;
+    cursor: pointer;
+
+    transition:
+            background 0.2s,
+            border-color 0.2s;
+}
+
+.chip:hover {
+    background: #202331;
+    border-color: #8b5cf6;
+}
+
+.chip ion-icon {
+    color: #a78bfa;
+}
+
+/* =========================================
+   ЖАНРЫ
+========================================= */
+
+.genre-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.genre-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    min-height: 105px;
+    padding: 20px;
+
+    border: 1px solid #ffffff12;
+    border-radius: 17px;
+
+    background: linear-gradient(
+            125deg,
+            var(--genre-color),
+            #171a23 115%
+    );
+
+    color: white;
+
+    font-size: 16px;
+    font-weight: 750;
+    text-align: left;
+
+    cursor: pointer;
+
+    transition:
+            transform 0.2s,
+            border-color 0.2s;
+}
+
+.genre-card:hover {
+    transform: translateY(-2px);
+    border-color: #ffffff35;
+}
+
+.genre-card ion-icon {
+    font-size: 27px;
+    opacity: 0.85;
+}
+
+/* =========================================
+   РЕЗУЛЬТАТЫ ПОИСКА
+========================================= */
+
+.results-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+
+.results-heading span {
+    color: #9296a7;
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.track-list {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.track-row {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    cursor: pointer;
+    min-width: 0;
+    padding: 11px;
+
+    border-radius: 14px;
+
+    transition: background 0.2s;
+}
+
+.track-row:hover {
+    background: #171a23;
+}
+.track-row-active {
+    background: #8b5cf61a;
+}
+.track-row-active .track-title {
+    color: #a78bfa;
+}
+.track-row:focus-visible {
+    outline: 2px solid #8b5cf6;
+    outline-offset: 2px;
+}
+/* =========================================
+   ОБЛОЖКИ ТРЕКОВ
+========================================= */
+
+.cover,
+.mini-cover {
+    position: relative;
+
+    display: grid;
+    place-items: center;
+
+    flex-shrink: 0;
+
+    background: linear-gradient(
+            140deg,
+            var(--cover-color),
+            #171a23
+    );
+
+    color: #ffffffc9;
+}
+
+.cover {
+    width: 62px;
+    height: 62px;
+
+    border-radius: 12px;
+
+    font-size: 27px;
+    overflow: hidden;
+}
+
+.cover-play {
+    position: absolute;
+    inset: 0;
+
+    display: grid;
+    place-items: center;
+
+    background: #08091080;
+    color: white;
+
+    border: 0;
+
+    font-size: 25px;
+
+    opacity: 0;
+    cursor: pointer;
+
+    transition: opacity 0.2s;
+}
+
+.track-row:hover .cover-play,
+.cover-play:focus-visible {
+    opacity: 1;
+}
+
+/* =========================================
+   ИНФОРМАЦИЯ О ТРЕКЕ
+========================================= */
+
+.track-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.track-title {
+    color: #f5f7fa;
+    font-size: 14px;
+    font-weight: 700;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.track-artist,
+.track-album {
+    display: block;
+
+    color: #9296a7;
+    font-size: 12px;
+
+    margin-top: 5px;
+}
+
+/* =========================================
+   КНОПКИ ТРЕКА
+========================================= */
+
+.track-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    flex-shrink: 0;
+}
+
+.favorite-button {
+    display: grid;
+    place-items: center;
+
+    width: 36px;
+    height: 36px;
+
+    border: 0;
+    border-radius: 50%;
+
+    background: transparent;
+    color: #9296a7;
+
+    font-size: 21px;
+
+    cursor: pointer;
+
+    transition:
+            background 0.2s,
+            color 0.2s;
+}
+
+.favorite-button:hover:not(:disabled) {
+    background: #8b5cf61a;
+    color: #d7c8ff;
+}
+
+.favorite-button.liked {
+    color: #e88bae;
+}
+
+.favorite-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.row-play {
+    width: 38px;
+    height: 38px;
+
+    border-radius: 50%;
+
+    color: #d7c8ff;
+    background: #8b5cf61a;
+
+    font-size: 20px;
+
+    flex-shrink: 0;
+
+    transition:
+            background 0.2s,
+            transform 0.2s;
+}
+
+.row-play:hover {
+    background: #8b5cf638;
+    transform: scale(1.05);
+}
+
+/* =========================================
+   ПУСТОЕ СОСТОЯНИЕ И ЗАГРУЗКА
+========================================= */
+
+.empty-state {
+    text-align: center;
+    padding: 45px 15px;
+}
+
+.empty-icon {
+    display: grid;
+    place-items: center;
+
+    width: 65px;
+    height: 65px;
+
+    margin: 0 auto 20px;
+
+    border-radius: 22px;
+
+    background: #8b5cf61a;
+    color: #a78bfa;
+
+    font-size: 28px;
+}
+
+.empty-state h3 {
+    color: #f5f7fa;
+    margin: 0 0 10px;
+}
+
+.empty-state p {
+    color: #9296a7;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.reset-button {
+    margin-top: 14px;
+
+    background: #8b5cf6;
+    border: 0;
+    border-radius: 12px;
+
+    padding: 12px 18px;
+
+    color: white;
+    font-weight: 650;
+
+    cursor: pointer;
+
+    transition: background 0.2s;
+}
+
+.reset-button:hover {
+    background: #9b76fa;
+}
+
+/* =========================================
+   ПРИМЕЧАНИЕ
+========================================= */
+
+.demo-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    color: #777c8d;
+    font-size: 12px;
+
+    margin-top: 35px;
+}
+
+.demo-note ion-icon {
+    font-size: 17px;
+    flex-shrink: 0;
+}
+
+/* =========================================
+   МИНИ-ПЛЕЕР
+========================================= */
+
+.mini-player {
+    position: fixed;
+    z-index: 20;
+
+    left: 50%;
+    bottom: 16px;
+
+    transform: translateX(-50%);
+
+    width: min(600px, calc(100% - 32px));
+    box-sizing: border-box;
+
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    padding: 11px 14px;
+
+    border: 1px solid #343043;
+    border-radius: 17px;
+
+    background: #171722f5;
+    backdrop-filter: blur(20px);
+
+    box-shadow: 0 12px 40px #0006;
+}
+
+.mini-cover {
+    width: 43px;
+    height: 43px;
+
+    border-radius: 10px;
+
+    font-size: 21px;
+}
+
+.mini-info {
+    flex: 1;
+    min-width: 0;
+
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.mini-info strong,
+.mini-info span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mini-info strong {
+    color: #f5f7fa;
+    font-size: 13px;
+}
+
+.mini-info span {
+    color: #9296a7;
+    font-size: 11px;
+}
+
+.mini-play {
+    width: 40px;
+    height: 40px;
+
+    border-radius: 50%;
+
+    background: #8b5cf6;
+    color: white;
+
+    font-size: 23px;
+
+    flex-shrink: 0;
+
+    transition: background 0.2s;
+}
+
+.mini-play:hover {
+    background: #9b76fa;
+}
+
+/* =========================================
+   АДАПТАЦИЯ ДЛЯ ПЛАНШЕТОВ И ТЕЛЕФОНОВ
+========================================= */
+
+@media (max-width: 650px) {
+    .search-layout {
+        max-width: 100%;
+        margin-left: 0;
+        padding: 30px 18px 120px;
+    }
+
+    .genre-grid {
+        gap: 10px;
+    }
+
+    .genre-card {
+        min-height: 90px;
+        padding: 14px;
+        font-size: 14px;
+    }
+
+    .search-box {
+        height: 55px;
+        padding: 0 14px;
+    }
+
+    .cover {
+        width: 54px;
+        height: 54px;
+    }
+
+    .track-row {
+        gap: 10px;
+        padding: 9px 5px;
+    }
+
+    .track-actions {
+        gap: 2px;
+    }
+
+    .favorite-button {
+        width: 32px;
+        height: 32px;
+    }
+
+    .row-play {
+        width: 34px;
+        height: 34px;
+    }
+
+    .track-title {
+        font-size: 13px;
+    }
+
+    .track-artist,
+    .track-album {
+        font-size: 11px;
+    }
+}
+
+/* =========================================
+   УЧЁТ БОКОВОЙ НАВИГАЦИИ
+========================================= */
+
+@media (min-width: 701px) {
+    .search-layout {
+        margin-left: 236px;
+        width: calc(100% - 236px);
+        max-width: none;
+    }
+}
+
+/* =========================================
+   МОБИЛЬНАЯ НАВИГАЦИЯ
+========================================= */
+
+@media (max-width: 700px) {
+    .search-layout {
+        width: 100%;
+        margin-left: 0;
+        max-width: 100%;
+        padding: 30px 18px 140px;
+    }
+
+    .mini-player {
+        bottom: 82px;
+        width: calc(100% - 24px);
+    }
+}
+
+/* =========================================
+   УЗКИЕ ЭКРАНЫ
+========================================= */
+
+@media (max-width: 380px) {
+    .search-layout {
+        padding-right: 12px;
+        padding-left: 12px;
+    }
+
+    .track-row {
+        gap: 8px;
+    }
+
+    .cover {
+        width: 46px;
+        height: 46px;
+        font-size: 22px;
+    }
+
+    .track-actions {
+        gap: 0;
+    }
+
+    .favorite-button {
+        width: 28px;
+        height: 32px;
+        font-size: 18px;
+    }
+
+    .row-play {
+        width: 30px;
+        height: 30px;
+        font-size: 17px;
+    }
+}

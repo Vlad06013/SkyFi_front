@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from '@ionic/vue-router';
 import { RouteRecordRaw } from 'vue-router';
 import HomePage from '../views/Home/HomePage.vue'
-import SearchPage from '@/views/SearchPage.vue';
+import SearchPage from '@/views/Search/SearchPage.vue';
 import LibraryPage from '@/views/Library/LibraryPage.vue';
 import PlaylistsPage from '@/views/PlaylistsPage.vue';
 import LoginPage from '@/views/LoginPage.vue';

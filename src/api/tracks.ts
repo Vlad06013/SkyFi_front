@@ -1,5 +1,9 @@
 import { http } from '@/api/http';
 
+// ============================================
+// ТИПЫ
+// ============================================
+
 export interface Artist {
     id: number;
     name: string;
@@ -14,11 +18,25 @@ export interface Track {
     id: number;
     title: string;
     description: string | null;
-    artists: Artist[];
-    album: Album | null;
-    duration_seconds: number | null;
+
+    uploaded_by: number | null;
+
+    source_type: string;
+    source_id: string | null;
+
+    status: string;
+    rights_confirmed_at: string | null;
+
+    artists?: Artist[];
+    album?: Album | null;
+    album_id: number | null;
+    duration_seconds?: number | null;
+
     play_count: number;
+
     created_at: string;
+    updated_at: string;
+    deleted_at: string | null;
 }
 
 export interface TracksResponse {
@@ -31,20 +49,17 @@ export interface TracksResponse {
     };
 }
 
-export interface ExternalTrack {
-    id: number;
-    title: string;
-    artist: string;
-    description: string | null;
-    year: number | null;
-    license_url: string | null;
-    downloads: number;
-    source: string;
-    url: string;
-}
-
-export interface ExternalSearchResponse {
-    data: ExternalTrack[];
+export interface SearchResponse {
+    data: {
+        items: Track[];
+        meta: {
+            query: string;
+            total: number;
+            page: number;
+            per_page: number;
+            last_page: number;
+        };
+    };
 }
 
 export interface AudioFile {
@@ -54,8 +69,12 @@ export interface AudioFile {
     format?: string | null;
 }
 
+// ============================================
+// АУДИОФАЙЛ ТРЕКА
+// ============================================
+
 /**
- * Получить ответ со ссылкой на аудиофайл.
+ * Получить ссылку на аудиофайл трека.
  *
  * API возвращает:
  * {
@@ -72,38 +91,60 @@ export async function getTrackAudio(
     const result = response.data?.data ?? response.data;
 
     if (!result?.url) {
-        throw new Error('API не вернул ссылку на аудиофайл');
+        throw new Error(
+            'API не вернул ссылку на аудиофайл',
+        );
     }
 
     return result as AudioFile;
 }
 
+// ============================================
+// СПИСОК ТРЕКОВ
+// ============================================
+
 /**
- * Получить список опубликованных треков из локальной базы SkyFi.
+ * Получить список опубликованных треков SkyFi.
  */
 export async function getTracks(): Promise<TracksResponse> {
-    const response = await http.get<TracksResponse>('/tracks');
+    const response = await http.get<TracksResponse>(
+        '/tracks',
+    );
 
     return response.data;
 }
 
+// ============================================
+// ПОИСК ТРЕКОВ
+// ============================================
 
 /**
- * Поиск внешних треков.
+ * Поиск треков в базе SkyFi.
+ *
+ * GET /skyfy/search?q=возраст&limit=20
  */
-export async function searchExternalTracks(
+export async function searchTracks(
     query: string,
     limit = 20,
-): Promise<ExternalSearchResponse> {
-    const response = await http.get<ExternalSearchResponse>('search', {
-        params: {
-            q: query,
-            limit,
+    page = 1,
+): Promise<SearchResponse> {
+    const response = await http.get<SearchResponse>(
+        '/search',
+        {
+            params: {
+                q: query,
+                limit,
+                page,
+            },
         },
-    });
+    );
 
     return response.data;
 }
+
+// ============================================
+// ИЗБРАННОЕ
+// ============================================
 
 /**
  * Получить избранные треки пользователя.
@@ -111,13 +152,15 @@ export async function searchExternalTracks(
 export async function getFavorites(): Promise<{
     data: Track[];
 }> {
-    const response = await http.get<{ data: Track[] }>('/favorites');
+    const response = await http.get<{
+        data: Track[];
+    }>('/favorites');
 
     return response.data;
 }
 
 /**
- * Добавить трек в избранное.
+ * Добавить трек SkyFi в избранное.
  */
 export async function addFavorite(
     trackId: number,
@@ -128,30 +171,6 @@ export async function addFavorite(
 }> {
     const response = await http.post(
         `/favorites/${trackId}`,
-    );
-
-    return response.data;
-}
-
-/**
- * Добавить внешний трек Internet Archive в избранное.
- */
-export async function addExternalFavorite(
-    track: ExternalTrack,
-): Promise<{
-    message: string;
-    is_favorite: boolean;
-    track_id: number;
-    source_id: string;
-}> {
-    const response = await http.post(
-        '/favorites/external',
-        {
-            id: track.id,
-            title: track.title,
-            artist: track.artist,
-            description: track.description,
-        },
     );
 
     return response.data;
@@ -185,6 +204,350 @@ export async function checkFavorite(
 }> {
     const response = await http.get(
         `/favorites/${trackId}/check`,
+    );
+
+    return response.data;
+}
+
+// ============================================
+// ГЛОБАЛЬНЫЙ ПЛЕЕР: ТИПЫ
+// ============================================
+
+export type PlayerDeviceType =
+    | 'phone'
+    | 'computer'
+    | 'car'
+    | 'tv';
+
+export interface PlayerDevice {
+    id: number;
+    user_id: number;
+    device_uuid: string;
+    name: string;
+    type: PlayerDeviceType;
+    is_active: boolean;
+    last_seen_at: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface PlaybackState {
+    id: number;
+    user_id: number;
+
+    current_track_id: number | null;
+    active_device_id: number | null;
+
+    position_seconds: number;
+    is_playing: boolean;
+
+    repeat_mode: 'off' | 'all' | 'one';
+    shuffle_enabled: boolean;
+
+    version: number;
+
+    current_track?: Track | null;
+    active_device?: PlayerDevice | null;
+
+    created_at: string;
+    updated_at: string;
+}
+
+export interface PlaybackQueueItem {
+    id: number;
+    playback_state_id: number;
+    track_id: number;
+    added_by_user_id: number | null;
+
+    position: number;
+    status: 'pending' | 'played';
+
+    track: Track;
+    added_by?: {
+        id: number;
+        name: string;
+    } | null;
+
+    created_at: string;
+    updated_at: string;
+}
+
+export interface PlayerStateResponse {
+    state: PlaybackState;
+    queue: PlaybackQueueItem[];
+}
+
+export interface PlayerActionResponse {
+    message: string;
+    state: PlaybackState;
+}
+
+export interface PlayerQueueResponse {
+    data: PlaybackQueueItem[];
+}
+
+// ============================================
+// ГЛОБАЛЬНЫЙ ПЛЕЕР: СОСТОЯНИЕ
+// ============================================
+
+/**
+ * Получить состояние плеера и очередь.
+ *
+ * GET /player
+ */
+export async function getPlayerState(): Promise<PlayerStateResponse> {
+    const response = await http.get<PlayerStateResponse>(
+        '/player',
+    );
+
+    return response.data;
+}
+
+// ============================================
+// ГЛОБАЛЬНЫЙ ПЛЕЕР: ВОСПРОИЗВЕДЕНИЕ
+// ============================================
+
+/**
+ * Выбрать трек и установить состояние воспроизведения.
+ *
+ * POST /player/play
+ */
+export async function playRemoteTrack(
+    trackId: number,
+    deviceId?: number,
+): Promise<PlayerActionResponse> {
+    const response = await http.post<PlayerActionResponse>(
+        '/player/play',
+        {
+            track_id: trackId,
+            ...(deviceId != null
+                ? { device_id: deviceId }
+                : {}),
+        },
+    );
+
+    return response.data;
+}
+
+/**
+ * Поставить воспроизведение на паузу.
+ *
+ * POST /player/pause
+ */
+export async function pauseRemotePlayback(): Promise<PlayerActionResponse> {
+    const response = await http.post<PlayerActionResponse>(
+        '/player/pause',
+    );
+
+    return response.data;
+}
+
+/**
+ * Продолжить воспроизведение.
+ *
+ * POST /player/resume
+ */
+export async function resumeRemotePlayback(): Promise<PlayerActionResponse> {
+    const response = await http.post<PlayerActionResponse>(
+        '/player/resume',
+    );
+
+    return response.data;
+}
+
+/**
+ * Сохранить позицию воспроизведения.
+ *
+ * POST /player/seek
+ */
+export async function seekRemotePlayback(
+    positionSeconds: number,
+): Promise<PlayerActionResponse> {
+    const response = await http.post<PlayerActionResponse>(
+        '/player/seek',
+        {
+            position_seconds: Math.max(
+                0,
+                Math.floor(positionSeconds),
+            ),
+        },
+    );
+
+    return response.data;
+}
+
+/**
+ * Переключить на следующий трек.
+ *
+ * POST /player/next
+ */
+export async function nextRemoteTrack(): Promise<PlayerActionResponse> {
+    const response = await http.post<PlayerActionResponse>(
+        '/player/next',
+    );
+
+    return response.data;
+}
+
+/**
+ * Переключить на предыдущий трек.
+ *
+ * POST /player/previous
+ */
+export async function previousRemoteTrack(): Promise<PlayerActionResponse> {
+    const response = await http.post<PlayerActionResponse>(
+        '/player/previous',
+    );
+
+    return response.data;
+}
+
+// ============================================
+// ГЛОБАЛЬНЫЙ ПЛЕЕР: ОЧЕРЕДЬ
+// ============================================
+
+/**
+ * Получить очередь воспроизведения.
+ *
+ * GET /player/queue
+ */
+export async function getPlayerQueue(): Promise<PlayerQueueResponse> {
+    const response = await http.get<PlayerQueueResponse>(
+        '/player/queue',
+    );
+
+    return response.data;
+}
+
+/**
+ * Добавить трек в очередь.
+ *
+ * POST /player/queue
+ */
+export async function addTrackToQueue(
+    trackId: number,
+): Promise<{
+    message: string;
+    item: PlaybackQueueItem;
+}> {
+    const response = await http.post(
+        '/player/queue',
+        {
+            track_id: trackId,
+        },
+    );
+
+    return response.data;
+}
+
+/**
+ * Удалить ожидающий трек из очереди.
+ *
+ * DELETE /player/queue/{queueItemId}
+ */
+export async function removeTrackFromQueue(
+    queueItemId: number,
+): Promise<{
+    message: string;
+}> {
+    const response = await http.delete(
+        `/player/queue/${queueItemId}`,
+    );
+
+    return response.data;
+}
+
+/**
+ * Изменить порядок треков в очереди.
+ *
+ * Передаём ID элементов очереди в нужном порядке.
+ *
+ * PATCH /player/queue/reorder
+ */
+export async function reorderPlayerQueue(
+    itemIds: number[],
+): Promise<PlayerQueueResponse & {
+    message: string;
+}> {
+    const response = await http.patch(
+        '/player/queue/reorder',
+        {
+            items: itemIds,
+        },
+    );
+
+    return response.data;
+}
+
+// ============================================
+// ГЛОБАЛЬНЫЙ ПЛЕЕР: УСТРОЙСТВА
+// ============================================
+
+/**
+ * Получить список зарегистрированных устройств.
+ *
+ * GET /player/devices
+ */
+export async function getPlayerDevices(): Promise<{
+    data: PlayerDevice[];
+}> {
+    const response = await http.get<{
+        data: PlayerDevice[];
+    }>('/player/devices');
+
+    return response.data;
+}
+
+/**
+ * Зарегистрировать устройство.
+ *
+ * POST /player/devices
+ */
+export async function registerPlayerDevice(
+    device: {
+        device_uuid: string;
+        name: string;
+        type: PlayerDeviceType;
+    },
+): Promise<{
+    message: string;
+    device: PlayerDevice;
+}> {
+    const response = await http.post(
+        '/player/devices',
+        device,
+    );
+
+    return response.data;
+}
+
+/**
+ * Выбрать устройство воспроизведения.
+ *
+ * PATCH /player/devices/{deviceId}/activate
+ */
+export async function activatePlayerDevice(
+    deviceId: number,
+): Promise<PlayerActionResponse> {
+    const response = await http.patch(
+        `/player/devices/${deviceId}/activate`,
+    );
+
+    return response.data;
+}
+
+/**
+ * Удалить зарегистрированное устройство.
+ *
+ * DELETE /player/devices/{deviceId}
+ */
+export async function deletePlayerDevice(
+    deviceId: number,
+): Promise<{
+    message: string;
+}> {
+    const response = await http.delete(
+        `/player/devices/${deviceId}`,
     );
 
     return response.data;

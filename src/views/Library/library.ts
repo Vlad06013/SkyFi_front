@@ -86,7 +86,7 @@ export function useLibrary() {
         return currentTrackId.value === track.id;
     }
 
-    async function playTrack(track: ApiTrack): Promise<void> {
+    async function playTrack(track: (typeof tracks.value)[number]): Promise<void> {
         if (!track) {
             return;
         }
@@ -105,7 +105,7 @@ export function useLibrary() {
         }
     }
 
-    async function playTrackFromList(track: ApiTrack): Promise<void> {
+    async function playTrackFromList(track: (typeof tracks.value)[number]): Promise<void> {
         await playTrack(track);
     }
     // ============================================
