@@ -264,6 +264,10 @@ export interface PlaybackState {
     updated_at: string;
 }
 
+export interface PlaybackStateUpdatedEvent {
+    state: PlaybackState;
+}
+
 export interface PlaybackQueueItem {
     id: number;
     playback_state_id: number;
@@ -345,9 +349,17 @@ export async function playRemoteTrack(
  *
  * POST /player/pause
  */
-export async function pauseRemotePlayback(): Promise<PlayerActionResponse> {
+export async function pauseRemotePlayback(
+    positionSeconds: number,
+): Promise<PlayerActionResponse> {
     const response = await http.post<PlayerActionResponse>(
         '/player/pause',
+        {
+            position_seconds: Math.max(
+                0,
+                Math.floor(positionSeconds),
+            ),
+        },
     );
 
     return response.data;
