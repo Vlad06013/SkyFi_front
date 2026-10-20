@@ -135,6 +135,64 @@
 
     <!-- Громкость -->
     <div class="player-right">
+      <div class="device-selector">
+        <button
+            type="button"
+            class="device-button"
+            :disabled="
+      player.isDevicesLoading ||
+      player.deviceSwitchLoading
+    "
+            aria-label="Выбрать устройство воспроизведения"
+            title="Устройство воспроизведения"
+            @click="showDeviceMenu = !showDeviceMenu"
+        >
+          <span aria-hidden="true">▣</span>
+        </button>
+
+        <div
+            v-if="showDeviceMenu"
+            class="device-menu"
+        >
+          <strong>Устройство воспроизведения</strong>
+
+          <p v-if="player.isDevicesLoading">
+            Загрузка устройств…
+          </p>
+
+          <p
+              v-else-if="player.devices.length === 0"
+              class="device-empty"
+          >
+            Нет зарегистрированных устройств
+          </p>
+
+          <button
+              v-for="device in player.devices"
+              :key="device.id"
+              type="button"
+              class="device-option"
+              :class="{
+        'device-option-active':
+          device.id === player.activeDeviceId,
+      }"
+              :disabled="player.deviceSwitchLoading"
+              @click="selectDevice(device.id)"
+          >
+      <span>
+        {{ device.type === 'phone' ? '▯' : '▣' }}
+      </span>
+
+            <span class="device-option-name">
+        {{ device.name }}
+      </span>
+
+            <span v-if="device.id === player.activeDeviceId">
+        ✓
+      </span>
+          </button>
+        </div>
+      </div>
       <span aria-hidden="true">♫</span>
 
       <input
@@ -156,6 +214,30 @@
 import usePlayerStore from '@/stores/player';
 
 const player = usePlayerStore();
+
+import { ref, onMounted, watch } from 'vue';
+
+
+const showDeviceMenu = ref(false);
+
+async function selectDevice(deviceId: number): Promise<void> {
+  await player.switchDevice(deviceId);
+
+  showDeviceMenu.value = false;
+}
+
+onMounted(() => {
+  void player.initializePlayerDevice();
+});
+
+watch(
+    () => Boolean(player.isServerSyncEnabled),
+    (isAuthenticated) => {
+      if (isAuthenticated) {
+        void player.initializePlayerDevice();
+      }
+    },
+);
 </script>
 
 <style scoped>
@@ -673,5 +755,115 @@ const player = usePlayerStore();
   .player *::after {
     transition-duration: 0.01ms !important;
   }
+}
+
+.device-selector {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.device-button {
+  display: grid;
+  place-items: center;
+
+  width: 32px;
+  height: 32px;
+
+  border: 0;
+  border-radius: 8px;
+
+  background: transparent;
+  color: #9a9caf;
+
+  cursor: pointer;
+  font-size: 19px;
+}
+
+.device-button:hover:not(:disabled) {
+  background: #ffffff0c;
+  color: #d0c2ff;
+}
+
+.device-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.device-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 12px);
+
+  width: 270px;
+  padding: 14px;
+
+  border: 1px solid #ffffff15;
+  border-radius: 12px;
+
+  background: #1c1b29;
+  box-shadow: 0 12px 40px #0005;
+
+  z-index: 1000;
+}
+
+.device-menu > strong {
+  display: block;
+  margin-bottom: 12px;
+
+  color: #f5f3fa;
+  font-size: 12px;
+}
+
+.device-menu p {
+  color: #9295a8;
+  font-size: 12px;
+}
+
+.device-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  width: 100%;
+  padding: 10px;
+
+  border: 0;
+  border-radius: 8px;
+
+  background: transparent;
+  color: #c9c7d6;
+
+  text-align: left;
+  cursor: pointer;
+}
+
+.device-option:hover:not(:disabled) {
+  background: #ffffff0c;
+}
+
+.device-option-active {
+  background: #b39bff15;
+  color: #c4b2ff;
+}
+
+.device-option-name {
+  flex: 1;
+  min-width: 0;
+
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  font-size: 12px;
+}
+
+.device-option:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.device-empty {
+  margin: 0;
 }
 </style>
