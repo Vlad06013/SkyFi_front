@@ -21,15 +21,15 @@ import {
 
 import axios from 'axios';
 
-import { http } from '@/api/http';
-
 import {
-    getTracks,
-    type Track,
-} from '@/api/tracks';
+    getUploadedTracks,
+    uploadTrack as uploadTrackApi,
+} from '@/api/uploads';
+
+import type { Track } from '@/api/tracks';
+import { getFavorites } from '@/api/favorites';
 
 import usePlayerStore from '@/stores/player';
-import { uploadTrack as uploadTrackApi } from '@/api/uploads';
 
 // ============================================
 // ТИПЫ
@@ -51,12 +51,6 @@ interface LibraryArtist {
     tracks: Track[];
 }
 
-interface UploadResponse {
-    data?: Track;
-    track?: Track;
-    message?: string;
-}
-
 // ============================================
 // ЛОГИКА БИБЛИОТЕКИ
 // ============================================
@@ -68,48 +62,45 @@ export function useLibrary() {
 
     const player = usePlayerStore();
 
-    const playerIsPlaying = computed(() => player.isPlaying);
+    const playerIsPlaying = computed(
+        () => player.isPlaying,
+    );
 
-    const currentTrackId = computed(() => {
+    const currentTrackId = computed<number | null>(() => {
         const currentTrack = player.currentTrack;
 
-        if (!currentTrack) {
+        if (
+            !currentTrack ||
+            currentTrack.id === undefined ||
+            currentTrack.id === null
+        ) {
             return null;
         }
 
-        return typeof currentTrack.id === 'number'
-            ? currentTrack.id
-            : null;
+        const id = Number(currentTrack.id);
+
+        return Number.isFinite(id) ? id : null;
     });
 
+    /**
+     * Сравниваем числовые ID.
+     *
+     * Например, 12 и "12" должны считаться одним треком.
+     */
     function isCurrentTrack(track: Track): boolean {
-        return currentTrackId.value === track.id;
-    }
-
-    async function playTrack(track: (typeof tracks.value)[number]): Promise<void> {
-        if (!track) {
-            return;
+        if (
+            !track ||
+            track.id === undefined ||
+            track.id === null
+        ) {
+            return false;
         }
 
-        try {
-            // Передаём в плеер весь список треков библиотеки.
-            player.setQueue(tracks.value);
-
-            // Запускаем выбранный трек.
-            await player.playTrack(track);
-        } catch (error) {
-            console.error(
-                'Ошибка воспроизведения трека:',
-                error,
-            );
-        }
+        return currentTrackId.value === Number(track.id);
     }
 
-    async function playTrackFromList(track: (typeof tracks.value)[number]): Promise<void> {
-        await playTrack(track);
-    }
     // ============================================
-    // БИБЛИОТЕКА
+    // ИЗБРАННОЕ
     // ============================================
 
     const tracks = ref<Track[]>([]);
@@ -125,13 +116,13 @@ export function useLibrary() {
         error.value = '';
 
         try {
-            const response = await getTracks();
+            const response = await getFavorites();
 
             if (requestId !== libraryRequestId) {
                 return;
             }
 
-            const responseData = response.data as unknown;
+            const responseData: unknown = response.data;
 
             let receivedTracks: unknown = responseData;
 
@@ -154,7 +145,7 @@ export function useLibrary() {
 
             if (!Array.isArray(receivedTracks)) {
                 throw new Error(
-                    'Сервер вернул данные библиотеки в неизвестном формате.',
+                    'Сервер вернул данные избранного в неизвестном формате.',
                 );
             }
 
@@ -165,31 +156,115 @@ export function useLibrary() {
             }
 
             console.error(
-                'Ошибка загрузки музыкальной коллекции:',
+                '[Library] Ошибка загрузки избранного:',
                 err,
             );
 
             if (axios.isAxiosError(err)) {
                 if (err.response?.status === 401) {
                     error.value =
-                        'Войди в аккаунт, чтобы просматривать свою музыкальную коллекцию.';
+                        'Войди в аккаунт, чтобы просматривать избранное.';
                 } else if (!err.response) {
                     error.value =
                         'Не удалось подключиться к серверу. Проверь интернет-соединение.';
                 } else {
                     error.value =
                         err.response.data?.message ||
-                        'Сервер не смог загрузить музыкальную коллекцию.';
+                        'Не удалось загрузить избранное.';
                 }
             } else {
-                error.value =
-                    err instanceof Error
-                        ? err.message
-                        : 'Не удалось получить данные музыкальной коллекции.';
+                error.value = err instanceof Error
+                    ? err.message
+                    : 'Не удалось получить данные избранного.';
             }
         } finally {
             if (requestId === libraryRequestId) {
                 loading.value = false;
+            }
+        }
+    }
+
+    // ============================================
+    // СОБСТВЕННЫЕ ЗАГРУЗКИ
+    // ============================================
+
+    const uploadedTracks = ref<Track[]>([]);
+    const uploadsLoading = ref(false);
+    const uploadsError = ref('');
+
+    let uploadsRequestId = 0;
+
+    async function loadUploadedTracks(): Promise<void> {
+        const requestId = ++uploadsRequestId;
+
+        uploadsLoading.value = true;
+        uploadsError.value = '';
+
+        try {
+            const response = await getUploadedTracks();
+
+            if (requestId !== uploadsRequestId) {
+                return;
+            }
+
+            const responseData: unknown = response.data;
+
+            let receivedTracks: unknown = responseData;
+
+            if (
+                responseData &&
+                typeof responseData === 'object' &&
+                !Array.isArray(responseData)
+            ) {
+                const payload = responseData as {
+                    data?: unknown;
+                    tracks?: unknown;
+                };
+
+                if (Array.isArray(payload.data)) {
+                    receivedTracks = payload.data;
+                } else if (Array.isArray(payload.tracks)) {
+                    receivedTracks = payload.tracks;
+                }
+            }
+
+            if (!Array.isArray(receivedTracks)) {
+                throw new Error(
+                    'Сервер вернул список загрузок в неизвестном формате.',
+                );
+            }
+
+            uploadedTracks.value = receivedTracks as Track[];
+        } catch (err: unknown) {
+            if (requestId !== uploadsRequestId) {
+                return;
+            }
+
+            console.error(
+                '[Library] Ошибка загрузки собственных треков:',
+                err,
+            );
+
+            if (axios.isAxiosError(err)) {
+                if (err.response?.status === 401) {
+                    uploadsError.value =
+                        'Войди в аккаунт, чтобы просматривать свои загрузки.';
+                } else if (!err.response) {
+                    uploadsError.value =
+                        'Не удалось подключиться к серверу.';
+                } else {
+                    uploadsError.value =
+                        err.response.data?.message ||
+                        'Не удалось загрузить список треков.';
+                }
+            } else {
+                uploadsError.value = err instanceof Error
+                    ? err.message
+                    : 'Произошла ошибка при загрузке треков.';
+            }
+        } finally {
+            if (requestId === uploadsRequestId) {
+                uploadsLoading.value = false;
             }
         }
     }
@@ -228,6 +303,7 @@ export function useLibrary() {
 
     const fileInput = ref<HTMLInputElement | null>(null);
     const selectedFile = ref<File | null>(null);
+
     const uploading = ref(false);
     const uploadSuccess = ref(false);
     const uploadError = ref('');
@@ -266,6 +342,8 @@ export function useLibrary() {
         uploadError.value = '';
 
         clearFieldErrors();
+
+        void loadUploadedTracks();
     }
 
     function handleFileChange(event: Event): void {
@@ -287,26 +365,35 @@ export function useLibrary() {
             .pop()
             ?.toLowerCase();
 
-        if (!extension || !allowedExtensions.includes(extension)) {
+        if (
+            !extension ||
+            !allowedExtensions.includes(extension)
+        ) {
             selectedFile.value = null;
+
             fieldErrors.audio =
                 'Выбери аудиофайл MP3, WAV, OGG, FLAC, M4A или AAC.';
+
             input.value = '';
             return;
         }
 
         if (file.size === 0) {
             selectedFile.value = null;
+
             fieldErrors.audio =
                 'Выбранный файл пуст. Выбери другой аудиофайл.';
+
             input.value = '';
             return;
         }
 
         if (file.size > MAX_FILE_SIZE) {
             selectedFile.value = null;
+
             fieldErrors.audio =
                 'Размер файла превышает 100 МБ. Выбери файл меньшего размера.';
+
             input.value = '';
             return;
         }
@@ -369,8 +456,8 @@ export function useLibrary() {
     }
 
     // ============================================
-// ОТПРАВКА МУЗЫКИ НА СЕРВЕР
-// ============================================
+    // ОТПРАВКА МУЗЫКИ НА СЕРВЕР
+    // ============================================
 
     async function uploadTrack(): Promise<void> {
         if (uploading.value) {
@@ -381,10 +468,6 @@ export function useLibrary() {
         uploadError.value = '';
 
         clearFieldErrors();
-
-        // ========================================
-        // ВАЛИДАЦИЯ ФОРМЫ
-        // ========================================
 
         if (!uploadForm.title.trim()) {
             fieldErrors.title = 'Укажи название трека.';
@@ -408,7 +491,6 @@ export function useLibrary() {
             return;
         }
 
-        // После проверки файл гарантированно выбран.
         const audioFile = selectedFile.value;
 
         if (!audioFile) {
@@ -418,38 +500,34 @@ export function useLibrary() {
         uploading.value = true;
 
         try {
-            // ========================================
-            // ЗАГРУЗКА ЧЕРЕЗ API-МОДУЛЬ
-            // ========================================
-
-            console.log('Отправка аудиофайла:', {
-                name: audioFile.name,
-                size: audioFile.size,
-                type: audioFile.type,
-            });
-
             const response = await uploadTrackApi({
                 title: uploadForm.title.trim(),
                 artist_name: uploadForm.artist_name.trim(),
                 genre_name: uploadForm.genre_name.trim(),
-                album_title: uploadForm.album_title.trim() || undefined,
-                description: uploadForm.description.trim() || undefined,
+                album_title:
+                    uploadForm.album_title.trim() || undefined,
+                description:
+                    uploadForm.description.trim() || undefined,
                 audio: audioFile,
             });
 
-            const uploadedTrack = response.data;
-
-            console.log('Трек успешно загружен:', uploadedTrack);
+            console.log(
+                '[Library] Трек успешно загружен:',
+                response.data,
+            );
 
             uploadSuccess.value = true;
 
             resetFormAfterUpload();
 
-            await loadLibrary();
+            await loadUploadedTracks();
 
             activeTab.value = 'upload';
         } catch (err: unknown) {
-            console.error('Ошибка загрузки трека:', err);
+            console.error(
+                '[Library] Ошибка загрузки трека:',
+                err,
+            );
 
             if (axios.isAxiosError(err)) {
                 const response = err.response;
@@ -499,6 +577,171 @@ export function useLibrary() {
         }
     }
 
+    // ============================================
+    // ВОСПРОИЗВЕДЕНИЕ МУЗЫКИ
+    // ============================================
+
+    /**
+     * Главная функция воспроизведения.
+     *
+     * Сначала устанавливает очередь.
+     * Затем передаёт выбранный трек в хранилище плеера.
+     */
+    async function playTrack(
+        track: Track,
+        queue: Track[] = tracks.value,
+    ): Promise<void> {
+        console.log('[Library] playTrack вызван:', {
+            track,
+            queueLength: queue.length,
+        });
+
+        if (
+            !track ||
+            track.id === undefined ||
+            track.id === null
+        ) {
+            console.error(
+                '[Library] Воспроизведение отменено: у трека нет ID.',
+                track,
+            );
+
+            return;
+        }
+
+        try {
+            // Не допускаем пустую очередь.
+            const validQueue = Array.isArray(queue)
+                ? [...queue]
+                : [];
+
+            // Если выбранного трека нет в очереди, добавляем его.
+            const trackExists = validQueue.some(
+                item => Number(item.id) === Number(track.id),
+            );
+
+            if (!trackExists) {
+                validQueue.unshift(track);
+            }
+
+            console.log(
+                '[Library] Устанавливаем очередь:',
+                validQueue,
+            );
+
+            player.setQueue(validQueue);
+
+            console.log(
+                '[Library] Запускаем воспроизведение:',
+                track.id,
+            );
+
+            await player.playTrack(track);
+
+            console.log(
+                '[Library] Вызов плеера завершён.',
+            );
+        } catch (err: unknown) {
+            console.error(
+                '[Library] Ошибка воспроизведения:',
+                err,
+            );
+
+            throw err;
+        }
+    }
+
+    /**
+     * Воспроизведение трека из пользовательских загрузок.
+     */
+    async function playUploadedTrack(
+        track: Track,
+    ): Promise<void> {
+        await playTrack(track, uploadedTracks.value);
+    }
+
+    /**
+     * Совместимость с прежним названием функции.
+     */
+    async function playTrackFromList(
+        track: Track,
+    ): Promise<void> {
+        await playTrack(track, tracks.value);
+    }
+
+    // ============================================
+    // ДОБАВЛЕНИЕ В ОЧЕРЕДЬ
+    // ============================================
+
+    const queueLoadingTrackId = ref<number | null>(null);
+
+    async function addTrackToQueueFromLibrary(
+        track: Track,
+    ): Promise<void> {
+        const trackId = Number(track?.id);
+
+        if (
+            !track ||
+            !Number.isFinite(trackId) ||
+            trackId <= 0
+        ) {
+            console.error(
+                '[Library] Нельзя добавить в очередь трек без корректного ID:',
+                track,
+            );
+
+            return;
+        }
+
+        queueLoadingTrackId.value = trackId;
+
+        try {
+            /*
+             * В исходном файле реализация добавления в очередь
+             * отсутствовала, хотя функция использовалась в шаблоне.
+             *
+             * Добавляем трек через доступное API плеера:
+             * устанавливаем очередь с выбранным треком.
+             *
+             * Если в хранилище есть специальный метод addToQueue,
+             * его использование можно настроить по коду stores/player.
+             */
+            const currentQueue = [
+                ...tracks.value,
+            ];
+
+            const uploadedQueue = [
+                ...uploadedTracks.value,
+            ];
+
+            const combinedQueue = [
+                ...currentQueue,
+                ...uploadedQueue,
+            ];
+
+            const alreadyInQueue = combinedQueue.some(
+                item => Number(item.id) === trackId,
+            );
+
+            if (!alreadyInQueue) {
+                combinedQueue.push(track);
+            }
+
+            player.setQueue(combinedQueue);
+
+            console.log(
+                '[Library] Очередь обновлена:',
+                track.title,
+            );
+        } catch (err: unknown) {
+            console.error(
+                '[Library] Ошибка добавления трека в очередь:',
+                err,
+            );
+        } finally {
+            queueLoadingTrackId.value = null;
+        }
+    }
 
     // ============================================
     // АЛЬБОМЫ
@@ -512,25 +755,33 @@ export function useLibrary() {
                 continue;
             }
 
-            const albumId =
-                (
-                    track as Track & {
-                        album_id?: number | null;
-                    }
-                ).album_id ?? track.album.id;
+            const albumId = (
+                track as Track & {
+                    album_id?: number | null;
+                }
+            ).album_id ?? track.album.id;
 
-            if (typeof albumId !== 'number') {
+            if (
+                albumId === undefined ||
+                albumId === null
+            ) {
                 continue;
             }
 
-            const existing = result.get(albumId);
+            const normalizedAlbumId = Number(albumId);
+
+            if (!Number.isFinite(normalizedAlbumId)) {
+                continue;
+            }
+
+            const existing = result.get(normalizedAlbumId);
 
             if (existing) {
                 existing.tracksCount++;
                 existing.tracks.push(track);
             } else {
-                result.set(albumId, {
-                    id: albumId,
+                result.set(normalizedAlbumId, {
+                    id: normalizedAlbumId,
                     title: track.album.title,
                     tracksCount: 1,
                     tracks: [track],
@@ -552,14 +803,20 @@ export function useLibrary() {
 
         for (const track of tracks.value) {
             for (const artist of track.artists ?? []) {
-                const existing = result.get(artist.id);
+                const artistId = Number(artist.id);
+
+                if (!Number.isFinite(artistId)) {
+                    continue;
+                }
+
+                const existing = result.get(artistId);
 
                 if (existing) {
                     existing.tracksCount++;
                     existing.tracks.push(track);
                 } else {
-                    result.set(artist.id, {
-                        id: artist.id,
+                    result.set(artistId, {
+                        id: artistId,
                         name: artist.name,
                         tracksCount: 1,
                         tracks: [track],
@@ -573,24 +830,39 @@ export function useLibrary() {
         );
     });
 
+    // ============================================
+    // ВОСПРОИЗВЕДЕНИЕ АЛЬБОМА
+    // ============================================
+
     function playAlbum(album: Album): void {
         const firstTrack = album.tracks[0];
 
         if (firstTrack) {
-            void playTrack(firstTrack);
+            void playTrack(firstTrack, album.tracks);
         }
     }
 
+    // ============================================
+    // ВОСПРОИЗВЕДЕНИЕ ИСПОЛНИТЕЛЯ
+    // ============================================
+
     function playArtist(artistId: number): void {
         const artist = artists.value.find(
-            item => item.id === artistId,
+            item => Number(item.id) === Number(artistId),
         );
 
-        const firstTrack = artist?.tracks[0];
+        if (!artist || artist.tracks.length === 0) {
+            console.warn(
+                '[Library] У исполнителя нет треков:',
+                artistId,
+            );
 
-        if (firstTrack) {
-            void playTrack(firstTrack);
+            return;
         }
+
+        const firstTrack = artist.tracks[0];
+
+        void playTrack(firstTrack, artist.tracks);
     }
 
     // ============================================
@@ -611,7 +883,15 @@ export function useLibrary() {
     ];
 
     function getTrackColor(id: number): string {
-        const index = Math.abs(id) % coverColors.length;
+        const normalizedId = Number(id);
+
+        if (!Number.isFinite(normalizedId)) {
+            return coverColors[0];
+        }
+
+        const index =
+            Math.abs(normalizedId) % coverColors.length;
+
         return coverColors[index];
     }
 
@@ -640,11 +920,13 @@ export function useLibrary() {
     // ============================================
 
     onMounted(() => {
+        console.log('[Library] Инициализация библиотеки.');
+
         void loadLibrary();
     });
 
     // ============================================
-    // ПУБЛИЧНЫЙ API ДЛЯ VUE-КОМПОНЕНТА
+    // ПУБЛИЧНЫЙ API
     // ============================================
 
     return {
@@ -652,11 +934,20 @@ export function useLibrary() {
         activeTab,
         openUpload,
 
+        // Избранное
         tracks,
         loading,
         error,
         loadLibrary,
 
+        // Собственные загрузки
+        uploadedTracks,
+        uploadsLoading,
+        uploadsError,
+        loadUploadedTracks,
+        playUploadedTrack,
+
+        // Форма загрузки
         uploadSuccess,
         uploadError,
         uploadForm,
@@ -670,20 +961,27 @@ export function useLibrary() {
         resetUploadForm,
         uploadTrack,
 
+        // Коллекции
         albums,
         artists,
 
+        // Плеер
         isCurrentTrack,
         playerIsPlaying,
         playTrack,
         playTrackFromList,
-
         playAlbum,
         playArtist,
 
+        // Очередь
+        addTrackToQueueFromLibrary,
+        queueLoadingTrackId,
+
+        // Оформление
         getTrackColor,
         pluralizeTracks,
 
+        // Иконки
         musicalNotesOutline,
         discOutline,
         cloudUploadOutline,

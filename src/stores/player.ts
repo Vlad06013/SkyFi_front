@@ -330,10 +330,39 @@ const usePlayerStore = defineStore('player', () => {
     // ============================================
 
     async function playNext(): Promise<void> {
-        if (isLoading.value || queue.value.length === 0) {
+        if (isLoading.value) {
             return;
         }
 
+        if (auth.user) {
+            try {
+                isLoading.value = true;
+
+                const response = await nextRemoteTrack();
+
+                playbackState.value = response.state;
+
+                const track = response.state.current_track;
+
+                if (!track) {
+                    isPlaying.value = false;
+                    return;
+                }
+
+                await playTrack(track as ApiTrack);
+            } catch (error) {
+                console.error(
+                    '[Player] Ошибка перехода к следующему треку:',
+                    error,
+                );
+            } finally {
+                isLoading.value = false;
+            }
+
+            return;
+        }
+
+        // Офлайн: используем локальную очередь.
         const nextIndex = currentTrackIndex.value + 1;
 
         if (nextIndex >= queue.value.length) {
@@ -371,6 +400,31 @@ const usePlayerStore = defineStore('player', () => {
         await playTrack(queue.value[previousIndex]);
     }
 
+    async function addToQueue(track: ApiTrack): Promise<void> {
+        if (!auth.user) {
+            console.warn('[Player] Для добавления в очередь необходимо авторизоваться.');
+            return;
+        }
+
+        try {
+            await addTrackToQueue(Number(track.id));
+
+            // Получаем актуальную очередь с сервера.
+            const response = await getPlayerQueue();
+
+            queue.value = response.data.map((item) => item.track);
+
+            currentTrackIndex.value = currentTrack.value
+                ? queue.value.findIndex(
+                    (item) => String(item.id) === String(currentTrack.value?.id),
+                )
+                : -1;
+
+            console.info('[Player] Трек добавлен в очередь:', track.title);
+        } catch (error) {
+            console.error('[Player] Не удалось добавить трек в очередь:', error);
+        }
+    }
     // ============================================
 // ВОССТАНОВЛЕНИЕ СОСТОЯНИЯ С СЕРВЕРА
 // ============================================
@@ -550,48 +604,54 @@ const usePlayerStore = defineStore('player', () => {
     // ============================================
 
     async function playTrack(track: ApiTrack): Promise<void> {
-        if (!track) {
+        if (!track || track.id == null) {
+            console.error('[Player] Не передан трек или его ID:', track);
             return;
         }
 
-        // Если очередь пуста, добавляем выбранный трек.
-        if (queue.value.length === 0) {
-            console.warn(
-                '[Player] Очередь пуста при выборе трека:',
-                track.title,
-            );
-
-            queue.value = [track];
-        }
-
-        const index = findTrackIndex(track);
-
-        currentTrackIndex.value = index;
-
-        console.log('[Player] Выбран трек:', track.title);
-        console.log('[Player] ID трека:', track.id);
-        console.log('[Player] Индекс:', index);
-        console.log('[Player] Размер очереди:', queue.value.length);
+        const trackId = track.id;
 
         // Отменяем предыдущие запросы воспроизведения.
         const requestId = ++playbackRequestId;
 
+        console.log('[Player] Запрос воспроизведения:', {
+            id: trackId,
+            title: track.title,
+        });
+
+        // Проверяем, есть ли трек в очереди.
+        let index = findTrackIndex(track);
+
+        // Если трека нет в очереди, добавляем его.
+        // Это важно для треков из избранного и загрузок.
+        if (index === -1) {
+            queue.value = [
+                track,
+                ...queue.value.filter(
+                    item => String(item.id) !== String(trackId),
+                ),
+            ];
+
+            index = 0;
+        }
+
+        currentTrackIndex.value = index;
+
+        // Обновляем текущий трек.
         currentTrack.value = {
             id: track.id,
             title: track.title,
             artist:
                 track.artists
-                    ?.map((artist) => artist.name)
+                    ?.map(artist => artist.name)
                     .join(', ') || 'Неизвестный исполнитель',
             cover: 'cover-purple',
             symbol: '♫',
         };
 
-        // Сбрасываем состояние избранного и проверяем
-        // его для нового трека.
         liked.value = false;
 
-        void updateFavoriteState(track.id);
+        void updateFavoriteState(trackId);
 
         isPlaying.value = false;
         isLoading.value = true;
@@ -600,27 +660,29 @@ const usePlayerStore = defineStore('player', () => {
         audioDuration.value = 0;
         isSeeking.value = false;
 
+        // Останавливаем предыдущее воспроизведение.
         audio.pause();
         audio.removeAttribute('src');
         audio.load();
 
         try {
-            const audioFile = await getTrackAudio(track.id);
+            // Получаем URL аудиофайла.
+            const audioFile = await getTrackAudio(Number(trackId));
 
-            // Если пользователь выбрал другой трек,
-            // игнорируем устаревший запрос.
+            // Если за время запроса пользователь выбрал другой трек,
+            // не запускаем предыдущий.
             if (requestId !== playbackRequestId) {
                 return;
             }
 
             if (!audioFile?.url) {
                 throw new Error(
-                    'Сервер не вернул ссылку на аудиофайл.',
+                    `Сервер не вернул URL аудиофайла для трека ${trackId}.`,
                 );
             }
 
+            // Устанавливаем источник.
             audio.src = audioFile.url;
-            audio.load();
             audio.volume = Math.max(
                 0,
                 Math.min(100, volume.value),
@@ -628,18 +690,36 @@ const usePlayerStore = defineStore('player', () => {
 
             audio.load();
 
+            // Запускаем локальное воспроизведение.
             await audio.play();
+
+            // Пока запускался звук, пользователь мог выбрать
+            // другой трек. Не синхронизируем устаревший запрос.
+            if (requestId !== playbackRequestId) {
+                return;
+            }
+
+            console.log(
+                '[Player] Воспроизведение запущено:',
+                track.title,
+            );
+
+            // Синхронизируем глобальный плеер с сервером.
             if (auth.user) {
                 try {
                     const response = await playRemoteTrack(
-                        track.id,
+                        Number(trackId),
                         activeDeviceId.value ?? undefined,
                     );
 
-                    playbackState.value = response.state;
+                    if (requestId === playbackRequestId) {
+                        playbackState.value = response.state;
+                    }
                 } catch (error) {
+                    // Ошибка синхронизации сервера не должна
+                    // останавливать уже работающий локальный звук.
                     console.error(
-                        '[Player] Не удалось синхронизировать воспроизведение:',
+                        '[Player] Ошибка синхронизации с сервером:',
                         error,
                     );
                 }
@@ -649,12 +729,17 @@ const usePlayerStore = defineStore('player', () => {
                 return;
             }
 
-            console.error(
-                '[Player] Ошибка воспроизведения трека:',
-                error,
-            );
-
+            audio.pause();
             isPlaying.value = false;
+
+            console.error(
+                '[Player] Не удалось воспроизвести трек:',
+                {
+                    id: trackId,
+                    title: track.title,
+                    error,
+                },
+            );
         } finally {
             if (requestId === playbackRequestId) {
                 isLoading.value = false;
@@ -1152,6 +1237,7 @@ const usePlayerStore = defineStore('player', () => {
         // Восстановление состояния
         restorePlayerState,
         isRestoringState,
+        addToQueue
     };
 });
 

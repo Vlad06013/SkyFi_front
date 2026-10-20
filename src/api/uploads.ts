@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { http } from '@/api/http';
+import type { Track } from '@/api/tracks';
 
 // ============================================
 // ТИПЫ
@@ -20,47 +21,13 @@ export interface UploadTrackPayload {
     genre_name?: string;
 }
 
-export interface UploadedTrackFile {
-    id: number;
-    variant: string;
-    disk: string;
-    path: string;
-    mime_type: string;
-    size_bytes: number;
-    duration_seconds: number | null;
-    bitrate_kbps?: number | null;
-    sample_rate?: number | null;
-}
-
-export interface UploadedTrack {
-    id: number;
-    title: string;
-    description: string | null;
-    status: string;
-    source_type: string;
-    album_id: number | null;
-
-    artists: Array<{
-        id: number;
-        name: string;
-    }>;
-
-    album: {
-        id: number;
-        title: string;
-    } | null;
-
-    genres: Array<{
-        id: number;
-        name: string;
-    }>;
-
-    files: UploadedTrackFile[];
-}
-
 export interface UploadTrackResponse {
     message: string;
-    data: UploadedTrack;
+    data: Track;
+}
+
+export interface UploadsResponse {
+    data: Track[];
 }
 
 // ============================================
@@ -71,10 +38,6 @@ export async function uploadTrack(
     payload: UploadTrackPayload,
     onProgress?: (progress: number) => void,
 ): Promise<UploadTrackResponse> {
-    // ========================================
-    // ПРОВЕРКА ДАННЫХ
-    // ========================================
-
     const title = payload.title.trim();
 
     if (!title) {
@@ -89,10 +52,7 @@ export async function uploadTrack(
         throw new Error('Выбранный аудиофайл пуст.');
     }
 
-    // ========================================
-    // ФОРМИРОВАНИЕ MULTIPART/FORM-DATA
-    // ========================================
-
+    // Формируем multipart/form-data.
     const formData = new FormData();
 
     formData.append('title', title);
@@ -110,7 +70,7 @@ export async function uploadTrack(
         );
     }
 
-    // Исполнитель
+    // Исполнитель.
     if (payload.artist_id !== undefined) {
         formData.append(
             'artist_id',
@@ -123,7 +83,7 @@ export async function uploadTrack(
         );
     }
 
-    // Альбом
+    // Альбом.
     if (payload.album_id !== undefined) {
         formData.append(
             'album_id',
@@ -136,7 +96,7 @@ export async function uploadTrack(
         );
     }
 
-    // Жанр
+    // Жанр.
     if (payload.genre_id !== undefined) {
         formData.append(
             'genre_id',
@@ -149,10 +109,7 @@ export async function uploadTrack(
         );
     }
 
-    // ========================================
-    // ПРОВЕРКА FORMDATA
-    // ========================================
-
+    // Проверяем добавление файла.
     const audioEntry = formData.get('audio');
 
     if (
@@ -169,12 +126,7 @@ export async function uploadTrack(
         fileName: audioEntry.name,
         fileSize: audioEntry.size,
         fileType: audioEntry.type,
-        formDataKeys: Array.from(formData.keys()),
     });
-
-    // ========================================
-    // ОТПРАВКА НА СЕРВЕР
-    // ========================================
 
     try {
         const response = await http.post<UploadTrackResponse>(
@@ -206,10 +158,6 @@ export async function uploadTrack(
 
         return response.data;
     } catch (error: unknown) {
-        // ====================================
-        // ОБРАБОТКА ОШИБОК AXIOS
-        // ====================================
-
         if (axios.isAxiosError(error)) {
             const status = error.response?.status;
             const responseData = error.response?.data;
@@ -290,10 +238,6 @@ export async function uploadTrack(
             );
         }
 
-        // ====================================
-        // НЕИЗВЕСТНАЯ ОШИБКА
-        // ====================================
-
         console.error(
             'Непредвиденная ошибка загрузки трека:',
             error,
@@ -301,4 +245,19 @@ export async function uploadTrack(
 
         throw error;
     }
+}
+
+// ============================================
+// СПИСОК ЗАГРУЖЕННЫХ ТРЕКОВ
+// ============================================
+
+/**
+ * Получить треки, загруженные текущим пользователем.
+ *
+ * GET /uploads
+ */
+export async function getUploadedTracks(): Promise<UploadsResponse> {
+    const response = await http.get<UploadsResponse>('/uploads');
+
+    return response.data;
 }

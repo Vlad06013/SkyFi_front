@@ -31,7 +31,9 @@
               type="button"
               class="tab"
               :class="{ active: activeTab === tab.value }"
-              :aria-current="activeTab === tab.value ? 'page' : undefined"
+              :aria-current="
+              activeTab === tab.value ? 'page' : undefined
+            "
               @click="activeTab = tab.value"
           >
             <ion-icon
@@ -55,12 +57,13 @@
         </nav>
 
         <!-- =====================================
-             ЗАГРУЗКА МУЗЫКИ
+             ЗАГРУЗКА МУЗЫКИ И МОИ ЗАГРУЗКИ
         ====================================== -->
         <section
             v-if="activeTab === 'upload'"
             class="upload-section"
         >
+          <!-- Заголовок загрузчика -->
           <div class="upload-heading">
             <div>
               <div class="section-eyebrow">
@@ -111,6 +114,7 @@
             </div>
           </div>
 
+          <!-- Форма загрузки -->
           <form
               class="upload-form"
               @submit.prevent="uploadTrack"
@@ -330,7 +334,7 @@
               </p>
             </div>
 
-            <!-- Кнопки -->
+            <!-- Кнопки формы -->
             <div class="upload-actions">
               <button
                   type="button"
@@ -368,10 +372,186 @@
               </button>
             </div>
           </form>
+
+          <!-- =====================================
+               СПИСОК ЗАГРУЖЕННЫХ ТРЕКОВ
+          ====================================== -->
+          <section class="library-section uploads-section">
+            <div class="section-heading">
+              <div>
+                <div class="section-eyebrow">
+                  ТВОЯ МУЗЫКА
+                </div>
+
+                <h2>Мои загрузки</h2>
+              </div>
+
+              <span class="count-badge">
+                {{ uploadedTracks.length }}
+                {{ pluralizeTracks(uploadedTracks.length) }}
+              </span>
+            </div>
+
+            <!-- Загрузка списка -->
+            <div
+                v-if="uploadsLoading"
+                class="empty-state"
+                aria-live="polite"
+            >
+              <div class="loading-icon">
+                <ion-spinner name="crescent" />
+              </div>
+
+              <h3>Загружаем твои треки</h3>
+
+              <p>
+                Получаем список загруженной музыки...
+              </p>
+            </div>
+
+            <!-- Ошибка списка -->
+            <div
+                v-else-if="uploadsError"
+                class="empty-state"
+                role="alert"
+            >
+              <div class="empty-icon error-icon">
+                <ion-icon :icon="informationCircleOutline" />
+              </div>
+
+              <h3>Не удалось загрузить список</h3>
+
+              <p>{{ uploadsError }}</p>
+
+              <button
+                  type="button"
+                  class="retry-button"
+                  @click="loadUploadedTracks"
+              >
+                <ion-icon :icon="refreshOutline" />
+
+                Повторить
+              </button>
+            </div>
+
+            <!-- Список -->
+            <div
+                v-else-if="uploadedTracks.length"
+                class="track-list"
+            >
+              <div
+                  v-for="track in uploadedTracks"
+                  :key="track.id"
+                  class="track-row"
+                  :class="{
+      'track-row-active': isCurrentTrack(track),
+    }"
+                  style="cursor: pointer"
+                  @click="playUploadedTrack(track)"
+              >
+
+              <!-- Кнопка воспроизведения -->
+                <button
+                    type="button"
+                    class="uploaded-track-play"
+                    :aria-label="`Воспроизвести ${track.title}`"
+                    @click="handleUploadedTrackClick(track)"
+                >
+                  <div
+                      class="cover"
+                      :style="{
+                      '--cover-color': getTrackColor(track.id),
+                    }"
+                  >
+                    <ion-icon :icon="musicalNotesOutline" />
+
+                    <span class="cover-play">
+                      <ion-icon
+                          :icon="
+                          isCurrentTrack(track) && playerIsPlaying
+                            ? pauseOutline
+                            : playOutline
+                        "
+                      />
+                    </span>
+                  </div>
+                </button>
+
+                <!-- Информация -->
+                <div class="track-info">
+                  <strong>{{ track.title }}</strong>
+
+                  <span>
+                    {{
+                      track.artists
+                          ?.map(artist => artist.name)
+                          .join(', ') || 'Неизвестный исполнитель'
+                    }}
+                  </span>
+
+                  <small>
+                    {{ track.album?.title || 'Без альбома' }}
+                  </small>
+                </div>
+
+                <!-- Индикатор воспроизведения -->
+                <span
+                    v-if="isCurrentTrack(track)"
+                    class="playing-indicator"
+                    aria-label="Сейчас воспроизводится"
+                >
+                  <span />
+                  <span />
+                  <span />
+                </span>
+
+                <!-- Добавление в очередь -->
+                <button
+                    type="button"
+                    class="queue-button"
+                    :disabled="
+                    queueLoadingTrackId === Number(track.id)
+                  "
+                    :aria-label="`Добавить ${track.title} в очередь`"
+                    title="Добавить в очередь"
+                    @click="addTrackToQueueFromLibrary(track)"
+                >
+                  <ion-spinner
+                      v-if="
+                      queueLoadingTrackId === Number(track.id)
+                    "
+                      name="crescent"
+                  />
+
+                  <ion-icon
+                      v-else
+                      :icon="addOutline"
+                  />
+                </button>
+              </div>
+            </div>
+
+            <!-- Список пуст -->
+            <div
+                v-else
+                class="empty-state"
+            >
+              <div class="empty-icon">
+                <ion-icon :icon="musicalNotesOutline" />
+              </div>
+
+              <h3>Ты пока ничего не загрузил</h3>
+
+              <p>
+                Загруженные тобой треки появятся здесь.
+                Заполни форму выше и добавь свою первую песню.
+              </p>
+            </div>
+          </section>
         </section>
 
         <!-- =====================================
-             ЗАГРУЗКА БИБЛИОТЕКИ
+             ЗАГРУЗКА ИЗБРАННОГО
         ====================================== -->
         <section
             v-else-if="loading"
@@ -390,7 +570,7 @@
         </section>
 
         <!-- =====================================
-             ОШИБКА ЗАГРУЗКИ БИБЛИОТЕКИ
+             ОШИБКА ЗАГРУЗКИ ИЗБРАННОГО
         ====================================== -->
         <section
             v-else-if="error"
@@ -417,7 +597,7 @@
         </section>
 
         <!-- =====================================
-             ТРЕКИ
+             ИЗБРАННОЕ
         ====================================== -->
         <section
             v-else-if="activeTab === 'tracks'"
@@ -429,7 +609,7 @@
                 ТВОЯ МУЗЫКА
               </div>
 
-              <h2>Твои треки</h2>
+              <h2>Избранное</h2>
             </div>
 
             <span class="count-badge">
@@ -438,39 +618,44 @@
             </span>
           </div>
 
-          <!-- Список треков -->
           <div
               v-if="tracks.length"
               class="track-list"
           >
-            <button
-                v-for="track in tracks"
-                :key="track.id"
-                type="button"
-                class="track-row"
-                :class="{
+            <<div
+              v-for="track in tracks"
+              :key="track.id"
+              class="track-row"
+              :class="{
                 'track-row-active': isCurrentTrack(track),
               }"
-                @click="playTrack(track)"
+              @click="handleTrackClick(track)"
+              style="cursor: pointer"
+          >
+            <button
+                type="button"
+                class="uploaded-track-play"
+                :aria-label="`Воспроизвести ${track.title}`"
             >
-              <div
-                  class="cover"
-                  :style="{
-                  '--cover-color': getTrackColor(track.id),
-                }"
-              >
-                <ion-icon :icon="musicalNotesOutline" />
+                <div
+                    class="cover"
+                    :style="{
+                    '--cover-color': getTrackColor(track.id),
+                  }"
+                >
+                  <ion-icon :icon="musicalNotesOutline" />
 
-                <span class="cover-play">
-                  <ion-icon
-                      :icon="
-                      isCurrentTrack(track) && playerIsPlaying
-                        ? pauseOutline
-                        : playOutline
-                    "
-                  />
-                </span>
-              </div>
+                  <span class="cover-play">
+                    <ion-icon
+                        :icon="
+                        isCurrentTrack(track) && playerIsPlaying
+                          ? pauseOutline
+                          : playOutline
+                      "
+                    />
+                  </span>
+                </div>
+              </button>
 
               <div class="track-info">
                 <strong>{{ track.title }}</strong>
@@ -498,15 +683,31 @@
                 <span />
               </span>
 
-              <ion-icon
-                  v-else
-                  class="track-arrow"
-                  :icon="playOutline"
-              />
-            </button>
+              <button
+                  type="button"
+                  class="queue-button"
+                  :disabled="
+                  queueLoadingTrackId === Number(track.id)
+                "
+                  :aria-label="`Добавить ${track.title} в очередь`"
+                  title="Добавить в очередь"
+                  @click="addTrackToQueueFromLibrary(track)"
+              >
+                <ion-spinner
+                    v-if="
+                    queueLoadingTrackId === Number(track.id)
+                  "
+                    name="crescent"
+                />
+
+                <ion-icon
+                    v-else
+                    :icon="addOutline"
+                />
+              </button>
+            </div>
           </div>
 
-          <!-- Пустая коллекция -->
           <div
               v-else
               class="empty-state"
@@ -515,11 +716,11 @@
               <ion-icon :icon="musicalNotesOutline" />
             </div>
 
-            <h3>Коллекция пока пуста</h3>
+            <h3>Избранное пока пусто</h3>
 
             <p>
-              Загрузи свою первую песню,
-              чтобы она появилась здесь.
+              Добавляй понравившиеся треки в избранное,
+              чтобы они всегда были под рукой.
             </p>
 
             <button
@@ -529,7 +730,7 @@
             >
               <ion-icon :icon="cloudUploadOutline" />
 
-              Загрузить первый трек
+              Загрузить музыку
             </button>
           </div>
         </section>
@@ -696,26 +897,61 @@
         </section>
       </main>
     </ion-content>
+
     <AudioPlayer />
   </ion-page>
 </template>
+
 <script setup lang="ts">
 import './library.css';
+
 import { useLibrary } from './library';
 
-import { IonContent, IonPage, IonIcon, IonSpinner } from '@ionic/vue';
+import {
+  IonContent,
+  IonPage,
+  IonIcon,
+  IonSpinner,
+} from '@ionic/vue';
+
+import {
+  musicalNotesOutline,
+  discOutline,
+  cloudUploadOutline,
+  checkmarkCircleOutline,
+  alertCircleOutline,
+  informationCircleOutline,
+  chevronForwardOutline,
+  refreshOutline,
+  playOutline,
+  pauseOutline,
+  peopleOutline,
+  addOutline,
+} from 'ionicons/icons';
+
 import AudioPlayer from '@/components/player/AudioPlayer.vue';
 import AppNavigation from '@/components/AppNavigation.vue';
+
+import type { Track } from '@/api/tracks';
+
 const {
   tabs,
   activeTab,
   openUpload,
 
+  // Избранное
   tracks,
   loading,
   error,
   loadLibrary,
 
+  // Собственные загрузки
+  uploadedTracks,
+  uploadsLoading,
+  uploadsError,
+  loadUploadedTracks,
+
+  // Форма загрузки
   uploadSuccess,
   uploadError,
   uploadForm,
@@ -729,28 +965,79 @@ const {
   resetUploadForm,
   uploadTrack,
 
+  // Коллекции
   albums,
   artists,
 
+  // Плеер
   isCurrentTrack,
   playerIsPlaying,
   playTrack,
+  playUploadedTrack,
   playAlbum,
   playArtist,
 
+  // Очередь
+  addTrackToQueueFromLibrary,
+  queueLoadingTrackId,
+
+  // Оформление
   getTrackColor,
   pluralizeTracks,
-
-  musicalNotesOutline,
-  discOutline,
-  cloudUploadOutline,
-  checkmarkCircleOutline,
-  alertCircleOutline,
-  informationCircleOutline,
-  chevronForwardOutline,
-  refreshOutline,
-  playOutline,
-  pauseOutline,
-  peopleOutline,
 } = useLibrary();
+
+/**
+ * Воспроизведение трека из избранного.
+ *
+ * Функция находится в useLibrary(), чтобы очередь
+ * и сам плеер использовали единый сценарий.
+ */
+async function handleTrackClick(track: Track): Promise<void> {
+  console.log('[Library.vue] Нажат трек из избранного:', track);
+
+  if (!track || track.id === undefined || track.id === null) {
+    console.error(
+        '[Library.vue] Нельзя воспроизвести трек без ID:',
+        track,
+    );
+
+    return;
+  }
+
+  try {
+    await playTrack(track, tracks.value);
+  } catch (error: unknown) {
+    console.error(
+        '[Library.vue] Ошибка воспроизведения избранного:',
+        error,
+    );
+  }
+}
+
+/**
+ * Воспроизведение трека, загруженного пользователем.
+ */
+async function handleUploadedTrackClick(
+    track: Track,
+): Promise<void> {
+  console.log('[Library.vue] Нажат загруженный трек:', track);
+
+  if (!track || track.id === undefined || track.id === null) {
+    console.error(
+        '[Library.vue] Нельзя воспроизвести загруженный трек без ID:',
+        track,
+    );
+
+    return;
+  }
+
+  try {
+    await playUploadedTrack(track);
+  } catch (error: unknown) {
+    console.error(
+        '[Library.vue] Ошибка воспроизведения загруженного трека:',
+        error,
+    );
+  }
+}
 </script>

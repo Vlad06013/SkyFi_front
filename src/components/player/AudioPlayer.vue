@@ -88,11 +88,11 @@
             type="button"
             aria-label="Следующий трек"
             :disabled="
-            player.isLoading ||
-            !player.currentTrack ||
-            player.currentTrackIndex < 0 ||
-            player.currentTrackIndex >= player.queue.length - 1
-          "
+        player.isLoading ||
+        !player.currentTrack ||
+        player.currentTrackIndex < 0 ||
+        player.currentTrackIndex >= player.queue.length - 1
+    "
             @click="player.playNext()"
         >
           ▶|
