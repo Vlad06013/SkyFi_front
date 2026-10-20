@@ -1117,10 +1117,84 @@ const usePlayerStore = defineStore('player', () => {
             : 'computer';
     }
 
+    function getOSName(): string {
+        const ua = navigator.userAgent;
+        const platform = navigator.platform ?? '';
+
+        if (/iPhone|iPad|iPod/i.test(ua)) {
+            return 'iOS';
+        }
+
+        if (/Android/i.test(ua)) {
+            return 'Android';
+        }
+
+        if (/Windows/i.test(ua)) {
+            return 'Windows';
+        }
+
+        if (/Macintosh|Mac OS X/i.test(ua)) {
+            return 'macOS';
+        }
+
+        if (/CrOS/i.test(ua)) {
+            return 'ChromeOS';
+        }
+
+        if (/Linux/i.test(ua) || /Linux/i.test(platform)) {
+            return 'Linux';
+        }
+
+        return 'Неизвестная ОС';
+    }
+
+    function getBrowserName(): string {
+        const ua = navigator.userAgent;
+
+        // Порядок важен: проверяем специальные браузеры раньше Chromium.
+        if (/Edg\//i.test(ua)) {
+            return 'Microsoft Edge';
+        }
+
+        if (/OPR\/|Opera/i.test(ua)) {
+            return 'Opera';
+        }
+
+        if (/SamsungBrowser/i.test(ua)) {
+            return 'Samsung Internet';
+        }
+
+        if (/YaBrowser/i.test(ua)) {
+            return 'Яндекс Браузер';
+        }
+
+        if (/Firefox\/|FxiOS\//i.test(ua)) {
+            return 'Mozilla Firefox';
+        }
+
+        if (/CriOS\//i.test(ua)) {
+            return 'Google Chrome';
+        }
+
+        if (/Chrome\/|Chromium\//i.test(ua)) {
+            return 'Google Chrome';
+        }
+
+        if (/Safari\//i.test(ua) && /Apple/i.test(navigator.vendor)) {
+            return 'Safari';
+        }
+
+        return 'Неизвестный браузер';
+    }
+
     function getDeviceName(): string {
-        return getDeviceType() === 'phone'
-            ? 'SkyFi — мобильное устройство'
-            : 'SkyFi — браузер';
+        // const os = getOSName();
+        return `${getOSName()} — ${getBrowserName()}`;
+
+
+        // return getDeviceType() === 'phone'
+        //     ? `SkyFi — ${os}`
+        //     : `${os} — браузер`;
     }
 
     async function loadDevices(): Promise<void> {
