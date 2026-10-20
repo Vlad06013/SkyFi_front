@@ -363,15 +363,20 @@ async function selectDevice(deviceId: number): Promise<void> {
   showDeviceMenu.value = false;
 }
 
-onMounted(() => {
-  void player.initializePlayerDevice();
+onMounted(async () => {
+  await player.initializePlayerDevice();
+
+  if (player.isServerSyncEnabled) {
+    player.subscribeToDeviceChanges();
+  }
 });
 
 watch(
     () => Boolean(player.isServerSyncEnabled),
-    (isAuthenticated) => {
+    async (isAuthenticated) => {
       if (isAuthenticated) {
-        void player.initializePlayerDevice();
+        await player.initializePlayerDevice();
+        player.subscribeToDeviceChanges();
       }
     },
 );

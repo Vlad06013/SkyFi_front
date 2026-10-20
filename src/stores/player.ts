@@ -1,5 +1,6 @@
 import { computed, ref, watch } from 'vue';
 import { defineStore } from 'pinia';
+import echo from '@/lib/echo';
 
 import {
     getTrackAudio,
@@ -66,6 +67,8 @@ const usePlayerStore = defineStore('player', () => {
     const isDevicesLoading = ref(false);
 
     const deviceSwitchLoading = ref(false);
+    let isDeviceChangesSubscribed = false;
+
 
     const playbackState = ref<PlaybackState | null>(null);
 
@@ -1307,10 +1310,11 @@ const usePlayerStore = defineStore('player', () => {
             const response = await activatePlayerDevice(deviceId);
 
             playbackState.value = response.state;
+            activeDeviceId.value = response.state.active_device_id;
 
-            activeDeviceId.value = deviceId;
-
-            await loadDevices();
+            // Не вызываем loadDevices() здесь:
+            // он определяет выбранное устройство по is_active,
+            // что не эквивалентно active_device_id.
         } catch (error) {
             console.error(
                 '[Player] Не удалось переключить устройство:',
@@ -1336,7 +1340,38 @@ const usePlayerStore = defineStore('player', () => {
             void updateFavoriteState(trackId);
         },
     );
+    function subscribeToDeviceChanges(): void {
+        if (!auth.user || isDeviceChangesSubscribed) {
+            return;
+        }
 
+        const channelName = `App.Models.User.${auth.user.id}`;
+
+        console.log('[Player] Подписываемся на канал:', channelName);
+
+        echo.private(channelName)
+            .listen('.playback.device.changed', (event: {
+                device_id: number;
+            }) => {
+                const deviceId = Number(event.device_id);
+
+                console.log(
+                    '[Player] Получено событие смены устройства:',
+                    event,
+                );
+
+                activeDeviceId.value = deviceId;
+
+                if (playbackState.value) {
+                    playbackState.value = {
+                        ...playbackState.value,
+                        active_device_id: deviceId,
+                    };
+                }
+            });
+
+        isDeviceChangesSubscribed = true;
+    }
     // ============================================
     // ЭКСПОРТ
     // ============================================
@@ -1401,7 +1436,10 @@ const usePlayerStore = defineStore('player', () => {
         restorePlayerState,
         isRestoringState,
         addToQueue,
-        playTrackNext
+        playTrackNext,
+
+
+        subscribeToDeviceChanges
     };
 });
 
