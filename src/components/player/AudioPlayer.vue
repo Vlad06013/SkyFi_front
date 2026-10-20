@@ -51,14 +51,56 @@
     <!-- Центральное управление -->
     <div class="player-center">
       <div class="player-controls">
+        <!-- Перемешивание -->
+        <button
+            type="button"
+            class="mode-button shuffle-button"
+            :class="{ 'mode-active': player.isShuffleEnabled }"
+            :aria-pressed="player.isShuffleEnabled"
+            :aria-label="
+              player.isShuffleEnabled
+                ? 'Выключить случайный порядок'
+                : 'Включить случайный порядок'
+            "
+            :title="
+              player.isShuffleEnabled
+                ? 'Случайный порядок включён'
+                : 'Случайный порядок выключен'
+            "
+            :disabled="player.isLoading"
+            @click="player.toggleShuffle()"
+        >
+          <svg
+              viewBox="0 0 24 24"
+              width="21"
+              height="21"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+          >
+            <path d="M16 3h5v5" />
+            <path d="M4 20L21 3" />
+            <path d="M21 16v5h-5" />
+            <path d="M15 15l6 6" />
+            <path d="M4 4l5 5" />
+          </svg>
+          <span
+              v-if="player.isShuffleEnabled"
+              class="shuffle-indicator"
+              aria-hidden="true"
+          ></span>
+        </button>
+
         <!-- Предыдущий трек -->
         <button
             type="button"
             aria-label="Предыдущий трек"
             :disabled="
             player.isLoading ||
-            !player.currentTrack ||
-            player.currentTrackIndex < 0
+            !player.currentTrack
           "
             @click="player.playPrevious()"
         >
@@ -83,15 +125,88 @@
           }}
         </button>
 
+        <!-- Режим повтора: выключен / всё / один трек -->
+        <button
+            type="button"
+            class="mode-button repeat-button"
+            :class="{ 'mode-active': player.repeatMode !== 'off' }"
+            :aria-pressed="player.repeatMode !== 'off'"
+            :aria-label="
+        player.repeatMode === 'off'
+            ? 'Включить повтор'
+            : player.repeatMode === 'all'
+              ? 'Повтор всего плейлиста'
+              : 'Повтор одного трека'
+    "
+            :title="
+        player.repeatMode === 'off'
+            ? 'Повтор выключен'
+            : player.repeatMode === 'all'
+              ? 'Повтор всего плейлиста'
+              : 'Повтор одного трека'
+    "
+            :disabled="player.isLoading"
+            @click="player.toggleRepeatMode()"
+        >
+          <svg
+              v-if="player.repeatMode !== 'one'"
+              viewBox="0 0 24 24"
+              width="21"
+              height="21"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+          >
+            <path d="m17 2 4 4-4 4" />
+            <path d="M3 11V9a3 3 0 0 1 3-3h15" />
+            <path d="m7 22-4-4 4-4" />
+            <path d="M21 13v2a3 3 0 0 1-3 3H3" />
+          </svg>
+
+          <svg
+              v-else
+              viewBox="0 0 24 24"
+              width="21"
+              height="21"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+          >
+            <path d="m17 2 4 4-4 4" />
+            <path d="M3 11V9a3 3 0 0 1 3-3h15" />
+            <path d="m7 22-4-4 4-4" />
+            <path d="M21 13v2a3 3 0 0 1-3 3H3" />
+            <text
+                x="12"
+                y="14"
+                text-anchor="middle"
+                font-size="9"
+                font-weight="700"
+                fill="currentColor"
+                stroke="none"
+            >1</text>
+          </svg>
+
+          <span
+              v-if="player.repeatMode !== 'off'"
+              class="shuffle-indicator"
+              aria-hidden="true"
+          ></span>
+        </button>
+
         <!-- Следующий трек -->
         <button
             type="button"
             aria-label="Следующий трек"
             :disabled="
         player.isLoading ||
-        !player.currentTrack ||
-        player.currentTrackIndex < 0 ||
-        player.currentTrackIndex >= player.queue.length - 1
+        !player.currentTrack
     "
             @click="player.playNext()"
         >
@@ -106,25 +221,27 @@
         </span>
 
         <input
-            v-model.number="player.progress"
+            :value="Math.min(
+                player.audioDuration,
+                Math.max(0, player.progress)
+              )"
             class="progress"
             type="range"
             min="0"
-            :max="player.audioDuration || 1"
+            :max="Math.max(1, player.audioDuration)"
             step="0.1"
             :style="{
-            '--range-progress': `${player.progressPercent}%`,
-          }"
-            aria-label="Позиция воспроизведения"
-            :disabled="
-            !player.currentTrack ||
-            player.audioDuration <= 0 ||
-            player.isLoading
-          "
+                '--range-progress': `${player.progressPercent}%`,
+              }"
+                        aria-label="Позиция воспроизведения"
+                        :disabled="
+                !player.currentTrack ||
+                player.audioDuration <= 0 ||
+                player.isLoading
+              "
             @pointerdown="player.isSeeking = true"
-            @pointerup="player.seekAudio(player.progress)"
-            @pointercancel="player.seekAudio(player.progress)"
-            @change="player.seekAudio(player.progress)"
+            @input="player.progress = Number(($event.target as HTMLInputElement).value)"
+            @change="player.seekAudio(player.progress); player.isSeeking = false"
         />
 
         <span>
@@ -136,9 +253,12 @@
     <!-- Громкость -->
     <div class="player-right">
       <div class="device-selector">
+
         <button
             type="button"
-            class="device-button"
+            class="device-button mode-button"
+            :class="{ 'mode-active': showDeviceMenu }"
+            :aria-pressed="showDeviceMenu"
             :disabled="
       player.isDevicesLoading ||
       player.deviceSwitchLoading
@@ -147,8 +267,25 @@
             title="Устройство воспроизведения"
             @click="showDeviceMenu = !showDeviceMenu"
         >
-          <span aria-hidden="true">▣</span>
+          <svg
+              viewBox="0 0 24 24"
+              width="21"
+              height="21"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+          >
+            <rect x="3" y="5" width="13" height="11" rx="2" />
+            <path d="M7 20h5" />
+            <path d="M9.5 16v4" />
+            <rect x="17" y="8" width="4" height="11" rx="1.2" />
+            <path d="M18.5 16.5h1" />
+          </svg>
         </button>
+
 
         <div
             v-if="showDeviceMenu"
@@ -238,6 +375,21 @@ watch(
       }
     },
 );
+
+function onProgressInput(event: Event): void {
+  const target = event.target as HTMLInputElement;
+
+  player.progress = Number(target.value);
+  player.isSeeking = true;
+}
+
+function onProgressChange(event: Event): void {
+  const target = event.target as HTMLInputElement;
+
+  player.progress = Number(target.value);
+  player.seekAudio(player.progress);
+  player.isSeeking = false;
+}
 </script>
 
 <style scoped>
@@ -425,6 +577,47 @@ watch(
 .player-controls button:disabled {
   opacity: 0.3;
   cursor: not-allowed;
+}
+
+.player-controls .mode-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 9px;
+  color: #9295a8;
+  background: transparent;
+  transition:
+      color 0.2s ease,
+      background 0.2s ease,
+      box-shadow 0.2s ease;
+}
+
+.player-controls .mode-button.mode-active {
+  color: #c4b5fd;
+  background: rgba(167, 139, 250, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(167, 139, 250, 0.3);
+}
+
+.shuffle-indicator {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  right: 3px;
+  top: 3px;
+  border-radius: 50%;
+  background: #c4b5fd;
+  box-shadow: 0 0 6px rgba(196, 181, 253, 0.8);
+}
+
+.repeat-one-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -1px;
+  font-size: 8px;
+  font-weight: 700;
+  color: #b8a2ff;
 }
 
 /* Кнопка воспроизведения */
@@ -691,8 +884,13 @@ watch(
   }
 
   .player-controls {
-    gap: 12px;
+    gap: 9px;
     margin: 0;
+  }
+
+  .player-controls .mode-button {
+    min-width: 28px;
+    min-height: 28px;
   }
 
   .player-controls button {
@@ -764,32 +962,44 @@ watch(
 }
 
 .device-button {
+  position: relative;
   display: grid;
   place-items: center;
 
   width: 32px;
   height: 32px;
+  min-width: 32px;
+  min-height: 32px;
 
   border: 0;
-  border-radius: 8px;
+  border-radius: 9px;
+  padding: 0;
 
   background: transparent;
-  color: #9a9caf;
+  color: #9295a8;
 
   cursor: pointer;
-  font-size: 19px;
+
+  transition:
+      color 0.2s ease,
+      background 0.2s ease,
+      box-shadow 0.2s ease;
 }
 
 .device-button:hover:not(:disabled) {
-  background: #ffffff0c;
   color: #d0c2ff;
+  background: rgba(167, 139, 250, 0.10);
 }
 
 .device-button:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
+.device-button:focus-visible {
+  outline: 2px solid #a78bfa80;
+  outline-offset: 5px;
+}
 .device-menu {
   position: absolute;
   right: 0;

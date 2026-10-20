@@ -18,25 +18,34 @@ export interface Track {
     id: number;
     title: string;
     description: string | null;
-
     uploaded_by: number | null;
-
     source_type: string;
     source_id: string | null;
-
     status: string;
-    rights_confirmed_at: string | null;
-
     artists?: Artist[];
     album?: Album | null;
     album_id: number | null;
-    duration_seconds?: number | null;
-
     play_count: number;
-
     created_at: string;
     updated_at: string;
     deleted_at: string | null;
+    files?: TrackFile[];
+}
+
+export interface TrackFile {
+    id: number;
+    track_id: number;
+    variant: string;
+    disk: string;
+    path: string;
+    mime_type: string;
+    size_bytes: number;
+    duration_seconds: number | null;
+    bitrate_kbps: number | null;
+    sample_rate: number | null;
+    sha256: string | null;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface TracksResponse {
@@ -236,6 +245,8 @@ export interface PlaybackState {
     user_id: number;
 
     current_track_id: number | null;
+    /** Трек основного списка, к которому нужно вернуться после серверной очереди. */
+    last_source_track_id: number | null;
     active_device_id: number | null;
 
     position_seconds: number;
@@ -381,9 +392,12 @@ export async function seekRemotePlayback(
  *
  * POST /player/next
  */
-export async function nextRemoteTrack(): Promise<PlayerActionResponse> {
+export async function nextRemoteTrack(
+    reason: 'manual' | 'ended' = 'manual',
+): Promise<PlayerActionResponse> {
     const response = await http.post<PlayerActionResponse>(
         '/player/next',
+        { reason },
     );
 
     return response.data;
@@ -548,6 +562,20 @@ export async function deletePlayerDevice(
 }> {
     const response = await http.delete(
         `/player/devices/${deviceId}`,
+    );
+
+    return response.data;
+}
+
+export type RepeatMode = 'off' | 'all' | 'one';
+
+export async function updatePlaybackOptions(options: {
+    repeat_mode?: RepeatMode;
+    shuffle_enabled?: boolean;
+}): Promise<PlayerActionResponse> {
+    const response = await http.patch<PlayerActionResponse>(
+        '/player/options',
+        options,
     );
 
     return response.data;

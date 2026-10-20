@@ -4,9 +4,6 @@ import { useAuthStore } from '@/stores/auth';
 
 import {
     getTracks,
-    addFavorite,
-    removeFavorite,
-    checkFavorite,
     type Track as ApiTrack,
 } from '@/api/tracks';
 
@@ -64,15 +61,11 @@ export function useHome() {
 
     const tracksError = ref('');
 
-    // ========================================
-    // ИЗБРАННОЕ
-    // ========================================
+    const liked = computed(() => player.liked);
 
-    const liked = ref(false);
-
-    const favoriteLoading = ref(false);
-
-    let favoriteRequestId = 0;
+    const favoriteLoading = computed(
+        () => player.favoriteLoading,
+    );
 
     // ========================================
     // ПРОФИЛЬ
@@ -219,97 +212,6 @@ export function useHome() {
         }
     }
 
-    // ========================================
-    // ИЗБРАННОЕ
-    // ========================================
-
-    async function updateFavoriteState(
-        track: ApiTrack | null,
-    ): Promise<void> {
-        const requestId = ++favoriteRequestId;
-
-        liked.value = false;
-
-        if (!track) {
-            return;
-        }
-
-        try {
-            const response = await checkFavorite(track.id);
-
-            if (requestId !== favoriteRequestId) {
-                return;
-            }
-
-            if (
-                String(player.currentTrack?.id) !==
-                String(track.id)
-            ) {
-                return;
-            }
-
-            liked.value = response.is_favorite;
-        } catch (error) {
-            if (requestId !== favoriteRequestId) {
-                return;
-            }
-
-            liked.value = false;
-
-            console.error(
-                'Не удалось проверить избранное:',
-                error,
-            );
-        }
-    }
-
-    async function toggleFavorite(): Promise<void> {
-        const track = currentTrack.value;
-
-        if (!track || favoriteLoading.value) {
-            return;
-        }
-
-        if (typeof track.id !== 'number') {
-            return;
-        }
-
-        if (!auth.user) {
-            console.warn(
-                'Для работы с избранным необходимо авторизоваться.',
-            );
-
-            return;
-        }
-
-        const trackId = track.id;
-
-        const wasLiked = liked.value;
-
-        favoriteLoading.value = true;
-
-        try {
-            if (wasLiked) {
-                await removeFavorite(trackId);
-            } else {
-                await addFavorite(trackId);
-            }
-
-            if (
-                String(player.currentTrack?.id) ===
-                String(trackId)
-            ) {
-                liked.value = !wasLiked;
-            }
-        } catch (error) {
-            console.error(
-                'Ошибка изменения избранного:',
-                error,
-            );
-        } finally {
-            favoriteLoading.value = false;
-        }
-    }
 
     // ========================================
     // НАВИГАЦИЯ
@@ -517,35 +419,6 @@ export function useHome() {
         return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
     }
 
-    // ========================================
-    // СИНХРОНИЗАЦИЯ ИЗБРАННОГО
-    // ========================================
-
-    watch(
-        () => player.currentTrack?.id,
-        async (trackId) => {
-            if (trackId == null) {
-                liked.value = false;
-
-                favoriteRequestId++;
-
-                return;
-            }
-
-            const track = tracks.value.find(
-                (item) =>
-                    String(item.id) === String(trackId),
-            );
-
-            if (track) {
-                await updateFavoriteState(track);
-            } else {
-                liked.value = false;
-
-                favoriteRequestId++;
-            }
-        },
-    );
 
     // ========================================
     // ИНИЦИАЛИЗАЦИЯ
@@ -570,7 +443,6 @@ export function useHome() {
     // ========================================
 
     onBeforeUnmount(() => {
-        favoriteRequestId++;
 
         document.removeEventListener(
             'click',
@@ -630,8 +502,8 @@ export function useHome() {
         loadTracks,
 
         // Избранное
-        updateFavoriteState,
-        toggleFavorite,
+        updateFavoriteState: player.updateFavoriteState,
+        toggleFavorite: player.toggleFavorite,
 
         // Навигация
         navigateTo,

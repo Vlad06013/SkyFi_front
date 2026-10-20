@@ -95,6 +95,10 @@ const usePlayerStore = defineStore('player', () => {
 
     const liked = ref(false);
 
+    // Режимы воспроизведения: перемешивание и повтор.
+    const isShuffleEnabled = ref(false);
+    const repeatMode = ref<'off' | 'all' | 'one'>('off');
+
     const favoriteLoading = ref(false);
 
     const isSeeking = ref(false);
@@ -137,6 +141,13 @@ const usePlayerStore = defineStore('player', () => {
             Number.isFinite(audio.duration) && audio.duration > 0
                 ? audio.duration
                 : 0;
+
+        // Синхронизируем прогресс с реальной позицией аудио.
+        if (!isSeeking.value) {
+            progress.value = Number.isFinite(audio.currentTime)
+                ? audio.currentTime
+                : 0;
+        }
     });
 
     audio.addEventListener('durationchange', () => {
@@ -158,9 +169,18 @@ const usePlayerStore = defineStore('player', () => {
         isPlaying.value = false;
         progress.value = audioDuration.value;
 
-        if (currentTrackIndex.value < queue.value.length - 1) {
-            void playNext();
+        if (repeatMode.value === 'one') {
+            audio.currentTime = 0;
+            progress.value = 0;
+            void audio.play().catch((error) => {
+                console.error('[Player] Не удалось повторить трек:', error);
+            });
+            return;
         }
+
+        // В режиме повтора всего списка playNext() сам решит,
+        // нужно ли перейти к следующему треку или начать список заново.
+        void playNext();
     });
 
     audio.addEventListener('error', () => {
@@ -339,10 +359,15 @@ const usePlayerStore = defineStore('player', () => {
                 isLoading.value = true;
 
                 const response = await nextRemoteTrack();
-
                 playbackState.value = response.state;
+                let track = response.state.current_track;
 
-                const track = response.state.current_track;
+                // Серверная очередь имеет приоритет. Если серверная
+                // последовательность закончилась, повторяем локально
+                // доступный список только при включённом повторе всего.
+                if (!track && repeatMode.value === 'all' && queue.value.length) {
+                    track = queue.value[0] as unknown as typeof track;
+                }
 
                 if (!track) {
                     isPlaying.value = false;
@@ -362,16 +387,71 @@ const usePlayerStore = defineStore('player', () => {
             return;
         }
 
-        // Офлайн: используем локальную очередь.
-        const nextIndex = currentTrackIndex.value + 1;
-
-        if (nextIndex >= queue.value.length) {
-            audio.pause();
+        // Офлайн: используем локальную очередь и выбранный режим.
+        if (!queue.value.length) {
             isPlaying.value = false;
             return;
         }
 
+        let nextIndex: number;
+        if (isShuffleEnabled.value && queue.value.length > 1) {
+            const candidates = queue.value
+                .map((_, index) => index)
+                .filter((index) => index !== currentTrackIndex.value);
+            nextIndex = candidates[Math.floor(Math.random() * candidates.length)];
+        } else {
+            nextIndex = currentTrackIndex.value + 1;
+        }
+
+        if (nextIndex >= queue.value.length) {
+            if (repeatMode.value !== 'all') {
+                audio.pause();
+                isPlaying.value = false;
+                return;
+            }
+            nextIndex = 0;
+        }
+
         await playTrack(queue.value[nextIndex]);
+    }
+
+    /** Перемешать порядок ожидающих треков в серверной очереди. */
+    async function toggleShuffle(): Promise<void> {
+        const enable = !isShuffleEnabled.value;
+        isShuffleEnabled.value = enable;
+
+        if (!enable || !auth.user) {
+            return;
+        }
+
+        try {
+            const response = await getPlayerQueue();
+            const items = [...response.data];
+            for (let i = items.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [items[i], items[j]] = [items[j], items[i]];
+            }
+            if (items.length > 1) {
+                const reordered = await reorderPlayerQueue(items.map((item) => item.id));
+                queue.value = (reordered.data ?? items).map((item) => item.track);
+            } else {
+                queue.value = items.map((item) => item.track);
+            }
+            currentTrackIndex.value = currentTrack.value
+                ? queue.value.findIndex((item) => String(item.id) === String(currentTrack.value?.id))
+                : -1;
+        } catch (error) {
+            console.error('[Player] Не удалось перемешать очередь:', error);
+        }
+    }
+
+    /** Циклически переключает: без повтора → повторить всё → повторить трек. */
+    function toggleRepeatMode(): void {
+        repeatMode.value = repeatMode.value === 'off'
+            ? 'all'
+            : repeatMode.value === 'all'
+                ? 'one'
+                : 'off';
     }
 
     // ============================================
@@ -425,6 +505,53 @@ const usePlayerStore = defineStore('player', () => {
             console.error('[Player] Не удалось добавить трек в очередь:', error);
         }
     }
+
+    /**
+     * Добавить трек в начало ожидающей очереди, чтобы он играл следующим.
+     * Порядок синхронизируется с сервером через существующий API очереди.
+     */
+    async function playTrackNext(track: ApiTrack): Promise<void> {
+        if (!auth.user) {
+            console.warn('[Player] Для изменения очереди необходимо авторизоваться.');
+            return;
+        }
+
+        const trackId = Number(track?.id);
+        if (!Number.isFinite(trackId) || trackId <= 0) {
+            return;
+        }
+
+        try {
+            // Используем ID именно созданного элемента очереди, а не ID трека:
+            // один и тот же трек может уже находиться в очереди несколько раз.
+            const added = await addTrackToQueue(trackId);
+            const response = await getPlayerQueue();
+            const items = [...response.data];
+            const targetIndex = items.findIndex(
+                (item) => Number(item.id) === Number(added.item.id),
+            );
+
+            if (targetIndex < 0) {
+                throw new Error('Добавленный элемент не найден в очереди сервера.');
+            }
+
+            const [target] = items.splice(targetIndex, 1);
+            // «Играть следующим» означает поставить перед всеми ожидающими,
+            // а не искать текущий трек в очереди: он часто играет из избранного.
+            items.unshift(target);
+
+            const reordered = await reorderPlayerQueue(items.map((item) => item.id));
+            const finalItems = reordered.data ?? items;
+            queue.value = finalItems.map((item) => item.track);
+            currentTrackIndex.value = currentTrack.value
+                ? queue.value.findIndex((item) => String(item.id) === String(currentTrack.value?.id))
+                : -1;
+
+            console.info('[Player] Трек поставлен следующим:', track.title);
+        } catch (error) {
+            console.error('[Player] Не удалось поставить трек следующим:', error);
+        }
+    }
     // ============================================
 // ВОССТАНОВЛЕНИЕ СОСТОЯНИЯ С СЕРВЕРА
 // ============================================
@@ -445,6 +572,7 @@ const usePlayerStore = defineStore('player', () => {
      *
      * Автоматически воспроизведение не запускаем.
      */
+
     async function restorePlayerState(): Promise<void> {
         if (!auth.user || isRestoringState.value) {
             return;
@@ -491,6 +619,7 @@ const usePlayerStore = defineStore('player', () => {
                 progress.value = 0;
                 audioDuration.value = 0;
                 isPlaying.value = false;
+                isSeeking.value = false;
 
                 return;
             }
@@ -511,7 +640,7 @@ const usePlayerStore = defineStore('player', () => {
                 (item) => String(item.id) === String(track.id),
             );
 
-            // Запоминаем серверную позицию.
+            // Восстанавливаем сохранённую позицию.
             const savedPosition = Math.max(
                 0,
                 Number(state.position_seconds) || 0,
@@ -519,10 +648,18 @@ const usePlayerStore = defineStore('player', () => {
 
             progress.value = savedPosition;
 
-            audioDuration.value =
-                track.duration_seconds ?? 0;
+            // Берём длительность из первого файла трека.
+            const duration = Number(
+                track.files?.[0]?.duration_seconds,
+            );
 
-            // Не запускаем аудио автоматически.
+            audioDuration.value =
+                Number.isFinite(duration) && duration > 0
+                    ? duration
+                    : 0;
+
+            // Не загружаем аудиофайл при открытии страницы.
+            // Источник будет запрошен в togglePlay() при нажатии Play.
             audio.pause();
             audio.removeAttribute('src');
             audio.load();
@@ -530,62 +667,6 @@ const usePlayerStore = defineStore('player', () => {
             isPlaying.value = false;
             isSeeking.value = false;
 
-            // Загружаем источник текущего трека,
-            // даже если очередь на сервере пуста.
-            const audioFile = await getTrackAudio(track.id);
-
-            if (requestId !== restoreRequestId) {
-                return;
-            }
-
-            if (!audioFile?.url) {
-                throw new Error(
-                    'Сервер не вернул ссылку на аудиофайл.',
-                );
-            }
-
-            audio.src = audioFile.url;
-            audio.load();
-
-            // После загрузки метаданных устанавливаем
-            // сохранённую позицию в самом HTML Audio.
-            const restorePosition = () => {
-                if (requestId !== restoreRequestId) {
-                    return;
-                }
-
-                if (
-                    Number.isFinite(audio.duration) &&
-                    audio.duration > 0
-                ) {
-                    audio.currentTime = Math.min(
-                        savedPosition,
-                        audio.duration,
-                    );
-
-                    progress.value = audio.currentTime;
-                    audioDuration.value = audio.duration;
-                }
-            };
-
-            if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) {
-                restorePosition();
-            } else {
-                audio.addEventListener(
-                    'loadedmetadata',
-                    restorePosition,
-                    { once: true },
-                );
-            }
-
-            void updateFavoriteState(track.id);
-
-            console.info(
-                '[Player] Состояние восстановлено:',
-                track.title,
-                'Позиция:',
-                savedPosition,
-            );
         } catch (error) {
             console.error(
                 '[Player] Не удалось восстановить состояние:',
@@ -597,6 +678,7 @@ const usePlayerStore = defineStore('player', () => {
             }
         }
     }
+
 
 
     // ============================================
@@ -650,8 +732,6 @@ const usePlayerStore = defineStore('player', () => {
         };
 
         liked.value = false;
-
-        void updateFavoriteState(trackId);
 
         isPlaying.value = false;
         isLoading.value = true;
@@ -1118,7 +1198,12 @@ const usePlayerStore = defineStore('player', () => {
 
                 activeDeviceId.value = currentDevice.id;
 
-                await loadDevices();
+                devices.value = devices.value.map((device) => ({
+                    ...device,
+                    is_active: device.id === currentDevice!.id,
+                }));
+
+                activeDeviceId.value = currentDevice!.id;
 
                 await restorePlayerState();
             } catch (error) {
@@ -1219,6 +1304,10 @@ const usePlayerStore = defineStore('player', () => {
         playNext,
         playPrevious,
         togglePlay,
+        isShuffleEnabled,
+        toggleShuffle,
+        repeatMode,
+        toggleRepeatMode,
 
         // Форматирование
         formatTime,
@@ -1237,7 +1326,8 @@ const usePlayerStore = defineStore('player', () => {
         // Восстановление состояния
         restorePlayerState,
         isRestoringState,
-        addToQueue
+        addToQueue,
+        playTrackNext
     };
 });
 

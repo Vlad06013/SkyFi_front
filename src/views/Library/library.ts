@@ -520,7 +520,6 @@ export function useLibrary() {
 
             resetFormAfterUpload();
 
-            await loadUploadedTracks();
 
             activeTab.value = 'upload';
         } catch (err: unknown) {

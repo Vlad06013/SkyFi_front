@@ -40,18 +40,6 @@
               <strong>SkyFi</strong>
             </div>
 
-            <!-- Поиск -->
-            <div class="search">
-              <span>⌕</span>
-
-              <input
-                  v-model="search"
-                  placeholder="Найти музыку..."
-                  type="search"
-              />
-
-              <kbd>⌘ K</kbd>
-            </div>
 
             <!-- Меню пользователя -->
             <div class="profile-menu">
@@ -195,117 +183,6 @@
                 </button>
               </div>
 
-              <!-- Загрузка -->
-              <div
-                  v-if="tracksLoading || (search.trim() && externalSearchLoading)"
-                  class="empty-state"
-              >
-                {{
-                  externalSearchLoading && search.trim()
-                      ? 'Ищем музыку...'
-                      : 'Загружаем треки...'
-                }}
-              </div>
-
-              <!-- Ошибка внешнего поиска -->
-              <div
-                  v-else-if="search.trim() && externalSearchError"
-                  class="empty-state"
-              >
-                <p>{{ externalSearchError }}</p>
-
-                <button
-                    @click="performExternalSearch(search.trim())"
-                >
-                  Повторить поиск
-                </button>
-              </div>
-
-              <!-- Ошибка загрузки локальных треков -->
-              <div
-                  v-else-if="!search.trim() && tracksError"
-                  class="empty-state"
-              >
-                {{ tracksError }}
-
-                <button @click="$router.go(0)">
-                  Повторить
-                </button>
-              </div>
-
-              <!-- Внешние результаты Internet Archive -->
-              <div
-                  v-else-if="search.trim() && externalTracks.length"
-                  class="track-grid"
-              >
-                <button
-                    v-for="track in externalTracks"
-                    :key="track.id"
-                    class="track-card"
-                    type="button"
-                    @click="playExternalTrack(track)"
-                >
-                  <span class="cover cover-purple">
-                    <span class="cover-symbol">♫</span>
-                    <span class="cover-play">▶</span>
-                  </span>
-
-                                  <span class="track-title">
-                    {{ track.title }}
-                  </span>
-
-                                  <span class="track-artist">
-                    {{ track.artist || 'Неизвестный исполнитель' }}
-                  </span>
-                </button>
-              </div>
-
-              <!-- Локальные треки SkyFi -->
-              <div
-                  v-else-if="!search.trim() && filteredTracks.length"
-                  class="track-grid"
-              >
-                <button
-                    v-for="track in filteredTracks"
-                    :key="track.id"
-                    class="track-card"
-                    type="button"
-                    @click="'artists' in track
-                      ? playTrack(track)
-                      : playExternalTrack(track)"
-                >
-                  <span class="cover cover-purple">
-                    <span class="cover-symbol">♫</span>
-                    <span class="cover-play">▶</span>
-                  </span>
-
-                  <span class="track-title">
-                    {{ track.title }}
-                  </span>
-
-                  <span class="track-artist">
-                    {{
-                      'artists' in track
-                          ? track.artists
-                          .map(artist => artist.name)
-                          .join(', ') || 'Неизвестный исполнитель'
-                          : track.artist || 'Неизвестный исполнитель'
-                    }}
-</span>
-                </button>
-              </div>
-
-              <!-- Ничего не найдено -->
-              <div
-                  v-else
-                  class="empty-state"
-              >
-                {{
-                  search.trim()
-                      ? 'Ничего не найдено. Попробуй другой запрос.'
-                      : 'Пока нет доступных треков.'
-                }}
-              </div>
             </section>
 
             <!-- Быстрый доступ -->
@@ -370,55 +247,19 @@ import { useHome } from './home';
 
 const {
   auth,
-
   menu,
   activeMenu,
-
   search,
-
-  currentTrack,
-  isPlaying,
-  liked,
-  favoriteLoading,
-  progress,
-  audioDuration,
-  isSeeking,
-  seekPosition,
-  volume,
-
   tracks,
-  tracksLoading,
-  tracksError,
-
-  externalTracks,
-  externalSearchLoading,
-  externalSearchError,
-  filteredTracks,
-
-  performExternalSearch,
-  updateFavoriteState,
-  toggleFavorite,
-
-  loadTracks,
-
   profileMenuOpen,
   loggingOut,
   logoutError,
-
   navigateTo,
   openProfile,
   openLibrary,
   logout,
 
-  playAudio,
-  playExternalTrack,
   playTrack,
-  togglePlay,
-  onSeekInput,
-  seekAudio,
-  nextTrack,
-
-  formatTime,
 } = useHome();
 </script>
 
