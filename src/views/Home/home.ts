@@ -198,10 +198,6 @@ export function useHome() {
             // Передаём весь каталог в глобальный плеер.
             player.setQueue(tracks.value);
 
-            console.log(
-                '[Home] Загружено треков:',
-                tracks.value.length,
-            );
         } catch (error) {
             console.error('[Home] Ошибка загрузки треков:', error);
 

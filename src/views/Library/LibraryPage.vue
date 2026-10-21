@@ -956,7 +956,7 @@ import {
 import AudioPlayer from '@/components/player/AudioPlayer.vue';
 import AppNavigation from '@/components/AppNavigation.vue';
 
-import { addFavorite, removeFavorite, checkFavorite } from '@/api/tracks';
+import { addFavorite, removeFavorite, checkFavorite } from '@/api/favorites';
 import type { Track } from '@/api/tracks';
 import usePlayerStore from '@/stores/player';
 import { ref, watch } from 'vue';

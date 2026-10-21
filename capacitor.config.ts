@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'io.ionic.starter',
-  appName: 'skyfi-temp',
+  appId: 'com.skyfi.app',
+  appName: 'SkyFi',
   webDir: 'dist'
 };
 

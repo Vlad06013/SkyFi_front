@@ -20,26 +20,62 @@
         </strong>
 
         <span>
-          {{
+      {{
             player.currentTrack?.artist
             ?? 'SkyFi · музыкальное пространство'
           }}
-        </span>
+    </span>
       </div>
 
+      <!-- Кнопка очереди воспроизведения -->
+      <button
+          type="button"
+          class="queue-toggle"
+          :class="{ 'queue-toggle-active': showQueue }"
+          :aria-pressed="showQueue"
+          aria-label="Открыть очередь воспроизведения"
+          title="Очередь воспроизведения"
+          @click="showQueue = !showQueue"
+      >
+        <svg
+            viewBox="0 0 24 24"
+            width="21"
+            height="21"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+        >
+          <path d="M4 6h16" />
+          <path d="M4 12h16" />
+          <path d="M4 18h10" />
+          <path d="m17 16 3 2-3 2" />
+        </svg>
+
+        <span
+            v-if="player.queue.length > 0"
+            class="queue-count"
+        >
+      {{ player.queue.length }}
+    </span>
+      </button>
+
+      <!-- Избранное -->
       <button
           class="heart-button"
           :class="{ liked: player.liked }"
           :disabled="
-          player.favoriteLoading ||
-          !player.currentTrack ||
-          typeof player.currentTrack.id !== 'number'
-        "
+      player.favoriteLoading ||
+      !player.currentTrack ||
+      typeof player.currentTrack.id !== 'number'
+    "
           :aria-label="
-          player.liked
-            ? 'Убрать из избранного'
-            : 'Добавить в избранное'
-        "
+      player.liked
+        ? 'Убрать из избранного'
+        : 'Добавить в избранное'
+    "
           :aria-pressed="player.liked"
           type="button"
           @click="player.toggleFavorite()"
@@ -250,6 +286,7 @@
       </div>
     </div>
 
+
     <!-- Громкость -->
     <div class="player-right">
       <div class="device-selector">
@@ -345,11 +382,17 @@
       />
     </div>
   </footer>
+  <QueuePanel
+      :open="showQueue"
+      :current-track="player.currentTrack"
+      @close="showQueue = false"
+  />
 </template>
 
 <script setup lang="ts">
 import usePlayerStore from '@/stores/player';
-
+import QueuePanel from '@/components/player/QueuePanel.vue';
+const showQueue = ref(false);
 const player = usePlayerStore();
 
 import { ref, onMounted, watch } from 'vue';
@@ -1081,4 +1124,52 @@ function onProgressChange(event: Event): void {
 .device-empty {
   margin: 0;
 }
+
+ .queue-toggle {
+   position: relative;
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+   flex-shrink: 0;
+
+   width: 36px;
+   height: 36px;
+   padding: 0;
+   margin-left: 4px;
+
+   border: 1px solid transparent;
+   border-radius: 10px;
+   background: transparent;
+   color: #a09db2;
+
+   cursor: pointer;
+   transition: color 0.2s, background 0.2s;
+ }
+
+.queue-toggle:hover,
+.queue-toggle-active {
+  background: #b8a2ff14;
+  color: #c4b5fd;
+}
+
+.queue-count {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+
+  display: grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  box-sizing: border-box;
+
+  border-radius: 999px;
+  background: #b8a2ff;
+  color: #1b1428;
+
+  font-size: 9px;
+  font-weight: 700;
+}
+
 </style>

@@ -8,11 +8,14 @@ import {
 
 import {
     searchTracks,
+    type Track,
+} from '@/api/tracks';
+
+import {
     getFavorites,
     addFavorite,
     removeFavorite,
-    type Track,
-} from '@/api/tracks';
+} from '@/api/favorites';
 
 import usePlayerStore from '@/stores/player';
 

@@ -4,9 +4,6 @@ import echo from '@/lib/echo';
 
 import {
     getTrackAudio,
-    addFavorite,
-    removeFavorite,
-    checkFavorite,
     getPlayerState,
     playRemoteTrack,
     pauseRemotePlayback,
@@ -18,6 +15,7 @@ import {
     getPlayerQueue,
     addTrackToQueue,
     reorderPlayerQueue,
+    fillPlayerQueue,
     getPlayerDevices,
     registerPlayerDevice,
     activatePlayerDevice,
@@ -26,6 +24,12 @@ import {
     type PlayerDevice,
     type PlayerDeviceType,
 } from '@/api/tracks';
+
+import {
+    addFavorite,
+    removeFavorite,
+    checkFavorite
+} from '@/api/favorites';
 
 import { useAuthStore } from '@/stores/auth';
 
@@ -235,7 +239,6 @@ const usePlayerStore = defineStore('player', () => {
                 ?.duration_seconds ?? track.files?.[0]?.duration_seconds,
         );
 
-        console.log('[Player] Данные трека для определения длительности', track);
         return Number.isFinite(duration) && duration > 0 ? duration : 0;
     }
 
@@ -903,14 +906,7 @@ const usePlayerStore = defineStore('player', () => {
         isPlaying.value = state.is_playing;
 
         updateServerProgress(state);
-        console.log('[Player] Прогресс после синхронизации', {
-            serverPosition: state.position_seconds,
-            progress: progress.value,
-            isPlaying: state.is_playing,
-            activeDeviceId: state.active_device_id,
-            localDeviceActive: isLocalDeviceActive.value,
-            version: state.version,
-        });
+
         const track = state.current_track;
 
         if (!track) {
@@ -936,21 +932,10 @@ const usePlayerStore = defineStore('player', () => {
         currentTrackIndex.value = findTrackIndex(track as ApiTrack);
         audioDuration.value = getTrackDuration(track as ApiTrack);
 
-        console.log('[Player] Длительность после выбора трека', {
-            trackId: track.id,
-            trackDuration: getTrackDuration(track as ApiTrack),
-            audioDuration: audioDuration.value,
-            localDeviceActive: isLocalDeviceActive.value,
-        });
-
         if (trackChanged) {
             liked.value = false;
         }
 
-        // if (!isLocalDeviceActive.value) {
-        //     stopLocalPlayback();
-        //     return;
-        // }
         if (!isLocalDeviceActive.value) {
             if (!audio.paused) {
                 audio.pause();
@@ -1210,6 +1195,37 @@ const usePlayerStore = defineStore('player', () => {
         isDeviceChangesSubscribed = true;
     }
 
+    async function fillQueue(trackIds: number[]): Promise<void> {
+        if (!auth.user) {
+            console.warn('[Player] Для заполнения очереди нужна авторизация.');
+            return;
+        }
+
+        const ids = trackIds
+            .map(Number)
+            .filter(id => Number.isInteger(id) && id > 0);
+
+        if (ids.length === 0) {
+            console.warn('[Player] Список треков для очереди пуст.');
+            return;
+        }
+
+        try {
+            console.log('[Player] Отправляем очередь на сервер:', ids);
+
+            const response = await fillPlayerQueue(ids);
+
+            console.log('[Player] Ответ сервера при заполнении очереди:', response);
+
+            const items = response.data ?? [];
+
+            setQueue(items.map(item => item.track));
+        } catch (error) {
+            console.error('[Player] Не удалось заполнить очередь на сервере:', error);
+            throw error;
+        }
+    }
+
     // ============================================
     // ЭКСПОРТ
     // ============================================
@@ -1269,6 +1285,7 @@ const usePlayerStore = defineStore('player', () => {
         isRestoringState,
 
         subscribeToDeviceChanges,
+        fillQueue
     };
 });
 

@@ -168,55 +168,9 @@ export async function getFavorites(): Promise<{
     return response.data;
 }
 
-/**
- * Добавить трек SkyFi в избранное.
- */
-export async function addFavorite(
-    trackId: number,
-): Promise<{
-    message: string;
-    is_favorite: boolean;
-    track_id: number;
-}> {
-    const response = await http.post(
-        `/favorites/${trackId}`,
-    );
 
-    return response.data;
-}
 
-/**
- * Удалить трек из избранного.
- */
-export async function removeFavorite(
-    trackId: number,
-): Promise<{
-    message: string;
-    is_favorite: boolean;
-    track_id: number;
-}> {
-    const response = await http.delete(
-        `/favorites/${trackId}`,
-    );
 
-    return response.data;
-}
-
-/**
- * Проверить, находится ли трек в избранном.
- */
-export async function checkFavorite(
-    trackId: number,
-): Promise<{
-    is_favorite: boolean;
-    track_id: number;
-}> {
-    const response = await http.get(
-        `/favorites/${trackId}/check`,
-    );
-
-    return response.data;
-}
 
 // ============================================
 // ГЛОБАЛЬНЫЙ ПЛЕЕР: ТИПЫ
@@ -263,11 +217,6 @@ export interface PlaybackState {
     created_at: string;
     updated_at: string;
 }
-
-export interface PlaybackStateUpdatedEvent {
-    state: PlaybackState;
-}
-
 export interface PlaybackQueueItem {
     id: number;
     playback_state_id: number;
@@ -431,6 +380,23 @@ export async function previousRemoteTrack(): Promise<PlayerActionResponse> {
 // ============================================
 // ГЛОБАЛЬНЫЙ ПЛЕЕР: ОЧЕРЕДЬ
 // ============================================
+
+/**
+ * Заполняет очередь треками выбранного источника.
+ * Порядок trackIds определяет порядок воспроизведения.
+ */
+export async function fillPlayerQueue(
+    trackIds: number[],
+): Promise<PlayerQueueResponse> {
+    const response = await http.put<PlayerQueueResponse>(
+        '/player/queue',
+        {
+            track_ids: trackIds,
+        },
+    );
+
+    return response.data;
+}
 
 /**
  * Получить очередь воспроизведения.

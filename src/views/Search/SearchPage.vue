@@ -131,13 +131,13 @@
                 :key="track.id"
                 class="track-row"
                 :class="{
-                'track-row-active': isTrackPlaying(track.id),
-                'track-row-playing': isTrackPlaying(track.id),
+                'track-row-active': isTrackPlaying(track),
+                'track-row-playing': isTrackPlaying(track),
               }"
                 role="button"
                 tabindex="0"
                 :aria-label="
-                (isTrackPlaying(track.id) ? 'Пауза: ' : 'Воспроизвести: ')
+                (isTrackPlaying(track) ? 'Пауза: ' : 'Воспроизвести: ')
                 + track.title
               "
                 @click="playTrack(track)"
@@ -158,7 +158,7 @@
                     class="cover-play"
                     type="button"
                     :aria-label="
-                    isTrackPlaying(track.id)
+                    isTrackPlaying(track)
                       ? 'Пауза'
                       : 'Воспроизвести ' + track.title
                   "
@@ -166,7 +166,7 @@
                 >
                   <ion-icon
                       :icon="
-                      isTrackPlaying(track.id)
+                      isTrackPlaying(track)
                         ? pauseOutline
                         : playOutline
                     "

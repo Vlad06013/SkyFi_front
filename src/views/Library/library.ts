@@ -26,8 +26,8 @@ import {
     uploadTrack as uploadTrackApi,
 } from '@/api/uploads';
 
-import type { Track } from '@/api/tracks';
-import { getFavorites } from '@/api/favorites';
+import type {Track} from '@/api/tracks';
+import {getFavorites} from '@/api/favorites';
 
 import usePlayerStore from '@/stores/player';
 
@@ -685,51 +685,19 @@ export function useLibrary() {
             trackId <= 0
         ) {
             console.error(
-                '[Library] Нельзя добавить в очередь трек без корректного ID:',
+                '[Library] Некорректный ID трека:',
                 track,
             );
-
             return;
         }
 
         queueLoadingTrackId.value = trackId;
 
         try {
-            /*
-             * В исходном файле реализация добавления в очередь
-             * отсутствовала, хотя функция использовалась в шаблоне.
-             *
-             * Добавляем трек через доступное API плеера:
-             * устанавливаем очередь с выбранным треком.
-             *
-             * Если в хранилище есть специальный метод addToQueue,
-             * его использование можно настроить по коду stores/player.
-             */
-            const currentQueue = [
-                ...tracks.value,
-            ];
-
-            const uploadedQueue = [
-                ...uploadedTracks.value,
-            ];
-
-            const combinedQueue = [
-                ...currentQueue,
-                ...uploadedQueue,
-            ];
-
-            const alreadyInQueue = combinedQueue.some(
-                item => Number(item.id) === trackId,
-            );
-
-            if (!alreadyInQueue) {
-                combinedQueue.push(track);
-            }
-
-            player.setQueue(combinedQueue);
+            await player.addToQueue(track);
 
             console.log(
-                '[Library] Очередь обновлена:',
+                '[Library] Трек добавлен в серверную очередь:',
                 track.title,
             );
         } catch (err: unknown) {
@@ -741,6 +709,75 @@ export function useLibrary() {
             queueLoadingTrackId.value = null;
         }
     }
+
+
+    // async function addTrackToQueueFromLibrary(
+    //     track: Track,
+    // ): Promise<void> {
+    //     const trackId = Number(track?.id);
+    //
+    //     if (
+    //         !track ||
+    //         !Number.isFinite(trackId) ||
+    //         trackId <= 0
+    //     ) {
+    //         console.error(
+    //             '[Library] Нельзя добавить в очередь трек без корректного ID:',
+    //             track,
+    //         );
+    //
+    //         return;
+    //     }
+    //
+    //     queueLoadingTrackId.value = trackId;
+    //
+    //     try {
+    //         /*
+    //          * В исходном файле реализация добавления в очередь
+    //          * отсутствовала, хотя функция использовалась в шаблоне.
+    //          *
+    //          * Добавляем трек через доступное API плеера:
+    //          * устанавливаем очередь с выбранным треком.
+    //          *
+    //          * Если в хранилище есть специальный метод addToQueue,
+    //          * его использование можно настроить по коду stores/player.
+    //          */
+    //         const currentQueue = [
+    //             ...tracks.value,
+    //         ];
+    //
+    //         const uploadedQueue = [
+    //             ...uploadedTracks.value,
+    //         ];
+    //
+    //         const combinedQueue = [
+    //             ...currentQueue,
+    //             ...uploadedQueue,
+    //         ];
+    //
+    //         const alreadyInQueue = combinedQueue.some(
+    //             item => Number(item.id) === trackId,
+    //         );
+    //
+    //         if (!alreadyInQueue) {
+    //             combinedQueue.push(track);
+    //         }
+    //
+    //         player.setQueue(combinedQueue);
+    //
+    //         console.log(
+    //             '[Library] Очередь обновлена:',
+    //             track.title,
+    //         );
+    //     } catch (err: unknown) {
+    //         console.error(
+    //             '[Library] Ошибка добавления трека в очередь:',
+    //             err,
+    //         );
+    //     } finally {
+    //         queueLoadingTrackId.value = null;
+    //     }
+    // }
 
     // ============================================
     // АЛЬБОМЫ
@@ -919,10 +956,9 @@ export function useLibrary() {
     // ============================================
 
     onMounted(() => {
-        console.log('[Library] Инициализация библиотеки.');
-
         void loadLibrary();
     });
+
 
     // ============================================
     // ПУБЛИЧНЫЙ API
