@@ -172,18 +172,17 @@ import {
 
 import AddToPlaylistItem from '@/components/track-menu/AddToPlaylistItem.vue';
 import DownloadTrackItem from '@/components/track-menu/DownloadTrackItem.vue';
-import type { Track } from '@/api/tracks';
-
+import type { TrackMenuItem } from '@/types/TrackMenuItem';
 const props = defineProps<{
-  track: Track;
+  track: TrackMenuItem;
   isFavorite: boolean;
   loading?: boolean;
 }>();
 
 const emit = defineEmits<{
-  action: [track: Track, action: 'next' | 'queue' | 'favorite'];
-  open: [track: Track];
-  close: [track: Track];
+  action: [track: TrackMenuItem, action: 'next' | 'queue' | 'favorite'];
+  open: [track: TrackMenuItem];
+  close: [track: TrackMenuItem];
 }>();
 
 const isOpen = ref(false);

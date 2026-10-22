@@ -84,7 +84,17 @@
           type="button"
           @click="player.toggleFavorite()"
       >
-        {{ player.liked ? '♥' : '♡' }}
+        <svg
+            viewBox="0 0 24 24"
+            class="control-icon heart-icon"
+            :class="{ 'is-liked': player.liked }"
+            fill="currentColor"
+            aria-hidden="true"
+        >
+          <path
+              d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z"
+          />
+        </svg>
       </button>
       <TrackContextMenu
           v-if="player.currentTrack"
@@ -151,7 +161,9 @@
           "
             @click="player.playPrevious()"
         >
-          |◀
+          <svg viewBox="0 0 24 24" class="control-icon" aria-hidden="true">
+            <path d="M6 5v14M19 5 8 12l11 7V5Z" />
+          </svg>
         </button>
 
         <!-- Play / Pause -->
@@ -161,15 +173,35 @@
             :disabled="player.isLoading || !player.currentTrack"
             :aria-label="player.isPlaying ? 'Пауза' : 'Воспроизвести'"
             :title="player.isPlaying ? 'Пауза' : 'Воспроизвести'"
-            @click="player.togglePlay()"
+            @click.stop="player.togglePlay()"
         >
-          {{
-            player.isLoading
-                ? '…'
-                : player.isPlaying
-                    ? 'Ⅱ'
-                    : '▶'
-          }}
+          <svg
+              v-if="player.isLoading"
+              class="control-icon loading-icon"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="9" />
+          </svg>
+
+          <svg
+              v-else-if="player.isPlaying"
+              class="control-icon"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+          >
+            <rect x="6" y="4" width="4" height="16" rx="1" />
+            <rect x="14" y="4" width="4" height="16" rx="1" />
+          </svg>
+
+          <svg
+              v-else
+              class="control-icon play-icon"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+          >
+            <path d="M7 4.5L20 12 7 19.5Z" />
+          </svg>
         </button>
 
 
@@ -184,7 +216,9 @@
     "
             @click="player.playNext()"
         >
-          ▶|
+          <svg viewBox="0 0 24 24" class="control-icon" aria-hidden="true">
+            <path d="M18 5v14M5 5l11 7-11 7V5Z" />
+          </svg>
         </button>
         <!-- Режим повтора: выключен / всё / один трек -->
         <button
@@ -649,9 +683,9 @@ function onProgressChange(event: Event): void {
   player.seekAudio(player.progress);
   player.isSeeking = false;
 }
-
+import type { TrackMenuItem } from '@/types/TrackMenuItem';
 function handleTrackMenuAction(
-    track: Track,
+    track: TrackMenuItem,
     action: 'next' | 'queue' | 'favorite',
 ) {
   switch (action) {

@@ -1336,3 +1336,29 @@
         transition-duration: 0.01ms !important;
     }
 }
+.control-icon {
+    display: block;
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex-shrink: 0;
+}
+
+.heart-icon {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.heart-icon.is-liked {
+    fill: currentColor;
+}
+
+.heart-icon:hover {
+    transform: scale(1.1);
+}
