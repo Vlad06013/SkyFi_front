@@ -1,0 +1,621 @@
+/* =========================================
+   СТРАНИЦА ПЛЕЙЛИСТОВ
+========================================= */
+
+.skyfi-content {
+    --background: #0b0d12;
+    color: #f5f7fa;
+}
+
+.page-layout {
+    max-width: 1050px;
+    margin: 0 auto;
+    padding: 42px 36px 100px;
+}
+
+/* Отступ от фиксированного бокового меню */
+
+@media (min-width: 701px) {
+    .page-layout {
+        width: calc(100% - 236px);
+        max-width: 1286px;
+        margin-left: 236px;
+    }
+}
+
+@media (max-width: 700px) {
+    .page-layout {
+        width: 100%;
+        margin-left: 0;
+    }
+}
+
+.eyebrow {
+    color: #a78bfa;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 2px;
+}
+
+.page-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin: 10px 0 30px;
+}
+
+.page-heading h1 {
+    color: #f5f7fa;
+    font-size: clamp(30px, 5vw, 42px);
+    font-weight: 800;
+    letter-spacing: -1.5px;
+    margin: 0;
+}
+
+.subtitle {
+    color: #9296a7;
+    margin: 10px 0 0;
+    font-size: 14px;
+}
+
+.create-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 17px;
+    border: 0;
+    border-radius: 12px;
+    background: #8b5cf6;
+    color: white;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.create-button:hover {
+    background: #7c3aed;
+    transform: translateY(-1px);
+}
+
+.create-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.create-button ion-icon {
+    font-size: 19px;
+}
+
+/* =========================================
+   ВКЛАДКИ
+========================================= */
+
+.playlist-tabs {
+    display: flex;
+    gap: 9px;
+    flex-wrap: wrap;
+    margin-bottom: 34px;
+}
+
+.tab {
+    padding: 10px 16px;
+    border: 1px solid #292d3b;
+    border-radius: 12px;
+    background: #171a23;
+    color: #a5a8b7;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.tab.active {
+    background: #8b5cf6;
+    border-color: #8b5cf6;
+    color: white;
+}
+
+/* =========================================
+   ЗАГОЛОВКИ СЕКЦИЙ
+========================================= */
+
+.section-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+}
+
+.section-heading h2 {
+    color: #f5f7fa;
+    font-size: 20px;
+    margin: 0;
+}
+
+.section-heading span {
+    color: #9296a7;
+    font-size: 13px;
+}
+
+/* =========================================
+   СЕТКА ПЛЕЙЛИСТОВ
+========================================= */
+
+.playlist-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 22px 18px;
+}
+
+.playlist-card {
+    min-width: 0;
+    cursor: pointer;
+}
+
+.playlist-cover {
+    position: relative;
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border: 1px solid #ffffff10;
+    border-radius: 17px;
+    background:
+        radial-gradient(circle at 75% 20%, #ffffff25, transparent 40%),
+        linear-gradient(140deg, var(--cover-color), #171a23 100%);
+    transition: transform 0.2s;
+}
+
+.playlist-card:hover .playlist-cover {
+    transform: translateY(-3px);
+}
+
+.cover-art {
+    display: grid;
+    place-items: center;
+    width: 92px;
+    height: 92px;
+    border: 1px solid #ffffff30;
+    border-radius: 50%;
+    color: #ffffffd9;
+    font-size: 42px;
+    background: #ffffff0b;
+}
+
+.cover-play {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    display: grid;
+    place-items: center;
+    width: 43px;
+    height: 43px;
+    border: 0;
+    border-radius: 50%;
+    background: #8b5cf6;
+    color: white;
+    font-size: 22px;
+    opacity: 0;
+    transform: translateY(5px);
+    transition: opacity 0.2s, transform 0.2s;
+    cursor: pointer;
+}
+
+.playlist-card:hover .cover-play,
+.cover-play:focus-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.playlist-card-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px 2px 0;
+}
+
+.playlist-card-info strong {
+    overflow: hidden;
+    color: #f5f7fa;
+    font-size: 14px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.playlist-card-info span {
+    overflow: hidden;
+    color: #9296a7;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* =========================================
+   ДЕТАЛИ ПЛЕЙЛИСТА
+========================================= */
+
+.back-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    margin-bottom: 26px;
+    border: 0;
+    background: transparent;
+    color: #b9a3ff;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.detail-hero {
+    display: flex;
+    align-items: center;
+    gap: 28px;
+    padding: 26px;
+    margin-bottom: 34px;
+    border: 1px solid #292d3b;
+    border-radius: 20px;
+    background: linear-gradient(120deg, #171a23, #11131b);
+}
+
+.detail-cover {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 190px;
+    aspect-ratio: 1;
+    border-radius: 17px;
+    background: linear-gradient(140deg, var(--cover-color), #171a23);
+    color: #ffffffdf;
+    font-size: 65px;
+}
+
+.detail-info h2 {
+    margin: 10px 0;
+    font-size: clamp(24px, 4vw, 34px);
+    font-weight: 800;
+}
+
+.detail-info p {
+    color: #9296a7;
+    font-size: 14px;
+}
+
+.detail-count {
+    display: block;
+    color: #a5a8b7;
+    font-size: 12px;
+    margin: 14px 0;
+}
+
+.detail-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 5px;
+}
+
+.delete-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 17px;
+    border: 1px solid #3a2a3b;
+    border-radius: 12px;
+    background: transparent;
+    color: #f0a4b0;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.delete-button:hover {
+    background: #2a1a22;
+    border-color: #5a3a44;
+}
+
+.delete-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.delete-button ion-icon {
+    font-size: 19px;
+}
+
+/* =========================================
+   СПИСОК ТРЕКОВ
+========================================= */
+
+.track-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.track-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px;
+    border-radius: 13px;
+}
+
+.track-row:hover {
+    background: #171a23;
+}
+
+.track-number {
+    width: 20px;
+    color: #777c8d;
+    font-size: 13px;
+    text-align: center;
+}
+
+.track-cover {
+    display: grid;
+    place-items: center;
+    width: 49px;
+    height: 49px;
+    border-radius: 10px;
+    background: linear-gradient(140deg, var(--cover-color), #171a23);
+    color: white;
+    font-size: 22px;
+}
+
+.track-info {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+}
+
+.track-info strong {
+    overflow: hidden;
+    color: #f5f7fa;
+    font-size: 13px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.track-info span {
+    overflow: hidden;
+    color: #9296a7;
+    font-size: 12px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.remove-button,
+.modal-close {
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: transparent;
+    color: #9296a7;
+    cursor: pointer;
+}
+
+.remove-button {
+    width: 38px;
+    height: 38px;
+    font-size: 20px;
+}
+
+.remove-button:hover,
+.modal-close:hover {
+    color: #f5f7fa;
+}
+
+/* =========================================
+   СОСТОЯНИЯ: ЗАГРУЗКА / ОШИБКА / ПУСТО
+========================================= */
+
+.empty-state {
+    padding: 50px 15px;
+    text-align: center;
+    color: #9296a7;
+}
+
+.empty-state > ion-icon {
+    font-size: 42px;
+    color: #a78bfa;
+}
+
+.empty-state .empty-icon,
+.empty-state .loading-icon {
+    display: grid;
+    place-items: center;
+    margin-bottom: 6px;
+    color: #a78bfa;
+    font-size: 42px;
+}
+
+.empty-state .error-icon {
+    color: #f0a4b0;
+}
+
+.empty-state h3 {
+    color: #f5f7fa;
+    margin: 16px 0 8px;
+}
+
+.empty-state p {
+    font-size: 13px;
+    margin-bottom: 20px;
+}
+
+.retry-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 11px 16px;
+    border: 1px solid #343849;
+    border-radius: 12px;
+    background: #171a23;
+    color: #f5f7fa;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.retry-button:hover {
+    border-color: #8b5cf6;
+}
+
+.retry-button ion-icon {
+    font-size: 17px;
+}
+
+.detail-alert {
+    margin: 0 0 18px;
+    color: #fda4af;
+    font-size: 13px;
+}
+
+/* =========================================
+   МОДАЛЬНОЕ ОКНО СОЗДАНИЯ
+========================================= */
+
+.modal-backdrop {
+    position: fixed;
+    z-index: 30;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background: #0009;
+    backdrop-filter: blur(7px);
+}
+
+.create-modal {
+    position: relative;
+    width: min(440px, 100%);
+    padding: 30px;
+    border: 1px solid #343043;
+    border-radius: 22px;
+    background: #171a23;
+    box-shadow: 0 25px 80px #0008;
+}
+
+.modal-close {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    width: 35px;
+    height: 35px;
+    font-size: 22px;
+}
+
+.modal-icon {
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    background: #8b5cf61f;
+    color: #b9a3ff;
+    font-size: 26px;
+    margin-bottom: 20px;
+}
+
+.create-modal h2 {
+    font-size: 23px;
+    color: #f5f7fa;
+    margin: 0;
+}
+
+.create-modal > p {
+    color: #9296a7;
+    font-size: 13px;
+    margin: 10px 0 24px;
+}
+
+.create-modal label {
+    display: block;
+    color: #d7d9e2;
+    font-size: 12px;
+    margin: 16px 0 8px;
+}
+
+.create-modal input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 13px 14px;
+    border: 1px solid #343849;
+    border-radius: 11px;
+    outline: none;
+    background: #0b0d12;
+    color: #f5f7fa;
+    font: inherit;
+    font-size: 13px;
+}
+
+.create-modal input:focus {
+    border-color: #8b5cf6;
+}
+
+.create-modal .form-error {
+    color: #fda4af;
+    margin: 12px 0 0;
+    font-size: 13px;
+}
+
+.submit-button {
+    width: 100%;
+    margin-top: 22px;
+}
+
+/* =========================================
+   АДАПТИВНОСТЬ
+========================================= */
+
+@media (max-width: 700px) {
+    .page-layout {
+        padding: 30px 18px 90px;
+    }
+
+    .playlist-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 20px 13px;
+    }
+
+    .cover-art {
+        width: 65px;
+        height: 65px;
+        font-size: 31px;
+    }
+
+    .page-heading {
+        align-items: flex-start;
+    }
+
+    .create-button {
+        padding: 11px 12px;
+    }
+
+    .detail-hero {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 18px;
+        gap: 20px;
+    }
+
+    .detail-cover {
+        width: 100%;
+        max-width: 240px;
+        align-self: center;
+    }
+
+    .create-modal {
+        padding: 25px 21px;
+    }
+}

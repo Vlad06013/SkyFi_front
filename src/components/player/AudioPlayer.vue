@@ -82,6 +82,40 @@
       >
         {{ player.liked ? '♥' : '♡' }}
       </button>
+
+      <!-- Меню действий с треком (планшет и телефон) -->
+      <div class="track-menu-wrap track-menu-compact" @click.stop @pointerdown.stop>
+        <button
+            type="button"
+            class="track-menu-button"
+            :disabled="!player.currentTrack"
+            :aria-expanded="showTrackMenu"
+            aria-haspopup="true"
+            aria-label="Действия с треком"
+            title="Действия с треком"
+            @click.stop="showTrackMenu = !showTrackMenu"
+        >
+          <svg
+              viewBox="0 0 24 24"
+              width="20"
+              height="20"
+              fill="currentColor"
+              aria-hidden="true"
+          >
+            <circle cx="12" cy="5" r="1.8" />
+            <circle cx="12" cy="12" r="1.8" />
+            <circle cx="12" cy="19" r="1.8" />
+          </svg>
+        </button>
+
+        <div v-if="showTrackMenu" class="track-menu-panel" role="menu">
+          <AddToPlaylistItem
+              :track-id="currentTrackNumericId"
+              @close="showTrackMenu = false"
+          />
+          <DownloadTrackItem @close="showTrackMenu = false" />
+        </div>
+      </div>
     </div>
 
     <!-- Центральное управление -->
@@ -380,6 +414,40 @@
           '--range-progress': `${player.volume}%`,
         }"
       />
+
+      <!-- Меню действий с треком -->
+      <div class="track-menu-wrap" @click.stop @pointerdown.stop>
+        <button
+            type="button"
+            class="track-menu-button"
+            :disabled="!player.currentTrack"
+            :aria-expanded="showTrackMenu"
+            aria-haspopup="true"
+            aria-label="Действия с треком"
+            title="Действия с треком"
+            @click.stop="showTrackMenu = !showTrackMenu"
+        >
+          <svg
+              viewBox="0 0 24 24"
+              width="20"
+              height="20"
+              fill="currentColor"
+              aria-hidden="true"
+          >
+            <circle cx="12" cy="5" r="1.8" />
+            <circle cx="12" cy="12" r="1.8" />
+            <circle cx="12" cy="19" r="1.8" />
+          </svg>
+        </button>
+
+        <div v-if="showTrackMenu" class="track-menu-panel" role="menu">
+          <AddToPlaylistItem
+              :track-id="currentTrackNumericId"
+              @close="showTrackMenu = false"
+          />
+          <DownloadTrackItem @close="showTrackMenu = false" />
+        </div>
+      </div>
     </div>
   </footer>
   <QueuePanel

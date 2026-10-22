@@ -227,6 +227,11 @@
                     <button type="button" role="menuitem" :disabled="menuActionLoadingId !== null" @click.stop="runTrackMenuAction(track, 'favorite')">
                       <ion-icon :icon="heartOutline" /> {{ isFavoriteTrack(track) ? 'Удалить из избранного' : 'Добавить в избранное' }}
                     </button>
+                    <AddToPlaylistItem
+                        :track-id="Number(track.id)"
+                        @close="openMenuTrackId = null"
+                    />
+                    <DownloadTrackItem @close="openMenuTrackId = null" />
                   </div>
                 </div>
               </div>
@@ -406,6 +411,11 @@
                   <button type="button" role="menuitem" :disabled="menuActionLoadingId !== null" @click.stop="runTrackMenuAction(track, 'favorite')">
                     <ion-icon :icon="heartOutline" /> {{ isFavoriteTrack(track) ? 'Удалить из избранного' : 'Добавить в избранное' }}
                   </button>
+                  <AddToPlaylistItem
+                      :track-id="Number(track.id)"
+                      @close="openMenuTrackId = null"
+                  />
+                  <DownloadTrackItem @close="openMenuTrackId = null" />
                 </div>
               </div>
             </div>
@@ -955,6 +965,8 @@ import {
 
 import AudioPlayer from '@/components/player/AudioPlayer.vue';
 import AppNavigation from '@/components/AppNavigation.vue';
+import AddToPlaylistItem from '@/components/track-menu/AddToPlaylistItem.vue';
+import DownloadTrackItem from '@/components/track-menu/DownloadTrackItem.vue';
 
 import { addFavorite, removeFavorite, checkFavorite } from '@/api/favorites';
 import type { Track } from '@/api/tracks';

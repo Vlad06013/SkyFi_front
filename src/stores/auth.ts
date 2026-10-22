@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import axios from 'axios';
 import { http } from '@/api/http';
+import { invalidatePlaylistsCache } from '@/api/playlists';
 
 export interface User {
     id: number;
@@ -34,6 +35,9 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = null;
 
         localStorage.removeItem('skyfi_token');
+
+        // Плейлисты привязаны к пользователю — сбрасываем кэш.
+        invalidatePlaylistsCache();
     }
 
     function getErrorMessage(exception: unknown): string {
