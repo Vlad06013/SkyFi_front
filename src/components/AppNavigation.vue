@@ -33,7 +33,7 @@
           <ion-icon :icon="musicalNotesOutline" />
         </span>
 
-        <span class="nav-label">Моя библиотека</span>
+        <span class="nav-label">Мое</span>
       </RouterLink>
 
       <RouterLink to="/playlists" class="nav-link">

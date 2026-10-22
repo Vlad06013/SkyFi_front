@@ -12,10 +12,6 @@ import {
     nextRemoteTrack,
     previousRemoteTrack,
     updatePlaybackOptions,
-    getPlayerQueue,
-    addTrackToQueue,
-    reorderPlayerQueue,
-    fillPlayerQueue,
     getPlayerDevices,
     registerPlayerDevice,
     activatePlayerDevice,
@@ -24,6 +20,14 @@ import {
     type PlayerDevice,
     type PlayerDeviceType,
 } from '@/api/tracks';
+
+import {
+    getPlayerQueue,
+    addTrackToQueue,
+    reorderPlayerQueue,
+    fillPlayerQueue,
+} from '@/api/queue';
+
 
 import {
     addFavorite,
@@ -147,7 +151,6 @@ const usePlayerStore = defineStore('player', () => {
             progress.value = nextProgress;
         }, 250);
 
-        console.log(serverProgressTimer)
     }
 
     function updateServerProgress(state: PlaybackState): void {
@@ -474,6 +477,7 @@ const usePlayerStore = defineStore('player', () => {
     // ЗАПУСК ТРЕКА
     // ============================================
 
+
     async function playTrack(track: ApiTrack): Promise<void> {
         if (!track?.id || !auth.user || isLoading.value) return;
 
@@ -481,14 +485,22 @@ const usePlayerStore = defineStore('player', () => {
         isLoading.value = true;
 
         try {
+            const selectedTrackId = Number(track.id);
+
             const response = await playRemoteTrack(
-                Number(track.id),
+                selectedTrackId,
                 localDeviceId.value ?? undefined,
             );
 
             if (requestId !== playbackRequestId) return;
 
-            await applyRemotePlaybackState(response.state, true);
+            // При явном выборе передаём ID выбранного трека,
+            // чтобы не полагаться на уже обновлённый currentTrack.
+            await applyRemotePlaybackState(
+                response.state,
+                true,
+                selectedTrackId,
+            );
         } catch (error) {
             console.error('[Player] Ошибка запуска трека:', error);
         } finally {
@@ -497,6 +509,7 @@ const usePlayerStore = defineStore('player', () => {
             }
         }
     }
+
 
     // ============================================
     // PLAY / PAUSE
@@ -876,6 +889,7 @@ const usePlayerStore = defineStore('player', () => {
     async function applyRemotePlaybackState(
         state: PlaybackState,
         allowAutoplay = false,
+        requestedTrackId?: number,
     ): Promise<void> {
         const incomingVersion = Number(state.version);
 
@@ -926,8 +940,16 @@ const usePlayerStore = defineStore('player', () => {
         }
 
         const previousTrackId = currentTrack.value?.id;
-        const trackChanged = String(previousTrackId) !== String(track.id);
 
+        const trackChanged =
+            requestedTrackId !== undefined
+                ? Number(requestedTrackId) !== Number(track.id) ||
+                Number(previousTrackId) !== Number(track.id)
+                : String(previousTrackId) !== String(track.id);
+
+        const forceLoadSelectedTrack =
+            requestedTrackId !== undefined &&
+            Number(requestedTrackId) === Number(track.id);
         currentTrack.value = mapPlaybackTrack(track as ApiTrack);
         currentTrackIndex.value = findTrackIndex(track as ApiTrack);
         audioDuration.value = getTrackDuration(track as ApiTrack);
@@ -1010,7 +1032,7 @@ const usePlayerStore = defineStore('player', () => {
             const sourceMissing =
                 !audio.src || audio.src === window.location.href;
 
-            if (trackChanged || sourceMissing) {
+            if (trackChanged || sourceMissing || forceLoadSelectedTrack) {
                 audio.pause();
 
                 const audioFile = await getTrackAudio(Number(track.id));
@@ -1025,7 +1047,10 @@ const usePlayerStore = defineStore('player', () => {
                 if (!audioFile?.url) {
                     throw new Error('Сервер не вернул ссылку на аудиофайл.');
                 }
-
+                console.log('[Player] ID выбранного трека:', track.id);
+                console.log('[Player] ID текущего трека до загрузки:', previousTrackId);
+                console.log('[Player] URL полученного аудио:', audioFile.url);
+                console.log('[Player] audio.src до обновления:', audio.src);
                 audio.src = audioFile.url;
                 audio.load();
 

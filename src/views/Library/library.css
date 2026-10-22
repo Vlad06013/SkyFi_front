@@ -624,57 +624,8 @@ h3 {
    СПИСОК ТРЕКОВ
 ========================================= */
 
-.track-list {
-    display: flex;
-    flex-direction: column;
 
-    gap: 6px;
-}
 
-.track-row {
-    position: relative;
-
-    display: flex;
-    align-items: center;
-
-    gap: 15px;
-
-    width: 100%;
-    box-sizing: border-box;
-
-    padding: 11px;
-
-    border: 1px solid transparent;
-    border-radius: 14px;
-
-    background: transparent;
-
-    color: inherit;
-
-    font-family: inherit;
-    text-align: left;
-
-    cursor: pointer;
-
-    transition:
-            background 0.2s,
-            border-color 0.2s,
-            transform 0.2s;
-}
-
-.track-row:hover {
-    background: #171a23;
-}
-
-.track-row:active {
-    transform: scale(0.995);
-}
-
-.track-row-active {
-    border-color: #514078;
-
-    background: #191526;
-}
 
 .cover,
 .album-cover {
@@ -730,15 +681,7 @@ h3 {
     font-size: 23px;
 }
 
-.track-row:hover .cover-play,
-.track-row-active .cover-play {
-    opacity: 1;
-}
 
-.track-row:hover .cover > ion-icon,
-.track-row-active .cover > ion-icon {
-    opacity: 0;
-}
 
 /* Информация о треке */
 
@@ -761,9 +704,6 @@ h3 {
     overflow-wrap: anywhere;
 }
 
-.track-row-active .track-info strong {
-    color: #c4b5fd;
-}
 
 .track-info span,
 .track-info small {
@@ -790,11 +730,7 @@ h3 {
             transform 0.2s;
 }
 
-.track-row:hover .track-arrow {
-    color: #c4b5fd;
 
-    transform: translateX(2px);
-}
 
 /* Индикатор воспроизведения */
 
@@ -1256,36 +1192,32 @@ h3 {
 
     .library-tabs {
         display: flex;
-        flex-wrap: nowrap;
-
+        flex-wrap: wrap;
+        align-items: center;
         gap: 8px;
 
-        margin-right: -18px;
-        margin-bottom: 26px;
-        padding-right: 18px;
-        padding-bottom: 5px;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
 
-        overflow-x: auto;
-        overscroll-behavior-x: contain;
+        margin: 0 0 26px;
+        padding: 0 0 5px;
 
-        scrollbar-width: none;
+        overflow: visible;
+    }
+
+    .tab {
+        flex: 0 1 auto;
+        min-width: 0;
+        max-width: 100%;
+        white-space: normal;
     }
 
     .library-tabs::-webkit-scrollbar {
         display: none;
     }
 
-    .tab {
-        flex-shrink: 0;
 
-        min-height: 40px;
-
-        padding: 9px 13px;
-
-        border-radius: 10px;
-
-        font-size: 12px;
-    }
 
     .upload-section {
         padding: 21px 16px;
@@ -1353,15 +1285,8 @@ h3 {
         font-size: 20px;
     }
 
-    .track-list {
-        gap: 5px;
-    }
 
-    .track-row {
-        gap: 11px;
 
-        padding: 9px 5px;
-    }
 
     .cover {
         width: 49px;
@@ -1465,10 +1390,6 @@ h3 {
         height: 38px;
 
         font-size: 19px;
-    }
-
-    .track-row {
-        gap: 9px;
     }
 
     .cover {

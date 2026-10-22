@@ -134,108 +134,18 @@
             </div>
 
             <!-- Список -->
-            <div
+            <TrackList
                 v-else-if="uploadedTracks.length"
-                class="track-list"
-            >
-              <div
-                  v-for="track in uploadedTracks"
-                  :key="track.id"
-                  class="track-row"
-                  :class="{
-      'track-row-active': isCurrentTrack(track),
-      'track-row-menu-open': openMenuTrackId === String(track.id),
-    }"
-                  style="cursor: pointer"
-                  @click="playUploadedTrack(track)"
-              >
-
-                <!-- Кнопка воспроизведения -->
-                <button
-                    type="button"
-                    class="uploaded-track-play"
-                    :aria-label="`Воспроизвести ${track.title}`"
-                    @click="handleUploadedTrackClick(track)"
-                >
-                  <div
-                      class="cover"
-                      :style="{
-                      '--cover-color': getTrackColor(track.id),
-                    }"
-                  >
-                    <ion-icon :icon="musicalNotesOutline" />
-
-                    <span class="cover-play">
-                      <ion-icon
-                          :icon="
-                          isCurrentTrack(track) && playerIsPlaying
-                            ? pauseOutline
-                            : playOutline
-                        "
-                      />
-                    </span>
-                  </div>
-                </button>
-
-                <!-- Информация -->
-                <div class="track-info">
-                  <strong>{{ track.title }}</strong>
-
-                  <span>
-                    {{
-                      track.artists
-                          ?.map(artist => artist.name)
-                          .join(', ') || 'Неизвестный исполнитель'
-                    }}
-                  </span>
-
-                  <small>
-                    {{ track.album?.title || 'Без альбома' }}
-                  </small>
-                </div>
-
-                <!-- Индикатор воспроизведения -->
-                <span
-                    v-if="isCurrentTrack(track)"
-                    class="playing-indicator"
-                    aria-label="Сейчас воспроизводится"
-                >
-                  <span />
-                  <span />
-                  <span />
-                </span>
-
-                <!-- Контекстное меню трека -->
-                <div class="track-menu-wrap" @click.stop @pointerdown.stop>
-                  <button
-                      type="button"
-                      class="track-menu-trigger"
-                      :aria-label="`Действия для трека ${track.title}`"
-                      :aria-expanded="openMenuTrackId === String(track.id)"
-                      @click="toggleTrackMenu(track)"
-                  >
-                    <ion-spinner v-if="menuActionLoadingId === Number(track.id)" name="crescent" />
-                    <ion-icon v-else :icon="ellipsisVerticalOutline" />
-                  </button>
-                  <div v-if="openMenuTrackId === String(track.id)" class="track-context-menu" role="menu" @click.stop @pointerdown.stop>
-                    <button type="button" role="menuitem" :disabled="menuActionLoadingId !== null" @click.stop="runTrackMenuAction(track, 'next')">
-                      <ion-icon :icon="playSkipForwardOutline" /> Играть следующим
-                    </button>
-                    <button type="button" role="menuitem" :disabled="menuActionLoadingId !== null" @click.stop="runTrackMenuAction(track, 'queue')">
-                      <ion-icon :icon="listOutline" /> Добавить в очередь
-                    </button>
-                    <button type="button" role="menuitem" :disabled="menuActionLoadingId !== null" @click.stop="runTrackMenuAction(track, 'favorite')">
-                      <ion-icon :icon="heartOutline" /> {{ isFavoriteTrack(track) ? 'Удалить из избранного' : 'Добавить в избранное' }}
-                    </button>
-                    <AddToPlaylistItem
-                        :track-id="Number(track.id)"
-                        @close="openMenuTrackId = null"
-                    />
-                    <DownloadTrackItem @close="openMenuTrackId = null" />
-                  </div>
-                </div>
-              </div>
-            </div>
+                :tracks="uploadedTracks"
+                :is-current-track="isCurrentTrack"
+                :is-playing="playerIsPlaying"
+                :get-track-color="getTrackColor"
+                :is-favorite="isFavoriteTrack"
+                :loading-track-id="menuActionLoadingId"
+                @play="handleUploadedTrackClick"
+                @menu-open="handleTrackMenuOpen"
+                @action="runTrackMenuAction"
+            />
 
             <!-- Список пуст -->
             <div
@@ -303,8 +213,8 @@
         </section>
 
         <!-- =====================================
-             ИЗБРАННОЕ
-        ====================================== -->
+              ИЗБРАННОЕ
+         ====================================== -->
         <section
             v-else-if="activeTab === 'tracks'"
             class="library-section"
@@ -324,102 +234,18 @@
             </span>
           </div>
 
-          <div
+          <TrackList
               v-if="tracks.length"
-              class="track-list"
-          >
-            <div
-                v-for="track in tracks"
-                :key="track.id"
-                class="track-row"
-                :class="{
-                'track-row-active': isCurrentTrack(track),
-                'track-row-menu-open': openMenuTrackId === String(track.id),
-              }"
-                @click="handleTrackClick(track)"
-                style="cursor: pointer"
-            >
-              <button
-                  type="button"
-                  class="uploaded-track-play"
-                  :aria-label="`Воспроизвести ${track.title}`"
-              >
-                <div
-                    class="cover"
-                    :style="{
-                    '--cover-color': getTrackColor(track.id),
-                  }"
-                >
-                  <ion-icon :icon="musicalNotesOutline" />
-
-                  <span class="cover-play">
-                    <ion-icon
-                        :icon="
-                        isCurrentTrack(track) && playerIsPlaying
-                          ? pauseOutline
-                          : playOutline
-                      "
-                    />
-                  </span>
-                </div>
-              </button>
-
-              <div class="track-info">
-                <strong>{{ track.title }}</strong>
-
-                <span>
-                  {{
-                    track.artists
-                        ?.map(artist => artist.name)
-                        .join(', ') || 'Неизвестный исполнитель'
-                  }}
-                </span>
-
-                <small>
-                  {{ track.album?.title || 'Без альбома' }}
-                </small>
-              </div>
-
-              <span
-                  v-if="isCurrentTrack(track)"
-                  class="playing-indicator"
-                  aria-label="Сейчас воспроизводится"
-              >
-                <span />
-                <span />
-                <span />
-              </span>
-
-              <div class="track-menu-wrap" @click.stop @pointerdown.stop>
-                <button
-                    type="button"
-                    class="track-menu-trigger"
-                    :aria-label="`Действия для трека ${track.title}`"
-                    :aria-expanded="openMenuTrackId === String(track.id)"
-                    @click="toggleTrackMenu(track)"
-                >
-                  <ion-spinner v-if="menuActionLoadingId === Number(track.id)" name="crescent" />
-                  <ion-icon v-else :icon="ellipsisVerticalOutline" />
-                </button>
-                <div v-if="openMenuTrackId === String(track.id)" class="track-context-menu" role="menu" @click.stop @pointerdown.stop>
-                  <button type="button" role="menuitem" :disabled="menuActionLoadingId !== null" @click.stop="runTrackMenuAction(track, 'next')">
-                    <ion-icon :icon="playSkipForwardOutline" /> Играть следующим
-                  </button>
-                  <button type="button" role="menuitem" :disabled="menuActionLoadingId !== null" @click.stop="runTrackMenuAction(track, 'queue')">
-                    <ion-icon :icon="listOutline" /> Добавить в очередь
-                  </button>
-                  <button type="button" role="menuitem" :disabled="menuActionLoadingId !== null" @click.stop="runTrackMenuAction(track, 'favorite')">
-                    <ion-icon :icon="heartOutline" /> {{ isFavoriteTrack(track) ? 'Удалить из избранного' : 'Добавить в избранное' }}
-                  </button>
-                  <AddToPlaylistItem
-                      :track-id="Number(track.id)"
-                      @close="openMenuTrackId = null"
-                  />
-                  <DownloadTrackItem @close="openMenuTrackId = null" />
-                </div>
-              </div>
-            </div>
-          </div>
+              :tracks="tracks"
+              :is-current-track="isCurrentTrack"
+              :is-playing="playerIsPlaying"
+              :get-track-color="getTrackColor"
+              :is-favorite="isFavoriteTrack"
+              :loading-track-id="menuActionLoadingId"
+              @play="handleTrackClick"
+              @menu-open="handleTrackMenuOpen"
+              @action="runTrackMenuAction"
+          />
 
           <div
               v-else
@@ -935,7 +761,6 @@
 import './library.css';
 
 import { useLibrary } from './library';
-
 import {
   IonContent,
   IonPage,
@@ -965,8 +790,7 @@ import {
 
 import AudioPlayer from '@/components/player/AudioPlayer.vue';
 import AppNavigation from '@/components/AppNavigation.vue';
-import AddToPlaylistItem from '@/components/track-menu/AddToPlaylistItem.vue';
-import DownloadTrackItem from '@/components/track-menu/DownloadTrackItem.vue';
+import TrackList from '@/components/tracks/TrackList.vue';
 
 import { addFavorite, removeFavorite, checkFavorite } from '@/api/favorites';
 import type { Track } from '@/api/tracks';
@@ -1030,6 +854,32 @@ const {
 function isFavoriteTrack(track: Track): boolean {
   const id = Number(track.id);
   return tracks.value.some(item => Number(item.id) === id) || favoriteTrackIds.value.has(id);
+}
+
+async function handleTrackMenuOpen(track: Track): Promise<void> {
+  const trackId = Number(track.id);
+
+  if (!Number.isFinite(trackId) || trackId <= 0) {
+    return;
+  }
+
+  try {
+    const result = await checkFavorite(trackId);
+    const next = new Set(favoriteTrackIds.value);
+
+    if (result.is_favorite) {
+      next.add(trackId);
+    } else {
+      next.delete(trackId);
+    }
+
+    favoriteTrackIds.value = next;
+  } catch (error) {
+    console.error(
+        '[Library.vue] Не удалось проверить избранное:',
+        error,
+    );
+  }
 }
 
 function toggleTrackMenu(track: Track): void {
