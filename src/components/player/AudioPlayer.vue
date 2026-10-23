@@ -628,7 +628,7 @@ import './audioPlayer.css';
 import { computed, onMounted, ref, watch } from 'vue';
 import usePlayerStore from '@/stores/player';
 import QueuePanel from '@/components/player/queue/QueuePanel.vue';
-import TrackContextMenu from '@/components/tracks/TrackContextMenu.vue';
+import TrackContextMenu from '@/components/track-menu/TrackContextMenu.vue';
 import type { Track } from '@/api/tracks';
 
 const player = usePlayerStore();
@@ -683,9 +683,9 @@ function onProgressChange(event: Event): void {
   player.seekAudio(player.progress);
   player.isSeeking = false;
 }
-import type { TrackMenuItem } from '@/types/TrackMenuItem';
+import type { TrackType } from '@/types/TrackType';
 function handleTrackMenuAction(
-    track: TrackMenuItem,
+    track: TrackType,
     action: 'next' | 'queue' | 'favorite',
 ) {
   switch (action) {

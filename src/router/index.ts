@@ -2,12 +2,13 @@ import { createRouter, createWebHistory } from '@ionic/vue-router';
 import { RouteRecordRaw } from 'vue-router';
 import HomePage from '../views/Home/HomePage.vue'
 import SearchPage from '@/views/Search/SearchPage.vue';
-import LibraryPage from '@/views/Library/LibraryPage.vue';
+// import LibraryPage from '@/views/Library/LibraryPage.vue';
 import PlaylistsPage from '@/views/Playlists/PlaylistsPage.vue';
 import LoginPage from '@/views/LoginPage.vue';
 import RegisterPage from '@/views/RegisterPage.vue';
 
 import { useAuthStore } from '@/stores/auth';
+import Favorite from "@/views/Favorites/Favorite.vue";
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -23,10 +24,16 @@ const routes: Array<RouteRecordRaw> = [
     path: '/search',
     component: SearchPage,
   },
+  // {
+  //   path: '/library',
+  //   name: 'Library',
+  //   component: LibraryPage,
+  //   meta: { requiresAuth: true },
+  // },
   {
-    path: '/library',
-    name: 'Library',
-    component: LibraryPage,
+    path: '/favorite',
+    name: 'Favorite',
+    component: Favorite,
     meta: { requiresAuth: true },
   },
   {

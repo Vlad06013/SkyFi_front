@@ -158,7 +158,7 @@
   </div>
 </template>
 
-<script setup lang="ts" generic="T extends TrackMenuItem">
+<script setup lang="ts" generic="T extends TrackType">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { IonIcon, IonSpinner } from '@ionic/vue';
 import {
@@ -172,7 +172,7 @@ import {
 
 import AddToPlaylistItem from '@/components/track-menu/AddToPlaylistItem.vue';
 import DownloadTrackItem from '@/components/track-menu/DownloadTrackItem.vue';
-import type { TrackMenuItem } from '@/types/TrackMenuItem';
+import type { TrackType } from '@/types/TrackType';
 const props = defineProps<{
   track: T;
   isFavorite: boolean;

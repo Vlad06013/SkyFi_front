@@ -28,7 +28,11 @@
         <span class="nav-label">Поиск</span>
       </RouterLink>
 
-      <RouterLink to="/library" class="nav-link">
+<!--      <RouterLink to="/library" class="nav-link">-->
+<!--        <span class="nav-icon">-->
+<!--          <ion-icon :icon="musicalNotesOutline" />-->
+<!--        </span>-->
+      <RouterLink to="/favorite" class="nav-link">
         <span class="nav-icon">
           <ion-icon :icon="musicalNotesOutline" />
         </span>

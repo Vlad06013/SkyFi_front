@@ -6,10 +6,9 @@ import {
     onBeforeUnmount,
 } from 'vue';
 
-import {
-    searchTracks,
-    type Track,
-} from '@/api/tracks';
+import {searchTracks,} from '@/api/search';
+import {type Track,} from '@/types/TrackType';
+
 
 import {
     getFavorites,

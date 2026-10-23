@@ -179,7 +179,7 @@ export function useLibrary() {
     const tracks = ref<Track[]>([]);
     const loading = ref(false);
     const error = ref('');
-
+    const nextFavoritesPageUrl = ref<string | null>(null);
     let libraryRequestId = 0;
 
     async function loadLibrary(): Promise<void> {
@@ -195,6 +195,8 @@ export function useLibrary() {
                 return;
             }
 
+            // getFavorites() уже возвращает response.data из Axios.
+            // Поэтому здесь response — объект пагинации Laravel.
             const responseData: unknown = response.data;
 
             let receivedTracks: unknown = responseData;
@@ -207,6 +209,7 @@ export function useLibrary() {
                 const payload = responseData as {
                     data?: unknown;
                     tracks?: unknown;
+                    next_page_url?: string | null;
                 };
 
                 if (Array.isArray(payload.data)) {
@@ -214,6 +217,12 @@ export function useLibrary() {
                 } else if (Array.isArray(payload.tracks)) {
                     receivedTracks = payload.tracks;
                 }
+
+                // Сохраняем ссылку на следующую страницу.
+                nextFavoritesPageUrl.value =
+                    payload.next_page_url ?? null;
+            } else {
+                nextFavoritesPageUrl.value = null;
             }
 
             if (!Array.isArray(receivedTracks)) {
@@ -223,6 +232,11 @@ export function useLibrary() {
             }
 
             tracks.value = receivedTracks as Track[];
+
+            console.log('[Library] Избранное загружено:', {
+                tracksCount: tracks.value.length,
+                nextPageUrl: nextFavoritesPageUrl.value,
+            });
         } catch (err: unknown) {
             if (requestId !== libraryRequestId) {
                 return;
@@ -1167,35 +1181,35 @@ export function useLibrary() {
         void playTrack(firstTrack, artist.tracks);
     }
 
-    // ============================================
-    // ОФОРМЛЕНИЕ
-    // ============================================
-
-    const coverColors = [
-        '#6546B8',
-        '#277D8A',
-        '#A04C72',
-        '#B26A38',
-        '#3569A8',
-        '#47865C',
-        '#8157A6',
-        '#B64E61',
-        '#4B65B5',
-        '#337E75',
-    ];
-
-    function getTrackColor(id: number | string): string {
-        const normalizedId = Number(id);
-
-        if (!Number.isFinite(normalizedId)) {
-            return coverColors[0];
-        }
-
-        const index =
-            Math.abs(normalizedId) % coverColors.length;
-
-        return coverColors[index];
-    }
+    // // ============================================
+    // // ОФОРМЛЕНИЕ
+    // // ============================================
+    //
+    // const coverColors = [
+    //     '#6546B8',
+    //     '#277D8A',
+    //     '#A04C72',
+    //     '#B26A38',
+    //     '#3569A8',
+    //     '#47865C',
+    //     '#8157A6',
+    //     '#B64E61',
+    //     '#4B65B5',
+    //     '#337E75',
+    // ];
+    //
+    // function getTrackColor(id: number | string): string {
+    //     const normalizedId = Number(id);
+    //
+    //     if (!Number.isFinite(normalizedId)) {
+    //         return coverColors[0];
+    //     }
+    //
+    //     const index =
+    //         Math.abs(normalizedId) % coverColors.length;
+    //
+    //     return coverColors[index];
+    // }
 
     function pluralizeTracks(count: number): string {
         const lastTwo = count % 100;
@@ -1240,6 +1254,7 @@ export function useLibrary() {
         loading,
         error,
         loadLibrary,
+        nextFavoritesPageUrl,
 
         // Собственные загрузки
         uploadedTracks,

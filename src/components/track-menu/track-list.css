@@ -223,3 +223,13 @@
     }
 }
 
+.track-list-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 12px;
+    color: var(--ion-color-medium, #888);
+    font-size: 13px;
+}

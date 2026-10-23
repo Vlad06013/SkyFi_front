@@ -145,6 +145,9 @@
                 @play="handleUploadedTrackClick"
                 @menu-open="handleTrackMenuOpen"
                 @action="runTrackMenuAction"
+                :next-page-url="nextFavoritesPageUrl"
+                :loading-more="loadingMoreFavorites"
+                @load-more="loadMoreFavorites"
             />
 
             <!-- Список пуст -->
@@ -242,6 +245,9 @@
               :get-track-color="getTrackColor"
               :is-favorite="isFavoriteTrack"
               :loading-track-id="menuActionLoadingId"
+              :next-page-url="nextFavoritesPageUrl"
+              :loading-more="loadingMoreFavorites"
+              @load-more="loadMoreFavorites"
               @play="handleTrackClick"
               @menu-open="handleTrackMenuOpen"
               @action="runTrackMenuAction"
@@ -924,7 +930,9 @@ import AudioPlayer from '@/components/player/AudioPlayer.vue';
 import AppNavigation from '@/components/AppNavigation.vue';
 import TrackList from '@/components/tracks/TrackList.vue';
 
-import { addFavorite, removeFavorite, checkFavorite } from '@/api/favorites';
+import { addFavorite, removeFavorite, checkFavorite, getFavorites } from '@/api/favorites';
+import { useCursorPagination } from '@/composables/useCursorPagination';
+
 import type { Track } from '@/api/tracks';
 import usePlayerStore from '@/stores/player';
 import { ref, watch } from 'vue';
@@ -933,6 +941,7 @@ const uploadModalOpen = ref(false);
 const openMenuTrackId = ref<string | null>(null);
 const menuActionLoadingId = ref<number | null>(null);
 const favoriteTrackIds = ref<Set<number>>(new Set());
+const loadingMoreFavorites = ref(false);
 const player = usePlayerStore();
 
 const {
@@ -944,6 +953,7 @@ const {
   loading,
   error,
   loadLibrary,
+  nextFavoritesPageUrl,
 
   // Собственные загрузки
   uploadedTracks,
@@ -995,6 +1005,72 @@ const {
   pluralizeTracks,
 } = useLibrary();
 
+
+const loadMoreFavoritesError = ref<string | null>(null);
+
+async function loadMoreFavorites(): Promise<void> {
+  const nextUrl = nextFavoritesPageUrl.value;
+
+  // Не отправляем повторный запрос, если URL отсутствует
+  // или предыдущая загрузка ещё выполняется.
+  if (!nextUrl || loadingMoreFavorites.value) {
+    return;
+  }
+
+  loadingMoreFavorites.value = true;
+
+  try {
+    const response = await getFavorites(nextUrl);
+
+    // getFavorites() возвращает response.data из Axios.
+    // По структуре твоего ответа:
+    // response.data      — массив треков внутри пагинации
+    // response.next_page_url — URL следующей страницы
+    const pagination = response.data;
+
+    if (!pagination || !Array.isArray(pagination.data)) {
+      console.error(
+          '[LibraryPage] Неожиданный формат ответа пагинации:',
+          response,
+      );
+
+      // Останавливаем повторные попытки при некорректном ответе.
+      nextFavoritesPageUrl.value = null;
+      return;
+    }
+
+    const receivedTracks = pagination.data as Track[];
+
+    // Защита от добавления уже имеющихся треков.
+    const existingIds = new Set(
+        tracks.value.map((track) => track.id),
+    );
+
+    const uniqueTracks = receivedTracks.filter(
+        (track) => !existingIds.has(track.id),
+    );
+
+    tracks.value = [...tracks.value, ...uniqueTracks];
+
+    // ВАЖНО: URL следующей страницы находится в объекте пагинации.
+    nextFavoritesPageUrl.value =
+        pagination.next_page_url ?? null;
+
+    console.log('[LibraryPage] Следующая страница загружена:', {
+      receivedCount: receivedTracks.length,
+      addedCount: uniqueTracks.length,
+      totalCount: tracks.value.length,
+      nextPageUrl: nextFavoritesPageUrl.value,
+    });
+  } catch (err: unknown) {
+    console.error(
+        '[LibraryPage] Ошибка загрузки следующей страницы:',
+        err,
+    );
+  } finally {
+    loadingMoreFavorites.value = false;
+  }
+}
 
 function isFavoriteTrack(track: Track): boolean {
   const id = Number(track.id);
