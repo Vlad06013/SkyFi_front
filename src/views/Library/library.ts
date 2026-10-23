@@ -26,6 +26,17 @@ import {
     uploadTrack as uploadTrackApi,
 } from '@/api/uploads';
 
+import {
+    searchAlbums,
+    searchArtists,
+    searchGenres,
+} from '@/api/catalog';
+
+import {
+    useAutocomplete,
+    type AutocompleteOption,
+} from './useAutocomplete';
+
 import type {Track} from '@/api/tracks';
 import {getFavorites} from '@/api/favorites';
 
@@ -49,6 +60,68 @@ interface LibraryArtist {
     name: string;
     tracksCount: number;
     tracks: Track[];
+}
+
+/*
+ * Поля формы загрузки с поисковыми подсказками.
+ *
+ * selectedId заполнен, только когда пользователь выбрал
+ * значение из подсказок. Если он написал своё — отправляем
+ * текст, и сервер создаст запись сам.
+ */
+interface ArtistField {
+    name: string;
+    selectedId: number | null;
+    autocomplete: ReturnType<typeof useAutocomplete>;
+}
+
+interface AlbumField {
+    title: string;
+    selectedId: number | null;
+    autocomplete: ReturnType<typeof useAutocomplete>;
+}
+
+interface GenreField {
+    name: string;
+    selectedId: number | null;
+    autocomplete: ReturnType<typeof useAutocomplete>;
+}
+
+// ============================================
+// МАППИНГ СПРАВОЧНИКОВ В ВАРИАНТЫ ВЫБОРА
+// ============================================
+
+async function fetchArtistOptions(
+    search: string,
+): Promise<AutocompleteOption[]> {
+    const artists = await searchArtists(search);
+
+    return artists.map(artist => ({
+        id: artist.id,
+        label: artist.name,
+    }));
+}
+
+async function fetchAlbumOptions(
+    search: string,
+): Promise<AutocompleteOption[]> {
+    const albums = await searchAlbums(search);
+
+    return albums.map(album => ({
+        id: album.id,
+        label: album.title,
+    }));
+}
+
+async function fetchGenreOptions(
+    search: string,
+): Promise<AutocompleteOption[]> {
+    const genres = await searchGenres(search);
+
+    return genres.map(genre => ({
+        id: genre.id,
+        label: genre.name,
+    }));
 }
 
 // ============================================
@@ -312,11 +385,130 @@ export function useLibrary() {
 
     const uploadForm = reactive({
         title: '',
-        artist_name: '',
-        album_title: '',
-        genre_name: '',
         description: '',
     });
+
+    // ============================================
+    // ПОЛЯ С ПОДСКАЗКАМИ
+    // ============================================
+    //
+    // Значение либо выбрано из подсказок (тогда есть
+    // selectedId и на сервер уходит id), либо написано
+    // пользователем (уходит текст, сервер создаст запись).
+
+    function createArtistField(): ArtistField {
+        return {
+            name: '',
+            selectedId: null,
+            autocomplete: useAutocomplete(fetchArtistOptions),
+        };
+    }
+
+    function createAlbumField(): AlbumField {
+        return {
+            title: '',
+            selectedId: null,
+            autocomplete: useAutocomplete(fetchAlbumOptions),
+        };
+    }
+
+    function createGenreField(): GenreField {
+        return {
+            name: '',
+            selectedId: null,
+            autocomplete: useAutocomplete(fetchGenreOptions),
+        };
+    }
+
+    const artistFields = reactive<ArtistField[]>([
+        createArtistField(),
+    ]);
+
+    const albumField = reactive(createAlbumField());
+
+    const genreField = reactive(createGenreField());
+
+    /**
+     * Исполнителей может быть несколько:
+     * кнопка «Ещё исполнитель» добавляет поле.
+     */
+    function addArtistField(): void {
+        if (uploading.value) {
+            return;
+        }
+
+        artistFields.push(createArtistField());
+    }
+
+    function removeArtistField(index: number): void {
+        if (uploading.value || artistFields.length <= 1) {
+            return;
+        }
+
+        artistFields[index]?.autocomplete.close();
+
+        artistFields.splice(index, 1);
+
+        delete fieldErrors.artist_name;
+    }
+
+    /**
+     * Любая правка текста сбрасывает выбор из подсказок:
+     * значение снова считается рукописным.
+     */
+    function handleArtistInput(field: ArtistField): void {
+        field.selectedId = null;
+
+        delete fieldErrors.artist_name;
+
+        field.autocomplete.search(field.name);
+    }
+
+    function selectArtist(
+        field: ArtistField,
+        option: AutocompleteOption,
+    ): void {
+        field.name = option.label;
+        field.selectedId = option.id;
+
+        delete fieldErrors.artist_name;
+
+        field.autocomplete.close();
+    }
+
+    function handleAlbumInput(): void {
+        albumField.selectedId = null;
+
+        delete fieldErrors.album_title;
+
+        albumField.autocomplete.search(albumField.title);
+    }
+
+    function selectAlbum(option: AutocompleteOption): void {
+        albumField.title = option.label;
+        albumField.selectedId = option.id;
+
+        delete fieldErrors.album_title;
+
+        albumField.autocomplete.close();
+    }
+
+    function handleGenreInput(): void {
+        genreField.selectedId = null;
+
+        delete fieldErrors.genre_name;
+
+        genreField.autocomplete.search(genreField.name);
+    }
+
+    function selectGenre(option: AutocompleteOption): void {
+        genreField.name = option.label;
+        genreField.selectedId = option.id;
+
+        delete fieldErrors.genre_name;
+
+        genreField.autocomplete.close();
+    }
 
     const allowedExtensions = [
         'mp3',
@@ -417,16 +609,35 @@ export function useLibrary() {
         return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} ГБ`;
     }
 
+    function resetAutocompleteFields(): void {
+        for (const field of artistFields) {
+            field.autocomplete.close();
+        }
+
+        artistFields.splice(
+            0,
+            artistFields.length,
+            createArtistField(),
+        );
+
+        albumField.autocomplete.close();
+        albumField.title = '';
+        albumField.selectedId = null;
+
+        genreField.autocomplete.close();
+        genreField.name = '';
+        genreField.selectedId = null;
+    }
+
     function resetUploadForm(): void {
         if (uploading.value) {
             return;
         }
 
         uploadForm.title = '';
-        uploadForm.artist_name = '';
-        uploadForm.album_title = '';
-        uploadForm.genre_name = '';
         uploadForm.description = '';
+
+        resetAutocompleteFields();
 
         selectedFile.value = null;
         uploadSuccess.value = false;
@@ -441,10 +652,9 @@ export function useLibrary() {
 
     function resetFormAfterUpload(): void {
         uploadForm.title = '';
-        uploadForm.artist_name = '';
-        uploadForm.album_title = '';
-        uploadForm.genre_name = '';
         uploadForm.description = '';
+
+        resetAutocompleteFields();
 
         selectedFile.value = null;
 
@@ -473,11 +683,51 @@ export function useLibrary() {
             fieldErrors.title = 'Укажи название трека.';
         }
 
-        if (!uploadForm.artist_name.trim()) {
+        /*
+         * Собираем исполнителей: выбранные из подсказок —
+         * по id, рукописные — по имени. Пустые поля
+         * пропускаем, дубликаты склеиваем.
+         */
+        const artistIds: number[] = [];
+        const artistNames: string[] = [];
+        const seenArtistNames = new Set<string>();
+
+        for (const field of artistFields) {
+            const name = field.name.trim();
+
+            if (!name) {
+                continue;
+            }
+
+            if (field.selectedId !== null) {
+                if (!artistIds.includes(field.selectedId)) {
+                    artistIds.push(field.selectedId);
+                }
+
+                continue;
+            }
+
+            const key = name.toLowerCase();
+
+            if (seenArtistNames.has(key)) {
+                continue;
+            }
+
+            seenArtistNames.add(key);
+            artistNames.push(name);
+        }
+
+        if (
+            artistIds.length === 0 &&
+            artistNames.length === 0
+        ) {
             fieldErrors.artist_name = 'Укажи исполнителя.';
         }
 
-        if (!uploadForm.genre_name.trim()) {
+        const albumTitle = albumField.title.trim();
+        const genreName = genreField.name.trim();
+
+        if (genreField.selectedId === null && !genreName) {
             fieldErrors.genre_name = 'Укажи жанр.';
         }
 
@@ -502,10 +752,26 @@ export function useLibrary() {
         try {
             const response = await uploadTrackApi({
                 title: uploadForm.title.trim(),
-                artist_name: uploadForm.artist_name.trim(),
-                genre_name: uploadForm.genre_name.trim(),
+                artist_ids: artistIds.length
+                    ? artistIds
+                    : undefined,
+                artist_names: artistNames.length
+                    ? artistNames
+                    : undefined,
+                album_id:
+                    albumField.selectedId ?? undefined,
                 album_title:
-                    uploadForm.album_title.trim() || undefined,
+                    albumField.selectedId === null &&
+                    albumTitle
+                        ? albumTitle
+                        : undefined,
+                genre_id:
+                    genreField.selectedId ?? undefined,
+                genre_name:
+                    genreField.selectedId === null &&
+                    genreName
+                        ? genreName
+                        : undefined,
                 description:
                     uploadForm.description.trim() || undefined,
                 audio: audioFile,
@@ -918,7 +1184,7 @@ export function useLibrary() {
         '#337E75',
     ];
 
-    function getTrackColor(id: number): string {
+    function getTrackColor(id: number | string): string {
         const normalizedId = Number(id);
 
         if (!Number.isFinite(normalizedId)) {
@@ -995,6 +1261,19 @@ export function useLibrary() {
         formatFileSize,
         resetUploadForm,
         uploadTrack,
+
+        // Поля с подсказками
+        artistFields,
+        albumField,
+        genreField,
+        addArtistField,
+        removeArtistField,
+        handleArtistInput,
+        selectArtist,
+        handleAlbumInput,
+        selectAlbum,
+        handleGenreInput,
+        selectGenre,
 
         // Коллекции
         albums,

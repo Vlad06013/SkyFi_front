@@ -524,25 +524,76 @@
             </p>
           </div>
 
-          <!-- Исполнитель -->
+          <!-- Исполнители -->
           <div class="form-field">
-            <label for="track-artist">
-              Исполнитель
+            <label>
+              Исполнители
 
               <span class="required">*</span>
             </label>
 
-            <input
-                id="track-artist"
-                v-model.trim="uploadForm.artist_name"
-                type="text"
-                maxlength="255"
-                placeholder="Имя исполнителя или название группы"
-                autocomplete="off"
-                required
-                :disabled="uploading"
-                :aria-invalid="Boolean(fieldErrors.artist_name)"
-            />
+            <div
+                v-for="(field, index) in artistFields"
+                :key="index"
+                class="autocomplete-field"
+            >
+              <div class="autocomplete-input-row">
+                <input
+                    :id="index === 0 ? 'track-artist' : undefined"
+                    v-model.trim="field.name"
+                    type="text"
+                    maxlength="255"
+                    placeholder="Имя исполнителя или название группы"
+                    autocomplete="off"
+                    :disabled="uploading"
+                    :aria-invalid="Boolean(fieldErrors.artist_name)"
+                    @input="handleArtistInput(field)"
+                    @focus="field.autocomplete.open(field.name)"
+                    @blur="field.autocomplete.close()"
+                />
+
+                <button
+                    v-if="artistFields.length > 1"
+                    type="button"
+                    class="field-remove-button"
+                    :disabled="uploading"
+                    aria-label="Убрать исполнителя"
+                    @click="removeArtistField(index)"
+                >
+                  <ion-icon :icon="closeOutline" />
+                </button>
+              </div>
+
+              <!-- Подсказки исполнителей -->
+              <ul
+                  v-if="
+                  field.autocomplete.state.isOpen &&
+                  (field.autocomplete.state.isLoading ||
+                    field.autocomplete.state.options.length)
+                "
+                  class="suggestions-list"
+              >
+                <li
+                    v-if="field.autocomplete.state.isLoading"
+                    class="suggestions-hint"
+                >
+                  <ion-spinner name="crescent" />
+                </li>
+
+                <li
+                    v-for="option in field.autocomplete.state.options"
+                    :key="option.id"
+                >
+                  <button
+                      type="button"
+                      class="suggestion-item"
+                      @mousedown.prevent="selectArtist(field, option)"
+                  >
+                    {{ option.label }}
+                  </button>
+                </li>
+              </ul>
+            </div>
 
             <p
                 v-if="fieldErrors.artist_name"
@@ -550,6 +601,17 @@
             >
               {{ fieldErrors.artist_name }}
             </p>
+
+            <button
+                type="button"
+                class="add-artist-button"
+                :disabled="uploading"
+                @click="addArtistField"
+            >
+              <ion-icon :icon="personAddOutline" />
+
+              Ещё исполнитель
+            </button>
           </div>
 
           <!-- Альбом -->
@@ -562,16 +624,51 @@
               </span>
             </label>
 
-            <input
-                id="track-album"
-                v-model.trim="uploadForm.album_title"
-                type="text"
-                maxlength="255"
-                placeholder="Название альбома"
-                autocomplete="off"
-                :disabled="uploading"
-                :aria-invalid="Boolean(fieldErrors.album_title)"
-            />
+            <div class="autocomplete-field">
+              <input
+                  id="track-album"
+                  v-model.trim="albumField.title"
+                  type="text"
+                  maxlength="255"
+                  placeholder="Название альбома"
+                  autocomplete="off"
+                  :disabled="uploading"
+                  :aria-invalid="Boolean(fieldErrors.album_title)"
+                  @input="handleAlbumInput"
+                  @focus="albumField.autocomplete.open(albumField.title)"
+                  @blur="albumField.autocomplete.close()"
+              />
+
+              <!-- Подсказки альбомов -->
+              <ul
+                  v-if="
+                  albumField.autocomplete.state.isOpen &&
+                  (albumField.autocomplete.state.isLoading ||
+                    albumField.autocomplete.state.options.length)
+                "
+                  class="suggestions-list"
+              >
+                <li
+                    v-if="albumField.autocomplete.state.isLoading"
+                    class="suggestions-hint"
+                >
+                  <ion-spinner name="crescent" />
+                </li>
+
+                <li
+                    v-for="option in albumField.autocomplete.state.options"
+                    :key="option.id"
+                >
+                  <button
+                      type="button"
+                      class="suggestion-item"
+                      @mousedown.prevent="selectAlbum(option)"
+                  >
+                    {{ option.label }}
+                  </button>
+                </li>
+              </ul>
+            </div>
 
             <p
                 v-if="fieldErrors.album_title"
@@ -589,17 +686,51 @@
               <span class="required">*</span>
             </label>
 
-            <input
-                id="track-genre"
-                v-model.trim="uploadForm.genre_name"
-                type="text"
-                maxlength="100"
-                placeholder="Например, Rock, Metal, Electronic"
-                autocomplete="off"
-                required
-                :disabled="uploading"
-                :aria-invalid="Boolean(fieldErrors.genre_name)"
-            />
+            <div class="autocomplete-field">
+              <input
+                  id="track-genre"
+                  v-model.trim="genreField.name"
+                  type="text"
+                  maxlength="100"
+                  placeholder="Например, Rock, Metal, Electronic"
+                  autocomplete="off"
+                  :disabled="uploading"
+                  :aria-invalid="Boolean(fieldErrors.genre_name)"
+                  @input="handleGenreInput"
+                  @focus="genreField.autocomplete.open(genreField.name)"
+                  @blur="genreField.autocomplete.close()"
+              />
+
+              <!-- Подсказки жанров -->
+              <ul
+                  v-if="
+                  genreField.autocomplete.state.isOpen &&
+                  (genreField.autocomplete.state.isLoading ||
+                    genreField.autocomplete.state.options.length)
+                "
+                  class="suggestions-list"
+              >
+                <li
+                    v-if="genreField.autocomplete.state.isLoading"
+                    class="suggestions-hint"
+                >
+                  <ion-spinner name="crescent" />
+                </li>
+
+                <li
+                    v-for="option in genreField.autocomplete.state.options"
+                    :key="option.id"
+                >
+                  <button
+                      type="button"
+                      class="suggestion-item"
+                      @mousedown.prevent="selectGenre(option)"
+                  >
+                    {{ option.label }}
+                  </button>
+                </li>
+              </ul>
+            </div>
 
             <p
                 v-if="fieldErrors.genre_name"
@@ -781,6 +912,7 @@ import {
   playOutline,
   pauseOutline,
   peopleOutline,
+  personAddOutline,
   closeOutline,
   ellipsisVerticalOutline,
   playSkipForwardOutline,
@@ -832,6 +964,19 @@ const {
   formatFileSize,
   resetUploadForm,
   uploadTrack,
+
+  // Поля с подсказками
+  artistFields,
+  albumField,
+  genreField,
+  addArtistField,
+  removeArtistField,
+  handleArtistInput,
+  selectArtist,
+  handleAlbumInput,
+  selectAlbum,
+  handleGenreInput,
+  selectGenre,
 
   // Коллекции
   albums,

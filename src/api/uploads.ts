@@ -11,8 +11,8 @@ export interface UploadTrackPayload {
     description?: string;
     audio: File;
 
-    artist_id?: number;
-    artist_name?: string;
+    artist_ids?: number[];
+    artist_names?: string[];
 
     album_id?: number;
     album_title?: string;
@@ -70,17 +70,18 @@ export async function uploadTrack(
         );
     }
 
-    // Исполнитель.
-    if (payload.artist_id !== undefined) {
-        formData.append(
-            'artist_id',
-            String(payload.artist_id),
-        );
-    } else if (payload.artist_name?.trim()) {
-        formData.append(
-            'artist_name',
-            payload.artist_name.trim(),
-        );
+    // Исполнители: выбранные из подсказок — по id,
+    // рукописные — по имени.
+    if (payload.artist_ids?.length) {
+        for (const id of payload.artist_ids) {
+            formData.append('artist_ids[]', String(id));
+        }
+    }
+
+    if (payload.artist_names?.length) {
+        for (const name of payload.artist_names) {
+            formData.append('artist_names[]', name.trim());
+        }
     }
 
     // Альбом.
