@@ -91,82 +91,12 @@
               </span>
             </div>
 
-            <!-- Загрузка списка -->
-            <div
-                v-if="uploadsLoading"
-                class="empty-state"
-                aria-live="polite"
-            >
-              <div class="loading-icon">
-                <ion-spinner name="crescent" />
-              </div>
-
-              <h3>Загружаем твои треки</h3>
-
-              <p>
-                Получаем список загруженной музыки...
-              </p>
-            </div>
-
-            <!-- Ошибка списка -->
-            <div
-                v-else-if="uploadsError"
-                class="empty-state"
-                role="alert"
-            >
-              <div class="empty-icon error-icon">
-                <ion-icon :icon="informationCircleOutline" />
-              </div>
-
-              <h3>Не удалось загрузить список</h3>
-
-              <p>{{ uploadsError }}</p>
-
-              <button
-                  type="button"
-                  class="retry-button"
-                  @click="loadUploadedTracks"
-              >
-                <ion-icon :icon="refreshOutline" />
-
-                Повторить
-              </button>
-            </div>
-
-            <!-- Список -->
-<!--            <TrackList-->
-<!--                v-else-if="uploadedTracks.length"-->
-<!--                :tracks="uploadedTracks"-->
-<!--                :is-current-track="isCurrentTrack"-->
-<!--                :is-playing="playerIsPlaying"-->
-<!--                :get-track-color="getTrackColor"-->
-<!--                :is-favorite="isFavoriteTrack"-->
-<!--                :loading-track-id="menuActionLoadingId"-->
-<!--                @play="handleUploadedTrackClick"-->
-<!--                @menu-open="handleTrackMenuOpen"-->
-<!--                @action="runTrackMenuAction"-->
-<!--                :next-page-url="nextFavoritesPageUrl"-->
-<!--                :loading-more="loadingMoreFavorites"-->
-<!--                @load-more="loadMoreFavorites"-->
-<!--            />-->
-
-
-            <!-- Список пуст -->
-            <div
-                v-else
-                class="empty-state"
-            >
-              <div class="empty-icon">
-                <ion-icon :icon="musicalNotesOutline" />
-              </div>
-
-              <h3>Ты пока ничего не загрузил</h3>
-
-              <p>
-                Загруженные тобой треки появятся здесь.
-                Нажми «Загрузить трек», чтобы добавить свою первую песню.
-              </p>
-            </div>
+            <UploadedTrackList
+                :items="uploadedTracks"
+                :loading="uploadsLoading"
+                :error="uploadsError"
+                :retry="loadUploadedTracks"
+            />
           </section>
         </section>
 
@@ -863,6 +793,38 @@
 import './favorite.css';
 
 import { useLibrary } from './favorite';
+import { useUploaded } from './uploaded';
+// import {
+//   // Собственные загрузки
+//   uploadedTracks,
+//   uploadsLoading,
+//   uploadsError,
+//   loadUploadedTracks,
+//
+//   // Форма загрузки
+//   uploadSuccess,
+//   uploadError,
+//   uploadForm,
+//   uploading,
+//   handleFileChange,
+//   formatFileSize,
+//   resetUploadForm,
+//   uploadTrack,
+//
+//   // Поля с подсказками
+//   artistFields,
+//   albumField,
+//   genreField,
+//   addArtistField,
+//   removeArtistField,
+//   handleArtistInput,
+//   selectArtist,
+//   handleAlbumInput,
+//   selectAlbum,
+//   handleGenreInput,
+//   selectGenre
+// } from './uploaded';
+
 import {
   IonContent,
   IonPage,
@@ -890,12 +852,10 @@ import AudioPlayer from '@/components/player/AudioPlayer.vue';
 import AppNavigation from '@/components/AppNavigation.vue';
 import FavoriteTracksList from '@/components/lists/FavoriteTracksList.vue';
 
-import usePlayerStore from '@/stores/player';
 import { ref, watch } from 'vue';
-import {storeToRefs} from "pinia";
+import UploadedTrackList from "@/components/lists/UploadedTrackList.vue";
 
 const uploadModalOpen = ref(false);
-const player = usePlayerStore();
 
 const {
   tabs,
@@ -906,38 +866,6 @@ const {
   loading,
   error,
   loadLibrary,
-
-  // Собственные загрузки
-  uploadedTracks,
-  uploadsLoading,
-  uploadsError,
-  loadUploadedTracks,
-
-  // Форма загрузки
-  uploadSuccess,
-  uploadError,
-  uploadForm,
-  uploading,
-  fieldErrors,
-  selectedFile,
-
-  handleFileChange,
-  formatFileSize,
-  resetUploadForm,
-  uploadTrack,
-
-  // Поля с подсказками
-  artistFields,
-  albumField,
-  genreField,
-  addArtistField,
-  removeArtistField,
-  handleArtistInput,
-  selectArtist,
-  handleAlbumInput,
-  selectAlbum,
-  handleGenreInput,
-  selectGenre,
 
   // Коллекции
   albums,
@@ -953,9 +881,41 @@ const {
 } = useLibrary();
 
 
+const {
+  uploadedTracks,
+  uploadsLoading,
+  uploadsError,
+  loadUploadedTracks,
+
+  uploadSuccess,
+  uploadError,
+  uploadForm,
+  uploading,
+  selectedFile,
+  fileInput,
+  fieldErrors,
+
+  handleFileChange,
+  formatFileSize,
+  resetUploadForm,
+  uploadTrack,
+
+  artistFields,
+  albumField,
+  genreField,
+  addArtistField,
+  removeArtistField,
+  handleArtistInput,
+  selectArtist,
+  handleAlbumInput,
+  selectAlbum,
+  handleGenreInput,
+  selectGenre,
+} = useUploaded({
+  activeTab,
+});
 async function openUploadedTab(): Promise<void> {
   activeTab.value = 'upload';
-  // Запрашиваем список при каждом переходе во вкладку «Загруженное».
   await loadUploadedTracks();
 }
 
@@ -966,7 +926,6 @@ function openUpload(): void {
 
 watch(uploadSuccess, async (success) => {
   if (success) {
-    await loadUploadedTracks();
     activeTab.value = 'upload';
     uploadModalOpen.value = false;
   }

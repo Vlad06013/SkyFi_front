@@ -2,10 +2,6 @@ import axios from 'axios';
 import { http } from '@/api/http';
 import type { Track } from '@/types/TrackType';
 
-// ============================================
-// ТИПЫ
-// ============================================
-
 export interface UploadTrackPayload {
     title: string;
     description?: string;

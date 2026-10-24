@@ -15,6 +15,7 @@ export interface Track {
     uploaded_by: number | null;
     source_type: string;
     source_id: string | null;
+    is_favorite?: boolean;
     status: string;
     artists?: Artist[];
     album?: Album | null;
