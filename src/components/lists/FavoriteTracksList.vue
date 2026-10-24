@@ -7,7 +7,9 @@
       :error="error"
       :get-key="track => track.id"
       :load-more="async () => {}"
-      :retry="loadInitial"
+      :retry="async () => {
+        await props.retry();
+      }"
   >
     <template #item="{ item: track }">
       <div
@@ -31,7 +33,7 @@
               '--cover-color': getTrackColor(track.id),
             }"
           >
-            <ion-icon :icon="musicalNotesOutline" />
+            <ion-icon :icon="musicalNotesOutline"/>
 
             <span class="cover-play">
               <ion-icon
@@ -67,9 +69,9 @@
             class="playing-indicator"
             aria-label="Сейчас воспроизводится"
         >
-          <span />
-          <span />
-          <span />
+          <span/>
+          <span/>
+          <span/>
         </span>
 
         <TrackContextMenu
@@ -86,8 +88,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
-import { IonIcon } from '@ionic/vue';
+import {computed, watch, ref} from 'vue';
+import {IonIcon} from '@ionic/vue';
 import {
   musicalNotesOutline,
   pauseOutline,
@@ -98,18 +100,13 @@ import BaseInfiniteList from '@/components/lists/BaseInfiniteList.vue';
 import TrackContextMenu from '@/components/track-menu/TrackContextMenu.vue';
 import usePlayerStore from '@/stores/player';
 
-import { getFavorites } from '@/api/favorites';
-import type { Track } from '@/types/TrackType';
+// import { getFavorites } from '@/api/favorites';
+import type {Track} from '@/types/TrackType';
 
 const player = usePlayerStore();
 
-const items = ref<Track[]>([]);
-const loading = ref(false);
-const error = ref<string | null>(null);
 const loadingTrackId = ref<number | null>(null);
 const openMenuTrackId = ref<string | null>(null);
-
-let requestInProgress: Promise<void> | null = null;
 
 const emit = defineEmits<{
   play: [track: Track];
@@ -120,49 +117,72 @@ const emit = defineEmits<{
   menuOpen: [track: Track];
 }>();
 
+
 const isPlaying = computed(() => player.isPlaying);
 
 function isCurrentTrack(track: Track): boolean {
   return Number(player.currentTrack?.id) === Number(track.id);
 }
 
-async function loadInitial(): Promise<void> {
-  // Не запускаем параллельную загрузку повторно.
-  if (requestInProgress) {
-    return requestInProgress;
-  }
+// async function loadInitial(): Promise<void> {
+//   console.count('[Favorites] loadInitial вызвана');
+//   console.trace('[Favorites] Стек вызова');
+//   // Не запускаем параллельную загрузку повторно.
+//   if (requestInProgress) {
+//     return requestInProgress;
+//   }
+//
+//   requestInProgress = (async () => {
+//     loading.value = true;
+//     error.value = null;
+//
+//     try {
+//       // getFavorites() сначала обращается к серверу,
+//       // а при ошибке пробует получить данные из IndexedDB.
+//       items.value = await getFavorites();
+//       console.log('[Favorites] Записано в items:', items.value.length);
+//     } catch (err: unknown) {
+//       console.error(
+//           '[FavoriteTracksList] Не удалось загрузить избранное:',
+//           err,
+//       );
+//
+//       error.value = 'Не удалось загрузить избранное';
+//     } finally {
+//       loading.value = false;
+//       requestInProgress = null;
+//     }
+//   })();
+//
+//   return requestInProgress;
+// }
 
-  requestInProgress = (async () => {
-    loading.value = true;
-    error.value = null;
 
-    try {
-      // getFavorites() сначала обращается к серверу,
-      // а при ошибке пробует получить данные из IndexedDB.
-      items.value = await getFavorites();
-    } catch (err: unknown) {
-      console.error(
-          '[FavoriteTracksList] Не удалось загрузить избранное:',
-          err,
-      );
-
-      error.value = 'Не удалось загрузить избранное';
-    } finally {
-      loading.value = false;
-      requestInProgress = null;
-    }
-  })();
-
-  return requestInProgress;
-}
-
+// async function playTrack(track: Track): Promise<void> {
+//   if (!track?.id || player.isLoading) {
+//     return;
+//   }
+//   // Передаём плееру весь список избранного.
+//   console.log('Передано в очередь', items.value)
+//
+//   player.setQueue(items.value);
+//   // Запускаем выбранный трек.
+//   await player.playTrack(track);
+// }
 async function playTrack(track: Track): Promise<void> {
-  if (!track?.id || player.isLoading) {
-    return;
-  }
+  if (!track?.id || player.isLoading) return;
+
+  player.setQueue([...props.items]);
+
+  console.log('[Favorites] Очередь перед запуском:', {
+    count: props.items.length,
+    ids: props.items.map(item => item.id),
+    selectedTrackId: track.id,
+  });
 
   await player.playTrack(track);
 }
+
 
 function handleMenuOpen(track: Track): void {
   openMenuTrackId.value = String(track.id);
@@ -201,7 +221,44 @@ function getTrackColor(id: number | string): string {
       ];
 }
 
-// onMounted(() => {
-//   void loadInitial();
-// });
+const props = defineProps<{
+  items: Track[];
+  loading: boolean;
+  error: string | null;
+  retry: () => void | Promise<void>;
+}>();
+
+// watch(
+//     () => props.items,
+//     (tracks) => {
+//       if (!player.isServerSyncEnabled) return;
+//
+//       player.setQueue([...tracks]);
+//
+//       console.log('[Favorites] Очередь синхронизирована:', {
+//         count: tracks.length,
+//         ids: tracks.map(track => track.id),
+//       });
+//     },
+//     { immediate: true },
+// );
+watch(
+    () => props.items,
+    (tracks) => {
+      if (
+          !player.isServerSyncEnabled ||
+          tracks.length === 0
+      ) {
+        return;
+      }
+
+      player.setQueue([...tracks]);
+
+      console.log('[Favorites] Очередь синхронизирована:', {
+        count: tracks.length,
+        ids: tracks.map(track => track.id),
+      });
+    },
+    { immediate: true },
+);
 </script>

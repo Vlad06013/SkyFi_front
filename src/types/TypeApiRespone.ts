@@ -1,4 +1,6 @@
 import {Track} from "@/types/TrackType";
+import {PlaybackState} from "@/types/PlayerType";
+import {PlaybackQueueItem} from "@/types/QueueType";
 
 export interface SearchResponse {
     data: {
@@ -21,4 +23,18 @@ export interface TracksResponse {
         per_page: number;
         total: number;
     };
+}
+
+export interface PlayerActionResponse {
+    message: string;
+    state: PlaybackState;
+}
+
+export interface PlayerStateResponse {
+    state: PlaybackState;
+    queue: PlaybackQueueItem[];
+}
+
+export interface PlayerQueueResponse {
+    data: PlaybackQueueItem[];
 }

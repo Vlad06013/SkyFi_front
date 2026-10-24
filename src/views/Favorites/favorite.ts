@@ -281,9 +281,7 @@ export function useLibrary() {
                 if (cached && Array.isArray(cached.tracks)) {
                     tracks.value = cached.tracks.map(item => item.track);
 
-                    console.log('[Library] Избранное загружено из кеша:', {
-                        tracksCount: tracks.value.length,
-                    });
+
                 }
             } catch (cacheError) {
                 console.warn(
@@ -323,9 +321,7 @@ export function useLibrary() {
                 });
             }
 
-            console.log('[Library] Избранное синхронизировано:', {
-                tracksCount: tracks.value.length,
-            });
+
         } catch (err: unknown) {
             if (requestId !== libraryRequestId) {
                 return;

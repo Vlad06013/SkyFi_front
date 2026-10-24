@@ -1,5 +1,5 @@
 import { http } from '@/api/http';
-import type { Track } from '@/api/tracks';
+import type { Track } from '@/types/TrackType';
 
 // ============================================
 // ТИПЫ

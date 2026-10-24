@@ -1,49 +1,7 @@
 import { http } from '@/api/http';
-import {Track} from "@/api/tracks";
+import {PlayerQueueResponse} from "@/types/TypeApiRespone";
+import {PlaybackQueueItem} from "@/types/QueueType";
 
-export interface PlaybackQueueItem {
-    id: number;
-    playback_state_id: number;
-    track_id: number;
-    added_by_user_id: number | null;
-
-    position: number;
-    status: 'pending' | 'played';
-
-    track: Track;
-    added_by?: {
-        id: number;
-        name: string;
-    } | null;
-
-    created_at: string;
-    updated_at: string;
-}
-
-export interface PlayerQueueResponse {
-    data: PlaybackQueueItem[];
-}
-
-// ============================================
-// ГЛОБАЛЬНЫЙ ПЛЕЕР: ОЧЕРЕДЬ
-// ============================================
-
-/**
- * Заполняет очередь треками выбранного источника.
- * Порядок trackIds определяет порядок воспроизведения.
- */
-export async function fillPlayerQueue(
-    trackIds: number[],
-): Promise<PlayerQueueResponse> {
-    const response = await http.put<PlayerQueueResponse>(
-        '/player/queue',
-        {
-            track_ids: trackIds,
-        },
-    );
-
-    return response.data;
-}
 
 /**
  * Получить очередь воспроизведения.

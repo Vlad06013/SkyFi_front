@@ -1,6 +1,6 @@
 import axios from 'axios';
 import { http } from '@/api/http';
-import type { Track } from '@/api/tracks';
+import type { Track } from '@/types/TrackType';
 
 // ============================================
 // ТИПЫ
@@ -122,12 +122,6 @@ export async function uploadTrack(
         );
     }
 
-    console.log('Загрузка трека:', {
-        title,
-        fileName: audioEntry.name,
-        fileSize: audioEntry.size,
-        fileType: audioEntry.type,
-    });
 
     try {
         const response = await http.post<UploadTrackResponse>(
@@ -150,11 +144,6 @@ export async function uploadTrack(
                     );
                 },
             },
-        );
-
-        console.log(
-            'Трек успешно загружен:',
-            response.data,
         );
 
         return response.data;

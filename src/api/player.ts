@@ -1,19 +1,46 @@
 import { http } from '@/api/http';
-import { PlaybackQueueItem } from '@/api/queue';
+import {PlayerActionResponse, PlayerStateResponse, TracksResponse} from '@/types/TypeApiRespone'
+import {AudioFile} from '@/types/TrackType'
+import {PlayerDevice, PlayerDeviceType} from '@/types/PlayerType'
 
-
-// ============================================
-// АУДИОФАЙЛ ТРЕКА
-// ============================================
+export type RepeatMode = 'off' | 'all' | 'one';
 
 /**
- * Получить ссылку на аудиофайл трека.
+ * Выбрать трек и установить состояние воспроизведения.
  *
- * API возвращает:
- * {
- *   "url": "http://127.0.0.1:8080/storage/tracks/uploads/..."
- * }
+ * POST /player/play
  */
+export async function playRemoteTrack(
+    trackId: number,
+    meta?: {
+        origin_device_id: number | null;
+        command_id: string;
+    },
+): Promise<PlayerActionResponse> {
+    const response = await http.post<PlayerActionResponse>(
+        '/player/play',
+        {
+            track_id: trackId,
+            ...meta
+        },
+    );
+
+    return response.data;
+}
+
+/**
+ * Получить состояние плеера и очередь.
+ *
+ * GET /player
+ */
+export async function getPlayerState(): Promise<PlayerStateResponse> {
+    const response = await http.get<PlayerStateResponse>(
+        '/player',
+    );
+
+    return response.data;
+}
+
 export async function getTrackAudio(
     trackId: number,
 ): Promise<AudioFile> {
@@ -38,144 +65,6 @@ export function downloadTrackAudio(
     return `${import.meta.env.VITE_API_URL}tracks/${trackId}/download`;
 }
 
-// ============================================
-// СПИСОК ТРЕКОВ
-// ============================================
-
-/**
- * Получить список опубликованных треков SkyFi.
- */
-export async function getTracks(): Promise<TracksResponse> {
-    const response = await http.get<TracksResponse>(
-        '/tracks',
-    );
-
-    return response.data;
-}
-
-
-
-// ============================================
-// ГЛОБАЛЬНЫЙ ПЛЕЕР: ТИПЫ
-// ============================================
-
-export type PlayerDeviceType =
-    | 'phone'
-    | 'computer'
-    | 'car'
-    | 'tv';
-
-export interface PlayerDevice {
-    id: number;
-    user_id: number;
-    device_uuid: string;
-    name: string;
-    type: PlayerDeviceType;
-    is_active: boolean;
-    last_seen_at: string | null;
-    created_at: string;
-    updated_at: string;
-}
-
-export interface PlaybackState {
-    id: number;
-    user_id: number;
-
-    current_track_id: number | null;
-    /** Трек основного списка, к которому нужно вернуться после серверной очереди. */
-    last_source_track_id: number | null;
-    active_device_id: number | null;
-
-    position_seconds: number;
-    is_playing: boolean;
-
-    repeat_mode: 'off' | 'all' | 'one';
-    shuffle_enabled: boolean;
-
-    version: number;
-
-    current_track?: Track | null;
-    active_device?: PlayerDevice | null;
-
-    created_at: string;
-    updated_at: string;
-}
-// export interface PlaybackQueueItem {
-//     id: number;
-//     playback_state_id: number;
-//     track_id: number;
-//     added_by_user_id: number | null;
-//
-//     position: number;
-//     status: 'pending' | 'played';
-//
-//     track: Track;
-//     added_by?: {
-//         id: number;
-//         name: string;
-//     } | null;
-//
-//     created_at: string;
-//     updated_at: string;
-// }
-
-export interface PlayerStateResponse {
-    state: PlaybackState;
-    queue: PlaybackQueueItem[];
-}
-
-export interface PlayerActionResponse {
-    message: string;
-    state: PlaybackState;
-}
-
-// export interface PlayerQueueResponse {
-//     data: PlaybackQueueItem[];
-// }
-
-// ============================================
-// ГЛОБАЛЬНЫЙ ПЛЕЕР: СОСТОЯНИЕ
-// ============================================
-
-/**
- * Получить состояние плеера и очередь.
- *
- * GET /player
- */
-export async function getPlayerState(): Promise<PlayerStateResponse> {
-    const response = await http.get<PlayerStateResponse>(
-        '/player',
-    );
-
-    return response.data;
-}
-
-// ============================================
-// ГЛОБАЛЬНЫЙ ПЛЕЕР: ВОСПРОИЗВЕДЕНИЕ
-// ============================================
-
-/**
- * Выбрать трек и установить состояние воспроизведения.
- *
- * POST /player/play
- */
-export async function playRemoteTrack(
-    trackId: number,
-    deviceId?: number,
-): Promise<PlayerActionResponse> {
-    const response = await http.post<PlayerActionResponse>(
-        '/player/play',
-        {
-            track_id: trackId,
-            ...(deviceId != null
-                ? { device_id: deviceId }
-                : {}),
-        },
-    );
-
-    return response.data;
-}
-
 /**
  * Поставить воспроизведение на паузу.
  *
@@ -183,6 +72,10 @@ export async function playRemoteTrack(
  */
 export async function pauseRemotePlayback(
     positionSeconds: number,
+    meta?: {
+        origin_device_id: number | null;
+        command_id: string;
+    },
 ): Promise<PlayerActionResponse> {
     const response = await http.post<PlayerActionResponse>(
         '/player/pause',
@@ -191,6 +84,7 @@ export async function pauseRemotePlayback(
                 0,
                 Math.floor(positionSeconds),
             ),
+            ...meta,
         },
     );
 
@@ -202,9 +96,17 @@ export async function pauseRemotePlayback(
  *
  * POST /player/resume
  */
-export async function resumeRemotePlayback(): Promise<PlayerActionResponse> {
+export async function resumeRemotePlayback(
+    meta?: {
+        origin_device_id: number | null;
+        command_id: string;
+    },
+): Promise<PlayerActionResponse> {
     const response = await http.post<PlayerActionResponse>(
         '/player/resume',
+        {
+            ...meta,
+        }
     );
 
     return response.data;
@@ -217,6 +119,10 @@ export async function resumeRemotePlayback(): Promise<PlayerActionResponse> {
  */
 export async function seekRemotePlayback(
     positionSeconds: number,
+    meta?: {
+        origin_device_id: number | null;
+        command_id: string;
+    },
 ): Promise<PlayerActionResponse> {
     const response = await http.post<PlayerActionResponse>(
         '/player/seek',
@@ -225,6 +131,7 @@ export async function seekRemotePlayback(
                 0,
                 Math.floor(positionSeconds),
             ),
+            ...meta,
         },
     );
 
@@ -238,23 +145,40 @@ export async function seekRemotePlayback(
  */
 export async function nextRemoteTrack(
     reason: 'manual' | 'ended' = 'manual',
+    meta?: {
+        origin_device_id: number | null;
+        command_id: string;
+    },
 ): Promise<PlayerActionResponse> {
     const response = await http.post<PlayerActionResponse>(
         '/player/next',
-        { reason },
+        {
+            reason,
+            ...meta
+
+        },
     );
 
     return response.data;
 }
+
 
 /**
  * Переключить на предыдущий трек.
  *
  * POST /player/previous
  */
-export async function previousRemoteTrack(): Promise<PlayerActionResponse> {
+export async function previousRemoteTrack(
+    meta?: {
+        origin_device_id: number | null;
+        command_id: string;
+    },
+): Promise<PlayerActionResponse> {
     const response = await http.post<PlayerActionResponse>(
         '/player/previous',
+        {
+            ...meta
+        },
     );
 
     return response.data;
@@ -310,9 +234,15 @@ export async function registerPlayerDevice(
  */
 export async function activatePlayerDevice(
     deviceId: number,
+    meta?: {
+        origin_device_id: number | null;
+        command_id: string;
+    },
 ): Promise<PlayerActionResponse> {
     const response = await http.patch(
-        `/player/devices/${deviceId}/activate`,
+        `/player/devices/${deviceId}/activate`,{
+            ... meta
+        }
     );
 
     return response.data;
@@ -335,7 +265,6 @@ export async function deletePlayerDevice(
     return response.data;
 }
 
-export type RepeatMode = 'off' | 'all' | 'one';
 
 export async function updatePlaybackOptions(options: {
     repeat_mode?: RepeatMode;
@@ -344,6 +273,15 @@ export async function updatePlaybackOptions(options: {
     const response = await http.patch<PlayerActionResponse>(
         '/player/options',
         options,
+    );
+
+    return response.data;
+}
+
+//TODO: Удалить
+export async function getTracks(): Promise<TracksResponse> {
+    const response = await http.get<TracksResponse>(
+        '/tracks',
     );
 
     return response.data;

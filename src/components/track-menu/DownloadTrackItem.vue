@@ -17,7 +17,7 @@
 import {computed, ref} from 'vue';
 import {IonIcon, IonSpinner} from '@ionic/vue';
 import {downloadOutline} from 'ionicons/icons';
-import {downloadTrackAudio} from '@/api/tracks';
+import {downloadTrackAudio} from '@/api/player';
 
 const props = defineProps<{
   trackId: number;

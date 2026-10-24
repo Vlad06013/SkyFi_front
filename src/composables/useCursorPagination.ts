@@ -37,13 +37,11 @@ export function useCursorPagination<T>(
 
         try {
             const response = await options.fetchPage();
-          console.log('Массив треков:', response.data);
 
             items.value = response.data;
             nextPageUrl.value = response.next_page_url;
             prevPageUrl.value = response.prev_page_url;
-          console.log('items.value:', items.value);
-          console.log('Количество треков:', items.value.length);
+
         } catch (err) {
             error.value = err;
         } finally {

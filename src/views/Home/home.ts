@@ -2,10 +2,10 @@ import { useRouter } from 'vue-router';
 import usePlayerStore from '@/stores/player';
 import { useAuthStore } from '@/stores/auth';
 
-import {
-    getTracks,
-    type Track as ApiTrack,
-} from '@/api/tracks';
+
+import {type Track as ApiTrack} from '@/types/TrackType';
+import {getTracks} from '@/api/player';
+
 
 import {
     computed,

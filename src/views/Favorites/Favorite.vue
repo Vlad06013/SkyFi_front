@@ -243,52 +243,6 @@
               :error="error"
               :retry="loadLibrary"
           />
-
-<!--          <TrackList-->
-<!--              v-if="tracks.length"-->
-<!--              :tracks="tracks"-->
-<!--              :is-current-track="isCurrentTrack"-->
-<!--              :is-playing="playerIsPlaying"-->
-<!--              :get-track-color="getTrackColor"-->
-<!--              :is-favorite="isFavoriteTrack"-->
-<!--              :loading-track-id="menuActionLoadingId"-->
-<!--              :next-page-url="nextFavoritesPageUrl"-->
-<!--              :loading-more="loadingMoreFavorites"-->
-<!--              @load-more="loadMoreFavorites"-->
-<!--              @play="handleTrackClick"-->
-<!--              @menu-open="handleTrackMenuOpen"-->
-<!--              @action="runTrackMenuAction"-->
-<!--          />-->
-<!--          <FavoriteTracksList-->
-<!--              :tracks="tracks"-->
-<!--              :loading="loading"-->
-<!--              :next-page-url="nextFavoritesPageUrl"-->
-<!--              @play="handleTrackClick"-->
-<!--              @menu-open="handleTrackMenuOpen"-->
-<!--              @action="runTrackMenuAction"-->
-<!--          />-->
-
-<!--            <div class="empty-icon">-->
-<!--              <ion-icon :icon="musicalNotesOutline" />-->
-<!--            </div>-->
-
-<!--            <h3>Избранное пока пусто</h3>-->
-
-<!--            <p>-->
-<!--              Добавляй понравившиеся треки в избранное,-->
-<!--              чтобы они всегда были под рукой.-->
-<!--            </p>-->
-
-<!--            <button-->
-<!--                type="button"-->
-<!--                class="retry-button"-->
-<!--                @click="openUpload"-->
-<!--            >-->
-<!--              <ion-icon :icon="cloudUploadOutline" />-->
-
-<!--              Загрузить музыку-->
-<!--            </button>-->
-<!--          </div>-->
         </section>
 
         <!-- =====================================

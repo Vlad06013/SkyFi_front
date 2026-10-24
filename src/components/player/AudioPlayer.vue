@@ -629,7 +629,6 @@ import { computed, onMounted, ref, watch } from 'vue';
 import usePlayerStore from '@/stores/player';
 import QueuePanel from '@/components/player/queue/QueuePanel.vue';
 import TrackContextMenu from '@/components/track-menu/TrackContextMenu.vue';
-import type { Track } from '@/api/tracks';
 
 const player = usePlayerStore();
 

@@ -17,7 +17,7 @@ import {
     type PlaylistWithTracks,
 } from '@/api/playlists';
 
-import type { Track } from '@/api/tracks';
+import type { Track } from '@/types/TrackType';
 
 import usePlayerStore from '@/stores/player';
 
