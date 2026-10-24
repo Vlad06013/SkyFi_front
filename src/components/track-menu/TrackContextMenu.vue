@@ -1,4 +1,3 @@
-
 <template>
   <div class="track-menu-wrap" @click.stop @pointerdown.stop>
     <button
@@ -37,7 +36,7 @@
 
           <div class="track-sheet-heading">
             <div class="track-sheet-cover">
-              <ion-icon :icon="musicalNotesOutline" />
+              <ion-icon :icon="musicalNotesOutline"/>
             </div>
 
             <div class="track-sheet-info">
@@ -56,7 +55,7 @@
                 aria-label="Закрыть меню"
                 @click="closeMenu"
             >
-              <ion-icon :icon="closeOutline" />
+              <ion-icon :icon="closeOutline"/>
             </button>
           </div>
 
@@ -67,7 +66,7 @@
                 :disabled="loading"
                 @click="runAction('next')"
             >
-              <ion-icon :icon="playSkipForwardOutline" />
+              <ion-icon :icon="playSkipForwardOutline"/>
               Играть следующим
             </button>
 
@@ -77,7 +76,7 @@
                 :disabled="loading"
                 @click="runAction('queue')"
             >
-              <ion-icon :icon="listOutline" />
+              <ion-icon :icon="listOutline"/>
               Добавить в очередь
             </button>
 
@@ -87,7 +86,7 @@
                 :disabled="loading"
                 @click="runAction('favorite')"
             >
-              <ion-icon :icon="heartOutline" />
+              <ion-icon :icon="heartOutline"/>
               {{ isFavorite ? 'Удалить из избранного' : 'Добавить в избранное' }}
             </button>
 
@@ -120,7 +119,7 @@
             :disabled="loading"
             @click="runAction('next')"
         >
-          <ion-icon :icon="playSkipForwardOutline" />
+          <ion-icon :icon="playSkipForwardOutline"/>
           Играть следующим
         </button>
 
@@ -130,7 +129,7 @@
             :disabled="loading"
             @click="runAction('queue')"
         >
-          <ion-icon :icon="listOutline" />
+          <ion-icon :icon="listOutline"/>
           Добавить в очередь
         </button>
 
@@ -140,7 +139,7 @@
             :disabled="loading"
             @click="runAction('favorite')"
         >
-          <ion-icon :icon="heartOutline" />
+          <ion-icon :icon="heartOutline"/>
           {{ isFavorite ? 'Удалить из избранного' : 'Добавить в избранное' }}
         </button>
 
@@ -159,8 +158,8 @@
 </template>
 
 <script setup lang="ts" generic="T extends TrackType">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
-import { IonIcon, IonSpinner } from '@ionic/vue';
+import {computed, nextTick, onBeforeUnmount, ref, watch} from 'vue';
+import {IonIcon, IonSpinner} from '@ionic/vue';
 import {
   closeOutline,
   ellipsisVerticalOutline,
@@ -172,7 +171,8 @@ import {
 
 import AddToPlaylistItem from '@/components/track-menu/AddToPlaylistItem.vue';
 import DownloadTrackItem from '@/components/track-menu/DownloadTrackItem.vue';
-import type { TrackType } from '@/types/TrackType';
+import type {TrackType} from '@/types/TrackType';
+
 const props = defineProps<{
   track: T;
   isFavorite: boolean;
@@ -180,7 +180,11 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  action: [track: T, action: 'next' | 'queue' | 'favorite'];
+  action: [
+    track: T,
+    action: 'next' | 'queue' | 'favorite',
+    isFavorite: boolean
+  ];
   open: [track: T];
   close: [track: T];
 }>();
@@ -270,12 +274,14 @@ function closeMenu() {
   if (!isOpen.value) return;
 
   isOpen.value = false;
-  desktopMenuStyle.value = { visibility: 'hidden' };
+  desktopMenuStyle.value = {visibility: 'hidden'};
   emit('close', props.track);
 }
 
 function runAction(action: 'next' | 'queue' | 'favorite') {
-  emit('action', props.track, action);
+  // emit('action', props.track, action);
+  emit('action', props.track, action, props.isFavorite);
+
   closeMenu();
 }
 
@@ -523,13 +529,21 @@ if (typeof window !== 'undefined') {
 }
 
 @keyframes track-sheet-in {
-  from { transform: translateY(100%); }
-  to { transform: translateY(0); }
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
 }
 
 @keyframes track-sheet-backdrop-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

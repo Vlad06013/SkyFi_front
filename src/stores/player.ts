@@ -223,17 +223,23 @@ const usePlayerStore = defineStore('player', () => {
      * @param track
      */
     async function addToQueue(track: Track): Promise<void> {
-        if (!auth.user) return;
+        if (!auth.user) {
+            throw new Error('Для добавления в очередь необходимо войти в аккаунт.');
+        }
 
         try {
             await addTrackToQueue(Number(track.id));
+
             const response = await getPlayerQueue();
-            setQueue(response.data.map((item) => item.track));
+
+            setQueue(response.data.map(item => item.track));
         } catch (error) {
             console.error(
                 '[Player] Не удалось добавить трек в очередь:',
                 error,
             );
+
+            throw error;
         }
     }
 
@@ -311,8 +317,15 @@ const usePlayerStore = defineStore('player', () => {
         }
     }
 
-    async function toggleFavorite(): Promise<void> {
-        const track = currentTrack.value;
+    async function toggleFavorite(
+        track?: Track,
+        isFavorite?: boolean,
+    ): Promise<void> {
+        const targetTrack = track ?? currentTrack.value;
+
+        if (!targetTrack) {
+            return;
+        }
 
         if (
             !track ||
@@ -323,30 +336,76 @@ const usePlayerStore = defineStore('player', () => {
             return;
         }
 
-        const trackId = track.id;
+        const isCurrentTrack =
+            String(currentTrack.value?.id) === String(targetTrack.id);
+
+        const currentFavoriteState = track
+            ? isFavorite
+            : liked.value;
+
+
+        if (currentFavoriteState === undefined) return;
+
+        // Для текущего трека сохраняем защиту плеера.
+        if (!track && favoriteLoading.value) return;
+
+
         const requestId = ++favoriteToggleRequestId;
-        favoriteLoading.value = true;
+        const trackId = Number(targetTrack.id);
+
+        if (!Number.isSafeInteger(trackId) || trackId <= 0) {
+            return;
+        }
+
+        if (!track) favoriteLoading.value = true;
 
         try {
-            const response = liked.value
+            const response = currentFavoriteState
                 ? await removeFavorite(trackId)
                 : await addFavorite(trackId);
 
-            if (
-                requestId !== favoriteToggleRequestId ||
-                String(currentTrack.value?.id) !== String(trackId)
-            ) {
-                return;
-            }
+            if (requestId !== favoriteToggleRequestId) return;
 
-            liked.value = response.is_favorite;
+            if (
+                isCurrentTrack &&
+                String(currentTrack.value?.id) === String(trackId)
+            ) {
+                liked.value = response.is_favorite;
+            }
         } catch (error) {
             console.error('[Player] Ошибка изменения избранного:', error);
         } finally {
-            if (requestId === favoriteToggleRequestId) {
+            if (!track && requestId === favoriteToggleRequestId) {
                 favoriteLoading.value = false;
             }
         }
+
+
+
+        // const trackId = track.id;
+        // const requestId = ++favoriteToggleRequestId;
+        // favoriteLoading.value = true;
+        //
+        // try {
+        //     const response = liked.value
+        //         ? await removeFavorite(trackId)
+        //         : await addFavorite(trackId);
+        //
+        //     if (
+        //         requestId !== favoriteToggleRequestId ||
+        //         String(currentTrack.value?.id) !== String(trackId)
+        //     ) {
+        //         return;
+        //     }
+        //
+        //     liked.value = response.is_favorite;
+        // } catch (error) {
+        //     console.error('[Player] Ошибка изменения избранного:', error);
+        // } finally {
+        //     if (requestId === favoriteToggleRequestId) {
+        //         favoriteLoading.value = false;
+        //     }
+        // }
     }
 
     watch(
@@ -1324,6 +1383,7 @@ const usePlayerStore = defineStore('player', () => {
         currentTrackIndex,
         setQueue,
         addToQueue,
+        playTrackNext,
 
         currentTrack,
         isPlaying,

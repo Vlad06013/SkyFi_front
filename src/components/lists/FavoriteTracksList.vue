@@ -80,7 +80,7 @@
             :loading="loadingTrackId === Number(track.id)"
             @open="handleMenuOpen"
             @close="handleMenuClose"
-            @action="(item, action) => emit('action', item, action)"
+            @action="handleAction"
         />
       </div>
     </template>
@@ -117,6 +117,30 @@ const emit = defineEmits<{
   menuOpen: [track: Track];
 }>();
 
+async function handleAction(
+    track: Track,
+    action: 'next' | 'queue' | 'favorite',
+    isFavorite: boolean,
+
+) {
+  console.log('Из списка',action);
+
+  switch (action) {
+    case 'queue':
+      await player.addToQueue(track);
+      break;
+
+    case 'next':
+      await player.playTrackNext(track);
+      break;
+
+    case 'favorite':
+      await player.toggleFavorite(track, isFavorite);
+// Обновляем список избранного после успешного действия.
+      await props.retry();
+      break;
+  }
+}
 
 const isPlaying = computed(() => player.isPlaying);
 
@@ -124,51 +148,6 @@ function isCurrentTrack(track: Track): boolean {
   return Number(player.currentTrack?.id) === Number(track.id);
 }
 
-// async function loadInitial(): Promise<void> {
-//   console.count('[Favorites] loadInitial вызвана');
-//   console.trace('[Favorites] Стек вызова');
-//   // Не запускаем параллельную загрузку повторно.
-//   if (requestInProgress) {
-//     return requestInProgress;
-//   }
-//
-//   requestInProgress = (async () => {
-//     loading.value = true;
-//     error.value = null;
-//
-//     try {
-//       // getFavorites() сначала обращается к серверу,
-//       // а при ошибке пробует получить данные из IndexedDB.
-//       items.value = await getFavorites();
-//       console.log('[Favorites] Записано в items:', items.value.length);
-//     } catch (err: unknown) {
-//       console.error(
-//           '[FavoriteTracksList] Не удалось загрузить избранное:',
-//           err,
-//       );
-//
-//       error.value = 'Не удалось загрузить избранное';
-//     } finally {
-//       loading.value = false;
-//       requestInProgress = null;
-//     }
-//   })();
-//
-//   return requestInProgress;
-// }
-
-
-// async function playTrack(track: Track): Promise<void> {
-//   if (!track?.id || player.isLoading) {
-//     return;
-//   }
-//   // Передаём плееру весь список избранного.
-//   console.log('Передано в очередь', items.value)
-//
-//   player.setQueue(items.value);
-//   // Запускаем выбранный трек.
-//   await player.playTrack(track);
-// }
 async function playTrack(track: Track): Promise<void> {
   if (!track?.id || player.isLoading) return;
 
@@ -228,20 +207,6 @@ const props = defineProps<{
   retry: () => void | Promise<void>;
 }>();
 
-// watch(
-//     () => props.items,
-//     (tracks) => {
-//       if (!player.isServerSyncEnabled) return;
-//
-//       player.setQueue([...tracks]);
-//
-//       console.log('[Favorites] Очередь синхронизирована:', {
-//         count: tracks.length,
-//         ids: tracks.map(track => track.id),
-//       });
-//     },
-//     { immediate: true },
-// );
 watch(
     () => props.items,
     (tracks) => {
