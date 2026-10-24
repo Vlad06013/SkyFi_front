@@ -3,9 +3,9 @@ import usePlayerStore from '@/stores/player';
 import {
     getPlayerQueue,
     removeTrackFromQueue,
-    type PlaybackQueueItem,
 } from '@/api/queue';
 
+import { PlaybackQueueItem } from '@/types/QueueType';
 export function useQueue() {
     const player = usePlayerStore();
 
@@ -24,7 +24,7 @@ export function useQueue() {
             const response = await getPlayerQueue();
 
             queueItems.value = response.data;
-
+            player.setServerQueueCount(response.data.length);
             player.setQueue(
                 response.data.map(item => item.track),
             );

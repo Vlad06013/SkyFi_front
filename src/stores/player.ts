@@ -72,7 +72,7 @@ const usePlayerStore = defineStore('player', () => {
     const favoriteLoading = ref(false);
     const isSeeking = ref(false);
     const isRestoringState = ref(false);
-
+    const serverQueueCount = ref(0);
     const isServerSyncEnabled = computed(() => Boolean(auth.user));
 
     const isLocalDeviceActive = computed(
@@ -102,6 +102,10 @@ const usePlayerStore = defineStore('player', () => {
     let isDeviceChangesSubscribed = false;
     let serverProgressTimer: ReturnType<typeof setInterval> | null = null;
     let lastAppliedVersion: number | null = null;
+
+    function setServerQueueCount(count: number): void {
+        serverQueueCount.value = count;
+    }
 
     // ============================================
     // ПРОГРЕСС ВОСПРОИЗВЕДЕНИЯ
@@ -1384,6 +1388,8 @@ const usePlayerStore = defineStore('player', () => {
         setQueue,
         addToQueue,
         playTrackNext,
+        serverQueueCount,
+        setServerQueueCount,
 
         currentTrack,
         isPlaying,

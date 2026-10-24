@@ -59,10 +59,10 @@
         </svg>
 
         <span
-            v-if="player.queue.length > 0"
+            v-if="player.serverQueueCount > 0"
             class="queue-count"
         >
-      {{ player.queue.length }}
+      {{ player.serverQueueCount }}
     </span>
       </button>
 
