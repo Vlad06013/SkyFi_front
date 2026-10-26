@@ -100,13 +100,13 @@ import BaseInfiniteList from '@/components/lists/BaseInfiniteList.vue';
 import TrackContextMenu from '@/components/track-menu/TrackContextMenu.vue';
 import usePlayerStore from '@/stores/player';
 
-// import { getFavorites } from '@/api/favorites';
 import type {Track} from '@/types/TrackType';
 
 const player = usePlayerStore();
 
 const loadingTrackId = ref<number | null>(null);
 const openMenuTrackId = ref<string | null>(null);
+const sourceList = "uploads";
 
 const emit = defineEmits<{
   play: [track: Track];
@@ -157,7 +157,7 @@ async function playTrack(track: Track): Promise<void> {
     selectedTrackId: track.id,
   });
 
-  await player.playTrack(track);
+  await player.playTrack(track, sourceList);
 }
 
 

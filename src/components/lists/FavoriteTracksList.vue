@@ -62,6 +62,12 @@
           <small>
             {{ track.album?.title || 'Без альбома' }}
           </small>
+          <span
+              class="source-badge"
+              :class="getSourceTypeClass(track.source_type)"
+          >
+            {{ getSourceTypeLabel(track.source_type) }}
+          </span>
         </div>
 
         <span
@@ -143,6 +149,7 @@ async function handleAction(
 }
 
 const isPlaying = computed(() => player.isPlaying);
+const sourceList = "favorite";
 
 function isCurrentTrack(track: Track): boolean {
   return Number(player.currentTrack?.id) === Number(track.id);
@@ -159,7 +166,7 @@ async function playTrack(track: Track): Promise<void> {
     selectedTrackId: track.id,
   });
 
-  await player.playTrack(track);
+  await player.playTrack(track, sourceList);
 }
 
 
@@ -188,6 +195,27 @@ const coverColors = [
   '#337E75',
 ];
 
+const sourceTypeLabels: Record<string, string> = {
+  yandex_music: 'Yandex Music',
+  upload: 'Загруженное',
+};
+
+function getSourceTypeLabel(sourceType: string): string {
+  return sourceTypeLabels[sourceType] ?? 'Другой источник';
+}
+
+function getSourceTypeClass(sourceType: string): string {
+  switch (sourceType) {
+    case 'yandex_music':
+      return 'source-badge--yandex';
+
+    case 'uploads':
+      return 'source-badge--uploads';
+
+    default:
+      return 'source-badge--other';
+  }
+}
 function getTrackColor(id: number | string): string {
   const normalizedId = Number(id);
 
@@ -227,3 +255,35 @@ watch(
     { immediate: true },
 );
 </script>
+<style scoped>
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin-top: 5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+}
+
+.source-badge--yandex {
+  color: #d8c8ff;
+  background: rgb(139 92 246 / 16%);
+  border: 1px solid rgb(139 92 246 / 25%);
+}
+
+.source-badge--uploads {
+  color: #8ce9d4;
+  background: rgb(45 212 191 / 12%);
+  border: 1px solid rgb(45 212 191 / 22%);
+}
+
+.source-badge--other {
+  color: var(--ion-color-medium);
+  background: rgb(128 128 128 / 10%);
+  border: 1px solid rgb(128 128 128 / 20%);
+}
+</style>

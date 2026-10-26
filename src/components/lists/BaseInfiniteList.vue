@@ -158,4 +158,6 @@ async function handleInfinite(event: CustomEvent): Promise<void> {
 .list-error {
   color: var(--ion-color-danger);
 }
+
+
 </style>

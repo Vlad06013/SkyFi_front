@@ -2,12 +2,12 @@ import {
     computed,
     ref,
     watch,
-    onMounted,
     onBeforeUnmount,
 } from 'vue';
 
 import {searchTracks,} from '@/api/search';
 import {type Track,} from '@/types/TrackType';
+const sourceList = "search";
 
 
 import {
@@ -52,6 +52,7 @@ export function useSearch() {
 
     const activeFilter = ref('all');
 
+
     const tracks = ref<SearchTrack[]>([]);
 
     const searchLoading = ref(false);
@@ -61,6 +62,18 @@ export function useSearch() {
     let searchTimeout: ReturnType<typeof setTimeout> | undefined;
 
     let searchRequestId = 0;
+
+    const activeSource = ref<SearchSource>('all');
+
+    const sourceFilters: {
+        label: string;
+        value: SearchSource;
+    }[] = [
+        { label: 'Все', value: 'all' },
+        { label: 'Загрузки', value: 'upload' },
+        { label: 'Яндекс Музыка', value: 'yandex_music' },
+        { label: 'Internet Archive', value: 'internet_archive' },
+    ];
 
     // ==========================================
     // ГЛОБАЛЬНЫЙ МУЗЫКАЛЬНЫЙ ПЛЕЕР
@@ -138,7 +151,7 @@ export function useSearch() {
             current &&
             String(current.id) === String(track.id)
         ) {
-            await player.togglePlay();
+            await player.togglePlay(sourceList);
             return;
         }
 
@@ -146,7 +159,7 @@ export function useSearch() {
         player.setQueue(tracks.value);
 
         // Воспроизводим трек через глобальный плеер.
-        await player.playTrack(track);
+        await player.playTrack(track, sourceList);
     }
 
     /**
@@ -192,7 +205,6 @@ export function useSearch() {
     // ==========================================
     // РЕЗУЛЬТАТЫ ПОИСКА
     // ==========================================
-
     const filteredTracks = computed(() => {
         if (
             !query.value.trim() ||
@@ -202,8 +214,20 @@ export function useSearch() {
             return [];
         }
 
-        return tracks.value;
+        if (activeSource.value === 'all') {
+            return tracks.value;
+        }
+
+        return tracks.value.filter(
+            track => track.source_type === activeSource.value,
+        );
     });
+
+    type SearchSource =
+        | 'all'
+        | 'upload'
+        | 'yandex_music'
+        | 'internet_archive';
 
     // ==========================================
     // ВЫПОЛНЕНИЕ ПОИСКА
@@ -218,6 +242,8 @@ export function useSearch() {
 
         try {
             const response = await searchTracks(term, 20);
+            console.log('[Search] Ответ API:', response);
+            console.log('[Search] Найдено треков:', response.data.items.length);
 
             // Игнорируем устаревшие ответы.
             if (requestId !== searchRequestId) {
@@ -322,20 +348,20 @@ export function useSearch() {
     // ЗАГРУЗКА ИЗБРАННОГО
     // ==========================================
 
-    async function loadFavorites(): Promise<void> {
-        try {
-            const response = await getFavorites();
-
-            favoriteTrackIds.value = new Set(
-                response.data.map((track) => track.id),
-            );
-        } catch (error) {
-            console.error(
-                'Не удалось загрузить избранное:',
-                error,
-            );
-        }
-    }
+    // async function loadFavorites(): Promise<void> {
+    //     try {
+    //         const response = await getFavorites();
+    //
+    //         favoriteTrackIds.value = new Set(
+    //             response.data.map((track) => track.id),
+    //         );
+    //     } catch (error) {
+    //         console.error(
+    //             'Не удалось загрузить избранное:',
+    //             error,
+    //         );
+    //     }
+    // }
 
     // ==========================================
     // ДОБАВЛЕНИЕ И УДАЛЕНИЕ ИЗБРАННОГО
@@ -397,9 +423,9 @@ export function useSearch() {
     // ИНИЦИАЛИЗАЦИЯ
     // ==========================================
 
-    onMounted(() => {
-        void loadFavorites();
-    });
+    // onMounted(() => {
+    //     void loadFavorites();
+    // });
 
     // ==========================================
     // ОЧИСТКА
@@ -428,6 +454,8 @@ export function useSearch() {
         searchLoading,
         searchError,
         filteredTracks,
+        activeSource,
+        sourceFilters,
 
         // Глобальный плеер.
         currentTrack,

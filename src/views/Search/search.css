@@ -740,3 +740,40 @@ h2 {
         font-size: 17px;
     }
 }
+
+   .source-filters {
+       display: flex;
+       flex-wrap: wrap;
+       gap: 10px;
+       margin-bottom: 16px;
+   }
+
+.source-filter {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 40px;
+    padding: 0 18px;
+    border: 1px solid var(--ion-color-step-200, #30323c);
+    border-radius: 12px;
+    background: var(--ion-color-step-50, #1c1e26);
+    color: var(--ion-color-medium, #a1a1aa);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+            background 0.2s ease,
+            color 0.2s ease,
+            border-color 0.2s ease;
+}
+
+.source-filter:hover {
+    border-color: #8b5cf6;
+    color: #c4b5fd;
+}
+
+.source-filter.active {
+    border-color: transparent;
+    background: #8b5cf6;
+    color: #fff;
+}

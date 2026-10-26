@@ -244,6 +244,7 @@ import AudioPlayer from '@/components/player/AudioPlayer.vue';
 import AppNavigation from '@/components/AppNavigation.vue';
 
 import { useHome } from './home';
+import YandexMusicAuth from "@/components/Auth/YandexMusic/YandexMusicAuth.vue";
 
 const {
   auth,

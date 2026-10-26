@@ -9,7 +9,7 @@ import {
     type PlayerDeviceType,
 } from '@/types/PlayerType';
 
-import {type Track } from '@/types/TrackType';
+import {AudioFile, type Track} from '@/types/TrackType';
 
 import {
     getTrackAudio,
@@ -46,6 +46,8 @@ const usePlayerStore = defineStore('player', () => {
         artist: string;
         cover?: string;
         symbol?: string;
+        source_id: string | null;
+        source_type: string;
     };
 
     const auth = useAuthStore();
@@ -270,6 +272,8 @@ const usePlayerStore = defineStore('player', () => {
                 'Неизвестный исполнитель',
             cover: 'cover-purple',
             symbol: '♫',
+            source_id: track.source_id,
+            source_type: track.source_type,
         };
     }
 
@@ -572,17 +576,21 @@ const usePlayerStore = defineStore('player', () => {
     // ============================================
     // ЗАПУСК ТРЕКА
     // ============================================
-    async function playTrack(track: Track): Promise<void> {
+    async function playTrack(track: Track, playbackSource: string): Promise<void> {
         if (!track?.id || !auth.user || isLoading.value) return;
 
         const requestId = ++playbackRequestId;
         isLoading.value = true;
+
        let commandId = createCommandId();
+
+        console.log("playbackSource", playbackSource)
         try {
             const selectedTrackId = Number(track.id);
 
             const response = await playRemoteTrack(
-                selectedTrackId,
+                track,
+                playbackSource,
                 {
                     origin_device_id: localDeviceId.value,
                     command_id: commandId,
@@ -617,7 +625,7 @@ const usePlayerStore = defineStore('player', () => {
     // PLAY / PAUSE
     // ============================================
 
-    async function togglePlay(): Promise<void> {
+    async function togglePlay(source: string): Promise<void> {
         if (isLoading.value || !auth.user) return;
         let commandId = createCommandId();
 
@@ -625,7 +633,7 @@ const usePlayerStore = defineStore('player', () => {
             const firstTrack = queue.value[0];
 
             if (firstTrack) {
-                await playTrack(firstTrack);
+                await playTrack(firstTrack,source);
             }
 
             return;
@@ -1168,7 +1176,17 @@ const usePlayerStore = defineStore('player', () => {
             if (trackChanged || sourceMissing || forceLoadSelectedTrack) {
                 audio.pause();
 
-                const audioFile = await getTrackAudio(Number(track.id));
+               // const audioFile = await getTrackAudio(Number(track.id));
+
+                let audioFile = <AudioFile>({});
+
+                if (track.url){
+                    audioFile.url = track.url;
+
+                } else {
+                    audioFile = await getTrackAudio(Number(track.id));
+                }
+
 
                 if (
                     requestId !== remoteStateRequestId ||

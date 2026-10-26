@@ -1,6 +1,6 @@
 import { http } from '@/api/http';
 import {PlayerActionResponse, PlayerStateResponse, TracksResponse} from '@/types/TypeApiRespone'
-import {AudioFile} from '@/types/TrackType'
+import {AudioFile, type Track} from '@/types/TrackType'
 import {PlayerDevice, PlayerDeviceType} from '@/types/PlayerType'
 
 export type RepeatMode = 'off' | 'all' | 'one';
@@ -11,7 +11,8 @@ export type RepeatMode = 'off' | 'all' | 'one';
  * POST /player/play
  */
 export async function playRemoteTrack(
-    trackId: number,
+    track: Track,
+    playbackSource?: string,
     meta?: {
         origin_device_id: number | null;
         command_id: string;
@@ -20,7 +21,9 @@ export async function playRemoteTrack(
     const response = await http.post<PlayerActionResponse>(
         '/player/play',
         {
-            track_id: trackId,
+            // track_id: trackId,
+            track: track,
+            playback_source: playbackSource,
             ...meta
         },
     );

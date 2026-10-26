@@ -9,6 +9,7 @@ import RegisterPage from '@/views/RegisterPage.vue';
 
 import { useAuthStore } from '@/stores/auth';
 import Favorite from "@/views/Favorites/Favorite.vue";
+import ProfilePage from '@/views/Profile/ProfilePage.vue';
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -24,12 +25,15 @@ const routes: Array<RouteRecordRaw> = [
     path: '/search',
     component: SearchPage,
   },
-  // {
-  //   path: '/library',
-  //   name: 'Library',
-  //   component: LibraryPage,
-  //   meta: { requiresAuth: true },
-  // },
+  {
+    path: '/profile',
+    name: 'profile',
+    component: ProfilePage,
+    meta: {
+      requiresAuth: true,
+    },
+  },
+
   {
     path: '/favorite',
     name: 'Favorite',

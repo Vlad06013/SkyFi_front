@@ -16,6 +16,7 @@ export interface Track {
     source_type: string;
     source_id: string | null;
     is_favorite?: boolean;
+    url?: string;
     status: string;
     artists?: Artist[];
     album?: Album | null;
@@ -25,6 +26,7 @@ export interface Track {
     updated_at: string;
     deleted_at: string | null;
     files?: TrackFile[];
+    has_cached_audio?: boolean;
 }
 
 export interface TrackFile {
