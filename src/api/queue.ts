@@ -1,5 +1,5 @@
 import { http } from '@/api/http';
-import {PlayerQueueResponse} from "@/types/TypeApiRespone";
+import {ApiResponse} from "@/types/TypeApiRespone";
 import {PlaybackQueueItem} from "@/types/QueueType";
 
 
@@ -8,10 +8,13 @@ import {PlaybackQueueItem} from "@/types/QueueType";
  *
  * GET /player/queue
  */
-export async function getPlayerQueue(): Promise<PlayerQueueResponse> {
-    const response = await http.get<PlayerQueueResponse>(
+export async function getPlayerQueue(): Promise<PlaybackQueueItem> {
+    // const response = await http.get<PlayerQueueResponse>(
+    //     '/player/queue',
+    // );
+    const response = (await http.get<ApiResponse<PlaybackQueueItem>>(
         '/player/queue',
-    );
+    )).data;
 
     return response.data;
 }
@@ -63,7 +66,7 @@ export async function removeTrackFromQueue(
  */
 export async function reorderPlayerQueue(
     itemIds: number[],
-): Promise<PlayerQueueResponse & {
+): Promise<PlaybackQueueItem & {
     message: string;
 }> {
     const response = await http.patch(

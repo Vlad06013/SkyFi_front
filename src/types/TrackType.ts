@@ -25,7 +25,7 @@ export interface Track {
     created_at: string;
     updated_at: string;
     deleted_at: string | null;
-    files?: TrackFile[];
+    file?: TrackFile;
     has_cached_audio?: boolean;
 }
 

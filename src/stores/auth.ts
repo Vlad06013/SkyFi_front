@@ -1,23 +1,20 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import axios from 'axios';
-import { http } from '@/api/http';
+
+import {
+    loginRequest,
+    registerRequest,
+    getCurrentUserRequest,
+    logoutRequest,
+} from '@/api/auth';
+
+import type { User } from '@/types/AuthType';
 import { invalidatePlaylistsCache } from '@/api/playlists';
-
-export interface User {
-    id: number;
-    name: string;
-    email: string;
-}
-
-interface AuthResponse {
-    user: User;
-    token: string;
-    message?: string;
-}
 
 export const useAuthStore = defineStore('auth', () => {
     const user = ref<User | null>(null);
+
     const token = ref<string | null>(
         localStorage.getItem('skyfi_token'),
     );
@@ -26,9 +23,9 @@ export const useAuthStore = defineStore('auth', () => {
     const isLoading = ref(false);
     const error = ref('');
 
-    const isAuthenticated = computed(() => {
-        return !!token.value && !!user.value;
-    });
+    const isAuthenticated = computed(
+        () => !!token.value && !!user.value,
+    );
 
     function clearAuth() {
         token.value = null;
@@ -36,8 +33,17 @@ export const useAuthStore = defineStore('auth', () => {
 
         localStorage.removeItem('skyfi_token');
 
-        // Плейлисты привязаны к пользователю — сбрасываем кэш.
         invalidatePlaylistsCache();
+    }
+
+    function setAuth(data: {
+        user: User;
+        token: string;
+    }) {
+        token.value = data.token;
+        user.value = data.user;
+
+        localStorage.setItem('skyfi_token', data.token);
     }
 
     function getErrorMessage(exception: unknown): string {
@@ -45,12 +51,17 @@ export const useAuthStore = defineStore('auth', () => {
             const data = exception.response?.data;
 
             if (data?.errors) {
-                const firstError = Object.values(data.errors)
+                const firstError = Object.values(
+                    data.errors as Record<string, unknown>,
+                )
                     .flat()
-                    .find((value) => typeof value === 'string');
+                    .find(
+                        (value): value is string =>
+                            typeof value === 'string',
+                    );
 
                 if (firstError) {
-                    return firstError as string;
+                    return firstError;
                 }
             }
 
@@ -62,26 +73,29 @@ export const useAuthStore = defineStore('auth', () => {
                 return 'Не удалось подключиться к серверу.';
             }
 
-            return data?.message ?? 'Произошла ошибка. Попробуй ещё раз.';
+            return (
+                data?.message
+                ?? 'Произошла ошибка. Попробуй ещё раз.'
+            );
         }
 
         return 'Произошла непредвиденная ошибка.';
     }
 
-    async function login(email: string, password: string) {
+    async function login(
+        email: string,
+        password: string,
+    ): Promise<boolean> {
         isLoading.value = true;
         error.value = '';
 
         try {
-            const response = await http.post<AuthResponse>(
-                '/login',
-                { email, password },
-            );
+            const response = await loginRequest({
+                email,
+                password,
+            });
 
-            token.value = response.data.token;
-            user.value = response.data.user;
-
-            localStorage.setItem('skyfi_token', response.data.token);
+            setAuth(response.data);
 
             return true;
         } catch (exception) {
@@ -97,25 +111,19 @@ export const useAuthStore = defineStore('auth', () => {
         email: string,
         password: string,
         passwordConfirmation: string,
-    ) {
+    ): Promise<boolean> {
         isLoading.value = true;
         error.value = '';
 
         try {
-            const response = await http.post<AuthResponse>(
-                '/register',
-                {
-                    name,
-                    email,
-                    password,
-                    password_confirmation: passwordConfirmation,
-                },
-            );
+            const response = await registerRequest({
+                name,
+                email,
+                password,
+                password_confirmation: passwordConfirmation,
+            });
 
-            token.value = response.data.token;
-            user.value = response.data.user;
-
-            localStorage.setItem('skyfi_token', response.data.token);
+            setAuth(response.data);
 
             return true;
         } catch (exception) {
@@ -133,20 +141,18 @@ export const useAuthStore = defineStore('auth', () => {
         }
 
         try {
-            const response = await http.get<{ user: User }>('/user');
+            const response = await getCurrentUserRequest();
 
             user.value = response.data.user;
 
             return true;
         } catch (exception) {
             if (
-                axios.isAxiosError(exception) &&
-                exception.response?.status === 401
+                axios.isAxiosError(exception)
+                && exception.response?.status === 401
             ) {
-                // Токен недействителен или отозван.
                 clearAuth();
             } else {
-                // При временной ошибке сохраняем токен.
                 console.error(
                     'Не удалось получить пользователя:',
                     exception,
@@ -158,23 +164,28 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
-    async function initialize() {
+    async function initialize(): Promise<void> {
         if (initialized.value) return;
 
-        if (token.value) {
-            await fetchUser();
-        }
-
-        initialized.value = true;
-    }
-
-    async function logout() {
         try {
             if (token.value) {
-                await http.post('/logout');
+                await fetchUser();
+            }
+        } finally {
+            initialized.value = true;
+        }
+    }
+
+    async function logout(): Promise<void> {
+        try {
+            if (token.value) {
+                await logoutRequest();
             }
         } catch (exception) {
-            console.error('Ошибка выхода на сервер:', exception);
+            console.error(
+                'Ошибка выхода на сервер:',
+                exception,
+            );
         } finally {
             clearAuth();
             initialized.value = true;

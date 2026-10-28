@@ -278,10 +278,13 @@ const usePlayerStore = defineStore('player', () => {
     }
 
     function getTrackDuration(track: Track): number {
-        const duration = Number(
-            track.files?.find((file) => file.variant === 'original')
-                ?.duration_seconds ?? track.files?.[0]?.duration_seconds,
-        );
+        // const duration = Number(
+        //     track.files?.find((file) => file.variant === 'original')
+        //         ?.duration_seconds ?? track.files?.[0]?.duration_seconds,
+        // );
+
+        const duration = Number(track.file?.duration_seconds);
+
 
         return Number.isFinite(duration) && duration > 0 ? duration : 0;
     }
@@ -584,7 +587,6 @@ const usePlayerStore = defineStore('player', () => {
 
        let commandId = createCommandId();
 
-        console.log("playbackSource", playbackSource)
         try {
             const selectedTrackId = Number(track.id);
 
@@ -600,10 +602,13 @@ const usePlayerStore = defineStore('player', () => {
             if (requestId !== playbackRequestId) return;
 
             console.log('[Player] Запрошен трек:', selectedTrackId);
+            console.log('[Player] response:', response);
             console.log('[Player] Сервер вернул трек:', {
                 id: response.state.current_track?.id,
                 current_track_id: response.state.current_track_id,
             });
+
+
             // При явном выборе передаём ID выбранного трека,
             // чтобы не полагаться на уже обновлённый currentTrack.
             await applyRemotePlaybackState(
@@ -658,7 +663,7 @@ const usePlayerStore = defineStore('player', () => {
                     command_id: commandId,
                 });
 
-
+                console.log("response",response);
             await applyRemotePlaybackState(response.state, true);
         } catch (error) {
             console.error(
@@ -994,11 +999,12 @@ const usePlayerStore = defineStore('player', () => {
 
             await applyRemotePlaybackState(response.state);
 
-            const queueResponse = await getPlayerQueue();
+            // const queueResponse = await getPlayerQueue();
+            const queueResponse = response.queue;
 
             if (requestId !== restoreRequestId) return;
 
-            const serverQueue = queueResponse.data.map(
+            const serverQueue = queueResponse.map(
                 (item) => item.track,
             );
 
@@ -1187,7 +1193,7 @@ const usePlayerStore = defineStore('player', () => {
                     audioFile = await getTrackAudio(Number(track.id));
                 }
 
-
+                console.log(audioFile)
                 if (
                     requestId !== remoteStateRequestId ||
                     !isLocalDeviceActive.value

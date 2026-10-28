@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/auth';
 
 
 import {type Track as ApiTrack} from '@/types/TrackType';
-import {getTracks} from '@/api/player';
+// import {getTracks} from '@/api/player';
 
 
 import {
@@ -186,27 +186,27 @@ export function useHome() {
     // ЗАГРУЗКА ТРЕКОВ
     // ========================================
 
-    async function loadTracks(): Promise<void> {
-        tracksLoading.value = true;
-        tracksError.value = '';
-
-        try {
-            const response = await getTracks();
-
-            tracks.value = response.data ?? [];
-
-            // Передаём весь каталог в глобальный плеер.
-            player.setQueue(tracks.value);
-
-        } catch (error) {
-            console.error('[Home] Ошибка загрузки треков:', error);
-
-            tracksError.value = 'Не удалось загрузить треки';
-            tracks.value = [];
-        } finally {
-            tracksLoading.value = false;
-        }
-    }
+    // async function loadTracks(): Promise<void> {
+    //     tracksLoading.value = true;
+    //     tracksError.value = '';
+    //
+    //     try {
+    //         const response = await getTracks();
+    //
+    //         tracks.value = response.data ?? [];
+    //
+    //         // Передаём весь каталог в глобальный плеер.
+    //         player.setQueue(tracks.value);
+    //
+    //     } catch (error) {
+    //         console.error('[Home] Ошибка загрузки треков:', error);
+    //
+    //         tracksError.value = 'Не удалось загрузить треки';
+    //         tracks.value = [];
+    //     } finally {
+    //         tracksLoading.value = false;
+    //     }
+    // }
 
 
     // ========================================
@@ -421,7 +421,7 @@ export function useHome() {
     // ========================================
 
     onMounted(() => {
-        void loadTracks();
+        // void loadTracks();
 
         document.addEventListener(
             'click',
@@ -495,7 +495,7 @@ export function useHome() {
         logoutError,
 
         // Загрузка
-        loadTracks,
+        // loadTracks,
 
         // Избранное
         updateFavoriteState: player.updateFavoriteState,

@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { http } from '@/api/http';
 import type { Track } from '@/types/TrackType';
+import {ApiResponse} from "@/types/TypeApiRespone";
 
 export interface UploadTrackPayload {
     title: string;
@@ -18,7 +19,7 @@ export interface UploadTrackPayload {
 }
 
 export interface UploadTrackResponse {
-    message: string;
+    // message: string;
     data: Track;
 }
 
@@ -120,9 +121,12 @@ export async function uploadTrack(
 
 
     try {
-        const response = await http.post<UploadTrackResponse>(
+        const response = (await http.post<ApiResponse<UploadTrackResponse>>(
             '/tracks/upload',
             formData,
+         // const response = await http.post<UploadTrackResponse>(
+         //    '/tracks/upload',
+         //    formData,
             {
                 timeout: 300000,
 
@@ -140,7 +144,7 @@ export async function uploadTrack(
                     );
                 },
             },
-        );
+        )).data;
 
         return response.data;
     } catch (error: unknown) {

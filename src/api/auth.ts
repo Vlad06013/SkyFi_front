@@ -1,4 +1,6 @@
 import { http } from '@/api/http';
+import { ApiResponse } from '@/types/TypeApiRespone';
+import { User, AuthResponse, LoginPayload, RegisterPayload } from '@/types/AuthType';
 
 
 /**
@@ -47,4 +49,32 @@ export async function disconnectYandexMusic() {
         connected: boolean;
         message: string;
     };
+}
+
+export async function loginRequest(
+    payload: LoginPayload,
+) {
+    return (await http.post<ApiResponse<AuthResponse>>(
+        '/login',
+        payload,
+    )).data;
+}
+
+export async function registerRequest(
+    payload: RegisterPayload,
+) {
+    return (await http.post<ApiResponse<AuthResponse>>(
+        '/register',
+        payload,
+    )).data;
+}
+
+export async function getCurrentUserRequest() {
+    return (
+        await http.get<ApiResponse<{ user: User }>>('/user')
+    ).data;
+}
+
+export async function logoutRequest() {
+    return http.post('/logout');
 }

@@ -2,6 +2,15 @@ import {Track} from "@/types/TrackType";
 import {PlaybackState} from "@/types/PlayerType";
 import {PlaybackQueueItem} from "@/types/QueueType";
 
+/**
+ * Базовый тип ари ответа
+ */
+export interface ApiResponse<T> {
+    errors: unknown[] | Record<string, unknown> | null;
+    data: T;
+    pagination: unknown | null;
+}
+
 export interface SearchResponse {
     data: {
         items: Track[];
@@ -35,6 +44,6 @@ export interface PlayerStateResponse {
     queue: PlaybackQueueItem[];
 }
 
-export interface PlayerQueueResponse {
-    data: PlaybackQueueItem[];
-}
+// export interface PlayerQueueResponse {
+//     data: PlaybackQueueItem[];
+// }

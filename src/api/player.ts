@@ -1,5 +1,5 @@
-import { http } from '@/api/http';
-import {PlayerActionResponse, PlayerStateResponse, TracksResponse} from '@/types/TypeApiRespone'
+import {http} from '@/api/http';
+import {ApiResponse, PlayerActionResponse, PlayerStateResponse} from '@/types/TypeApiRespone'
 import {AudioFile, type Track} from '@/types/TrackType'
 import {PlayerDevice, PlayerDeviceType} from '@/types/PlayerType'
 
@@ -17,16 +17,17 @@ export async function playRemoteTrack(
         origin_device_id: number | null;
         command_id: string;
     },
-): Promise<PlayerActionResponse> {
-    const response = await http.post<PlayerActionResponse>(
-        '/player/play',
-        {
-            // track_id: trackId,
-            track: track,
-            playback_source: playbackSource,
-            ...meta
-        },
-    );
+): Promise<ApiResponse<PlayerStateResponse>> {
+    const response = (
+        await http.post<ApiResponse<PlayerStateResponse>>(
+            '/player/play',
+            {
+                track,
+                playback_source: playbackSource,
+                ...meta,
+            },
+        )
+    ).data;
 
     return response.data;
 }
@@ -37,21 +38,21 @@ export async function playRemoteTrack(
  * GET /player
  */
 export async function getPlayerState(): Promise<PlayerStateResponse> {
-    const response = await http.get<PlayerStateResponse>(
+    const response = (await http.get<ApiResponse<PlayerStateResponse>>(
         '/player',
-    );
+    )).data;
 
     return response.data;
 }
 
 export async function getTrackAudio(
     trackId: number,
-): Promise<AudioFile> {
-    const response = await http.get(
+): Promise<ApiResponse<AudioFile>> {
+    const response = (await http.get<ApiResponse<AudioFile>>(
         `/tracks/${trackId}/audio`,
-    );
+    )).data;
 
-    const result = response.data?.data ?? response.data;
+    const result = response.data;
 
     if (!result?.url) {
         throw new Error(
@@ -59,8 +60,9 @@ export async function getTrackAudio(
         );
     }
 
-    return result as AudioFile;
+    return response.data;
 }
+
 
 export function downloadTrackAudio(
     trackId: number,
@@ -79,8 +81,8 @@ export async function pauseRemotePlayback(
         origin_device_id: number | null;
         command_id: string;
     },
-): Promise<PlayerActionResponse> {
-    const response = await http.post<PlayerActionResponse>(
+): Promise<ApiResponse<PlayerStateResponse>> {
+    const response = (await http.post<ApiResponse<PlayerStateResponse>>(
         '/player/pause',
         {
             position_seconds: Math.max(
@@ -89,7 +91,7 @@ export async function pauseRemotePlayback(
             ),
             ...meta,
         },
-    );
+    )).data;
 
     return response.data;
 }
@@ -104,13 +106,13 @@ export async function resumeRemotePlayback(
         origin_device_id: number | null;
         command_id: string;
     },
-): Promise<PlayerActionResponse> {
-    const response = await http.post<PlayerActionResponse>(
+): Promise<ApiResponse<PlayerStateResponse>> {
+    const response = (await http.post<ApiResponse<PlayerStateResponse>>(
         '/player/resume',
         {
             ...meta,
-        }
-    );
+        },
+    )).data;
 
     return response.data;
 }
@@ -126,8 +128,8 @@ export async function seekRemotePlayback(
         origin_device_id: number | null;
         command_id: string;
     },
-): Promise<PlayerActionResponse> {
-    const response = await http.post<PlayerActionResponse>(
+): Promise<ApiResponse<PlayerStateResponse>> {
+    const response = (await http.post<ApiResponse<PlayerStateResponse>>(
         '/player/seek',
         {
             position_seconds: Math.max(
@@ -136,7 +138,7 @@ export async function seekRemotePlayback(
             ),
             ...meta,
         },
-    );
+    )).data;
 
     return response.data;
 }
@@ -152,15 +154,14 @@ export async function nextRemoteTrack(
         origin_device_id: number | null;
         command_id: string;
     },
-): Promise<PlayerActionResponse> {
-    const response = await http.post<PlayerActionResponse>(
+): Promise<ApiResponse<PlayerStateResponse>> {
+    const response = (await http.post<ApiResponse<PlayerStateResponse>>(
         '/player/next',
         {
             reason,
-            ...meta
-
+            ...meta,
         },
-    );
+    )).data;
 
     return response.data;
 }
@@ -176,13 +177,13 @@ export async function previousRemoteTrack(
         origin_device_id: number | null;
         command_id: string;
     },
-): Promise<PlayerActionResponse> {
-    const response = await http.post<PlayerActionResponse>(
+): Promise<ApiResponse<PlayerStateResponse>> {
+    const response = (await http.post<ApiResponse<PlayerStateResponse>>(
         '/player/previous',
         {
             ...meta
         },
-    );
+    )).data;
 
     return response.data;
 }
@@ -243,8 +244,8 @@ export async function activatePlayerDevice(
     },
 ): Promise<PlayerActionResponse> {
     const response = await http.patch(
-        `/player/devices/${deviceId}/activate`,{
-            ... meta
+        `/player/devices/${deviceId}/activate`, {
+            ...meta
         }
     );
 
@@ -281,11 +282,4 @@ export async function updatePlaybackOptions(options: {
     return response.data;
 }
 
-//TODO: Удалить
-export async function getTracks(): Promise<TracksResponse> {
-    const response = await http.get<TracksResponse>(
-        '/tracks',
-    );
 
-    return response.data;
-}
