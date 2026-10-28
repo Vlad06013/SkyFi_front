@@ -243,14 +243,14 @@ export function useSearch() {
         try {
             const response = await searchTracks(term, 20);
             console.log('[Search] Ответ API:', response);
-            console.log('[Search] Найдено треков:', response.data.items.length);
+            console.log('[Search] Найдено треков:', response.data.length);
 
             // Игнорируем устаревшие ответы.
             if (requestId !== searchRequestId) {
                 return;
             }
 
-            tracks.value = response.data.items.map(
+            tracks.value = response.data.map(
                 (track, index) => ({
                     ...track,
                     color: coverColors[index % coverColors.length],
