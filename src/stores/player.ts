@@ -1,7 +1,7 @@
-import { computed, ref, watch } from 'vue';
-import { defineStore } from 'pinia';
+import {computed, ref, watch} from 'vue';
+import {defineStore} from 'pinia';
 import echo from '@/lib/echo';
-import { useAuthStore } from '@/stores/auth';
+import {useAuthStore} from '@/stores/auth';
 
 import {
     type PlaybackState,
@@ -86,6 +86,7 @@ const usePlayerStore = defineStore('player', () => {
     const audio = new Audio();
     audio.preload = 'metadata';
     audio.volume = volume.value / 100;
+
     function createCommandId(): string {
         return crypto.randomUUID();
     }
@@ -392,7 +393,6 @@ const usePlayerStore = defineStore('player', () => {
         }
 
 
-
         // const trackId = track.id;
         // const requestId = ++favoriteToggleRequestId;
         // favoriteLoading.value = true;
@@ -431,7 +431,6 @@ const usePlayerStore = defineStore('player', () => {
             void updateFavoriteState(trackId);
         },
     );
-
 
 
     async function playTrackNext(track: Track): Promise<void> {
@@ -477,10 +476,18 @@ const usePlayerStore = defineStore('player', () => {
     async function toggleShuffle(): Promise<void> {
         if (!auth.user) return;
 
+        const commandId = createCommandId();
+
         try {
-            const response = await updatePlaybackOptions({
-                shuffle_enabled: !isShuffleEnabled.value,
-            });
+            const response = await updatePlaybackOptions(
+                {
+                    shuffle_enabled: !isShuffleEnabled.value,
+                },
+                {
+                    origin_device_id: localDeviceId.value,
+                    command_id: commandId,
+                })
+            ;
 
             await applyRemotePlaybackState(response.state);
         } catch (error) {
@@ -501,10 +508,21 @@ const usePlayerStore = defineStore('player', () => {
                     ? 'one'
                     : 'off';
 
+        console.log("repeatMode",repeatMode.value, nextMode);
+
+        const commandId = createCommandId();
+
         try {
-            const response = await updatePlaybackOptions({
+            const response = await updatePlaybackOptions(
+                {
                 repeat_mode: nextMode,
-            });
+            },
+                {
+                    origin_device_id: localDeviceId.value,
+                    command_id: commandId,
+                }
+            );
+            console.log("STATEEEE",response.state);
 
             await applyRemotePlaybackState(response.state);
         } catch (error) {
@@ -585,7 +603,7 @@ const usePlayerStore = defineStore('player', () => {
         const requestId = ++playbackRequestId;
         isLoading.value = true;
 
-       let commandId = createCommandId();
+        let commandId = createCommandId();
 
         try {
             const selectedTrackId = Number(track.id);
@@ -638,7 +656,7 @@ const usePlayerStore = defineStore('player', () => {
             const firstTrack = queue.value[0];
 
             if (firstTrack) {
-                await playTrack(firstTrack,source);
+                await playTrack(firstTrack, source);
             }
 
             return;
@@ -658,12 +676,12 @@ const usePlayerStore = defineStore('player', () => {
                         command_id: commandId,
                     }
                 )
-                : await resumeRemotePlayback( {
+                : await resumeRemotePlayback({
                     origin_device_id: localDeviceId.value,
                     command_id: commandId,
                 });
 
-                console.log("response",response);
+            console.log("response", response);
             await applyRemotePlaybackState(response.state, true);
         } catch (error) {
             console.error(
@@ -692,7 +710,7 @@ const usePlayerStore = defineStore('player', () => {
         progress.value = target;
 
         try {
-            const response = await seekRemotePlayback(target,{
+            const response = await seekRemotePlayback(target, {
                 origin_device_id: localDeviceId.value,
                 command_id: commandId,
             });
@@ -934,7 +952,7 @@ const usePlayerStore = defineStore('player', () => {
                 );
 
                 if (!activeDevice) {
-                    await activatePlayerDevice(currentDevice.id,{
+                    await activatePlayerDevice(currentDevice.id, {
                         origin_device_id: localDeviceId.value,
                         command_id: commandId,
                     });
@@ -1182,11 +1200,11 @@ const usePlayerStore = defineStore('player', () => {
             if (trackChanged || sourceMissing || forceLoadSelectedTrack) {
                 audio.pause();
 
-               // const audioFile = await getTrackAudio(Number(track.id));
+                // const audioFile = await getTrackAudio(Number(track.id));
 
                 let audioFile = <AudioFile>({});
 
-                if (track.url){
+                if (track.url) {
                     audioFile.url = track.url;
 
                 } else {
@@ -1399,7 +1417,6 @@ const usePlayerStore = defineStore('player', () => {
 
         isDeviceChangesSubscribed = true;
     }
-
 
 
     // ============================================

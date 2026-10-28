@@ -243,11 +243,11 @@ export async function activatePlayerDevice(
         command_id: string;
     },
 ): Promise<PlayerActionResponse> {
-    const response = await http.patch(
+    const response = (await http.patch(
         `/player/devices/${deviceId}/activate`, {
             ...meta
         }
-    );
+    )).data;
 
     return response.data;
 }
@@ -270,14 +270,23 @@ export async function deletePlayerDevice(
 }
 
 
-export async function updatePlaybackOptions(options: {
-    repeat_mode?: RepeatMode;
-    shuffle_enabled?: boolean;
-}): Promise<PlayerActionResponse> {
-    const response = await http.patch<PlayerActionResponse>(
-        '/player/options',
-        options,
-    );
+export async function updatePlaybackOptions(
+    options: {
+        repeat_mode?: RepeatMode;
+        shuffle_enabled?: boolean;
+    },
+    meta?: {
+        origin_device_id: number | null;
+        command_id: string;
+    },
+): Promise<ApiResponse<PlayerStateResponse>> {
+
+    const response = (await http.patch<ApiResponse<PlayerStateResponse>>(
+        '/player/options', {
+            options,
+            ...meta
+        }
+    )).data;
 
     return response.data;
 }

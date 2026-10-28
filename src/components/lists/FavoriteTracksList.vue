@@ -149,7 +149,7 @@ async function handleAction(
 }
 
 const isPlaying = computed(() => player.isPlaying);
-const sourceList = "favorite";
+const sourceList = "favorites";
 
 function isCurrentTrack(track: Track): boolean {
   return Number(player.currentTrack?.id) === Number(track.id);

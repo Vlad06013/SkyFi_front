@@ -246,15 +246,6 @@ export function useLibrary() {
 
     const activeTab = ref<LibraryTab>('tracks');
 
-    // ============================================
-    // ЗАГРУЗКА ТРЕКА
-    // ============================================
-
-    // const fileInput = ref<HTMLInputElement | null>(null);
-    // const selectedFile = ref<File | null>(null);
-
-    // const fieldErrors = reactive<Record<string, string>>({});
-
 
     // ============================================
     // ВОСПРОИЗВЕДЕНИЕ МУЗЫКИ
