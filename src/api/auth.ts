@@ -1,6 +1,7 @@
 import { http } from '@/api/http';
 import { ApiResponse } from '@/types/TypeApiRespone';
 import { User, AuthResponse, LoginPayload, RegisterPayload } from '@/types/AuthType';
+import { YandexMusicFavoriteSummary, YandexMusicImportStart, YandexMusicImportStatus} from '@/types/TypeApiRespone';
 
 
 /**
@@ -49,6 +50,44 @@ export async function disconnectYandexMusic() {
         connected: boolean;
         message: string;
     };
+}
+
+/**
+ * Получает сводку по избранным трекам.
+ */
+export async function getYandexMusicFavoriteSummary() {
+    const response = await http.get<
+        ApiResponse<YandexMusicFavoriteSummary>
+    >('yandex-music/favorite/init');
+
+    return response.data;
+}
+
+
+/**
+ * Запускает импорт избранных треков.
+ */
+export async function startYandexMusicFavoriteImport() {
+    const response = await http.post<
+        ApiResponse<YandexMusicImportStart>
+    >('yandex-music/favorite/import');
+
+    return response.data;
+}
+
+/**
+ * Получает статус задачи импорта.
+ */
+export async function getYandexMusicFavoriteImportStatus(
+    jobId: string,
+) {
+    const response = await http.get<
+        ApiResponse<YandexMusicImportStatus>
+    >(
+        `yandex-music/favorite/import/${encodeURIComponent(jobId)}`,
+    );
+
+    return response.data;
 }
 
 export async function loginRequest(

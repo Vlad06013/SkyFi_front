@@ -33,7 +33,16 @@
               '--cover-color': getTrackColor(track.id),
             }"
           >
-            <ion-icon :icon="musicalNotesOutline"/>
+            <img
+                v-if="track.meta?.album?.cover_path"
+                :src="track.meta?.album?.cover_path"
+                :alt="track.meta?.album?.title || track.title"
+                class="track-cover"
+            />
+
+            <div v-else class="track-cover-placeholder">
+              <ion-icon :icon="musicalNotesOutline" />
+            </div>
 
             <span class="cover-play">
               <ion-icon
@@ -52,7 +61,7 @@
 
           <span>
             {{
-              track.artists
+              track.meta?.artists
                   ?.map(artist => artist.name)
                   .join(', ')
               || 'Неизвестный исполнитель'
@@ -60,7 +69,7 @@
           </span>
 
           <small>
-            {{ track.album?.title || 'Без альбома' }}
+            {{ track.meta?.album?.title || 'Без альбома' }}
           </small>
           <span
               class="source-badge"

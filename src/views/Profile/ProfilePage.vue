@@ -69,6 +69,10 @@
                       @connected="onYandexConnected"
                       @disconnected="onYandexDisconnected"
                   />
+                  <YandexMusicImport
+                      :connected="yandexConnected"
+                      @open-library="goToLibrary"
+                  />
                 </div>
               </div>
             </section>
@@ -91,12 +95,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { IonPage, IonContent } from '@ionic/vue';
 
-import AppNavigation from '@/components/AppNavigation.vue';
+import YandexMusicImport from '@/components/Auth/YandexMusic/YandexMusicImport.vue';
 import YandexMusicAuth from '@/components/Auth/YandexMusic/YandexMusicAuth.vue';
+import AppNavigation from '@/components/AppNavigation.vue';
 import { useAuthStore } from '@/stores/auth';
 
 const router = useRouter();
@@ -108,16 +113,22 @@ const userInitial = computed(() => {
   return user.value?.name?.trim().charAt(0).toUpperCase() || 'U';
 });
 
+const yandexConnected = ref(false);
+
 function goHome(): void {
-  router.push('/');
+  void router.push('/');
 }
 
 function onYandexConnected(): void {
-  // При необходимости здесь можно обновить состояние интеграции.
+  yandexConnected.value = true;
 }
 
 function onYandexDisconnected(): void {
-  // При необходимости здесь можно обновить состояние интеграции.
+  yandexConnected.value = false;
+}
+
+function goToLibrary(): void {
+  void router.push('/library');
 }
 </script>
 

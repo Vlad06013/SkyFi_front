@@ -794,37 +794,6 @@ import './favorite.css';
 
 import { useLibrary } from './favorite';
 import { useUploaded } from './uploaded';
-// import {
-//   // Собственные загрузки
-//   uploadedTracks,
-//   uploadsLoading,
-//   uploadsError,
-//   loadUploadedTracks,
-//
-//   // Форма загрузки
-//   uploadSuccess,
-//   uploadError,
-//   uploadForm,
-//   uploading,
-//   handleFileChange,
-//   formatFileSize,
-//   resetUploadForm,
-//   uploadTrack,
-//
-//   // Поля с подсказками
-//   artistFields,
-//   albumField,
-//   genreField,
-//   addArtistField,
-//   removeArtistField,
-//   handleArtistInput,
-//   selectArtist,
-//   handleAlbumInput,
-//   selectAlbum,
-//   handleGenreInput,
-//   selectGenre
-// } from './uploaded';
-
 import {
   IonContent,
   IonPage,

@@ -44,6 +44,37 @@ export interface PlayerStateResponse {
     queue: PlaybackQueueItem[];
 }
 
+export interface YandexMusicFavoriteSummary {
+    total: number;
+    existing?: number;
+    new_tracks?: number;
+    already_imported?: number;
+}
+
+export interface YandexMusicImportStart {
+    job_id?: string;
+    jobId?: string;
+    status?: string;
+    total?: number;
+    processed?: number;
+    imported?: number;
+    skipped?: number;
+    failed?: number;
+    progress?: number;
+    message?: string;
+}
+
+export interface YandexMusicImportStatus {
+    status: string;
+    total?: number;
+    processed?: number;
+    imported?: number;
+    skipped?: number;
+    failed?: number;
+    progress?: number;
+    message?: string;
+}
+
 // export interface PlayerQueueResponse {
 //     data: PlaybackQueueItem[];
 // }
