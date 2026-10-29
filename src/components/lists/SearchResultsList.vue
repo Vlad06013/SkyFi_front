@@ -48,7 +48,7 @@
 
           <span>
             {{
-              track.artists
+              track.meta.artists
                   ?.map(artist => artist.name)
                   .join(', ')
               || 'Неизвестный исполнитель'
@@ -56,7 +56,7 @@
           </span>
 
           <small>
-            {{ track.album?.title || 'Без альбома' }}
+            {{ track.meta?.album?.title || 'Без альбома' }}
           </small>
 
           <div class="track-source-row">
@@ -68,8 +68,8 @@
   </span>
               <ion-icon
                   v-if="
-                    track.source_type === 'yandex_music'
-                    && track.has_cached_audio
+                    track.source_type !== 'upload'
+                    && track.file?.path
                   "
                 :icon="flashOutline"
                 class="cached-audio-icon"

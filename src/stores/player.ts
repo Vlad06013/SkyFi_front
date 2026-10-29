@@ -924,6 +924,7 @@ const usePlayerStore = defineStore('player', () => {
 
         deviceInitializationPromise = (async () => {
             try {
+                const  commandID = createCommandId();
                 const response = await getPlayerDevices();
                 devices.value = response.data;
 
@@ -935,7 +936,8 @@ const usePlayerStore = defineStore('player', () => {
 
                 if (!currentDevice) {
                     const registration = await registerPlayerDevice({
-                        device_uuid: uuid,
+                        origin_device_id: uuid,
+                        command_id: commandID,
                         name: getDeviceName(),
                         type: getDeviceType(),
                     });
