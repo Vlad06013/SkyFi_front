@@ -42,77 +42,7 @@
 
 
             <!-- Меню пользователя -->
-            <div class="profile-menu">
-              <button
-                  class="profile-button"
-                  aria-label="Открыть меню профиля"
-                  :aria-expanded="profileMenuOpen"
-                  aria-haspopup="true"
-                  :disabled="loggingOut"
-                  @click.stop="profileMenuOpen = !profileMenuOpen"
-              >
-                {{ auth.user?.name?.charAt(0).toUpperCase() ?? 'U' }}
-
-                <span class="profile-chevron">⌄</span>
-              </button>
-
-              <div
-                  v-if="profileMenuOpen"
-                  class="profile-dropdown"
-                  role="menu"
-              >
-                <div class="profile-info">
-                  <div class="profile-name">
-                    {{ auth.user?.name ?? 'Пользователь' }}
-                  </div>
-
-                  <div class="profile-email">
-                    {{ auth.user?.email ?? '' }}
-                  </div>
-                </div>
-
-                <div class="dropdown-divider"></div>
-
-                <button
-                    class="dropdown-item"
-                    role="menuitem"
-                    @click="openProfile"
-                >
-                  <span>♙</span>
-                  Мой профиль
-                </button>
-
-                <button
-                    class="dropdown-item"
-                    role="menuitem"
-                    @click="openLibrary"
-                >
-                  <span>♫</span>
-                  Моя музыка
-                </button>
-
-                <div class="dropdown-divider"></div>
-
-                <div v-if="logoutError" class="logout-error">
-                  {{ logoutError }}
-                </div>
-
-                <button
-                    class="dropdown-item logout-item"
-                    role="menuitem"
-                    :disabled="loggingOut"
-                    @click="logout"
-                >
-                  <span>↪</span>
-
-                  {{
-                    loggingOut
-                        ? 'Выходим...'
-                        : 'Выйти из аккаунта'
-                  }}
-                </button>
-              </div>
-            </div>
+            <ProfileMenu />
           </header>
 
           <!-- Контент страницы -->
@@ -242,23 +172,17 @@ import { IonPage, IonContent } from '@ionic/vue';
 
 import AudioPlayer from '@/components/player/AudioPlayer.vue';
 import AppNavigation from '@/components/AppNavigation.vue';
+import ProfileMenu from '@/components/profile/ProfileMenu.vue';
 
 import { useHome } from './home';
 import YandexMusicAuth from "@/components/Auth/YandexMusic/YandexMusicAuth.vue";
 
 const {
-  auth,
   menu,
   activeMenu,
   search,
   tracks,
-  profileMenuOpen,
-  loggingOut,
-  logoutError,
   navigateTo,
-  openProfile,
-  openLibrary,
-  logout,
 
   playTrack,
 } = useHome();

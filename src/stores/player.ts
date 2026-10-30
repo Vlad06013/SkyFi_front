@@ -299,9 +299,11 @@ const usePlayerStore = defineStore('player', () => {
     ): Promise<void> {
         const requestId = ++favoriteCheckRequestId;
 
+        const numericTrackId = Number(trackId);
+
         if (
-            trackId === null ||
-            typeof trackId !== 'number' ||
+            !Number.isSafeInteger(numericTrackId) ||
+            numericTrackId <= 0 ||
             !auth.user
         ) {
             liked.value = false;
@@ -309,7 +311,7 @@ const usePlayerStore = defineStore('player', () => {
         }
 
         try {
-            const response = await checkFavorite(trackId);
+            const response = await checkFavorite(numericTrackId);
 
             if (
                 requestId !== favoriteCheckRequestId ||
@@ -340,9 +342,7 @@ const usePlayerStore = defineStore('player', () => {
         }
 
         if (
-            !track ||
             favoriteLoading.value ||
-            typeof track.id !== 'number' ||
             !auth.user
         ) {
             return;

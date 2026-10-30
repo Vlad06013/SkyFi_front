@@ -3,6 +3,8 @@
     <AppNavigation />
 
     <ion-content :fullscreen="true" class="skyfi-content">
+      <ProfileMenu floating />
+
       <div class="search-layout">
         <header class="search-header">
           <div>
@@ -139,6 +141,7 @@ import {
 import { computed, ref } from 'vue';
 import AppNavigation from '@/components/AppNavigation.vue';
 import AudioPlayer from '@/components/player/AudioPlayer.vue';
+import ProfileMenu from '@/components/profile/ProfileMenu.vue';
 import SearchResultsList from '@/components/lists/SearchResultsList.vue';
 import { useSearch } from './search';
 

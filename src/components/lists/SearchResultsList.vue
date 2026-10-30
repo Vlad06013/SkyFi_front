@@ -171,26 +171,33 @@ function isTrackPlaying(track: Track): boolean {
 }
 function isCurrentTrack(track: Track): boolean {
   const current = player.currentTrack;
-  console.log("СРАВНЕНИЕ", current, track);
+
   if (!current || !track) {
     return false;
   }
 
-  // Внешний ID трека, который сейчас воспроизводится.
-  const currentSourceId = current.source_id;
+  // Совпадение по внутреннему ID (треки SkyFi).
+  if (String(current.id) === String(track.id)) {
+    return true;
+  }
 
-  // ID трека из внешней поисковой выдачи.
-  const searchSourceId = String(track.id);
-
+  // Совпадение по ID во внешнем каталоге (Яндекс, Internet Archive):
+  // у текущего трека внутренний ID другой, сравниваем source_id.
   return (
-      current.source_type === 'yandex_music' &&
-      currentSourceId != null &&
-      String(currentSourceId) === searchSourceId
+      current.source_id != null &&
+      String(current.source_id) === String(track.id)
   );
 }
 
 async function playTrack(track: Track): Promise<void> {
   if (!track?.id || player.isLoading) return;
+
+  // Повторный клик по текущему треку — пауза/продолжение,
+  // а не перезапуск с начала.
+  if (isCurrentTrack(track)) {
+    await player.togglePlay(sourceList);
+    return;
+  }
 
   player.setQueue([...props.items]);
 

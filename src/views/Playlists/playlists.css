@@ -53,6 +53,13 @@
     margin: 0;
 }
 
+.heading-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-shrink: 0;
+}
+
 .subtitle {
     color: #9296a7;
     margin: 10px 0 0;

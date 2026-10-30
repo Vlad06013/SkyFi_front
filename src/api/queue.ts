@@ -12,9 +12,9 @@ export async function getPlayerQueue(): Promise<PlaybackQueueItem> {
     // const response = await http.get<PlayerQueueResponse>(
     //     '/player/queue',
     // );
-    const response = (await http.get<ApiResponse<PlaybackQueueItem>>(
+    const response = await http.get<ApiResponse<PlaybackQueueItem>>(
         '/player/queue',
-    )).data;
+    );
 
     return response.data;
 }

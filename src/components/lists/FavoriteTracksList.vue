@@ -167,6 +167,13 @@ function isCurrentTrack(track: Track): boolean {
 async function playTrack(track: Track): Promise<void> {
   if (!track?.id || player.isLoading) return;
 
+  // Повторный клик по текущему треку — пауза/продолжение,
+  // а не перезапуск с начала.
+  if (isCurrentTrack(track)) {
+    await player.togglePlay(sourceList);
+    return;
+  }
+
   player.setQueue([...props.items]);
 
   console.log('[Favorites] Очередь перед запуском:', {

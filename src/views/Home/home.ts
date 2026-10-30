@@ -1,6 +1,5 @@
 import { useRouter } from 'vue-router';
 import usePlayerStore from '@/stores/player';
-import { useAuthStore } from '@/stores/auth';
 
 
 import {type Track as ApiTrack} from '@/types/TrackType';
@@ -11,8 +10,6 @@ import {
     computed,
     ref,
     watch,
-    onMounted,
-    onBeforeUnmount,
 } from 'vue';
 
 // ============================================
@@ -33,7 +30,6 @@ type PlayerTrack = {
 
 export function useHome() {
     const router = useRouter();
-    const auth = useAuthStore();
     const player = usePlayerStore();
 
     // ========================================
@@ -66,16 +62,6 @@ export function useHome() {
     const favoriteLoading = computed(
         () => player.favoriteLoading,
     );
-
-    // ========================================
-    // ПРОФИЛЬ
-    // ========================================
-
-    const profileMenuOpen = ref(false);
-
-    const loggingOut = ref(false);
-
-    const logoutError = ref('');
 
     // ========================================
     // СОСТОЯНИЕ ПЛЕЕРА
@@ -217,7 +203,7 @@ export function useHome() {
         const paths: Record<string, string> = {
             home: '/home',
             search: '/search',
-            library: '/library',
+            library: '/favorite',
             playlists: '/playlists',
         };
 
@@ -229,77 +215,7 @@ export function useHome() {
 
         activeMenu.value = id;
 
-        profileMenuOpen.value = false;
-
-        logoutError.value = '';
-
         void router.push(path);
-    }
-
-    function openProfile(): void {
-        profileMenuOpen.value = false;
-
-        logoutError.value = '';
-
-        void router.push('/profile');
-    }
-
-    function openLibrary(): void {
-        navigateTo('library');
-    }
-
-    // ========================================
-    // ВЫХОД ИЗ АККАУНТА
-    // ========================================
-
-    async function logout(): Promise<void> {
-        if (loggingOut.value) {
-            return;
-        }
-
-        loggingOut.value = true;
-
-        logoutError.value = '';
-
-        try {
-            await auth.logout();
-
-            profileMenuOpen.value = false;
-
-            await router.replace('/login');
-        } catch (error) {
-            console.error(
-                'Ошибка выхода из аккаунта:',
-                error,
-            );
-
-            logoutError.value =
-                'Не удалось выйти. Попробуй ещё раз.';
-        } finally {
-            loggingOut.value = false;
-        }
-    }
-
-    // ========================================
-    // ОБРАБОТЧИКИ ПРОФИЛЯ
-    // ========================================
-
-    function handleDocumentClick(event: MouseEvent): void {
-        const target = event.target;
-
-        if (!(target instanceof Element)) {
-            return;
-        }
-
-        if (!target.closest('.profile-menu')) {
-            profileMenuOpen.value = false;
-        }
-    }
-
-    function handleEscape(event: KeyboardEvent): void {
-        if (event.key === 'Escape') {
-            profileMenuOpen.value = false;
-        }
     }
 
     // ========================================
@@ -420,51 +336,21 @@ export function useHome() {
     // ИНИЦИАЛИЗАЦИЯ
     // ========================================
 
-    onMounted(() => {
-        // void loadTracks();
-
-        document.addEventListener(
-            'click',
-            handleDocumentClick,
-        );
-
-        document.addEventListener(
-            'keydown',
-            handleEscape,
-        );
-    });
-
     // ========================================
     // ОЧИСТКА
     // ========================================
 
-    onBeforeUnmount(() => {
-
-        document.removeEventListener(
-            'click',
-            handleDocumentClick,
-        );
-
-        document.removeEventListener(
-            'keydown',
-            handleEscape,
-        );
-
-        /*
-         * Не останавливаем глобальный плеер:
-         * музыка должна продолжать играть при переходах
-         * между страницами приложения.
-         */
-    });
+    /*
+     * Не останавливаем глобальный плеер:
+     * музыка должна продолжать играть при переходах
+     * между страницами приложения.
+     */
 
     // ========================================
     // ЭКСПОРТ ДЛЯ ШАБЛОНА
     // ========================================
 
     return {
-        // Авторизация
-        auth,
-
         // Плеер
         currentTrack,
         isPlaying,
@@ -489,11 +375,6 @@ export function useHome() {
         tracksLoading,
         tracksError,
 
-        // Профиль
-        profileMenuOpen,
-        loggingOut,
-        logoutError,
-
         // Загрузка
         // loadTracks,
 
@@ -503,9 +384,6 @@ export function useHome() {
 
         // Навигация
         navigateTo,
-        openProfile,
-        openLibrary,
-        logout,
 
         // Управление плеером
         playTrack,

@@ -19,13 +19,17 @@
                 </p>
               </div>
 
-              <button
-                  class="back-button"
-                  type="button"
-                  @click="goHome"
-              >
-                ← На главную
-              </button>
+              <div class="heading-actions">
+                <button
+                    class="back-button"
+                    type="button"
+                    @click="goHome"
+                >
+                  ← На главную
+                </button>
+
+                <ProfileMenu />
+              </div>
             </header>
 
             <!-- Информация о пользователе -->
@@ -102,6 +106,7 @@ import { IonPage, IonContent } from '@ionic/vue';
 import YandexMusicImport from '@/components/Auth/YandexMusic/YandexMusicImport.vue';
 import YandexMusicAuth from '@/components/Auth/YandexMusic/YandexMusicAuth.vue';
 import AppNavigation from '@/components/AppNavigation.vue';
+import ProfileMenu from '@/components/profile/ProfileMenu.vue';
 import { useAuthStore } from '@/stores/auth';
 
 const router = useRouter();
@@ -238,6 +243,13 @@ function goToLibrary(): void {
 .back-button:hover {
   background: #201b2d;
   border-color: #a78bfa70;
+}
+
+.heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
 }
 
 .profile-card,

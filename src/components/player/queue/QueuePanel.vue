@@ -60,7 +60,7 @@
 
             <span>
               {{
-                item.track.artists
+                item.track.meta?.artists
                     ?.map(artist => artist.name)
                     .join(', ')
                 || 'Неизвестный исполнитель'
@@ -100,7 +100,6 @@
   </div>
 </template>
 
-```ts
 <script setup lang="ts">
 import './queue.css';
 import { watch } from 'vue';
@@ -133,4 +132,3 @@ watch(
     { immediate: true },
 );
 </script>
-```

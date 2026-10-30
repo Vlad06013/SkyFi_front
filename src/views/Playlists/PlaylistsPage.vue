@@ -12,10 +12,14 @@
             <p class="subtitle">Собирай музыку под любое настроение</p>
           </div>
 
-          <button class="create-button" @click="showCreate = true">
-            <ion-icon :icon="addOutline" />
-            <span>Создать</span>
-          </button>
+          <div class="heading-actions">
+            <button class="create-button" @click="showCreate = true">
+              <ion-icon :icon="addOutline" />
+              <span>Создать</span>
+            </button>
+
+            <ProfileMenu />
+          </div>
         </div>
 
         <div class="playlist-tabs">
@@ -327,6 +331,7 @@ import {
 
 import AudioPlayer from '@/components/player/AudioPlayer.vue';
 import AppNavigation from '@/components/AppNavigation.vue';
+import ProfileMenu from '@/components/profile/ProfileMenu.vue';
 
 const {
   tabs,

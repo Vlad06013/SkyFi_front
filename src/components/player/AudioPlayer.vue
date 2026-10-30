@@ -72,8 +72,7 @@
           :class="{ liked: player.liked }"
           :disabled="
       player.favoriteLoading ||
-      !player.currentTrack ||
-      typeof player.currentTrack.id !== 'number'
+      !player.currentTrack
     "
           :aria-label="
       player.liked

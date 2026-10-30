@@ -20,7 +20,7 @@ const echo = new Echo({
     // Авторизация приватного канала через Laravel Sanctum.
     // Предполагается, что твой API-клиент использует cookie-аутентификацию.
     // authEndpoint: `${import.meta.env.VITE_API_URL}broadcasting/auth`,
-    authEndpoint: 'http://127.0.0.1:8080/broadcasting/auth',
+    authEndpoint:  'http://31.128.42.183:8080/broadcasting/auth',
 
     auth: {
         headers: {
