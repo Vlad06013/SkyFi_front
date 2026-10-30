@@ -2,9 +2,23 @@
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 
-const host = import.meta.env.VITE_REVERB_HOST;
-const port = Number(import.meta.env.VITE_REVERB_PORT || 8081);
-const scheme = import.meta.env.VITE_REVERB_SCHEME || 'http';
+/*
+ * Хост WebSocket-сервера берём из VITE_API_URL, чтобы не
+ * дублировать адрес сервера в отдельных переменных.
+ * При необходимости можно переопределить через VITE_REVERB_*.
+ */
+
+const apiUrl = new URL(import.meta.env.VITE_API_URL);
+
+const host = import.meta.env.VITE_REVERB_HOST ?? apiUrl.hostname;
+
+const port = Number(
+    import.meta.env.VITE_REVERB_PORT
+        ?? (apiUrl.port || (apiUrl.protocol === 'https:' ? 443 : 80)),
+);
+
+const scheme = import.meta.env.VITE_REVERB_SCHEME
+    ?? apiUrl.protocol.replace(':', '');
 
 const echo = new Echo({
     broadcaster: 'reverb',
@@ -17,10 +31,8 @@ const echo = new Echo({
     enabledTransports: ['ws', 'wss'],
     disableStats: true,
 
-    // Авторизация приватного канала через Laravel Sanctum.
-    // Предполагается, что твой API-клиент использует cookie-аутентификацию.
-    // authEndpoint: `${import.meta.env.VITE_API_URL}broadcasting/auth`,
-    authEndpoint:  'http://31.128.42.183:8080/broadcasting/auth',
+    // Авторизация приватных каналов на том же хосте, что и API.
+    authEndpoint: `${apiUrl.origin}/broadcasting/auth`,
 
     auth: {
         headers: {
