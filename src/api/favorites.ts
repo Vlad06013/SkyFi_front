@@ -32,6 +32,9 @@ export async function getFavorites(): Promise<Track[]> {
             );
 
             if (cached && Array.isArray(cached.tracks)) {
+                // file.path отдаём как есть: плеер сам решает по
+                // path_fetch_at + path_ttl_sec (TTL приходит с бэка),
+                // протухшую ссылку пропустит и запросит через /audio.
                 return cached.tracks.map(item => item.track);
             }
 

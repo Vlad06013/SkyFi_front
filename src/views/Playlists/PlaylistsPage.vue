@@ -300,8 +300,6 @@
         </form>
       </div>
     </ion-content>
-
-    <AudioPlayer />
   </ion-page>
 </template>
 
@@ -329,7 +327,6 @@ import {
   trashOutline,
 } from 'ionicons/icons';
 
-import AudioPlayer from '@/components/player/AudioPlayer.vue';
 import AppNavigation from '@/components/AppNavigation.vue';
 import ProfileMenu from '@/components/profile/ProfileMenu.vue';
 

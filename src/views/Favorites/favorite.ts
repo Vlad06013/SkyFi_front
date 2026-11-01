@@ -147,9 +147,12 @@ export function useLibrary() {
                 }
 
                 if (cached && Array.isArray(cached.tracks)) {
-                    tracks.value = cached.tracks.map(item => item.track);
-
-
+                    // file.path отдаём как есть: плеер сам решает по
+                    // path_fetch_at + path_ttl_sec (TTL приходит с бэка),
+                    // протухшую ссылку пропустит и запросит через /audio.
+                    tracks.value = cached.tracks.map(
+                        item => item.track,
+                    );
                 }
             } catch (cacheError) {
                 console.warn(

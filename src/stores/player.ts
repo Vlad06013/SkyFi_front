@@ -11,7 +11,9 @@ import {
 
 import {PlaySourceListsEnum} from '@/types/PlaySourceListsEnum';
 
-import {AudioFile, type Track} from '@/types/TrackType';
+import {isAudioUrlFresh, parseServerDate} from '@/lib/audioUrlTtl';
+
+import {type Track} from '@/types/TrackType';
 
 import {
     getTrackAudio,
@@ -31,7 +33,10 @@ import {
 import {
     addTrackToQueue,
     reorderPlayerQueue,
+    updateQueueItemStatus,
 } from '@/api/queue';
+
+import type {PlaybackQueueItem} from '@/types/QueueType';
 
 import {
     addFavorite,
@@ -65,8 +70,14 @@ const usePlayerStore = defineStore('player', () => {
 
     const playbackState = ref<PlaybackState | null>(null);
     const queue = ref<Track[]>([]);
+    const serverQueue = ref<PlaybackQueueItem[]>([]);
     const currentTrackIndex = ref(-1);
     const currentTrack = ref<PlayerTrack | null>(null);
+
+    /** Список-источник, из которого запущен текущий трек.
+     *  null, пока источник неизвестен: заполняется из play_source
+     *  серверного состояния или при запуске трека из списка. */
+    const playSource = ref<PlaySourceListsEnum | null>(null);
 
     const isPlaying = ref(false);
     const isLoading = ref(false);
@@ -129,6 +140,20 @@ const usePlayerStore = defineStore('player', () => {
     let remoteStateRequestId = 0;
     let favoriteCheckRequestId = 0;
     let favoriteToggleRequestId = 0;
+
+    /** ID играющего сейчас элемента серверной очереди (если трек из неё). */
+    let currentQueueItemId: number | null = null;
+
+    /** Порядок индексов при перемешивании и текущая позиция в нём. */
+    let shuffleOrder: number[] = [];
+    let shuffleCursor = -1;
+
+    /** Кеш полученных через /tracks/{id}/audio ссылок (на время сессии).
+     *  fetchedAt — когда ссылка получена, для проверки по TTL источника. */
+    const audioUrlCache = new Map<
+        number,
+        { url: string; fetchedAt: number }
+    >();
 
     let deviceInitializationPromise: Promise<void> | null = null;
     let isDeviceChangesSubscribed = false;
@@ -239,7 +264,7 @@ const usePlayerStore = defineStore('player', () => {
     // ============================================
 
     /**
-     * Заполнение очереди каталогом
+     * Заполнение списка-источника каталогом
      * @param tracks
      */
     function setQueue(tracks: Track[]): void {
@@ -252,6 +277,10 @@ const usePlayerStore = defineStore('player', () => {
                     String(track.id) === String(currentTrack.value?.id),
             )
             : -1;
+
+        if (isShuffleEnabled.value) {
+            rebuildShuffleOrder();
+        }
     }
 
     /**
@@ -268,7 +297,7 @@ const usePlayerStore = defineStore('player', () => {
             // отдельно запрашивать её не нужно.
             const items = await addTrackToQueue(track);
 
-            setQueue(items.map(item => item.track));
+            serverQueue.value = items;
         } catch (error) {
             console.error(
                 '[Player] Не удалось добавить трек в очередь:',
@@ -277,14 +306,6 @@ const usePlayerStore = defineStore('player', () => {
 
             throw error;
         }
-    }
-
-    /**
-     * Отчистка очереди??????
-     */
-    function clearQueue(): void {
-        queue.value = [];
-        currentTrackIndex.value = -1;
     }
 
     function findTrackIndex(track: Track): number {
@@ -326,6 +347,501 @@ const usePlayerStore = defineStore('player', () => {
         }
 
         return 0;
+    }
+
+    // ============================================
+    // ЛОКАЛЬНОЕ ЯДРО ВОСПРОИЗВЕДЕНИЯ
+    //
+    // Команды применяются к <audio> мгновенно, серверу об
+    // изменениях сообщаем в фоне — он служит журналом для
+    // других устройств, а не исполнителем команд.
+    // ============================================
+
+    /**
+     * Фоновая задача синхронизации: ошибки только в консоль,
+     * на воспроизведение не влияют.
+     */
+    function backgroundSync(
+        task: () => Promise<unknown>,
+        label: string,
+    ): void {
+        if (!auth.user) return;
+
+        void task().catch((error: unknown) => {
+            console.warn(
+                `[Player] Фоновая синхронизация (${label}) не удалась:`,
+                error,
+            );
+        });
+    }
+
+    function createSyncMeta(): {
+        origin_device_id: number | null;
+        command_id: string;
+    } {
+        return {
+            origin_device_id: localDeviceId.value,
+            command_id: createCommandId(),
+        };
+    }
+
+    /**
+     * Ссылка на аудио.
+     *
+     * 1) Кеш текущей сессии (если запись не протухла по TTL файла).
+     * 2) file.path — бэкенд всегда подставляет туда прямую ссылку
+     *    на аудиофайл, /audio не нужен. Берём её только пока она
+     *    свежая (path_fetch_at + path_ttl_sec приходят с бэка).
+     * 3) Иначе — запрос /tracks/{id}/audio.
+     *
+     * forceFresh — пропустить кеш и file.path и запросить
+     * ссылку заново (повторная попытка после ошибки воспроизведения).
+     */
+    async function resolveAudioUrl(
+        track: Track,
+        forceFresh = false,
+    ): Promise<string> {
+        const trackId = Number(track.id);
+        const ttlSec = track.file?.path_ttl_sec ?? null;
+
+        if (!forceFresh) {
+            const cached = audioUrlCache.get(trackId);
+
+            if (
+                cached &&
+                isAudioUrlFresh(cached.fetchedAt, ttlSec)
+            ) {
+                return cached.url;
+            }
+
+            const file = track.file;
+
+            if (
+                typeof file?.path === 'string' &&
+                file.path.length > 0 &&
+                isAudioUrlFresh(file.path_fetch_at, ttlSec)
+            ) {
+                audioUrlCache.set(trackId, {
+                    url: file.path,
+                    fetchedAt: file.path_fetch_at
+                        ? parseServerDate(file.path_fetch_at)
+                        : Date.now(),
+                });
+
+                return file.path;
+            }
+        }
+
+        const audioFile = await getTrackAudio(trackId);
+
+        if (!audioFile.url) {
+            throw new Error('API не вернул ссылку на аудиофайл.');
+        }
+
+        audioUrlCache.set(trackId, {
+            url: audioFile.url,
+            fetchedAt: Date.now(),
+        });
+
+        return audioFile.url;
+    }
+
+    /**
+     * Дождаться загрузки метаданных аудио (с таймаутом).
+     *
+     * После 'error' даём короткую передышку: Chromium может кинуть
+     * ошибку только что прерванной предыдущей загрузки (code 4),
+     * а реальная загрузка при этом продолжается и завершится
+     * 'loadedmetadata'. Если за передышку метаданные не пришли —
+     * считаем ошибку настоящей.
+     */
+    function waitForAudioMetadata(): Promise<void> {
+        return new Promise<void>((resolve, reject) => {
+            let settled = false;
+            let errorGraceTimer: ReturnType<typeof setTimeout> | null =
+                null;
+
+            const cleanup = (): void => {
+                clearTimeout(timeout);
+
+                if (errorGraceTimer !== null) {
+                    clearTimeout(errorGraceTimer);
+                    errorGraceTimer = null;
+                }
+
+                audio.removeEventListener(
+                    'loadedmetadata',
+                    onLoadedMetadata,
+                );
+
+                audio.removeEventListener('error', onError);
+            };
+
+            const finish = (error?: Error): void => {
+                if (settled) return;
+
+                settled = true;
+                cleanup();
+
+                if (error) {
+                    reject(error);
+                } else {
+                    resolve();
+                }
+            };
+
+            const onLoadedMetadata = (): void => finish();
+
+            const onError = (): void => {
+                if (settled || errorGraceTimer !== null) {
+                    return;
+                }
+
+                errorGraceTimer = setTimeout(() => {
+                    finish(
+                        new Error('Не удалось загрузить аудиофайл.'),
+                    );
+                }, 500);
+            };
+
+            const timeout = setTimeout(() => {
+                finish(new Error('Истекло время загрузки аудио.'));
+            }, 15000);
+
+            audio.addEventListener('loadedmetadata', onLoadedMetadata);
+            audio.addEventListener('error', onError);
+
+            if (audio.readyState >= HTMLMediaElement.HAVE_METADATA) {
+                finish();
+            }
+        });
+    }
+
+    /**
+     * Локальный запуск трека: состояние меняем сразу,
+     * позицию и автостарт контролирует вызывающий код.
+     *
+     * Возвращает true, если трек готов к воспроизведению.
+     */
+    async function startLocalTrack(
+        track: Track,
+        options: {
+            position?: number;
+            autoplay?: boolean;
+            queueItemId?: number | null;
+        } = {},
+    ): Promise<boolean> {
+        isLoading.value = true;
+
+        try {
+            const started = await startLocalTrackOnce(track, options);
+
+            if (started) {
+                return true;
+            }
+
+            // Ссылка могла умереть, даже если по TTL она «свежая»
+            // (её могли получить за минуту до протухания) — выбрасываем
+            // её из кеша и запрашиваем новую через /audio один раз.
+            if (audioUrlCache.delete(Number(track.id))) {
+                return await startLocalTrackOnce(track, options, true);
+            }
+
+            return false;
+        } finally {
+            isLoading.value = false;
+        }
+    }
+
+    async function startLocalTrackOnce(
+        track: Track,
+        options: {
+            position?: number;
+            autoplay?: boolean;
+            queueItemId?: number | null;
+        },
+        forceFreshUrl = false,
+    ): Promise<boolean> {
+        const requestId = ++playbackRequestId;
+
+        currentQueueItemId = options.queueItemId ?? null;
+        currentTrack.value = mapPlaybackTrack(track);
+        currentTrackIndex.value = findTrackIndex(track);
+        audioDuration.value = getTrackDuration(track);
+
+        // liked перезапросится через watch на смену трека.
+        try {
+            const url = await resolveAudioUrl(track, forceFreshUrl);
+
+            if (requestId !== playbackRequestId) {
+                return false;
+            }
+
+            audio.pause();
+            audio.src = url;
+            audio.load();
+
+            await waitForAudioMetadata();
+
+            if (requestId !== playbackRequestId) {
+                return false;
+            }
+
+            const position = Math.max(0, options.position ?? 0);
+
+            if (position > 0) {
+                audio.currentTime = Number.isFinite(audio.duration)
+                    ? Math.min(position, audio.duration)
+                    : position;
+
+                progress.value = position;
+            } else {
+                progress.value = 0;
+            }
+
+            if (options.autoplay ?? true) {
+                await audio.play();
+            }
+
+            return true;
+        } catch (error) {
+            console.error(
+                '[Player] Не удалось запустить трек локально:',
+                error,
+            );
+
+            return false;
+        }
+    }
+
+    /**
+     * Сообщить серверу, что сейчас играет этот трек.
+     * Сервер обновит состояние и разошлёт его другим устройствам.
+     */
+    function reportTrackStarted(
+        track: Track,
+        position: number,
+        source: PlaySourceListsEnum,
+    ): void {
+        backgroundSync(async () => {
+            const response = await playRemoteTrack(
+                track,
+                source,
+                createSyncMeta(),
+            );
+
+            const version = Number(response?.state?.version);
+
+            if (Number.isFinite(version)) {
+                lastAppliedVersion = version;
+            }
+
+            if (position > 0) {
+                await seekRemotePlayback(
+                    position,
+                    createSyncMeta(),
+                );
+            }
+        }, 'play');
+    }
+
+    function reportPause(): void {
+        backgroundSync(() =>
+            pauseRemotePlayback(
+                Math.max(0, audio.currentTime || progress.value),
+                createSyncMeta(),
+            ),
+        'pause');
+    }
+
+    function reportResume(): void {
+        backgroundSync(
+            () => resumeRemotePlayback(createSyncMeta()),
+            'resume',
+        );
+    }
+
+    function reportSeek(positionSeconds: number): void {
+        backgroundSync(
+            () =>
+                seekRemotePlayback(
+                    Math.max(0, Math.floor(positionSeconds)),
+                    createSyncMeta(),
+                ),
+            'seek',
+        );
+    }
+
+    function reportOptions(): void {
+        backgroundSync(
+            () =>
+                updatePlaybackOptions(
+                    {
+                        repeat_mode: repeatMode.value,
+                        shuffle_enabled: isShuffleEnabled.value,
+                    },
+                    createSyncMeta(),
+                ),
+            'options',
+        );
+    }
+
+    function reportQueueStatus(
+        queueItemId: number,
+        status: 'pending' | 'playing_now' | 'played' | 'skipped',
+    ): void {
+        backgroundSync(
+            () => updateQueueItemStatus(queueItemId, status),
+            'queue-status',
+        );
+    }
+
+    /**
+     * Завершить играющий элемент серверной очереди:
+     * played — если трек доиграл, skipped — если переключили.
+     */
+    function finalizeCurrentQueueItem(
+        outcome: 'played' | 'skipped',
+    ): void {
+        if (currentQueueItemId === null) return;
+
+        reportQueueStatus(currentQueueItemId, outcome);
+
+        currentQueueItemId = null;
+    }
+
+    // ============================================
+    // СЕРВЕРНАЯ ОЧЕРЕДЬ (В ПРИОРИТЕТЕ)
+    // ============================================
+
+    /**
+     * Ближайший ожидающий элемент серверной очереди.
+     */
+    function getPendingQueueItem(): PlaybackQueueItem | null {
+        const pending = serverQueue.value
+            .filter(item => item.status === 'pending')
+            .sort((a, b) => a.position - b.position);
+
+        return pending[0] ?? null;
+    }
+
+    /**
+     * Извлечь ближайший ожидающий элемент из локальной копии очереди.
+     */
+    function takeNextFromQueue(): PlaybackQueueItem | null {
+        const item = getPendingQueueItem();
+
+        if (!item) return null;
+
+        serverQueue.value = serverQueue.value.filter(
+            queueItem => queueItem.id !== item.id,
+        );
+
+        return item;
+    }
+
+    async function playQueueItem(item: PlaybackQueueItem): Promise<void> {
+        const started = await startLocalTrack(item.track, {
+            queueItemId: item.id,
+        });
+
+        if (!started) return;
+
+        reportTrackStarted(item.track, 0, PlaySourceListsEnum.QUEUE);
+        reportQueueStatus(item.id, 'playing_now');
+    }
+
+    // ============================================
+    // ПЕРЕМЕШИВАНИЕ
+    // ============================================
+
+    function rebuildShuffleOrder(): void {
+        const total = queue.value.length;
+        const current = currentTrackIndex.value;
+
+        const indices: number[] = [];
+
+        for (let index = 0; index < total; index++) {
+            if (index !== current) {
+                indices.push(index);
+            }
+        }
+
+        // Перемешивание Фишера—Йейтса.
+        for (let i = indices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+
+            [indices[i], indices[j]] = [indices[j], indices[i]];
+        }
+
+        shuffleOrder = indices;
+        shuffleCursor = -1;
+    }
+
+    /**
+     * Следующий индекс списка-источника с учётом shuffle/repeat.
+     * -1 — воспроизведение дальше невозможно.
+     */
+    function resolveNextIndex(): number {
+        const total = queue.value.length;
+
+        if (total === 0) return -1;
+
+        if (isShuffleEnabled.value) {
+            if (shuffleOrder.length === 0) {
+                rebuildShuffleOrder();
+            }
+
+            shuffleCursor++;
+
+            if (shuffleCursor >= shuffleOrder.length) {
+                if (repeatMode.value !== 'all') {
+                    return -1;
+                }
+
+                shuffleCursor = 0;
+            }
+
+            return shuffleOrder[shuffleCursor];
+        }
+
+        const current = currentTrackIndex.value;
+
+        if (current < 0) return 0;
+
+        const next = current + 1;
+
+        if (next < total) return next;
+
+        return repeatMode.value === 'all' ? 0 : -1;
+    }
+
+    /**
+     * Предыдущий индекс списка-источника с учётом shuffle/repeat.
+     * -1 — переключаться некуда, достаточно перемотать в начало.
+     */
+    function resolvePreviousIndex(): number {
+        const total = queue.value.length;
+
+        if (total === 0) return -1;
+
+        if (isShuffleEnabled.value) {
+            if (shuffleCursor > 0) {
+                shuffleCursor--;
+
+                return shuffleOrder[shuffleCursor];
+            }
+
+            return -1;
+        }
+
+        const current = currentTrackIndex.value;
+
+        if (current < 0) return total - 1;
+
+        if (current > 0) return current - 1;
+
+        return repeatMode.value === 'all' ? total - 1 : -1;
     }
 
     // ============================================
@@ -498,7 +1014,7 @@ const usePlayerStore = defineStore('player', () => {
 
             const reordered = await reorderPlayerQueue(orderedIds);
 
-            setQueue(reordered.map((item) => item.track));
+            serverQueue.value = reordered;
         } catch (error) {
             console.error(
                 '[Player] Не удалось поставить трек следующим:',
@@ -514,121 +1030,160 @@ const usePlayerStore = defineStore('player', () => {
     async function toggleShuffle(): Promise<void> {
         if (!auth.user) return;
 
-        const commandId = createCommandId();
+        isShuffleEnabled.value = !isShuffleEnabled.value;
 
-        try {
-            const response = await updatePlaybackOptions(
-                {
-                    shuffle_enabled: !isShuffleEnabled.value,
-                },
-                {
-                    origin_device_id: localDeviceId.value,
-                    command_id: commandId,
-                })
-            ;
-
-            await applyRemotePlaybackState(response.state);
-        } catch (error) {
-            console.error(
-                '[Player] Не удалось изменить перемешивание:',
-                error,
-            );
+        if (isShuffleEnabled.value) {
+            rebuildShuffleOrder();
+        } else {
+            shuffleOrder = [];
+            shuffleCursor = -1;
         }
+
+        reportOptions();
     }
 
     async function toggleRepeatMode(): Promise<void> {
         if (!auth.user) return;
 
-        const nextMode =
+        repeatMode.value =
             repeatMode.value === 'off'
                 ? 'all'
                 : repeatMode.value === 'all'
                     ? 'one'
                     : 'off';
 
-        console.log("repeatMode",repeatMode.value, nextMode);
-
-        const commandId = createCommandId();
-
-        try {
-            const response = await updatePlaybackOptions(
-                {
-                repeat_mode: nextMode,
-            },
-                {
-                    origin_device_id: localDeviceId.value,
-                    command_id: commandId,
-                }
-            );
-            console.log("STATEEEE",response.state);
-
-            await applyRemotePlaybackState(response.state);
-        } catch (error) {
-            console.error('[Player] Не удалось изменить повтор:', error);
-        }
+        reportOptions();
     }
 
     // ============================================
     // СЛЕДУЮЩИЙ / ПРЕДЫДУЩИЙ ТРЕК
     // ============================================
 
+    /**
+     * Следующий трек: локально, в приоритете — серверная очередь.
+     */
     async function playNext(
         reason: 'manual' | 'ended' = 'manual',
     ): Promise<void> {
 
-        const commandId = createCommandId();
+        if (!auth.user) return;
 
-        if (isLoading.value || !auth.user) return;
+        // Мы — пульт: команда уходит на сервер, активное
+        // устройство применит её через сокет.
+        if (!isLocalDeviceActive.value) {
+            try {
+                const response = await nextRemoteTrack(
+                    reason,
+                    createSyncMeta(),
+                );
 
-        isLoading.value = true;
+                await applyRemotePlaybackState(response.state, true);
+            } catch (error) {
+                console.error(
+                    '[Player] Ошибка переключения трека:',
+                    error,
+                );
+            }
 
-        try {
-            const response = await nextRemoteTrack(reason, {
-                origin_device_id: localDeviceId.value,
-                command_id: commandId,
-            });
+            return;
+        }
 
-            await applyRemotePlaybackState(response.state, true);
+        // Повтор одного трека: просто начинаем сначала.
+        if (
+            reason === 'ended' &&
+            repeatMode.value === 'one' &&
+            currentTrack.value
+        ) {
+            finalizeCurrentQueueItem('played');
 
-        } catch (error) {
-            console.error('[Player] Ошибка переключения трека:', error);
-        } finally {
-            isLoading.value = false;
+            audio.currentTime = 0;
+
+            try {
+                await audio.play();
+                reportSeek(0);
+            } catch (error) {
+                console.error('[Player] Не удалось повторить трек:', error);
+            }
+
+            return;
+        }
+
+        finalizeCurrentQueueItem(
+            reason === 'ended' ? 'played' : 'skipped',
+        );
+
+        // 1) Серверная очередь в приоритете.
+        const queueItem = takeNextFromQueue();
+
+        if (queueItem) {
+            await playQueueItem(queueItem);
+
+            return;
+        }
+
+        // 2) Список-источник.
+        const nextIndex = resolveNextIndex();
+
+        if (nextIndex === -1) {
+            // Конец списка: останавливаемся на месте.
+            audio.pause();
+            isPlaying.value = false;
+            reportPause();
+
+            return;
+        }
+
+        const track = queue.value[nextIndex];
+        const started = await startLocalTrack(track);
+
+        if (started && playSource.value) {
+            reportTrackStarted(track, 0, playSource.value);
         }
     }
 
     async function playPrevious(): Promise<void> {
-        if (isLoading.value || !auth.user) return;
+        if (!auth.user) return;
 
-        if (progress.value > 3) {
-            await seekAudio(0);
+        // Мы — пульт: команда уходит на сервер.
+        if (!isLocalDeviceActive.value) {
+            try {
+                const response = await previousRemoteTrack(
+                    createSyncMeta(),
+                );
+
+                await applyRemotePlaybackState(response.state, true);
+            } catch (error) {
+                console.error(
+                    '[Player] Ошибка переключения трека:',
+                    error,
+                );
+            }
+
             return;
         }
 
-        isLoading.value = true;
-        let commandId = createCommandId();
-        try {
-            const response = await previousRemoteTrack({
-                origin_device_id: localDeviceId.value,
-                command_id: commandId,
-            });
-            console.log('[PREVIOUS] Ответ сервера', {
-                commandId,
-                stateTrackId: response.state?.current_track?.id,
-                state: response.state,
-            });
+        // Более 3 секунд — перематываем в начало текущего трека.
+        if (progress.value > 3) {
+            await seekAudio(0);
 
-            await applyRemotePlaybackState(response.state, true);
-            console.log('[PREVIOUS] После применения состояния', {
-                currentTrackId: currentTrack.value?.id,
-                audioSrc: audio.src,
-                paused: audio.paused,
-                currentTime: audio.currentTime,
-            });
-        } catch (error) {
-            console.error('[Player] Ошибка переключения трека:', error);
-        } finally {
-            isLoading.value = false;
+            return;
+        }
+
+        finalizeCurrentQueueItem('skipped');
+
+        const previousIndex = resolvePreviousIndex();
+
+        if (previousIndex === -1) {
+            await seekAudio(0);
+
+            return;
+        }
+
+        const track = queue.value[previousIndex];
+        const started = await startLocalTrack(track);
+
+        if (started && playSource.value) {
+            reportTrackStarted(track, 0, playSource.value);
         }
     }
 
@@ -637,50 +1192,96 @@ const usePlayerStore = defineStore('player', () => {
     // ============================================
     async function playTrack(
         track: Track,
-        playbackSource: PlaySourceListsEnum = PlaySourceListsEnum.SINGLE,
+        playbackSource: PlaySourceListsEnum,
     ): Promise<void> {
         if (!track?.id || !auth.user || isLoading.value) return;
 
-        const requestId = ++playbackRequestId;
+        // Мы — пульт: старая схема, сервер дёрнёт активное устройство.
+        if (!isLocalDeviceActive.value) {
+            const requestId = ++playbackRequestId;
+
+            isLoading.value = true;
+
+            try {
+                const response = await playRemoteTrack(
+                    track,
+                    playbackSource,
+                    createSyncMeta(),
+                );
+
+                if (requestId !== playbackRequestId) return;
+
+                await applyRemotePlaybackState(
+                    response.state,
+                    true,
+                    Number(track.id),
+                );
+            } catch (error) {
+                console.error('[Player] Ошибка запуска трека:', error);
+            } finally {
+                if (requestId === playbackRequestId) {
+                    isLoading.value = false;
+                }
+            }
+
+            return;
+        }
+
+        playSource.value = playbackSource;
+
         isLoading.value = true;
 
-        let commandId = createCommandId();
-
         try {
-            const selectedTrackId = Number(track.id);
+            finalizeCurrentQueueItem('skipped');
 
-            const response = await playRemoteTrack(
-                track,
-                playbackSource,
-                {
-                    origin_device_id: localDeviceId.value,
-                    command_id: commandId,
+            // Внешний трек поиска ещё не в базе, /audio по его
+            // внешнему id не сработает. Сначала /play: бэкенд
+            // сохранит трек и вернёт его версию с DB id — её
+            // и запускаем локально.
+            if (playbackSource === PlaySourceListsEnum.SEARCH) {
+                const response = await playRemoteTrack(
+                    track,
+                    playbackSource,
+                    createSyncMeta(),
+                );
+
+                const serverTrack = response.state?.current_track;
+
+                if (!serverTrack) {
+                    throw new Error(
+                        'Сервер не вернул сохранённый трек поиска.',
+                    );
                 }
-            );
 
-            if (requestId !== playbackRequestId) return;
+                const version = Number(response.state?.version);
 
-            console.log('[Player] Запрошен трек:', selectedTrackId);
-            console.log('[Player] response:', response);
-            console.log('[Player] Сервер вернул трек:', {
-                id: response.state.current_track?.id,
-                current_track_id: response.state.current_track_id,
-            });
+                if (Number.isFinite(version)) {
+                    lastAppliedVersion = version;
+                }
 
+                // Подменяем трек в списке на версию из базы:
+                // следующий/предыдущий по выдаче пойдут с DB id.
+                const queueIndex = queue.value.findIndex(
+                    (item) =>
+                        String(item.id) === String(track.id),
+                );
 
-            // При явном выборе передаём ID выбранного трека,
-            // чтобы не полагаться на уже обновлённый currentTrack.
-            await applyRemotePlaybackState(
-                response.state,
-                true,
-                selectedTrackId,
-            );
-        } catch (error) {
-            console.error('[Player] Ошибка запуска трека:', error);
-        } finally {
-            if (requestId === playbackRequestId) {
-                isLoading.value = false;
+                if (queueIndex !== -1) {
+                    queue.value.splice(queueIndex, 1, serverTrack);
+                }
+
+                await startLocalTrack(serverTrack);
+
+                return;
             }
+
+            const started = await startLocalTrack(track);
+
+            if (started) {
+                reportTrackStarted(track, 0, playbackSource);
+            }
+        } finally {
+            isLoading.value = false;
         }
     }
 
@@ -689,50 +1290,101 @@ const usePlayerStore = defineStore('player', () => {
     // PLAY / PAUSE
     // ============================================
 
-    async function togglePlay(
-        source: PlaySourceListsEnum = PlaySourceListsEnum.SINGLE,
-    ): Promise<void> {
+    async function togglePlay(source?: PlaySourceListsEnum): Promise<void> {
         if (isLoading.value || !auth.user) return;
-        let commandId = createCommandId();
 
-        if (!playbackState.value?.current_track_id && !currentTrack.value) {
+        if (!currentTrack.value) {
             const firstTrack = queue.value[0];
+            const trackSource = source ?? playSource.value;
 
-            if (firstTrack) {
-                await playTrack(firstTrack, source);
+            if (firstTrack && trackSource) {
+                await playTrack(firstTrack, trackSource);
             }
 
             return;
         }
 
-        isLoading.value = true;
+        // Мы — пульт: пауза/продолжение идут через сервер.
+        if (!isLocalDeviceActive.value) {
+            try {
+                const isCurrentlyPlaying = playbackState.value?.is_playing;
 
-        try {
-            const isCurrentlyPlaying = playbackState.value?.is_playing;
+                const response = isCurrentlyPlaying
+                    ? await pauseRemotePlayback(
+                        Math.max(0, progress.value),
+                        createSyncMeta(),
+                    )
+                    : await resumeRemotePlayback(createSyncMeta());
 
+                await applyRemotePlaybackState(response.state, true);
+            } catch (error) {
+                console.error(
+                    '[Player] Не удалось изменить состояние воспроизведения:',
+                    error,
+                );
+            }
 
-            const response = isCurrentlyPlaying
-                ? await pauseRemotePlayback(
-                    Math.max(0, audio.currentTime || progress.value),
-                    {
-                        origin_device_id: localDeviceId.value,
-                        command_id: commandId,
+            return;
+        }
+
+        if (audio.paused) {
+            if (!audio.src) {
+                // Состояние восстановлено с сервера, но аудио ещё
+                // не загружено: стартуем трек заново из локальной
+                // очереди, с сохранённой позиции.
+                const track = queue.value.find(
+                    item =>
+                        String(item.id)
+                        === String(currentTrack.value?.id),
+                );
+
+                if (track && playSource.value) {
+                    const position = Math.max(0, progress.value);
+
+                    const started = await startLocalTrack(track, {
+                        position,
+                    });
+
+                    if (started) {
+                        reportTrackStarted(
+                            track,
+                            position,
+                            playSource.value,
+                        );
                     }
-                )
-                : await resumeRemotePlayback({
-                    origin_device_id: localDeviceId.value,
-                    command_id: commandId,
-                });
+                } else {
+                    // Трека нет в списке — старая схема через сервер.
+                    try {
+                        const response = await resumeRemotePlayback(
+                            createSyncMeta(),
+                        );
 
-            console.log("response", response);
-            await applyRemotePlaybackState(response.state, true);
-        } catch (error) {
-            console.error(
-                '[Player] Не удалось изменить состояние воспроизведения:',
-                error,
-            );
-        } finally {
-            isLoading.value = false;
+                        await applyRemotePlaybackState(
+                            response.state,
+                            true,
+                        );
+                    } catch (error) {
+                        console.error(
+                            '[Player] Не удалось продолжить:',
+                            error,
+                        );
+                    }
+                }
+
+                return;
+            }
+
+            try {
+                await audio.play();
+                isPlaying.value = true;
+                reportResume();
+            } catch (error) {
+                console.error('[Player] Не удалось продолжить:', error);
+            }
+        } else {
+            audio.pause();
+            isPlaying.value = false;
+            reportPause();
         }
     }
 
@@ -743,7 +1395,6 @@ const usePlayerStore = defineStore('player', () => {
     async function seekAudio(value: number): Promise<void> {
         if (!Number.isFinite(value) || value < 0 || !auth.user) return;
 
-        let commandId = createCommandId();
         const target =
             audioDuration.value > 0
                 ? Math.min(value, audioDuration.value)
@@ -752,36 +1403,22 @@ const usePlayerStore = defineStore('player', () => {
         isSeeking.value = true;
         progress.value = target;
 
-        try {
-            const response = await seekRemotePlayback(target, {
-                origin_device_id: localDeviceId.value,
-                command_id: commandId,
-            });
-
-            await applyRemotePlaybackState(response.state, false);
-
-            progress.value = Math.max(
-                0,
-                Number(response.state.position_seconds) || 0,
+        // Применяем мгновенно: на активном устройстве — к аудио,
+        // на пульте — только в UI (сервер пришлёт состояние).
+        if (
+            isLocalDeviceActive.value &&
+            audio.src &&
+            audio.readyState >= HTMLMediaElement.HAVE_METADATA
+        ) {
+            audio.currentTime = Math.min(
+                target,
+                audio.duration || target,
             );
-
-            if (
-                isLocalDeviceActive.value &&
-                audio.src &&
-                audio.readyState >= HTMLMediaElement.HAVE_METADATA
-            ) {
-                const position = progress.value;
-
-                audio.currentTime = Math.min(
-                    position,
-                    audio.duration || position,
-                );
-            }
-        } catch (error) {
-            console.error('[Player] Ошибка перемотки:', error);
-        } finally {
-            isSeeking.value = false;
         }
+
+        reportSeek(target);
+
+        isSeeking.value = false;
     }
 
     // ============================================
@@ -1067,22 +1704,14 @@ const usePlayerStore = defineStore('player', () => {
 
             if (requestId !== restoreRequestId) return;
 
-            const serverQueue = queueResponse.map(
-                (item) => item.track,
-            );
+            // Серверная очередь (со статусами) хранится отдельно
+            // от списка-источника — она в приоритете при переключении.
+            serverQueue.value = queueResponse;
 
-            if (serverQueue.length > 0) {
-                setQueue(serverQueue);
-                console.log(
-                    '[Player] Очередь восстановлена с сервера:',
-                    serverQueue.length,
-                );
-            } else {
-                console.log(
-                    '[Player] Серверная очередь пуста — локальную очередь сохраняем:',
-                    queue.value.length,
-                );
-            }
+            console.log(
+                '[Player] Очередь восстановлена с сервера:',
+                queueResponse.length,
+            );
         } catch (error) {
             console.error(
                 '[Player] Не удалось восстановить состояние:',
@@ -1123,6 +1752,10 @@ const usePlayerStore = defineStore('player', () => {
         playbackState.value = state;
         activeDeviceId.value = state.active_device_id;
 
+        // Состояние пришло с сервера — локальная привязка
+        // к элементу очереди больше не актуальна.
+        currentQueueItemId = null;
+
         devices.value = devices.value.map((device) => ({
             ...device,
             is_active: device.id === state.active_device_id,
@@ -1131,6 +1764,10 @@ const usePlayerStore = defineStore('player', () => {
         isShuffleEnabled.value = state.shuffle_enabled;
         repeatMode.value = state.repeat_mode;
         isPlaying.value = state.is_playing;
+
+        if (state.play_source) {
+            playSource.value = state.play_source as PlaySourceListsEnum;
+        }
 
         updateServerProgress(state);
 
@@ -1245,18 +1882,8 @@ const usePlayerStore = defineStore('player', () => {
             if (trackChanged || sourceMissing || forceLoadSelectedTrack) {
                 audio.pause();
 
-                // const audioFile = await getTrackAudio(Number(track.id));
+                const url = await resolveAudioUrl(track);
 
-                let audioFile = <AudioFile>({});
-
-                if (track.url) {
-                    audioFile.url = track.url;
-
-                } else {
-                    audioFile = await getTrackAudio(Number(track.id));
-                }
-
-                console.log(audioFile)
                 if (
                     requestId !== remoteStateRequestId ||
                     !isLocalDeviceActive.value
@@ -1264,58 +1891,10 @@ const usePlayerStore = defineStore('player', () => {
                     return;
                 }
 
-                if (!audioFile?.url) {
-                    throw new Error('Сервер не вернул ссылку на аудиофайл.');
-                }
-
-                audio.src = audioFile.url;
+                audio.src = url;
                 audio.load();
 
-                await new Promise<void>((resolve, reject) => {
-                    let settled = false;
-                    let timeout: ReturnType<typeof setTimeout>;
-
-                    const finish = (error?: Error) => {
-                        if (settled) return;
-
-                        settled = true;
-                        clearTimeout(timeout);
-
-                        audio.removeEventListener(
-                            'loadedmetadata',
-                            onLoadedMetadata,
-                        );
-
-                        audio.removeEventListener('error', onError);
-
-                        if (error) {
-                            reject(error);
-                        } else {
-                            resolve();
-                        }
-                    };
-
-                    const onLoadedMetadata = () => finish();
-                    const onError = () =>
-                        finish(new Error('Не удалось загрузить аудиофайл.'));
-
-                    timeout = setTimeout(() => {
-                        finish(new Error('Истекло время загрузки аудио.'));
-                    }, 15000);
-
-                    audio.addEventListener(
-                        'loadedmetadata',
-                        onLoadedMetadata,
-                    );
-
-                    audio.addEventListener('error', onError);
-
-                    if (
-                        audio.readyState >= HTMLMediaElement.HAVE_METADATA
-                    ) {
-                        finish();
-                    }
-                });
+                await waitForAudioMetadata();
 
                 if (
                     requestId !== remoteStateRequestId ||
@@ -1470,6 +2049,7 @@ const usePlayerStore = defineStore('player', () => {
 
     return {
         queue,
+        serverQueue,
         currentTrackIndex,
         setQueue,
         addToQueue,

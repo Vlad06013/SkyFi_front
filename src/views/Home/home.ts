@@ -3,7 +3,6 @@ import usePlayerStore from '@/stores/player';
 
 
 import {type Track as ApiTrack} from '@/types/TrackType';
-import {PlaySourceListsEnum} from '@/types/PlaySourceListsEnum';
 // import {getTracks} from '@/api/player';
 
 
@@ -220,56 +219,6 @@ export function useHome() {
     }
 
     // ========================================
-    // ВОСПРОИЗВЕДЕНИЕ
-    // ========================================
-
-    async function playTrack(track: ApiTrack): Promise<void> {
-        try {
-            await player.playTrack(
-                track,
-                PlaySourceListsEnum.SINGLE,
-            );
-        } catch (error) {
-            console.error(
-                'Ошибка воспроизведения трека:',
-                error,
-            );
-        }
-    }
-
-    // ========================================
-    // PLAY / PAUSE
-    // ========================================
-
-    async function togglePlay(): Promise<void> {
-        try {
-            if (!player.currentTrack) {
-                const firstTrack = filteredTracks.value[0];
-
-                if (!firstTrack) {
-                    return;
-                }
-
-                /*
-                 * playTrack устанавливает текущий трек
-                 * и запускает воспроизведение.
-                 */
-
-                await playTrack(firstTrack);
-
-                return;
-            }
-
-            await player.togglePlay();
-        } catch (error) {
-            console.error(
-                'Ошибка переключения воспроизведения:',
-                error,
-            );
-        }
-    }
-
-    // ========================================
     // ПРЕДЫДУЩИЙ / СЛЕДУЮЩИЙ ТРЕК
     // ========================================
 
@@ -390,8 +339,6 @@ export function useHome() {
         navigateTo,
 
         // Управление плеером
-        playTrack,
-        togglePlay,
         nextTrack,
         onSeekInput,
         seekAudio,

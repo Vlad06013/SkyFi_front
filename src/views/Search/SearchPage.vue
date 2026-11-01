@@ -128,7 +128,6 @@
         </div>
       </div>
     </ion-content>
-    <AudioPlayer />
   </ion-page>
 </template>
 
@@ -140,7 +139,6 @@ import {
 } from '@ionic/vue';
 import { computed, ref } from 'vue';
 import AppNavigation from '@/components/AppNavigation.vue';
-import AudioPlayer from '@/components/player/AudioPlayer.vue';
 import ProfileMenu from '@/components/profile/ProfileMenu.vue';
 import SearchResultsList from '@/components/lists/SearchResultsList.vue';
 import { useSearch } from './search';

@@ -67,7 +67,6 @@
                 <button
                     class="primary-button"
                     :disabled="!tracks.length"
-                    @click="tracks[0] && playTrack(tracks[0])"
                 >
                   <span>▶</span>
                   Начать слушать
@@ -157,9 +156,6 @@
           </div>
         </main>
       </div>
-
-      <!-- Нижний музыкальный плеер -->
-      <AudioPlayer />
     </ion-content>
 
     <!-- Единая навигация SkyFi -->
@@ -170,7 +166,6 @@
 <script setup lang="ts">
 import { IonPage, IonContent } from '@ionic/vue';
 
-import AudioPlayer from '@/components/player/AudioPlayer.vue';
 import AppNavigation from '@/components/AppNavigation.vue';
 import ProfileMenu from '@/components/profile/ProfileMenu.vue';
 
@@ -183,8 +178,6 @@ const {
   search,
   tracks,
   navigateTo,
-
-  playTrack,
 } = useHome();
 </script>
 

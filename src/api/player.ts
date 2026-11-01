@@ -18,7 +18,7 @@ export async function playRemoteTrack(
         origin_device_id: number | null;
         command_id: string;
     },
-): Promise<ApiResponse<PlayerStateResponse>> {
+): Promise<PlayerStateResponse> {
     const response = (
         await http.post<ApiResponse<PlayerStateResponse>>(
             '/player/play',
@@ -48,9 +48,12 @@ export async function getPlayerState(): Promise<PlayerStateResponse> {
 
 export async function getTrackAudio(
     trackId: number,
-): Promise<ApiResponse<AudioFile>> {
+): Promise<AudioFile> {
+    // Яндекс может долго отдавать ссылку — даём минуту
+    // вместо глобальных 15 секунд.
     const response = (await http.get<ApiResponse<AudioFile>>(
         `/tracks/${trackId}/audio`,
+        {timeout: 60000},
     )).data;
 
     const result = response.data;
@@ -61,7 +64,7 @@ export async function getTrackAudio(
         );
     }
 
-    return response.data;
+    return result;
 }
 
 
@@ -82,7 +85,7 @@ export async function pauseRemotePlayback(
         origin_device_id: number | null;
         command_id: string;
     },
-): Promise<ApiResponse<PlayerStateResponse>> {
+): Promise<PlayerStateResponse> {
     const response = (await http.post<ApiResponse<PlayerStateResponse>>(
         '/player/pause',
         {
@@ -107,7 +110,7 @@ export async function resumeRemotePlayback(
         origin_device_id: number | null;
         command_id: string;
     },
-): Promise<ApiResponse<PlayerStateResponse>> {
+): Promise<PlayerStateResponse> {
     const response = (await http.post<ApiResponse<PlayerStateResponse>>(
         '/player/resume',
         {
@@ -129,7 +132,7 @@ export async function seekRemotePlayback(
         origin_device_id: number | null;
         command_id: string;
     },
-): Promise<ApiResponse<PlayerStateResponse>> {
+): Promise<PlayerStateResponse> {
     const response = (await http.post<ApiResponse<PlayerStateResponse>>(
         '/player/seek',
         {
@@ -155,7 +158,7 @@ export async function nextRemoteTrack(
         origin_device_id: number | null;
         command_id: string;
     },
-): Promise<ApiResponse<PlayerStateResponse>> {
+): Promise<PlayerStateResponse> {
     const response = (await http.post<ApiResponse<PlayerStateResponse>>(
         '/player/next',
         {
@@ -178,7 +181,7 @@ export async function previousRemoteTrack(
         origin_device_id: number | null;
         command_id: string;
     },
-): Promise<ApiResponse<PlayerStateResponse>> {
+): Promise<PlayerStateResponse> {
     const response = (await http.post<ApiResponse<PlayerStateResponse>>(
         '/player/previous',
         {
@@ -216,9 +219,10 @@ export async function getPlayerDevices(): Promise<{
  */
 export async function registerPlayerDevice(
     device: {
-        device_uuid: string;
         name: string;
         type: PlayerDeviceType;
+        origin_device_id: string;
+        command_id: string;
     },
 ): Promise<{
     message: string;
@@ -280,7 +284,7 @@ export async function updatePlaybackOptions(
         origin_device_id: number | null;
         command_id: string;
     },
-): Promise<ApiResponse<PlayerStateResponse>> {
+): Promise<PlayerStateResponse> {
 
     const response = (await http.patch<ApiResponse<PlayerStateResponse>>(
         '/player/options', {

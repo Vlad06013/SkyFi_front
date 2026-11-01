@@ -7,7 +7,7 @@ export interface PlaybackQueueItem {
     added_by_user_id: number | null;
 
     position: number;
-    status: 'pending' | 'played' | '';
+    status: 'pending' | 'playing_now' | 'played' | 'skipped';
 
     track: Track;
     added_by?: {

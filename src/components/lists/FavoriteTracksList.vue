@@ -185,6 +185,7 @@ function isCurrentTrack(track: Track): boolean {
 async function playTrack(track: Track): Promise<void> {
   if (!track?.id || player.isLoading) return;
 
+  console.log('playTrack', track, sourceList);
   // Повторный клик по текущему треку — пауза/продолжение,
   // а не перезапуск с начала.
   if (isCurrentTrack(track)) {
@@ -195,6 +196,7 @@ async function playTrack(track: Track): Promise<void> {
   player.setQueue([...props.items]);
 
   console.log('[Favorites] Очередь перед запуском:', {
+    list: sourceList,
     count: props.items.length,
     ids: props.items.map(item => item.id),
     selectedTrackId: track.id,

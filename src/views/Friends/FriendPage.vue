@@ -294,8 +294,6 @@
                 </section>
             </main>
         </ion-content>
-
-        <AudioPlayer />
     </ion-page>
 </template>
 

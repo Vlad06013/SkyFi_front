@@ -284,8 +284,6 @@
                 </div>
             </main>
         </ion-content>
-
-        <AudioPlayer />
     </ion-page>
 </template>
 

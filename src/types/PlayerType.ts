@@ -34,6 +34,9 @@ export interface PlaybackState {
     repeat_mode: 'off' | 'all' | 'one';
     shuffle_enabled: boolean;
 
+    /** Источник списка, из которого играет трек (favorites, search, ...). */
+    play_source?: string;
+
     version: number;
 
     current_track?: Track | null;

@@ -1,11 +1,19 @@
 <template>
   <ion-app>
     <ion-router-outlet />
+
+    <!-- Глобальный футер-плеер: монтируется один раз,
+         переходы между страницами его не пересоздают. -->
+    <AudioPlayer v-if="auth.isAuthenticated" />
   </ion-app>
 </template>
 
 <script setup lang="ts">
 import { IonApp, IonRouterOutlet } from '@ionic/vue';
+import AudioPlayer from '@/components/player/AudioPlayer.vue';
+import { useAuthStore } from '@/stores/auth';
+
+const auth = useAuthStore();
 </script>
 
 <style>

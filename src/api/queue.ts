@@ -77,3 +77,21 @@ export async function reorderPlayerQueue(
 
     return response.data.data;
 }
+
+/**
+ * Обновить статус элемента очереди.
+ *
+ * Плеер применяет изменения локально и шлёт статусы
+ * фоновой синхронизацией.
+ *
+ * PATCH /player/queue/{queueItemId}/status
+ */
+export async function updateQueueItemStatus(
+    queueItemId: number,
+    status: 'pending' | 'playing_now' | 'played' | 'skipped',
+): Promise<void> {
+    await http.patch(
+        `/player/queue/${queueItemId}/status`,
+        {status},
+    );
+}
