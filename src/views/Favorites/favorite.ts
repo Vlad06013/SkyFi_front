@@ -3,6 +3,8 @@ import {
     onMounted,
     reactive,
     ref,
+    toRaw,
+    watch,
 } from 'vue';
 import { useAuthStore } from '@/stores/auth';
 import {
@@ -28,7 +30,7 @@ import axios from 'axios';
 
 
 import type {Track} from '@/types/TrackType';
-import {getFavorites} from '@/api/favorites';
+import {getFavorites, updateFavoritesSort} from '@/api/favorites';
 
 import usePlayerStore from '@/stores/player';
 
@@ -117,11 +119,18 @@ export function useLibrary() {
 
     const FAVORITES_CACHE_KEY = 'favorites';
 
+    // Время последней загрузки списка с сервера. Инициализируем
+    // временем входа, чтобы восстановление плеера (liked)
+    // не дублировало запрос избранного при старте.
+    let favoritesLoadedAt = Date.now();
+
     async function loadLibrary(): Promise<void> {
         const requestId = ++libraryRequestId;
         const userId = auth.user?.id;
 
-        loading.value = true;
+        // Полноэкранный спиннер только при первой загрузке,
+        // повторные подгрузки идут в фоне, чтобы список не мигал.
+        loading.value = tracks.value.length === 0;
         error.value = '';
 
         // Сначала показываем локальный кеш текущего пользователя.
@@ -164,19 +173,17 @@ export function useLibrary() {
 
             // Сервер — источник актуальных данных.
             tracks.value = favorites;
+            favoritesLoadedAt = Date.now();
 
-            // Сохраняем свежий список в IndexedDB.
-            if (userId !== undefined && userId !== null) {
-                await saveCachedCollection({
-                    key: FAVORITES_CACHE_KEY,
-                    userId: String(userId),
-                    updatedAt: Date.now(),
-                    tracks: favorites.map((track, index) => ({
-                        id: Number(track.id),
-                        position: index,
-                        track,
-                    })),
-                });
+            // Сохраняем свежий список в IndexedDB. Проблемы кеша
+            // не должны выглядеть как ошибка синхронизации.
+            try {
+                await persistFavoritesCache();
+            } catch (cacheError) {
+                console.warn(
+                    '[Library] Не удалось обновить кеш избранного:',
+                    cacheError,
+                );
             }
 
 
@@ -217,6 +224,115 @@ export function useLibrary() {
     }
 
 
+
+    /**
+     * Сохранить текущий список избранного в локальный кеш.
+     */
+    async function persistFavoritesCache(): Promise<void> {
+        const userId = auth.user?.id;
+
+        if (userId === undefined || userId === null) {
+            return;
+        }
+
+        await saveCachedCollection({
+            key: FAVORITES_CACHE_KEY,
+            userId: String(userId),
+            updatedAt: Date.now(),
+            tracks: tracks.value.map((track, index) => ({
+                id: Number(track.id),
+                position: index,
+                // IndexedDB не умеет клонировать реактивные
+                // прокси Vue — сохраняем сырые объекты.
+                track: toRaw(track),
+            })),
+        });
+    }
+
+    /**
+     * Переставить трек избранного на новую позицию (drag & drop).
+     *
+     * Порядок меняется оптимистично, затем сохраняется на сервере.
+     * При ошибке локальный порядок откатывается.
+     */
+    async function reorderFavorites(
+        fromIndex: number,
+        toIndex: number,
+    ): Promise<void> {
+        const list = tracks.value;
+        const lastIndex = list.length - 1;
+
+        if (
+            fromIndex === toIndex ||
+            fromIndex < 0 ||
+            fromIndex > lastIndex ||
+            toIndex < 0 ||
+            toIndex > lastIndex
+        ) {
+            return;
+        }
+
+        const snapshot = [...list];
+        const reordered = [...list];
+        const [moved] = reordered.splice(fromIndex, 1);
+
+        reordered.splice(toIndex, 0, moved);
+
+        // Сервер сортирует по sort DESC: верхний трек получает
+        // самое большое значение, нижний — ноль.
+        const sorts = reordered.map((track, index) => ({
+            track_id: Number(track.id),
+            sort: reordered.length - 1 - index,
+        }));
+
+        tracks.value = reordered;
+
+        try {
+            await updateFavoritesSort(sorts);
+        } catch (err) {
+            console.error(
+                '[Library] Не удалось сохранить порядок избранного:',
+                err,
+            );
+
+            tracks.value = snapshot;
+
+            return;
+        }
+
+        // Порядок уже сохранён на сервере: приводим локальные sort
+        // к новым значениям, даже если кеш обновить не удалось.
+        reordered.forEach((track, index) => {
+            track.sort = sorts[index].sort;
+        });
+
+        try {
+            await persistFavoritesCache();
+        } catch (cacheError) {
+            console.warn(
+                '[Library] Не удалось обновить кеш избранного:',
+                cacheError,
+            );
+        }
+    }
+
+    /**
+     * Переместить трек избранного в начало списка.
+     *
+     * Значения sort пересчитываются для всего списка,
+     * как при перетаскивании.
+     */
+    async function moveFavoriteToTop(track: Track): Promise<void> {
+        const index = tracks.value.findIndex(
+            item => Number(item.id) === Number(track.id),
+        );
+
+        if (index <= 0) {
+            return;
+        }
+
+        await reorderFavorites(index, 0);
+    }
 
     // ============================================
     // ВКЛАДКИ
@@ -507,6 +623,38 @@ export function useLibrary() {
         void loadLibrary();
     });
 
+    // При возврате на вкладку треков подтягиваем свежий список:
+    // избранное могло измениться на других экранах.
+    watch(activeTab, (tab) => {
+        if (tab === 'tracks') {
+            void loadLibrary();
+        }
+    });
+
+    // Лайк текущего трека с плеера: подтягиваем список, чтобы трек
+    // появился сразу. Без guard-ов восстановление плеера при входе
+    // дублировало бы запрос избранного.
+    watch(
+        () => player.liked,
+        (liked) => {
+            if (!liked || activeTab.value !== 'tracks') {
+                return;
+            }
+
+            const currentId = Number(player.currentTrack?.id);
+
+            const alreadyInList = tracks.value.some(
+                track => Number(track.id) === currentId,
+            );
+
+            const fresh = Date.now() - favoritesLoadedAt < 10_000;
+
+            if (!alreadyInList && !fresh) {
+                void loadLibrary();
+            }
+        },
+    );
+
 
     // ============================================
     // ПУБЛИЧНЫЙ API
@@ -521,6 +669,8 @@ export function useLibrary() {
         loading,
         error,
         loadLibrary,
+        reorderFavorites,
+        moveFavoriteToTop,
 
         // Собственные загрузки
 

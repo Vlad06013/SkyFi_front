@@ -61,6 +61,17 @@
 
           <div class="track-context-menu track-context-menu-mobile" role="menu">
             <button
+                v-if="movableToTop"
+                type="button"
+                role="menuitem"
+                :disabled="loading"
+                @click="runMoveToTop"
+            >
+              <ion-icon :icon="arrowUpOutline"/>
+              В начало списка
+            </button>
+
+            <button
                 type="button"
                 role="menuitem"
                 :disabled="loading"
@@ -113,6 +124,17 @@
           @click.stop
           @pointerdown.stop
       >
+        <button
+            v-if="movableToTop"
+            type="button"
+            role="menuitem"
+            :disabled="loading"
+            @click="runMoveToTop"
+        >
+          <ion-icon :icon="arrowUpOutline"/>
+          В начало списка
+        </button>
+
         <button
             type="button"
             role="menuitem"
@@ -167,6 +189,7 @@ import {
   listOutline,
   musicalNotesOutline,
   playSkipForwardOutline,
+  arrowUpOutline,
 } from 'ionicons/icons';
 
 import AddToPlaylistItem from '@/components/track-menu/AddToPlaylistItem.vue';
@@ -177,6 +200,8 @@ const props = defineProps<{
   track: T;
   isFavorite: boolean;
   loading?: boolean;
+  /** Показать действие «В начало списка» (только для списка избранного). */
+  movableToTop?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -187,6 +212,7 @@ const emit = defineEmits<{
   ];
   open: [track: T];
   close: [track: T];
+  moveToTop: [track: T];
 }>();
 
 const isOpen = ref(false);
@@ -281,6 +307,12 @@ function closeMenu() {
 function runAction(action: 'next' | 'queue' | 'favorite') {
   // emit('action', props.track, action);
   emit('action', props.track, action, props.isFavorite);
+
+  closeMenu();
+}
+
+function runMoveToTop() {
+  emit('moveToTop', props.track);
 
   closeMenu();
 }

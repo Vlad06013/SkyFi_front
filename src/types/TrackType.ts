@@ -35,6 +35,8 @@ export interface Track {
     // has_audio_url: boolean;
     meta: TrackMeta;
     file: TrackFile | null;
+    /** Порядок в избранном (favorites.sort): больше = выше. Только у избранного. */
+    sort?: number | null;
 }
 
 export interface TrackFile {

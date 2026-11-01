@@ -91,3 +91,18 @@ export async function addFavorite( trackId: number): Promise<{
 
     return response.data;
 }
+
+/**
+ * Применить новый порядок избранного целиком.
+ *
+ * sorts — финальные значения favorites.sort для всего списка
+ * (больше = выше в списке).
+ */
+export async function updateFavoritesSort(
+    sorts: { track_id: number; sort: number }[],
+): Promise<void> {
+    await http.patch(
+        '/favorites/sort',
+        {sorts},
+    );
+}

@@ -174,6 +174,8 @@
               :loading="loading"
               :error="error"
               :retry="loadLibrary"
+              @reorder="reorderFavorites"
+              @move-to-top="moveFavoriteToTop"
           />
         </section>
 
@@ -838,6 +840,8 @@ const {
   loading,
   error,
   loadLibrary,
+  reorderFavorites,
+  moveFavoriteToTop,
 
   // Коллекции
   albums,

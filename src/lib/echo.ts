@@ -2,6 +2,8 @@
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 
+import { http } from '@/api/http';
+
 /*
  * Хост WebSocket-сервера берём из VITE_API_URL, чтобы не
  * дублировать адрес сервера в отдельных переменных.
@@ -34,12 +36,26 @@ const echo = new Echo({
     // Авторизация приватных каналов на том же хосте, что и API.
     authEndpoint: `${apiUrl.origin}/broadcasting/auth`,
 
-    auth: {
-        headers: {
-            Authorization: `Bearer ${localStorage.getItem('skyfi_token') ?? ''}`,
+    // Кастомный авторизатор вместо статичного заголовка: наш axios-интерцептор
+    // подставляет Bearer-токен на каждый запрос, поэтому токен, появившийся
+    // после регистрации или входа, подхватится автоматически.
+    authorizer: (channel) => ({
+        authorize: (socketId, callback) => {
+            http.post(`${apiUrl.origin}/broadcasting/auth`, {
+                socket_id: socketId,
+                channel_name: channel.name,
+            })
+                .then((response) => callback(null, response.data))
+                .catch((error: unknown) => {
+                    callback(
+                        error instanceof Error
+                            ? error
+                            : new Error('Broadcasting auth failed.'),
+                        null,
+                    );
+                });
         },
-    },
-    withCredentials: true,
+    }),
 });
 
 export default echo;
