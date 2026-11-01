@@ -13,6 +13,14 @@ export function useQueue() {
     const queueItems = ref<PlaybackQueueItem[]>([]);
     const removingIds = ref(new Set<number>());
 
+    function applyQueue(items: PlaybackQueueItem[]): void {
+        queueItems.value = items;
+        player.setServerQueueCount(items.length);
+        player.setQueue(
+            items.map(item => item.track),
+        );
+    }
+
     async function refreshQueue(): Promise<void> {
         if (loading.value || !player.isServerSyncEnabled) {
             return;
@@ -21,13 +29,7 @@ export function useQueue() {
         loading.value = true;
 
         try {
-            const response = await getPlayerQueue();
-
-            queueItems.value = response.data;
-            player.setServerQueueCount(response.data.length);
-            player.setQueue(
-                response.data.map(item => item.track),
-            );
+            applyQueue(await getPlayerQueue());
         } catch (error) {
             console.error(
                 '[QueuePanel] Не удалось загрузить очередь:',
@@ -54,8 +56,9 @@ export function useQueue() {
         ]);
 
         try {
-            await removeTrackFromQueue(queueItemId);
-            await refreshQueue();
+            // Ответ уже содержит очередь целиком —
+            // отдельно запрашивать её не нужно.
+            applyQueue(await removeTrackFromQueue(queueItemId));
         } catch (error) {
             console.error(
                 '[QueuePanel] Не удалось удалить трек:',
