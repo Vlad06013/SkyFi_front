@@ -197,6 +197,18 @@
     background: #8b5cf612;
 }
 
+.now-playing--clickable {
+    cursor: pointer;
+    transition:
+        background 0.2s,
+        border-color 0.2s;
+}
+
+.now-playing--clickable:hover {
+    border-color: #8b5cf6;
+    background: #8b5cf620;
+}
+
 .now-playing__icon {
     display: grid;
     place-items: center;
@@ -229,6 +241,12 @@
     white-space: nowrap;
     color: #aaa6b7;
     font-size: 12px;
+}
+
+.now-playing__hint {
+    margin-top: 5px;
+    color: #6f7285;
+    font-size: 11px;
 }
 
 /* =========================================
@@ -301,6 +319,10 @@
 .track-row:hover {
     background: #ffffff0d;
     border-color: #302d3c;
+}
+
+.track-row--clickable {
+    cursor: pointer;
 }
 
 .track-row__cover {

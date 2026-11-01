@@ -78,10 +78,19 @@
 
                     <div
                         v-else-if="nowPlaying?.is_playing && nowPlaying.track"
-                        class="now-playing"
+                        class="now-playing now-playing--clickable"
+                        @click="handleNowPlayingClick"
                     >
                         <div class="now-playing__icon">
-                            <ion-icon :icon="playOutline" />
+                            <ion-icon
+                                :icon="
+                                    isCurrentTrack(nowPlaying.track)
+                                        ? player.isPlaying
+                                            ? pauseOutline
+                                            : playOutline
+                                        : playOutline
+                                "
+                            />
                         </div>
 
                         <div class="now-playing__info">
@@ -94,6 +103,10 @@
                                 class="now-playing__artists"
                             >
                                 {{ trackArtists(nowPlaying.track) }}
+                            </div>
+
+                            <div class="now-playing__hint">
+                                нажми, чтобы включить у себя
                             </div>
                         </div>
                     </div>
@@ -131,7 +144,8 @@
                         <li
                             v-for="track in queueResults"
                             :key="String(track.id)"
-                            class="track-row"
+                            class="track-row track-row--clickable"
+                            @click="handleTrackClick(track)"
                         >
                             <img
                                 v-if="trackCover(track)"
@@ -144,7 +158,15 @@
                                 v-else
                                 class="track-row__cover track-row__cover--placeholder"
                             >
-                                <ion-icon :icon="musicalNotesOutline" />
+                                <ion-icon
+                                    :icon="
+                                        isCurrentTrack(track)
+                                            ? player.isPlaying
+                                                ? pauseOutline
+                                                : playOutline
+                                            : musicalNotesOutline
+                                    "
+                                />
                             </div>
 
                             <div class="track-row__info">
@@ -183,7 +205,7 @@
                                     type="button"
                                     class="action-button action-button--primary"
                                     :disabled="queuePending[String(track.id)]"
-                                    @click="handleAddToQueue(track)"
+                                    @click.stop="handleAddToQueue(track)"
                                 >
                                     <ion-icon :icon="addOutline" />
                                     {{

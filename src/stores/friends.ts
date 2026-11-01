@@ -160,6 +160,24 @@ const useFriendsStore = defineStore('friends', () => {
                         `${receiverName} принял(а) твою заявку в друзья`,
                     );
                 },
+            )
+            .listen(
+                '.friend.queue.track.added',
+                (event: {
+                    added_by?: { id: number; name: string };
+                    track?: { title: string; artists?: string[] };
+                }) => {
+                    if (!event.track) return;
+
+                    const who = event.added_by?.name ?? 'Друг';
+                    const artists = event.track.artists?.length
+                        ? `${event.track.artists.join(', ')} — `
+                        : '';
+
+                    void showToast(
+                        `${who} добавил трек в очередь: ${artists}${event.track.title}`,
+                    );
+                },
             );
 
         isSubscribed = true;

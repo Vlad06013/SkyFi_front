@@ -11,6 +11,7 @@ import {useRoute, useRouter} from 'vue-router';
 import {
     arrowBackOutline,
     playOutline,
+    pauseOutline,
     addOutline,
     checkmarkOutline,
     searchOutline,
@@ -21,9 +22,12 @@ import {IonContent, IonIcon, IonPage, toastController} from '@ionic/vue';
 
 import './FriendPage.css';
 
+import echo from '@/lib/echo';
 import AppNavigation from '@/components/AppNavigation.vue';
 import ProfileMenu from '@/components/profile/ProfileMenu.vue';
 import AudioPlayer from '@/components/player/AudioPlayer.vue';
+
+import usePlayerStore from '@/stores/player';
 
 import {
     getFriendProfile,
@@ -39,6 +43,12 @@ import type {Track} from '@/types/TrackType';
 
 const NOW_PLAYING_REFRESH_MS = 30000;
 
+/**
+ * Источник воспроизведения для треков со страницы друга:
+ * бэкенд по 'search' сам создаёт meta для внешних треков.
+ */
+const PLAYBACK_SOURCE = 'search';
+
 export default defineComponent({
     name: 'FriendPage',
     components: {
@@ -52,8 +62,15 @@ export default defineComponent({
     setup() {
         const route = useRoute();
         const router = useRouter();
+        const player = usePlayerStore();
 
         const friendId = Number(route.params.id);
+
+        /*
+         * Канал дружбы: сюда бэкенд дублирует playback.state.updated,
+         * чтобы друзья видели смену треков в реальном времени.
+         */
+        const friendChannelName = `friends.${friendId}`;
 
         const profile = ref<FriendProfile | null>(null);
         const nowPlaying = ref<{
@@ -77,6 +94,8 @@ export default defineComponent({
             void loadNowPlaying();
             void loadFavorites();
 
+            subscribeToFriendPlayer();
+
             nowPlayingTimer = setInterval(() => {
                 void loadNowPlaying();
             }, NOW_PLAYING_REFRESH_MS);
@@ -86,7 +105,21 @@ export default defineComponent({
             if (nowPlayingTimer) {
                 clearInterval(nowPlayingTimer);
             }
+
+            echo.leave(friendChannelName);
         });
+
+        /**
+         * Смена трека/состояния у друга — обновляем блок «Слушает сейчас».
+         */
+        function subscribeToFriendPlayer(): void {
+            echo.private(friendChannelName).listen(
+                '.playback.state.updated',
+                () => {
+                    void loadNowPlaying();
+                },
+            );
+        }
 
         async function loadProfile(): Promise<void> {
             isLoadingProfile.value = true;
@@ -200,6 +233,56 @@ export default defineComponent({
         }
 
         // ============================================
+        // ВОСПРОИЗВЕДЕНИЕ У СЕБЯ
+        // ============================================
+
+        function isCurrentTrack(track: Track): boolean {
+            const current = player.currentTrack;
+
+            return (
+                !!current &&
+                String(current.id) === String(track.id)
+            );
+        }
+
+        /**
+         * Клик по треку из поиска: первый — играть у себя,
+         * повторный по текущему — пауза.
+         */
+        async function handleTrackClick(track: Track): Promise<void> {
+            if (player.isLoading) {
+                return;
+            }
+
+            if (isCurrentTrack(track)) {
+                await player.togglePlay(PLAYBACK_SOURCE);
+                return;
+            }
+
+            player.setQueue(queueResults.value);
+
+            await player.playTrack(track, PLAYBACK_SOURCE);
+        }
+
+        /**
+         * Клик по «Слушает сейчас» — играть этот трек у себя.
+         */
+        async function handleNowPlayingClick(): Promise<void> {
+            const track = nowPlaying.value?.track;
+
+            if (!track || player.isLoading) {
+                return;
+            }
+
+            if (isCurrentTrack(track)) {
+                await player.togglePlay(PLAYBACK_SOURCE);
+                return;
+            }
+
+            await player.playTrack(track, PLAYBACK_SOURCE);
+        }
+
+        // ============================================
         // ОЧЕРЕДЬ ДРУГА
         // ============================================
 
@@ -289,6 +372,7 @@ export default defineComponent({
         return {
             arrowBackOutline,
             playOutline,
+            pauseOutline,
             addOutline,
             checkmarkOutline,
             searchOutline,
@@ -297,6 +381,8 @@ export default defineComponent({
             profile,
             nowPlaying,
             favorites,
+
+            player,
 
             isLoadingProfile,
             isLoadingNowPlaying,
@@ -319,6 +405,9 @@ export default defineComponent({
             trackCover,
             formatDuration,
             handleAddToQueue,
+            isCurrentTrack,
+            handleTrackClick,
+            handleNowPlayingClick,
         };
     },
 });
