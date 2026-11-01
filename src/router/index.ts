@@ -10,6 +10,8 @@ import RegisterPage from '@/views/RegisterPage.vue';
 import { useAuthStore } from '@/stores/auth';
 import Favorite from "@/views/Favorites/Favorite.vue";
 import ProfilePage from '@/views/Profile/ProfilePage.vue';
+import FriendsPage from '@/views/Friends/FriendsPage.vue';
+import FriendPage from '@/views/Friends/FriendPage.vue';
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -44,6 +46,18 @@ const routes: Array<RouteRecordRaw> = [
     path: '/playlists',
     name: 'Playlists',
     component: PlaylistsPage,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/friends',
+    name: 'Friends',
+    component: FriendsPage,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/friends/:id',
+    name: 'Friend',
+    component: FriendPage,
     meta: { requiresAuth: true },
   },
   {

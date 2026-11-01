@@ -1,0 +1,453 @@
+/* =========================================
+   СТРАНИЦА ДРУГА
+========================================= */
+
+.friend-content {
+    --background: #0b0c12;
+    color: #f4f4fa;
+}
+
+.friend-layout {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 1050px;
+    margin: 0 auto;
+    padding: 42px 36px 130px;
+}
+
+/* =========================================
+   ЗАГОЛОВОК
+========================================= */
+
+.friend-header {
+    margin-bottom: 28px;
+}
+
+.back-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 20px;
+    padding: 12px 16px;
+    border: 1px solid #302d3c;
+    border-radius: 12px;
+    background: #15141c;
+    color: #fff;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition:
+        background 0.2s,
+        border-color 0.2s;
+}
+
+.back-button:hover {
+    background: #201b2d;
+    border-color: #a78bfa70;
+}
+
+.back-button ion-icon {
+    font-size: 15px;
+}
+
+.friend-heading .eyebrow {
+    color: #9295a8;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.8px;
+}
+
+.friend-heading h1 {
+    margin: 12px 0;
+    color: #fff;
+    font-size: clamp(30px, 3.2vw, 42px);
+    line-height: 1.15;
+    letter-spacing: -1.5px;
+    overflow-wrap: anywhere;
+}
+
+.friend-heading .subtitle {
+    margin: 0;
+    color: #a7a4b3;
+    font-size: 13px;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+}
+
+/* =========================================
+   КАРТОЧКА ДРУГА
+========================================= */
+
+.friend-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    width: 100%;
+    padding: 26px;
+    box-sizing: border-box;
+    border: 1px solid #292633;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #191721, #111117);
+}
+
+.friend-card__avatar {
+    display: grid;
+    place-items: center;
+    flex: 0 0 72px;
+    width: 72px;
+    height: 72px;
+    overflow: hidden;
+    border-radius: 22px;
+    background: linear-gradient(135deg, #9274f6, #5741b7);
+    color: #fff;
+    font-size: 30px;
+    font-weight: 700;
+}
+
+.friend-card__avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.friend-card__info {
+    flex: 1;
+    min-width: 0;
+}
+
+.friend-card__overline {
+    color: #9295a8;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.8px;
+}
+
+.friend-card__info h2 {
+    margin: 8px 0;
+    color: #f5f3fa;
+    font-size: 23px;
+    overflow-wrap: anywhere;
+}
+
+.friend-card__info p {
+    margin: 0;
+    color: #aaa6b7;
+    overflow-wrap: anywhere;
+}
+
+/* =========================================
+   СЕКЦИИ
+========================================= */
+
+.friend-section {
+    margin-top: 34px;
+    padding: 22px;
+    border: 1px solid #292633;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #191721, #111117);
+}
+
+.section-heading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.section-heading h2 {
+    margin: 0;
+    color: #f3f2f9;
+    font-size: clamp(18px, 1.8vw, 22px);
+    letter-spacing: -0.5px;
+}
+
+.section-hint {
+    color: #85899c;
+    font-size: 13px;
+}
+
+.section-empty {
+    padding: 10px 0 4px;
+    color: #6f7285;
+    font-size: 13px;
+}
+
+.friend-error {
+    margin-top: 16px;
+    padding: 12px 16px;
+    border: 1px solid #f05b7755;
+    border-radius: 12px;
+    background: #f05b7712;
+    color: #ff9ba9;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+/* =========================================
+   СЛУШАЕТ СЕЙЧАС
+========================================= */
+
+.now-playing {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    border: 1px solid #8b5cf655;
+    border-radius: 14px;
+    background: #8b5cf612;
+}
+
+.now-playing__icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: #8b5cf6;
+    color: #fff;
+    font-size: 18px;
+}
+
+.now-playing__info {
+    min-width: 0;
+}
+
+.now-playing__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #f5f3fa;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.now-playing__artists {
+    margin-top: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #aaa6b7;
+    font-size: 12px;
+}
+
+/* =========================================
+   ПОИСК
+========================================= */
+
+.friend-search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    border: 1px solid #302d3c;
+    border-radius: 12px;
+    background: #15141c;
+    transition: border-color 0.2s;
+}
+
+.friend-search:focus-within {
+    border-color: #a78bfa70;
+}
+
+.friend-search__icon {
+    flex-shrink: 0;
+    color: #85899c;
+    font-size: 18px;
+}
+
+.friend-search__input {
+    flex: 1;
+    min-width: 0;
+    height: 46px;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: #f4f4fa;
+    font: inherit;
+    font-size: 14px;
+}
+
+.friend-search__input::placeholder {
+    color: #6f7285;
+}
+
+/* =========================================
+   СПИСОК ТРЕКОВ
+========================================= */
+
+.track-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 16px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.track-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid transparent;
+    border-radius: 14px;
+    background: #ffffff06;
+    transition:
+        background 0.2s,
+        border-color 0.2s;
+}
+
+.track-row:hover {
+    background: #ffffff0d;
+    border-color: #302d3c;
+}
+
+.track-row__cover {
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    object-fit: cover;
+}
+
+.track-row__cover--placeholder {
+    display: grid;
+    place-items: center;
+    background: #221f2d;
+    color: #6f7285;
+    font-size: 18px;
+}
+
+.track-row__info {
+    flex: 1;
+    min-width: 0;
+}
+
+.track-row__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #f5f3fa;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.track-row__artists {
+    margin-top: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #85899c;
+    font-size: 12px;
+}
+
+.track-row__duration {
+    flex-shrink: 0;
+    color: #6f7285;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.track-row__actions {
+    flex-shrink: 0;
+}
+
+/* =========================================
+   КНОПКИ
+========================================= */
+
+.action-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 14px;
+    border: 1px solid #302d3c;
+    border-radius: 10px;
+    background: #15141c;
+    color: #d8d6e5;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition:
+        background 0.2s,
+        border-color 0.2s,
+        color 0.2s;
+}
+
+.action-button ion-icon {
+    font-size: 15px;
+}
+
+.action-button:hover {
+    background: #201b2d;
+    border-color: #a78bfa70;
+    color: #c6b5ff;
+}
+
+.action-button:disabled {
+    opacity: 0.55;
+    cursor: wait;
+}
+
+.action-button--primary {
+    border-color: #8b5cf6;
+    background: #8b5cf6;
+    color: #fff;
+}
+
+.action-button--primary:hover {
+    border-color: #a78bfa;
+    background: #9d71f7;
+    color: #fff;
+}
+
+.action-button--muted {
+    opacity: 0.6;
+    cursor: default;
+}
+
+/* =========================================
+   АДАПТИВ
+========================================= */
+
+@media (max-width: 1050px) {
+    .friend-layout {
+        padding-right: 26px;
+        padding-left: 26px;
+    }
+}
+
+@media (max-width: 650px) {
+    .friend-layout {
+        padding: 26px 17px 140px;
+    }
+
+    .friend-card {
+        padding: 18px;
+    }
+
+    .friend-card__avatar {
+        flex-basis: 58px;
+        width: 58px;
+        height: 58px;
+        border-radius: 17px;
+        font-size: 25px;
+    }
+
+    .friend-section {
+        margin-top: 24px;
+        padding: 16px;
+    }
+
+    .track-row {
+        flex-wrap: wrap;
+    }
+
+    .track-row__actions {
+        width: 100%;
+        display: flex;
+        justify-content: flex-end;
+    }
+}

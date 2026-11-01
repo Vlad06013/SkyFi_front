@@ -152,7 +152,6 @@ function goToLibrary(): void {
   box-sizing: border-box;
   min-width: 0;
   width: auto;
-  margin-left: 228px;
 }
 
 .page-content {
@@ -435,10 +434,6 @@ function goToLibrary(): void {
 
 /* Планшеты: соответствует home.css */
 @media (max-width: 1050px) {
-  .main-area {
-    margin-left: 190px;
-  }
-
   .page-content {
     padding: 32px 24px 150px;
   }
@@ -452,7 +447,6 @@ function goToLibrary(): void {
 @media (max-width: 650px) {
   .main-area {
     width: 100%;
-    margin-left: 0;
   }
 
   .page-content {

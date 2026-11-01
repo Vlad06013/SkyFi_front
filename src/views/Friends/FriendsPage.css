@@ -1,0 +1,326 @@
+/* =========================================
+   СТРАНИЦА ДРУЗЕЙ
+========================================= */
+
+.friends-content {
+    --background: #0b0c12;
+    color: #f4f4fa;
+}
+
+.friends-layout {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 1050px;
+    margin: 0 auto;
+    padding: 42px 36px 130px;
+}
+
+.friends-header {
+    margin-bottom: 30px;
+}
+
+.eyebrow {
+    color: #9295a8;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.8px;
+}
+
+.friends-header h1 {
+    margin: 12px 0;
+    color: #fff;
+    font-size: clamp(30px, 3.2vw, 42px);
+    line-height: 1.15;
+    letter-spacing: -1.5px;
+}
+
+.friends-header .subtitle {
+    margin: 0;
+    color: #a7a4b3;
+    font-size: 13px;
+    line-height: 1.7;
+}
+
+/* =========================================
+   СЕКЦИИ
+========================================= */
+
+.friends-section {
+    margin-top: 34px;
+    padding: 22px;
+    border: 1px solid #292633;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #191721, #111117);
+}
+
+.section-heading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.section-heading h2 {
+    margin: 0;
+    color: #f3f2f9;
+    font-size: clamp(18px, 1.8vw, 22px);
+    letter-spacing: -0.5px;
+}
+
+.count-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 7px;
+    box-sizing: border-box;
+    border-radius: 12px;
+    background: #8b5cf6;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.section-hint {
+    margin-top: 14px;
+    color: #85899c;
+    font-size: 13px;
+}
+
+.section-empty {
+    padding: 18px 0 6px;
+    color: #6f7285;
+    font-size: 13px;
+}
+
+.friends-error {
+    margin-top: 18px;
+    padding: 12px 16px;
+    border: 1px solid #f05b7755;
+    border-radius: 12px;
+    background: #f05b7712;
+    color: #ff9ba9;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+/* =========================================
+   ПОИСК
+========================================= */
+
+.friend-search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    border: 1px solid #302d3c;
+    border-radius: 12px;
+    background: #15141c;
+    transition: border-color 0.2s;
+}
+
+.friend-search:focus-within {
+    border-color: #a78bfa70;
+}
+
+.friend-search__icon {
+    flex-shrink: 0;
+    color: #85899c;
+    font-size: 18px;
+}
+
+.friend-search__input {
+    flex: 1;
+    min-width: 0;
+    height: 46px;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: #f4f4fa;
+    font: inherit;
+    font-size: 14px;
+}
+
+.friend-search__input::placeholder {
+    color: #6f7285;
+}
+
+/* =========================================
+   СПИСОК И СТРОКА
+========================================= */
+
+.friends-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 16px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.friend-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+    border: 1px solid transparent;
+    border-radius: 14px;
+    background: #ffffff06;
+    transition:
+        background 0.2s,
+        border-color 0.2s;
+}
+
+.friend-row:hover {
+    background: #ffffff0d;
+    border-color: #302d3c;
+}
+
+.friend-row--clickable {
+    cursor: pointer;
+}
+
+.friend-row__chevron {
+    color: #6f7285;
+    font-size: 18px;
+}
+
+.friend-avatar {
+    display: grid;
+    place-items: center;
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #9274f6, #5741b7);
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.friend-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.friend-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #f5f3fa;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.friend-sub {
+    margin-top: 3px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #85899c;
+    font-size: 12px;
+}
+
+.friend-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+/* =========================================
+   КНОПКИ
+========================================= */
+
+.action-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 14px;
+    border: 1px solid #302d3c;
+    border-radius: 10px;
+    background: #15141c;
+    color: #d8d6e5;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition:
+        background 0.2s,
+        border-color 0.2s,
+        color 0.2s;
+}
+
+.action-button ion-icon {
+    font-size: 15px;
+}
+
+.action-button:hover {
+    background: #201b2d;
+    border-color: #a78bfa70;
+    color: #c6b5ff;
+}
+
+.action-button:disabled {
+    opacity: 0.55;
+    cursor: wait;
+}
+
+.action-button--primary {
+    border-color: #8b5cf6;
+    background: #8b5cf6;
+    color: #fff;
+}
+
+.action-button--primary:hover {
+    border-color: #a78bfa;
+    background: #9d71f7;
+    color: #fff;
+}
+
+.action-button--muted {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.action-button--danger {
+    color: #f09aab;
+}
+
+.action-button--danger:hover {
+    border-color: #f05b7755;
+    background: #f05b7715;
+    color: #ffb0bf;
+}
+
+/* =========================================
+   АДАПТИВ
+========================================= */
+
+@media (max-width: 1050px) {
+    .friends-layout {
+        padding-right: 26px;
+        padding-left: 26px;
+    }
+}
+
+@media (max-width: 650px) {
+    .friends-layout {
+        padding: 26px 17px 140px;
+    }
+
+    .friends-section {
+        margin-top: 24px;
+        padding: 16px;
+    }
+
+    .friend-row {
+        flex-wrap: wrap;
+    }
+
+    .friend-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}

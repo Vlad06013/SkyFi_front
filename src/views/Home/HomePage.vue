@@ -1,6 +1,6 @@
 <template>
   <ion-page>
-    <ion-content :fullscreen="true" class="skyfi-content">
+    <ion-content :fullscreen="true" class="skyfi-content content--full">
       <div class="app-layout">
         <!-- Боковая панель -->
         <aside class="sidebar">

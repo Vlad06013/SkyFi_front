@@ -1598,21 +1598,4 @@ button:focus-visible {
     }
 }
 
-/* =========================================
-   ОБЩАЯ НАВИГАЦИЯ
-========================================= */
-
-@media (min-width: 701px) {
-    .library-layout {
-        width: calc(100% - 236px);
-        max-width: 1286px;
-        margin-left: 236px;
-    }
-}
-
-@media (max-width: 700px) {
-    .library-layout {
-        width: 100%;
-        margin-left: 0;
-    }
-}
+/* Отступ от бокового меню задан централизованно в theme/variables.css */

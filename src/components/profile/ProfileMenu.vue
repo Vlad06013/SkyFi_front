@@ -103,6 +103,8 @@ function openProfile(): void {
 
   logoutError.value = '';
 
+  blurActiveElement();
+
   void router.push('/profile');
 }
 
@@ -111,7 +113,20 @@ function openLibrary(): void {
 
   logoutError.value = '';
 
+  blurActiveElement();
+
   void router.push('/favorite');
+}
+
+/*
+ * Кнопка остаётся в фокусе на старой странице, которую
+ * ion-router-outlet скрывает через aria-hidden, — браузер блокирует
+ * такое скрытие. Снимаем фокус перед переходом.
+ */
+function blurActiveElement(): void {
+  if (document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur();
+  }
 }
 
 async function logout(): Promise<void> {

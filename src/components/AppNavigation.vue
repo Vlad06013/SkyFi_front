@@ -1,5 +1,5 @@
 <template>
-  <nav class="app-navigation">
+  <nav class="app-navigation" @click="handleNavClick">
     <!-- Логотип -->
     <RouterLink to="/home" class="nav-logo">
       <span class="logo-icon">S</span>
@@ -47,11 +47,27 @@
 
         <span class="nav-label">Плейлисты</span>
       </RouterLink>
+
+      <RouterLink to="/friends" class="nav-link">
+        <span class="nav-icon">
+          <ion-icon :icon="peopleOutline" />
+
+          <span
+              v-if="friendsIncomingCount > 0"
+              class="nav-badge"
+          >
+            {{ friendsIncomingCount }}
+          </span>
+        </span>
+
+        <span class="nav-label">Друзья</span>
+      </RouterLink>
     </div>
   </nav>
 </template>
 
 <script setup lang="ts">
+import { computed, onMounted } from 'vue';
 import { RouterLink } from 'vue-router';
 
 import { IonIcon } from '@ionic/vue';
@@ -61,7 +77,37 @@ import {
   searchOutline,
   musicalNotesOutline,
   listOutline,
+  peopleOutline,
 } from 'ionicons/icons';
+
+import useFriendsStore from '@/stores/friends';
+
+const friendsStore = useFriendsStore();
+
+const friendsIncomingCount = computed(
+    () => friendsStore.incomingCount,
+);
+
+onMounted(() => {
+  void friendsStore.ensureInitialized();
+});
+
+/*
+ * Ссылка меню остаётся в фокусе на старой странице, которую
+ * ion-router-outlet скрывает через aria-hidden — браузер блокирует
+ * такое скрытие и ругается в консоль. Снимаем фокус после клика.
+ */
+function handleNavClick(event: MouseEvent): void {
+  const target = event.target;
+
+  if (!(target instanceof Element)) {
+    return;
+  }
+
+  if (target.closest('.nav-link') && document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur();
+  }
+}
 </script>
 
 <style scoped>
@@ -195,6 +241,8 @@ import {
   align-items: center;
   justify-content: center;
 
+  position: relative;
+
   flex: 0 0 24px;
 
   width: 24px;
@@ -227,6 +275,34 @@ import {
   padding: 0;
 
   flex-shrink: 0;
+}
+
+/* =========================================
+   БЕЙДЖ С ЧИСЛОМ ЗАЯВОК
+========================================= */
+
+.nav-badge {
+  position: absolute;
+  top: -5px;
+  right: -9px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+
+  box-sizing: border-box;
+
+  border-radius: 8px;
+  background: #8b5cf6;
+
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 /* =========================================
