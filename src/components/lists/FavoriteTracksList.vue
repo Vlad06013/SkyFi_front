@@ -132,6 +132,7 @@ import usePlayerStore from '@/stores/player';
 
 // import { getFavorites } from '@/api/favorites';
 import type {Track} from '@/types/TrackType';
+import {PlaySourceListsEnum} from '@/types/PlaySourceListsEnum';
 
 const player = usePlayerStore();
 
@@ -175,7 +176,7 @@ async function handleAction(
 }
 
 const isPlaying = computed(() => player.isPlaying);
-const sourceList = "favorites";
+const sourceList = PlaySourceListsEnum.FAVORITES;
 
 function isCurrentTrack(track: Track): boolean {
   return Number(player.currentTrack?.id) === Number(track.id);

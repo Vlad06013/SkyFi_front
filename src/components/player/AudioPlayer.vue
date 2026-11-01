@@ -184,16 +184,7 @@
             @click.stop="player.togglePlay()"
         >
           <svg
-              v-if="player.isLoading"
-              class="control-icon loading-icon"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-          >
-            <circle cx="12" cy="12" r="9" />
-          </svg>
-
-          <svg
-              v-else-if="player.isPlaying"
+              v-if="player.isPlaying"
               class="control-icon"
               viewBox="0 0 24 24"
               aria-hidden="true"
@@ -683,16 +674,7 @@
               @click="player.togglePlay()"
           >
             <svg
-                v-if="player.isLoading"
-                class="control-icon loading-icon"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-            >
-              <circle cx="12" cy="12" r="9" />
-            </svg>
-
-            <svg
-                v-else-if="player.isPlaying"
+                v-if="player.isPlaying"
                 class="control-icon"
                 viewBox="0 0 24 24"
                 aria-hidden="true"

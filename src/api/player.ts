@@ -2,6 +2,7 @@ import {http} from '@/api/http';
 import {ApiResponse, PlayerActionResponse, PlayerStateResponse} from '@/types/TypeApiRespone'
 import {AudioFile, type Track} from '@/types/TrackType'
 import {PlayerDevice, PlayerDeviceType} from '@/types/PlayerType'
+import {PlaySourceListsEnum} from '@/types/PlaySourceListsEnum'
 
 export type RepeatMode = 'off' | 'all' | 'one';
 
@@ -12,7 +13,7 @@ export type RepeatMode = 'off' | 'all' | 'one';
  */
 export async function playRemoteTrack(
     track: Track,
-    playbackSource?: string,
+    playbackSource?: PlaySourceListsEnum,
     meta?: {
         origin_device_id: number | null;
         command_id: string;

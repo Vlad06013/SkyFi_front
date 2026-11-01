@@ -7,7 +7,8 @@ import {
 
 import {searchTracks,} from '@/api/search';
 import {type Track,} from '@/types/TrackType';
-const sourceList = "search";
+import {PlaySourceListsEnum} from '@/types/PlaySourceListsEnum';
+const sourceList = PlaySourceListsEnum.SEARCH;
 
 
 import {

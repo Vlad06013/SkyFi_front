@@ -126,6 +126,7 @@ import TrackContextMenu from '@/components/track-menu/TrackContextMenu.vue';
 import usePlayerStore from '@/stores/player';
 
 import type {Track} from '@/types/TrackType';
+import {PlaySourceListsEnum} from '@/types/PlaySourceListsEnum';
 
 const player = usePlayerStore();
 
@@ -165,7 +166,7 @@ async function handleAction(
 }
 
 const isPlaying = computed(() => player.isPlaying);
-const sourceList = "search";
+const sourceList = PlaySourceListsEnum.SEARCH;
 function isTrackPlaying(track: Track): boolean {
   return isCurrentTrack(track) && player.isPlaying;
 }

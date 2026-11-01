@@ -22,3 +22,12 @@ http://ionicframework.com/docs/theming/ */
         --padding-start: 236px;
     }
 }
+
+/*
+ * Планшеты: боковое меню сжато до иконок (80px, см. AppNavigation).
+ */
+@media (max-width: 1050px) and (min-width: 701px) {
+    .ion-page > ion-content:not(.auth-content):not(.content--full) {
+        --padding-start: 80px;
+    }
+}

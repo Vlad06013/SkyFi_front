@@ -9,6 +9,8 @@ import {
     type PlayerDeviceType,
 } from '@/types/PlayerType';
 
+import {PlaySourceListsEnum} from '@/types/PlaySourceListsEnum';
+
 import {AudioFile, type Track} from '@/types/TrackType';
 
 import {
@@ -634,7 +636,10 @@ const usePlayerStore = defineStore('player', () => {
     // ============================================
     // ЗАПУСК ТРЕКА
     // ============================================
-    async function playTrack(track: Track, playbackSource: string): Promise<void> {
+    async function playTrack(
+        track: Track,
+        playbackSource: PlaySourceListsEnum = PlaySourceListsEnum.SINGLE,
+    ): Promise<void> {
         if (!track?.id || !auth.user || isLoading.value) return;
 
         const requestId = ++playbackRequestId;
@@ -685,7 +690,9 @@ const usePlayerStore = defineStore('player', () => {
     // PLAY / PAUSE
     // ============================================
 
-    async function togglePlay(source: string): Promise<void> {
+    async function togglePlay(
+        source: PlaySourceListsEnum = PlaySourceListsEnum.SINGLE,
+    ): Promise<void> {
         if (isLoading.value || !auth.user) return;
         let commandId = createCommandId();
 

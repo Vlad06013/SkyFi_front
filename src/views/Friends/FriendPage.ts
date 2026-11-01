@@ -40,6 +40,7 @@ import {searchTracks} from '@/api/search';
 
 import type {FriendProfile} from '@/types/FriendshipType';
 import type {Track} from '@/types/TrackType';
+import {PlaySourceListsEnum} from '@/types/PlaySourceListsEnum';
 
 const NOW_PLAYING_REFRESH_MS = 30000;
 
@@ -47,7 +48,7 @@ const NOW_PLAYING_REFRESH_MS = 30000;
  * Источник воспроизведения для треков со страницы друга:
  * бэкенд по 'search' сам создаёт meta для внешних треков.
  */
-const PLAYBACK_SOURCE = 'search';
+const PLAYBACK_SOURCE = PlaySourceListsEnum.SEARCH;
 
 export default defineComponent({
     name: 'FriendPage',

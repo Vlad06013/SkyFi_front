@@ -101,12 +101,13 @@ import TrackContextMenu from '@/components/track-menu/TrackContextMenu.vue';
 import usePlayerStore from '@/stores/player';
 
 import type {Track} from '@/types/TrackType';
+import {PlaySourceListsEnum} from '@/types/PlaySourceListsEnum';
 
 const player = usePlayerStore();
 
 const loadingTrackId = ref<number | null>(null);
 const openMenuTrackId = ref<string | null>(null);
-const sourceList = "uploads";
+const sourceList = PlaySourceListsEnum.UPLOAD;
 
 const emit = defineEmits<{
   play: [track: Track];

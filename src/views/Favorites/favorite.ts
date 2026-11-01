@@ -33,6 +33,7 @@ import type {Track} from '@/types/TrackType';
 import {getFavorites, updateFavoritesSort} from '@/api/favorites';
 
 import usePlayerStore from '@/stores/player';
+import {PlaySourceListsEnum} from '@/types/PlaySourceListsEnum';
 
 // ============================================
 // ТИПЫ
@@ -422,7 +423,10 @@ export function useLibrary() {
                 track.id,
             );
 
-            await player.playTrack(track);
+            await player.playTrack(
+                track,
+                PlaySourceListsEnum.FAVORITES,
+            );
 
             console.log(
                 '[Library] Вызов плеера завершён.',

@@ -3,6 +3,7 @@ import usePlayerStore from '@/stores/player';
 
 
 import {type Track as ApiTrack} from '@/types/TrackType';
+import {PlaySourceListsEnum} from '@/types/PlaySourceListsEnum';
 // import {getTracks} from '@/api/player';
 
 
@@ -224,7 +225,10 @@ export function useHome() {
 
     async function playTrack(track: ApiTrack): Promise<void> {
         try {
-            await player.playTrack(track);
+            await player.playTrack(
+                track,
+                PlaySourceListsEnum.SINGLE,
+            );
         } catch (error) {
             console.error(
                 'Ошибка воспроизведения трека:',

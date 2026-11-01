@@ -18,6 +18,7 @@ import {
 } from '@/api/playlists';
 
 import type { Track } from '@/types/TrackType';
+import { PlaySourceListsEnum } from '@/types/PlaySourceListsEnum';
 
 import usePlayerStore from '@/stores/player';
 
@@ -386,7 +387,10 @@ export function usePlaylists() {
 
             const firstTrack = playlist.tracks[0];
 
-            await player.playTrack(firstTrack);
+            await player.playTrack(
+                firstTrack,
+                PlaySourceListsEnum.PLAYLIST,
+            );
         } catch (err: unknown) {
             console.error(
                 '[Playlists] Ошибка воспроизведения плейлиста:',

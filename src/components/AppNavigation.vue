@@ -134,6 +134,8 @@ function handleNavClick(event: MouseEvent): void {
 
   background: #0b0d12;
   border-right: 1px solid #292d3b;
+
+  transition: width 0.2s ease;
 }
 
 /* =========================================
@@ -345,6 +347,66 @@ function handleNavClick(event: MouseEvent): void {
 .nav-link.router-link-exact-active {
   color: #c4b5fd;
   background: rgba(139, 92, 246, 0.15);
+}
+
+/* =========================================
+   ПЛАНШЕТЫ: КОМПАКТНАЯ ПАНЕЛЬ (ТОЛЬКО ИКОНКИ)
+========================================= */
+
+@media (max-width: 1050px) and (min-width: 701px) {
+  .app-navigation {
+    align-items: center;
+
+    width: 80px;
+
+    padding: 30px 12px;
+  }
+
+  /* От панели остаётся только логотип-иконка */
+
+  .nav-logo {
+    justify-content: center;
+
+    padding: 0;
+  }
+
+  .logo-text {
+    display: none;
+  }
+
+  .nav-links {
+    gap: 10px;
+  }
+
+  /* Пункты выстраиваются в колонку: иконка по центру */
+
+  .nav-link {
+    flex-direction: column;
+    justify-content: center;
+
+    gap: 6px;
+
+    padding: 12px 4px;
+  }
+
+  /*
+   * Текст прячем визуально, но оставляем доступным
+   * для скринридеров.
+   */
+
+  .nav-label {
+    position: absolute;
+
+    width: 1px;
+    height: 1px;
+
+    overflow: hidden;
+
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+
+    white-space: nowrap;
+  }
 }
 
 /* =========================================
