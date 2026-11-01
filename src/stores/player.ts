@@ -29,7 +29,6 @@ import {
 } from '@/api/player';
 
 import {
-    getPlayerQueue,
     addTrackToQueue,
     reorderPlayerQueue,
 } from '@/api/queue';
@@ -265,11 +264,11 @@ const usePlayerStore = defineStore('player', () => {
         }
 
         try {
-            await addTrackToQueue(Number(track.id));
+            // Ответ уже содержит очередь целиком —
+            // отдельно запрашивать её не нужно.
+            const items = await addTrackToQueue(track);
 
-            const response = await getPlayerQueue();
-
-            setQueue(response.data.map(item => item.track));
+            setQueue(items.map(item => item.track));
         } catch (error) {
             console.error(
                 '[Player] Не удалось добавить трек в очередь:',
@@ -475,31 +474,31 @@ const usePlayerStore = defineStore('player', () => {
     async function playTrackNext(track: Track): Promise<void> {
         if (!auth.user) return;
 
-        const trackId = Number(track.id);
-        if (!Number.isFinite(trackId) || trackId <= 0) return;
-
         try {
-            const added = await addTrackToQueue(trackId);
-            const response = await getPlayerQueue();
-            const items = [...response.data];
+            // Ответ уже содержит очередь целиком —
+            // отдельно запрашивать её не нужно.
+            const items = await addTrackToQueue(track);
 
-            const targetIndex = items.findIndex(
-                (item) => Number(item.id) === Number(added.item.id),
-            );
+            // Добавленный трек стоит последним (макс. position) —
+            // ставим его первым через reorder.
+            const target = [...items].sort(
+                (a, b) => b.position - a.position,
+            )[0];
 
-            if (targetIndex < 0) {
+            if (!target) {
                 throw new Error('Добавленный трек не найден в очереди.');
             }
 
-            const [target] = items.splice(targetIndex, 1);
-            items.unshift(target);
+            const orderedIds = [
+                target.id,
+                ...items
+                    .filter((item) => item.id !== target.id)
+                    .map((item) => item.id),
+            ];
 
-            const reordered = await reorderPlayerQueue(
-                items.map((item) => item.id),
-            );
+            const reordered = await reorderPlayerQueue(orderedIds);
 
-            const finalItems = reordered.data ?? items;
-            setQueue(finalItems.map((item) => item.track));
+            setQueue(reordered.map((item) => item.track));
         } catch (error) {
             console.error(
                 '[Player] Не удалось поставить трек следующим:',
