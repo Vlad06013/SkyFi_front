@@ -46,6 +46,10 @@ const usePlayerStore = defineStore('player', () => {
         artist: string;
         cover?: string;
         symbol?: string;
+        /** URL обложки из meta альбома, если есть. */
+        coverPath?: string | null;
+        /** Название альбома из meta, если есть. */
+        albumTitle?: string | null;
         source_id: string | null;
         source_type: string;
     };
@@ -289,29 +293,38 @@ const usePlayerStore = defineStore('player', () => {
     }
 
     function mapPlaybackTrack(track: Track): PlayerTrack {
+        const artists =
+            track.meta?.artists
+                ?.map((artist) => artist.name)
+                .join(', ') || '';
+
         return {
             id: track.id,
             title: track.title,
-            artist:
-                track.artists?.map((artist) => artist.name).join(', ') ||
-                'Неизвестный исполнитель',
+            artist: artists || 'Неизвестный исполнитель',
             cover: 'cover-purple',
             symbol: '♫',
+            coverPath: track.meta?.album?.cover_path ?? null,
+            albumTitle: track.meta?.album?.title ?? null,
             source_id: track.source_id,
             source_type: track.source_type,
         };
     }
 
     function getTrackDuration(track: Track): number {
-        // const duration = Number(
-        //     track.files?.find((file) => file.variant === 'original')
-        //         ?.duration_seconds ?? track.files?.[0]?.duration_seconds,
-        // );
+        const fromFile = Number(track.file?.duration_ms);
 
-        const duration = Number(track.file?.duration_seconds);
+        if (Number.isFinite(fromFile) && fromFile > 0) {
+            return fromFile / 1000;
+        }
 
+        const fromResource = Number(track.duration);
 
-        return Number.isFinite(duration) && duration > 0 ? duration : 0;
+        if (Number.isFinite(fromResource) && fromResource > 0) {
+            return fromResource / 1000;
+        }
+
+        return 0;
     }
 
     // ============================================

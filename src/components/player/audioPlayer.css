@@ -50,11 +50,22 @@
     width: 46px;
     height: 46px;
 
+    overflow: hidden;
+
     border-radius: 8px;
     color: #fff;
     font-size: 21px;
 
     background: linear-gradient(135deg, #7658bc, #32244e);
+}
+
+.mini-cover__img {
+    display: block;
+
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
 }
 
 .mini-empty {
@@ -742,10 +753,20 @@
     .player {
         gap: 12px;
         padding: 12px 16px;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr) auto auto;
     }
 
+    /*
+     * Правая зона компактная: только выбор устройства,
+     * слайдер громкости скрыт.
+     */
     .player-right {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .player-right .volume-control {
         display: none;
     }
 
@@ -784,7 +805,7 @@
 
         min-height: 68px;
 
-        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-columns: minmax(0, 1fr) auto auto;
         grid-template-rows: auto;
         gap: 8px;
 
@@ -840,7 +861,8 @@
     }
 
     .heart-button,
-    .queue-toggle {
+    .queue-toggle,
+    .now-playing .track-menu-wrap {
         display: none;
     }
 
@@ -877,8 +899,22 @@
         font-size: 13px;
     }
 
-    .progress-row,
+    .progress-row {
+        display: none;
+    }
+
+    /*
+     * Правая зона на телефоне: только выбор устройства
+     * (иконка подключённых устройств должна быть доступна всегда),
+     * слайдер громкости скрыт.
+     */
     .player-right {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+    }
+
+    .player-right .volume-control {
         display: none;
     }
 
@@ -1039,6 +1075,8 @@
 
     margin: 0 auto 18px;
 
+    overflow: hidden;
+
     border-radius: 16px;
 
     background: linear-gradient(145deg, #8b5cf6, #28223d);
@@ -1046,6 +1084,15 @@
 
     color: #fff;
     font-size: clamp(48px, 7vw, 70px);
+}
+
+.track-details-cover__img {
+    display: block;
+
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
 }
 
 .track-details-info {
@@ -1078,6 +1125,13 @@
     line-height: 1.4;
 }
 
+.track-details-text p.track-details-album {
+    margin-top: 3px;
+
+    color: #8f8aa0;
+    font-size: 11px;
+}
+
 .track-details-heart {
     display: grid;
     place-items: center;
@@ -1105,55 +1159,103 @@
     margin-bottom: 18px;
 }
 
-.track-details-range {
-    display: block;
+/* Кастомный ползунок перемотки */
+.seek-bar {
+    position: relative;
+    padding: 12px 0;
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
 
-    width: 100%;
-    height: 3px;
+.seek-bar--disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+}
 
-    margin: 0;
+.seek-bar__track {
+    position: relative;
+    height: 4px;
+    border-radius: 999px;
+    background: #393448;
+    overflow: visible;
+}
+
+.seek-bar__fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    border-radius: 999px;
+    background: #a78bfa;
+}
+
+.seek-bar__thumb {
+    position: absolute;
+    top: 50%;
+
+    width: 13px;
+    height: 13px;
+    margin: -6.5px 0 0 -6.5px;
+
+    border: 1px solid #ffffff2e;
+    border-radius: 50%;
+
+    background: #c4b2ff;
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s;
+}
+
+.seek-bar:hover .seek-bar__thumb,
+.seek-bar:focus-visible .seek-bar__thumb,
+.seek-bar--dragging .seek-bar__thumb {
+    opacity: 1;
+}
+
+.seek-bar:focus-visible {
+    border-radius: 8px;
+    outline: 2px solid #a78bfa80;
+    outline-offset: 4px;
+}
+
+/* Кнопки режимов (shuffle/repeat) в полноэкранном плеере */
+.track-details-mode {
+    position: relative;
+    display: grid;
+    place-items: center;
+
+    width: 36px;
+    height: 36px;
     padding: 0;
 
     border: 0;
-    border-radius: 999px;
+    border-radius: 50%;
 
-    appearance: none;
-    -webkit-appearance: none;
-
-    background: linear-gradient(
-            to right,
-            #a78bfa 0%,
-            #a78bfa var(--range-progress, 0%),
-            #393448 var(--range-progress, 0%),
-            #393448 100%
-    );
+    background: transparent;
+    color: #a5a0b8;
 
     cursor: pointer;
-    touch-action: pan-y;
+    transition:
+        color 0.2s,
+        background 0.2s;
 }
 
-.track-details-range::-webkit-slider-thumb {
-    appearance: none;
-    -webkit-appearance: none;
-
-    width: 10px;
-    height: 10px;
-
-    border: 1px solid #fff;
-    border-radius: 50%;
-
-    background: #a78bfa;
-    box-shadow: none;
+.track-details-mode:hover:not(:disabled) {
+    color: #d0c2ff;
+    background: #ffffff10;
 }
 
-.track-details-range::-moz-range-thumb {
-    width: 8px;
-    height: 8px;
+.track-details-mode:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
 
-    border: 1px solid #fff;
-    border-radius: 50%;
-
-    background: #a78bfa;
+.track-details-mode.mode-active {
+    color: #c4b5fd;
 }
 
 .track-details-times {
@@ -1201,9 +1303,18 @@
 
     background: #c4b5fd;
     color: #171323;
-    font-size: 23px;
 
     box-shadow: 0 8px 28px rgba(139, 92, 246, 0.22);
+}
+
+@keyframes player-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.track-details-play .loading-icon {
+    animation: player-spin 0.9s linear infinite;
 }
 
 .track-details-controls button:disabled,

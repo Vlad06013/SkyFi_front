@@ -11,7 +11,16 @@
           class="mini-cover"
           :class="player.currentTrack.cover"
       >
-        {{ player.currentTrack.symbol }}
+        <img
+            v-if="player.currentTrack.coverPath"
+            :src="player.currentTrack.coverPath"
+            alt=""
+            class="mini-cover__img"
+        >
+
+        <template v-else>
+          {{ player.currentTrack.symbol }}
+        </template>
       </div>
 
       <div v-else class="mini-cover mini-empty">
@@ -488,7 +497,19 @@
               aria-label="Закрыть плеер"
               @click="showTrackDetails = false"
           >
-            ✕
+            <svg
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
           </button>
 
           <span>СЕЙЧАС ИГРАЕТ</span>
@@ -499,7 +520,22 @@
               aria-label="Открыть очередь"
               @click="showQueue = true; showTrackDetails = false"
           >
-            ☷
+            <svg
+                viewBox="0 0 24 24"
+                width="19"
+                height="19"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+            >
+              <path d="M4 6h16" />
+              <path d="M4 12h16" />
+              <path d="M4 18h10" />
+              <path d="m17 16 3 2-3 2" />
+            </svg>
           </button>
         </header>
 
@@ -507,7 +543,16 @@
             class="track-details-cover"
             :class="player.currentTrack.cover"
         >
-          {{ player.currentTrack.symbol || '♫' }}
+          <img
+              v-if="player.currentTrack.coverPath"
+              :src="player.currentTrack.coverPath"
+              alt=""
+              class="track-details-cover__img"
+          >
+
+          <template v-else>
+            {{ player.currentTrack.symbol || '♫' }}
+          </template>
         </div>
 
         <div class="track-details-info">
@@ -515,6 +560,13 @@
             <h2>{{ player.currentTrack.title }}</h2>
             <p>
               {{ player.currentTrack.artist || 'Неизвестный исполнитель' }}
+            </p>
+
+            <p
+                v-if="player.currentTrack.albumTitle"
+                class="track-details-album"
+            >
+              {{ player.currentTrack.albumTitle }}
             </p>
           </div>
 
@@ -535,39 +587,44 @@
         </div>
 
         <div class="track-details-progress">
-          <input
-              class="track-details-range"
-              type="range"
-              min="0"
-              :max="Math.max(1, player.audioDuration)"
-              step="0.1"
-              :value="Math.min(
-            player.audioDuration,
-            Math.max(0, player.progress)
-          )"
-              :style="{
-            '--range-progress': `${player.progressPercent}%`
-          }"
+          <!--
+            Кастомный ползунок перемотки (pointer-driven):
+            нативный input[type=range] с appearance:none на тонком треке
+            в части браузеров перестаёт принимать pointer-события.
+          -->
+          <div
+              class="seek-bar"
+              :class="{
+                'seek-bar--dragging': seekDragging,
+                'seek-bar--disabled': seekDisabled,
+              }"
+              role="slider"
               aria-label="Перемотка трека"
-              :disabled="
-            !player.currentTrack ||
-            player.audioDuration <= 0 ||
-            player.isLoading
-          "
-              @pointerdown="player.isSeeking = true"
-              @input="
-            player.progress = Number(
-              ($event.target as HTMLInputElement).value
-            )
-          "
-              @change="
-            player.seekAudio(player.progress);
-            player.isSeeking = false
-          "
-          />
+              :aria-valuemin="0"
+              :aria-valuemax="Math.round(seekDuration)"
+              :aria-valuenow="Math.round(seekValue)"
+              :tabindex="seekDisabled ? -1 : 0"
+              @pointerdown="onSeekPointerDown"
+              @pointermove="onSeekPointerMove"
+              @pointerup="onSeekPointerUp"
+              @pointercancel="onSeekPointerCancel"
+              @keydown="onSeekKeyDown"
+          >
+            <div class="seek-bar__track">
+              <div
+                  class="seek-bar__fill"
+                  :style="{ width: `${seekPercent}%` }"
+              ></div>
+
+              <div
+                  class="seek-bar__thumb"
+                  :style="{ left: `${seekPercent}%` }"
+              ></div>
+            </div>
+          </div>
 
           <div class="track-details-times">
-            <span>{{ player.formatTime(player.progress) }}</span>
+            <span>{{ player.formatTime(seekValue) }}</span>
             <span>{{ player.formatTime(player.audioDuration) }}</span>
           </div>
         </div>
@@ -575,11 +632,47 @@
         <div class="track-details-controls">
           <button
               type="button"
+              class="track-details-mode"
+              :class="{ 'mode-active': player.isShuffleEnabled }"
+              :aria-pressed="player.isShuffleEnabled"
+              :disabled="player.isLoading"
+              aria-label="Случайный порядок"
+              @click="player.toggleShuffle()"
+          >
+            <svg
+                viewBox="0 0 24 24"
+                width="19"
+                height="19"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+            >
+              <path d="M16 3h5v5" />
+              <path d="M4 20L21 3" />
+              <path d="M21 16v5h-5" />
+              <path d="M15 15l6 6" />
+              <path d="M4 4l5 5" />
+            </svg>
+
+            <span
+                v-if="player.isShuffleEnabled"
+                class="shuffle-indicator"
+                aria-hidden="true"
+            ></span>
+          </button>
+
+          <button
+              type="button"
               aria-label="Предыдущий трек"
               :disabled="player.isLoading || !player.currentTrack"
               @click="player.playPrevious()"
           >
-            |◀
+            <svg viewBox="0 0 24 24" class="control-icon" aria-hidden="true">
+              <path d="M6 5v14M19 5 8 12l11 7V5Z" />
+            </svg>
           </button>
 
           <button
@@ -589,13 +682,33 @@
               :aria-label="player.isPlaying ? 'Пауза' : 'Воспроизвести'"
               @click="player.togglePlay()"
           >
-            {{
-              player.isLoading
-                  ? '…'
-                  : player.isPlaying
-                      ? 'Ⅱ'
-                      : '▶'
-            }}
+            <svg
+                v-if="player.isLoading"
+                class="control-icon loading-icon"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+            >
+              <circle cx="12" cy="12" r="9" />
+            </svg>
+
+            <svg
+                v-else-if="player.isPlaying"
+                class="control-icon"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+            >
+              <rect x="6" y="4" width="4" height="16" rx="1" />
+              <rect x="14" y="4" width="4" height="16" rx="1" />
+            </svg>
+
+            <svg
+                v-else
+                class="control-icon"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+            >
+              <path d="M7 4.5L20 12 7 19.5Z" />
+            </svg>
           </button>
 
           <button
@@ -604,7 +717,56 @@
               :disabled="player.isLoading || !player.currentTrack"
               @click="player.playNext()"
           >
-            ▶|
+            <svg viewBox="0 0 24 24" class="control-icon" aria-hidden="true">
+              <path d="M18 5v14M5 5l11 7-11 7V5Z" />
+            </svg>
+          </button>
+
+          <button
+              type="button"
+              class="track-details-mode"
+              :class="{ 'mode-active': player.repeatMode !== 'off' }"
+              :aria-pressed="player.repeatMode !== 'off'"
+              :disabled="player.isLoading"
+              :aria-label="
+                player.repeatMode === 'one'
+                    ? 'Повтор одного трека'
+                    : 'Повтор'
+              "
+              @click="player.toggleRepeatMode()"
+          >
+            <svg
+                viewBox="0 0 24 24"
+                width="19"
+                height="19"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+            >
+              <path d="m17 2 4 4-4 4" />
+              <path d="M3 11V9a3 3 0 0 1 3-3h15" />
+              <path d="m7 22-4-4 4-4" />
+              <path d="M21 13v2a3 3 0 0 1-3 3H3" />
+              <text
+                  v-if="player.repeatMode === 'one'"
+                  x="12"
+                  y="14"
+                  text-anchor="middle"
+                  font-size="9"
+                  font-weight="700"
+                  fill="currentColor"
+                  stroke="none"
+              >1</text>
+            </svg>
+
+            <span
+                v-if="player.repeatMode !== 'off'"
+                class="shuffle-indicator"
+                aria-hidden="true"
+            ></span>
           </button>
         </div>
 
@@ -635,13 +797,124 @@ const showQueue = ref(false);
 const showDeviceMenu = ref(false);
 const showTrackDetails = ref(false);
 
-const currentTrackNumericId = computed<number | null>(() => {
-  const id = player.currentTrack?.id;
+// ============================================
+// ПЕРЕМОТКА В ПОЛНОЭКРАННОМ ПЛЕЕРЕ
+// ============================================
 
-  return id != null && Number.isFinite(Number(id))
-      ? Number(id)
-      : null;
-});
+const seekDragging = ref(false);
+const seekDragValue = ref(0);
+
+const seekDuration = computed(() => Math.max(1, player.audioDuration));
+
+const seekValue = computed(() =>
+    seekDragging.value
+        ? seekDragValue.value
+        : Math.min(seekDuration.value, Math.max(0, player.progress)),
+);
+
+const seekPercent = computed(
+    () => (seekValue.value / seekDuration.value) * 100,
+);
+
+const seekDisabled = computed(
+    () =>
+        !player.currentTrack ||
+        player.audioDuration <= 0 ||
+        player.isLoading,
+);
+
+function updateSeekFromPointer(event: PointerEvent): void {
+    const target = event.currentTarget;
+
+    if (!(target instanceof HTMLElement)) {
+        return;
+    }
+
+    const rect = target.getBoundingClientRect();
+
+    if (rect.width <= 0) {
+        return;
+    }
+
+    const ratio = Math.min(
+        1,
+        Math.max(0, (event.clientX - rect.left) / rect.width),
+    );
+
+    seekDragValue.value = ratio * seekDuration.value;
+}
+
+function onSeekPointerDown(event: PointerEvent): void {
+    if (seekDisabled.value) {
+        return;
+    }
+
+    if (event.currentTarget instanceof HTMLElement) {
+        event.currentTarget.setPointerCapture(event.pointerId);
+    }
+
+    seekDragging.value = true;
+    player.isSeeking = true;
+    updateSeekFromPointer(event);
+}
+
+function onSeekPointerMove(event: PointerEvent): void {
+    if (!seekDragging.value) {
+        return;
+    }
+
+    updateSeekFromPointer(event);
+}
+
+function onSeekPointerUp(event: PointerEvent): void {
+    if (!seekDragging.value) {
+        return;
+    }
+
+    updateSeekFromPointer(event);
+    finishSeek();
+}
+
+function onSeekPointerCancel(): void {
+    if (!seekDragging.value) {
+        return;
+    }
+
+    // Отмена перетаскивания — возвращаем отображение к реальному прогрессу.
+    seekDragging.value = false;
+    player.isSeeking = false;
+}
+
+function finishSeek(): void {
+    const target = seekDragValue.value;
+
+    seekDragging.value = false;
+
+    void player.seekAudio(target);
+    player.isSeeking = false;
+}
+
+function onSeekKeyDown(event: KeyboardEvent): void {
+    if (seekDisabled.value) {
+        return;
+    }
+
+    const step = 5;
+    let value = seekValue.value;
+
+    if (event.key === 'ArrowRight') {
+        value = Math.min(seekDuration.value, value + step);
+    } else if (event.key === 'ArrowLeft') {
+        value = Math.max(0, value - step);
+    } else {
+        return;
+    }
+
+    event.preventDefault();
+
+    player.isSeeking = true;
+    void player.seekAudio(value);
+}
 
 async function selectDevice(deviceId: number): Promise<void> {
   await player.switchDevice(deviceId);
@@ -667,20 +940,6 @@ watch(
     },
 );
 
-function onProgressInput(event: Event): void {
-  const target = event.target as HTMLInputElement;
-
-  player.progress = Number(target.value);
-  player.isSeeking = true;
-}
-
-function onProgressChange(event: Event): void {
-  const target = event.target as HTMLInputElement;
-
-  player.progress = Number(target.value);
-  player.seekAudio(player.progress);
-  player.isSeeking = false;
-}
 import type { TrackType } from '@/types/TrackType';
 function handleTrackMenuAction(
     track: TrackType,

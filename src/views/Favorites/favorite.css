@@ -831,6 +831,35 @@ h3 {
     font-size: 25px;
 }
 
+/* Кнопка-обложка: без браузерных padding/border, иначе под обложкой остаётся отступ */
+.uploaded-track-play {
+    display: block;
+    flex-shrink: 0;
+
+    padding: 0;
+    border: 0;
+
+    border-radius: 12px;
+    background: transparent;
+
+    line-height: 0;
+    font: inherit;
+
+    cursor: pointer;
+}
+
+/* Обложка растягивается на всю кнопку */
+.track-cover {
+    display: block;
+
+    width: 100%;
+    height: 100%;
+
+    border-radius: inherit;
+
+    object-fit: cover;
+}
+
 .cover > ion-icon {
     transition:
             opacity 0.2s,
