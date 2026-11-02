@@ -244,7 +244,6 @@ export function useSearch() {
         try {
             const response = await searchTracks(term, 20);
             console.log('[Search] Ответ API:', response);
-            console.log('[Search] Найдено треков:', response.data.length);
 
             // Игнорируем устаревшие ответы.
             if (requestId !== searchRequestId) {
@@ -384,7 +383,7 @@ export function useSearch() {
 
         try {
             if (isFavorite(trackId)) {
-                await removeFavorite(trackId);
+                await removeFavorite(track);
 
                 const ids = new Set(
                     favoriteTrackIds.value,
@@ -394,7 +393,7 @@ export function useSearch() {
 
                 favoriteTrackIds.value = ids;
             } else {
-                await addFavorite(trackId);
+                await addFavorite(track);
 
                 const ids = new Set(
                     favoriteTrackIds.value,

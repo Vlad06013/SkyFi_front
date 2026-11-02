@@ -53,13 +53,17 @@ export async function getFavorites(): Promise<Track[]> {
 
 /**
  * Проверить, находится ли трек в избранном.
+ *
+ * Единый контракт: бэкенд ищет внешний трек по (source_type, source_id),
+ * трек при этом не создаётся.
  */
-export async function checkFavorite(trackId: number): Promise<{
+export async function checkFavorite(track: Track): Promise<{
     is_favorite: boolean;
-    track_id: number;
+    track_id: number | null;
 }> {
-    const response = await http.get(
-        `/favorites/${trackId}/check`,
+    const response = await http.post(
+        '/favorites/check',
+        {track},
     );
 
     return response.data;
@@ -67,29 +71,36 @@ export async function checkFavorite(trackId: number): Promise<{
 
 /**
  * Удалить трек из избранного.
+ *
+ * Единый контракт: работает и с внешним треком поиска.
  */
-export async function removeFavorite(trackId: number): Promise<{
+export async function removeFavorite(track: Track): Promise<{
     message: string;
     is_favorite: boolean;
-    track_id: number;
+    track_id: number | null;
 }> {
     const response = await http.delete(
-        `/favorites/${trackId}`,
+        '/favorites',
+        {data: {track}},
     );
 
     return response.data;
 }
 
 /**
- * Добавить трек SkyFi в избранное.
+ * Добавить трек в избранное.
+ *
+ * Единый контракт: бэкенд сам сохранит внешний трек (поиск),
+ * если его ещё нет в базе, и вернёт его DB id.
  */
-export async function addFavorite( trackId: number): Promise<{
+export async function addFavorite(track: Track): Promise<{
     message: string;
     is_favorite: boolean;
     track_id: number;
 }> {
     const response = await http.post(
-        `/favorites/${trackId}`,
+        '/favorites',
+        {track},
     );
 
     return response.data;

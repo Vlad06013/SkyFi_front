@@ -74,6 +74,10 @@ const usePlayerStore = defineStore('player', () => {
     const currentTrackIndex = ref(-1);
     const currentTrack = ref<PlayerTrack | null>(null);
 
+    /** Полный трек текущего воспроизведения (с meta и source_id) —
+     *  нужен для запросов по единому контракту (избранное). */
+    const currentSourceTrack = ref<Track | null>(null);
+
     /** Список-источник, из которого запущен текущий трек.
      *  null, пока источник неизвестен: заполняется из play_source
      *  серверного состояния или при запуске трека из списка. */
@@ -566,6 +570,7 @@ const usePlayerStore = defineStore('player', () => {
 
         currentQueueItemId = options.queueItemId ?? null;
         currentTrack.value = mapPlaybackTrack(track);
+        currentSourceTrack.value = track;
         currentTrackIndex.value = findTrackIndex(track);
         audioDuration.value = getTrackDuration(track);
 
@@ -849,27 +854,31 @@ const usePlayerStore = defineStore('player', () => {
     // ============================================
 
     async function updateFavoriteState(
-        trackId: number | string | null,
+        track?: Track | null,
     ): Promise<void> {
         const requestId = ++favoriteCheckRequestId;
 
-        const numericTrackId = Number(trackId);
+        const targetTrack =
+            track ??
+            currentSourceTrack.value ??
+            queue.value.find(
+                (item) =>
+                    String(item.id)
+                    === String(currentTrack.value?.id),
+            );
 
-        if (
-            !Number.isSafeInteger(numericTrackId) ||
-            numericTrackId <= 0 ||
-            !auth.user
-        ) {
+        if (!targetTrack || !auth.user) {
             liked.value = false;
             return;
         }
 
         try {
-            const response = await checkFavorite(numericTrackId);
+            const response = await checkFavorite(targetTrack);
 
             if (
                 requestId !== favoriteCheckRequestId ||
-                String(currentTrack.value?.id) !== String(trackId)
+                String(currentTrack.value?.id)
+                !== String(targetTrack.id)
             ) {
                 return;
             }
@@ -889,7 +898,14 @@ const usePlayerStore = defineStore('player', () => {
         track?: Track,
         isFavorite?: boolean,
     ): Promise<void> {
-        const targetTrack = track ?? currentTrack.value;
+        const targetTrack =
+            track ??
+            currentSourceTrack.value ??
+            queue.value.find(
+                (item) =>
+                    String(item.id)
+                    === String(currentTrack.value?.id),
+            );
 
         if (!targetTrack) {
             return;
@@ -902,9 +918,6 @@ const usePlayerStore = defineStore('player', () => {
             return;
         }
 
-        const isCurrentTrack =
-            String(currentTrack.value?.id) === String(targetTrack.id);
-
         const currentFavoriteState = track
             ? isFavorite
             : liked.value;
@@ -912,29 +925,20 @@ const usePlayerStore = defineStore('player', () => {
 
         if (currentFavoriteState === undefined) return;
 
-        // Для текущего трека сохраняем защиту плеера.
-        if (!track && favoriteLoading.value) return;
-
-
         const requestId = ++favoriteToggleRequestId;
-        const trackId = Number(targetTrack.id);
-
-        if (!Number.isSafeInteger(trackId) || trackId <= 0) {
-            return;
-        }
 
         if (!track) favoriteLoading.value = true;
 
         try {
             const response = currentFavoriteState
-                ? await removeFavorite(trackId)
-                : await addFavorite(trackId);
+                ? await removeFavorite(targetTrack)
+                : await addFavorite(targetTrack);
 
             if (requestId !== favoriteToggleRequestId) return;
 
             if (
-                isCurrentTrack &&
-                String(currentTrack.value?.id) === String(trackId)
+                String(currentTrack.value?.id)
+                === String(targetTrack.id)
             ) {
                 liked.value = response.is_favorite;
             }
@@ -982,7 +986,7 @@ const usePlayerStore = defineStore('player', () => {
                 return;
             }
 
-            void updateFavoriteState(trackId);
+            void updateFavoriteState();
         },
     );
 
@@ -1559,42 +1563,6 @@ const usePlayerStore = defineStore('player', () => {
     // Логика переключения оставлена без изменений.
     // ============================================
 
-    async function loadDevices(): Promise<void> {
-        if (!auth.user) {
-            devices.value = [];
-            activeDeviceId.value = null;
-            localDeviceId.value = null;
-            return;
-        }
-
-        isDevicesLoading.value = true;
-
-        try {
-            const response = await getPlayerDevices();
-            devices.value = response.data;
-
-            const activeDevice = devices.value.find(
-                (device) => device.is_active,
-            );
-
-            activeDeviceId.value = activeDevice?.id ?? null;
-
-            const localDevice = devices.value.find(
-                (device) => device.device_uuid === getDeviceUuid(),
-            );
-
-            localDeviceId.value = localDevice?.id ?? null;
-
-            if (!isLocalDeviceActive.value) {
-                stopLocalPlayback();
-            }
-        } catch (error) {
-            console.error('[Player] Не удалось загрузить устройства:', error);
-        } finally {
-            isDevicesLoading.value = false;
-        }
-    }
-
     async function initializePlayerDevice(): Promise<void> {
         if (!auth.user) return;
 
@@ -1627,7 +1595,7 @@ const usePlayerStore = defineStore('player', () => {
                 }
 
                 localDeviceId.value = currentDevice.id;
-                let commandId = createCommandId()
+                const commandId = createCommandId();
 
                 const activeDevice = devices.value.find(
                     (device) => device.is_active,
@@ -1663,7 +1631,7 @@ const usePlayerStore = defineStore('player', () => {
         ) {
             return;
         }
-        let commandId = createCommandId();
+        const commandId = createCommandId();
         deviceSwitchLoading.value = true;
 
         try {
@@ -1775,6 +1743,7 @@ const usePlayerStore = defineStore('player', () => {
 
         if (!track) {
             currentTrack.value = null;
+            currentSourceTrack.value = null;
             currentTrackIndex.value = -1;
             progress.value = 0;
             audioDuration.value = 0;
@@ -1794,12 +1763,9 @@ const usePlayerStore = defineStore('player', () => {
             requestedTrackId !== undefined &&
             Number(requestedTrackId) === Number(track.id);
         currentTrack.value = mapPlaybackTrack(track);
+        currentSourceTrack.value = track;
         currentTrackIndex.value = findTrackIndex(track);
         audioDuration.value = getTrackDuration(track);
-
-        const sourceMissing =
-            !audio.src || audio.src === window.location.href;
-
 
         if (trackChanged) {
             liked.value = false;
