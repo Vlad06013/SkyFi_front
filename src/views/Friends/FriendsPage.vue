@@ -227,6 +227,69 @@
                 </section>
 
                 <!-- =====================================
+                     ПОДЕЛИЛИСЬ СО МНОЙ
+                ====================================== -->
+                <section
+                    v-if="friendsStore.trackShares.length"
+                    class="friends-section"
+                >
+                    <div class="section-heading">
+                        <h2>Поделились со мной</h2>
+
+                        <span class="count-badge">
+                            {{ friendsStore.trackShares.length }}
+                        </span>
+                    </div>
+
+                    <ul class="friends-list">
+                        <li
+                            v-for="share in friendsStore.trackShares"
+                            :key="share.id"
+                            class="friend-row friend-row--clickable"
+                            @click="playSharedTrack(share)"
+                        >
+                            <div class="friend-avatar">♫</div>
+
+                            <div class="friend-info">
+                                <div class="friend-name">
+                                    {{ share.track.title }}
+                                </div>
+
+                                <div class="friend-sub">
+                                    {{
+                                        share.track.meta?.artists
+                                            ?.map(artist => artist.name)
+                                            .join(', ')
+                                        || 'Неизвестный исполнитель'
+                                    }}
+                                    · от {{ share.sender.name }}
+                                </div>
+                            </div>
+
+                            <div class="friend-actions">
+                                <button
+                                    type="button"
+                                    class="action-button action-button--primary"
+                                    @click.stop="playSharedTrack(share)"
+                                >
+                                    <ion-icon :icon="playOutline" />
+                                    Слушать
+                                </button>
+
+                                <button
+                                    type="button"
+                                    class="action-button"
+                                    @click.stop="friendsStore.removeTrackShare(share.id)"
+                                >
+                                    <ion-icon :icon="trashOutline" />
+                                    Убрать
+                                </button>
+                            </div>
+                        </li>
+                    </ul>
+                </section>
+
+                <!-- =====================================
                      ДРУЗЬЯ
                 ====================================== -->
                 <section class="friends-section">

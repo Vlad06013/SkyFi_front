@@ -147,51 +147,6 @@ export async function seekRemotePlayback(
     return response.data;
 }
 
-/**
- * Переключить на следующий трек.
- *
- * POST /player/next
- */
-export async function nextRemoteTrack(
-    reason: 'manual' | 'ended' = 'manual',
-    meta?: {
-        origin_device_id: number | null;
-        command_id: string;
-    },
-): Promise<PlayerStateResponse> {
-    const response = (await http.post<ApiResponse<PlayerStateResponse>>(
-        '/player/next',
-        {
-            reason,
-            ...meta,
-        },
-    )).data;
-
-    return response.data;
-}
-
-
-/**
- * Переключить на предыдущий трек.
- *
- * POST /player/previous
- */
-export async function previousRemoteTrack(
-    meta?: {
-        origin_device_id: number | null;
-        command_id: string;
-    },
-): Promise<PlayerStateResponse> {
-    const response = (await http.post<ApiResponse<PlayerStateResponse>>(
-        '/player/previous',
-        {
-            ...meta
-        },
-    )).data;
-
-    return response.data;
-}
-
 
 // ============================================
 // ГЛОБАЛЬНЫЙ ПЛЕЕР: УСТРОЙСТВА
@@ -215,6 +170,9 @@ export async function getPlayerDevices(): Promise<{
 /**
  * Зарегистрировать устройство.
  *
+ * Ответ: BaseResponseResource поверх PlayerDeviceResource —
+ * поля устройства лежат в data напрямую.
+ *
  * POST /player/devices
  */
 export async function registerPlayerDevice(
@@ -224,16 +182,13 @@ export async function registerPlayerDevice(
         origin_device_id: string;
         command_id: string;
     },
-): Promise<{
-    message: string;
-    device: PlayerDevice;
-}> {
-    const response = await http.post(
+): Promise<PlayerDevice> {
+    const response = await http.post<ApiResponse<PlayerDevice>>(
         '/player/devices',
         device,
     );
 
-    return response.data;
+    return response.data.data;
 }
 
 /**
@@ -255,6 +210,19 @@ export async function activatePlayerDevice(
     )).data;
 
     return response.data;
+}
+
+/**
+ * Отметить устройство активным (heartbeat).
+ *
+ * POST /player/devices/heartbeat
+ */
+export async function sendPlayerHeartbeat(
+    deviceUuid: string,
+): Promise<void> {
+    await http.post('/player/devices/heartbeat', {
+        device_uuid: deviceUuid,
+    });
 }
 
 /**

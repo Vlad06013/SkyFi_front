@@ -32,10 +32,17 @@ export async function getPlayerQueue(): Promise<PlaybackQueueItem[]> {
  */
 export async function addTrackToQueue(
     track: Track,
+    meta?: {
+        origin_device_id: number | null;
+        command_id: string;
+    },
 ): Promise<PlaybackQueueItem[]> {
     const response = await http.post<QueueListResponse>(
         '/player/queue',
-        track,
+        {
+            ...track,
+            ...meta,
+        },
     );
 
     return response.data.data;

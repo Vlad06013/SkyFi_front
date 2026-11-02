@@ -3,6 +3,8 @@
     <AppNavigation />
 
     <ion-content class="vibe-content">
+      <ProfileMenu floating />
+
       <div class="vibe-blobs" aria-hidden="true">
         <span class="vibe-blob vibe-blob-yellow" />
         <span class="vibe-blob vibe-blob-purple" />
@@ -10,15 +12,6 @@
       </div>
 
       <div class="vibe-page">
-        <header class="vibe-topbar">
-          <div class="vibe-brand">
-            <span class="vibe-brand-mark">♫</span>
-            <strong>SkyFi</strong>
-          </div>
-
-          <ProfileMenu />
-        </header>
-
         <section class="vibe-hero">
           <template v-if="!heroDisplay">
             <h1 class="vibe-logo">
@@ -39,6 +32,13 @@
               />
               <ion-icon v-else :icon="playOutline" />
             </button>
+
+            <p
+                v-if="waveLoading && !player.waveMode"
+                class="vibe-loading"
+            >
+              Загружаем волну…
+            </p>
           </template>
 
           <template v-else>
@@ -86,15 +86,7 @@
         </section>
 
         <div
-            v-if="waveLoading && !player.waveMode && !heroDisplay"
-            class="vibe-state"
-        >
-          <ion-spinner name="crescent" />
-          <p>Загружаем волну…</p>
-        </div>
-
-        <div
-            v-else-if="waveError && !player.waveMode && !heroDisplay"
+            v-if="waveError && !player.waveMode && !heroDisplay"
             class="vibe-state vibe-error"
         >
           <p>{{ waveError }}</p>
@@ -210,32 +202,14 @@ const {
   min-height: 100%;
   max-width: 560px;
   margin: 0 auto;
-  padding: 16px 24px 140px;
+  padding: 72px 24px 140px;
 }
 
-.vibe-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8vh;
-}
-
-.vibe-brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #f5f3fa;
-  font-size: 16px;
-}
-
-.vibe-brand-mark {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: linear-gradient(145deg, #ffd633, #b8860b);
-  color: #16130a;
+/* Кнопка профиля на волне — крупнее стандартной. */
+.vibe-content :deep(.profile-button) {
+  width: 50px;
+  height: 50px;
+  font-size: 18px;
 }
 
 /* ---------- ЦЕНТРАЛЬНЫЙ БЛОК ---------- */
@@ -375,6 +349,13 @@ const {
   height: 68px;
   margin-top: 0;
   font-size: 30px;
+}
+
+/* Подпись под кнопкой во время загрузки выдачи. */
+.vibe-loading {
+  margin: 18px 0 0;
+  color: #9295a8;
+  font-size: 13px;
 }
 
 /* ---------- СОСТОЯНИЯ ---------- */

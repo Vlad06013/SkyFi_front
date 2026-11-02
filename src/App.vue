@@ -17,8 +17,9 @@ const auth = useAuthStore();
 </script>
 
 <style>
-/* Тосты уведомлений о заявках в друзья (рендерятся вне scoped-области). */
-.friends-toast {
+/* Тосты уведомлений (рендерятся вне scoped-области). */
+.friends-toast,
+.player-toast {
   --background: #1d1b29;
   --color: #f4f4fa;
   --border-radius: 12px;

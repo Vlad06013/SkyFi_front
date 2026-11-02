@@ -37,3 +37,14 @@ export interface FriendNowPlaying {
     is_playing: boolean;
     track: import('@/types/TrackType').Track | null;
 }
+
+/** Трек, которым поделились с текущим пользователем. */
+export interface TrackShareItem {
+    id: number;
+    sender: {
+        id: number;
+        name: string;
+    };
+    track: import('@/types/TrackType').Track;
+    created_at: string | null;
+}

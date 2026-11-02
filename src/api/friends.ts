@@ -5,14 +5,19 @@ import type {
     FriendNowPlaying,
     FriendProfile,
     Friendship,
+    TrackShareItem,
     UserSearchResult,
 } from '@/types/FriendshipType';
 
 /**
  * Список друзей (принятые заявки).
+ * Необязательный поиск по имени собеседника (ilike на бэке).
  */
-export async function getFriends(): Promise<Friendship[]> {
-    const response = await http.get<ApiResponse<Friendship[]>>('/friends');
+export async function getFriends(query?: string): Promise<Friendship[]> {
+    const response = await http.get<ApiResponse<Friendship[]>>(
+        '/friends',
+        {params: query?.trim() ? {q: query.trim()} : {}},
+    );
     return response.data.data;
 }
 
@@ -119,4 +124,35 @@ export async function addTrackToFriendQueue(
         track,
     );
     return response.data.data;
+}
+
+/**
+ * Поделиться треком с другом: шара + нотификатор получателю.
+ */
+export async function shareTrackWithFriend(
+    userId: number,
+    track: Track,
+): Promise<{ message: string }> {
+    const response = await http.post<ApiResponse<{ message: string }>>(
+        `/friends/${userId}/share`,
+        track,
+    );
+    return response.data.data;
+}
+
+/**
+ * Треки, которыми поделились с текущим пользователем (свежие сверху).
+ */
+export async function getTrackShares(): Promise<TrackShareItem[]> {
+    const response = await http.get<ApiResponse<TrackShareItem[]>>(
+        '/shares',
+    );
+    return response.data.data;
+}
+
+/**
+ * Убрать шару из списка.
+ */
+export async function deleteTrackShare(shareId: number): Promise<void> {
+    await http.delete(`/shares/${shareId}`);
 }

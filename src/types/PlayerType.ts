@@ -1,4 +1,5 @@
 import {Track} from "@/types/TrackType";
+import {PlaybackQueueItem} from "@/types/QueueType";
 
 
 export type PlayerDeviceType =
@@ -36,6 +37,9 @@ export interface PlaybackState {
 
     /** Источник списка, из которого играет трек (favorites, search, ...). */
     play_source?: string;
+
+    /** Очередь воспроизведения (приходит в broadcast-состоянии). */
+    queue?: PlaybackQueueItem[];
 
     version: number;
 

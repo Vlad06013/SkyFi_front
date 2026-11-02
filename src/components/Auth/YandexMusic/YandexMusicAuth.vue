@@ -132,6 +132,7 @@ import {
   getYandexMusicDeviceAuthStatus,
   disconnectYandexMusic,
 } from '@/api/auth';
+import { yandexMusicConnected } from '@/lib/yandexConnection';
 
 const emit = defineEmits<{
   connected: [];
@@ -164,6 +165,7 @@ async function checkExistingConnection(): Promise<void> {
 
     if (result.connected || result.status === 'connected') {
       connected.value = true;
+      yandexMusicConnected.value = true;
       emit('connected');
       return;
     }
@@ -240,6 +242,7 @@ async function pollStatus(): Promise<void> {
       connected.value = true;
       authStarted.value = false;
       successMessage.value = 'Яндекс Музыка успешно подключена.';
+      yandexMusicConnected.value = true;
       emit('connected');
       return;
     }
@@ -317,6 +320,7 @@ async function disconnect(): Promise<void> {
     authStarted.value = false;
     verificationUrl.value = '';
     userCode.value = '';
+    yandexMusicConnected.value = false;
     emit('disconnected');
   } catch (e: unknown) {
     if (!disposed) {

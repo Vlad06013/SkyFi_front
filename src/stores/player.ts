@@ -1,5 +1,6 @@
 import {computed, ref, watch} from 'vue';
 import {defineStore} from 'pinia';
+import {toastController} from '@ionic/vue';
 import echo from '@/lib/echo';
 import {useAuthStore} from '@/stores/auth';
 
@@ -28,16 +29,16 @@ import {
     pauseRemotePlayback,
     resumeRemotePlayback,
     seekRemotePlayback,
-    nextRemoteTrack,
-    previousRemoteTrack,
     updatePlaybackOptions,
     getPlayerDevices,
     registerPlayerDevice,
     activatePlayerDevice,
+    sendPlayerHeartbeat,
 } from '@/api/player';
 
 import {
     addTrackToQueue,
+    getPlayerQueue,
     reorderPlayerQueue,
     updateQueueItemStatus,
 } from '@/api/queue';
@@ -73,6 +74,9 @@ const usePlayerStore = defineStore('player', () => {
     const activeDeviceId = ref<number | null>(null);
     const isDevicesLoading = ref(false);
     const deviceSwitchLoading = ref(false);
+
+    /** Когда этот клиент в последний раз удачно стучался heartbeat-ом. */
+    const lastOwnHeartbeatAt = ref(Date.now());
 
     const playbackState = ref<PlaybackState | null>(null);
     const queue = ref<Track[]>([]);
@@ -188,12 +192,152 @@ const usePlayerStore = defineStore('player', () => {
 
     let deviceInitializationPromise: Promise<void> | null = null;
     let isDeviceChangesSubscribed = false;
+    /** Канал Echo, на который оформлена текущая подписка. */
+    let subscribedChannelName: string | null = null;
+    let deviceHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
     let serverProgressTimer: ReturnType<typeof setInterval> | null = null;
     let lastAppliedVersion: number | null = null;
 
     function setServerQueueCount(count: number): void {
         serverQueueCount.value = count;
     }
+
+    // ============================================
+    // УВЕДОМЛЕНИЯ
+    // ============================================
+
+    async function showPlayerToast(message: string): Promise<void> {
+        const toast = await toastController.create({
+            message,
+            duration: 4000,
+            position: 'top',
+            cssClass: 'player-toast',
+        });
+
+        await toast.present();
+    }
+
+    function getTrackArtistLine(track: Track): string {
+        const artists =
+            track.meta?.artists?.map((artist) => artist.name).join(', ');
+
+        return artists || 'Неизвестный исполнитель';
+    }
+
+    // ============================================
+    // HEARTBEAT УСТРОЙСТВА
+    //
+    // Фронт периодически отмечает устройство активным,
+    // чтобы бэкенд и другие клиенты видели, какие
+    // устройства онлайн. На закрытии вкладки —
+    // последний keepalive-запрос через pagehide.
+    // ============================================
+
+    const DEVICE_HEARTBEAT_INTERVAL_MS = 45_000;
+
+    /** Устройство онлайн, если heartbeat был не позже этого порога. */
+    const DEVICE_ONLINE_THRESHOLD_MS = 90_000;
+
+    function isDeviceOnline(device: PlayerDevice): boolean {
+        // Свою метку знаем локально — серверный last_seen_at в списке
+        // для своего устройства всегда немного отстаёт.
+        if (device.id === localDeviceId.value) {
+            return (
+                Date.now() - lastOwnHeartbeatAt.value <
+                DEVICE_ONLINE_THRESHOLD_MS
+            );
+        }
+
+        if (!device.last_seen_at) return false;
+
+        const lastSeenAt = new Date(device.last_seen_at).getTime();
+
+        if (!Number.isFinite(lastSeenAt)) return false;
+
+        return (
+            Date.now() - lastSeenAt < DEVICE_ONLINE_THRESHOLD_MS
+        );
+    }
+
+    let heartbeatTickCount = 0;
+
+    async function beatDeviceHeart(): Promise<void> {
+        if (!auth.user) return;
+
+        try {
+            await sendPlayerHeartbeat(getDeviceUuid());
+        } catch (error) {
+            console.warn('[Player] Heartbeat не отправлен:', error);
+            return;
+        }
+
+        lastOwnHeartbeatAt.value = Date.now();
+
+        // Свежую мету сразу отражаем в своей записи списка.
+        devices.value = devices.value.map((device) =>
+            device.id === localDeviceId.value
+                ? {...device, last_seen_at: new Date().toISOString()}
+                : device,
+        );
+
+        // Раз в несколько ударов подтягиваем список устройств —
+        // чтобы чужие last_seen_at обновлялись и бейджи онлайна
+        // не требовали перезагрузки страницы.
+        heartbeatTickCount += 1;
+
+        if (heartbeatTickCount % 4 !== 0) return;
+
+        try {
+            const response = await getPlayerDevices();
+            devices.value = response.data;
+        } catch (error) {
+            console.warn(
+                '[Player] Не удалось обновить список устройств:',
+                error,
+            );
+        }
+    }
+
+    function stopDeviceHeartbeat(): void {
+        if (deviceHeartbeatTimer !== null) {
+            clearInterval(deviceHeartbeatTimer);
+            deviceHeartbeatTimer = null;
+        }
+    }
+
+    function startDeviceHeartbeat(): void {
+        stopDeviceHeartbeat();
+
+        if (!auth.user) return;
+
+        heartbeatTickCount = 0;
+        lastOwnHeartbeatAt.value = Date.now();
+
+        deviceHeartbeatTimer = setInterval(() => {
+            void beatDeviceHeart();
+        }, DEVICE_HEARTBEAT_INTERVAL_MS);
+    }
+
+    window.addEventListener('pagehide', () => {
+        if (!auth.user) return;
+
+        const token = localStorage.getItem('skyfi_token');
+
+        void fetch(
+            `${import.meta.env.VITE_API_URL}player/devices/heartbeat`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token
+                        ? {Authorization: `Bearer ${token}`}
+                        : {}),
+                },
+                body: JSON.stringify({device_uuid: getDeviceUuid()}),
+                keepalive: true,
+            },
+        ).catch(() => undefined);
+    });
 
     // ============================================
     // ПРОГРЕСС ВОСПРОИЗВЕДЕНИЯ
@@ -206,6 +350,11 @@ const usePlayerStore = defineStore('player', () => {
         }
     }
 
+    /** Как часто активное устройство отдаёт реальную позицию на сервер. */
+    const POSITION_SYNC_INTERVAL_S = 10;
+
+    let positionSyncAccum = 0;
+
     function startServerProgressTimer(): void {
         stopServerProgressTimer();
 
@@ -214,6 +363,7 @@ const usePlayerStore = defineStore('player', () => {
         }
 
         let lastTick = Date.now();
+        positionSyncAccum = 0;
 
 
         serverProgressTimer = setInterval(() => {
@@ -235,9 +385,28 @@ const usePlayerStore = defineStore('player', () => {
                     audioDuration.value = audio.duration;
                 }
 
+                // Периодически отдаём реальную позицию на сервер:
+                // остальные устройства подтягивают к ней свои
+                // прогресс-бары, а сервер хранит точную позицию
+                // для восстановления после перезагрузки.
+                positionSyncAccum += elapsed;
+
+                if (positionSyncAccum >= POSITION_SYNC_INTERVAL_S) {
+                    positionSyncAccum = 0;
+                    reportSeek(audio.currentTime || progress.value);
+                }
+
                 return;
             }
-            const nextProgress = Math.max(0, progress.value + elapsed);
+
+            let nextProgress = Math.max(0, progress.value + elapsed);
+
+            if (
+                audioDuration.value > 0 &&
+                nextProgress > audioDuration.value
+            ) {
+                nextProgress = audioDuration.value;
+            }
 
             if (progress.value > 0 && nextProgress === 0) {
                 console.trace('[Player] Прогресс неожиданно сброшен');
@@ -352,10 +521,17 @@ const usePlayerStore = defineStore('player', () => {
         try {
             // Ответ уже содержит очередь целиком —
             // отдельно запрашивать её не нужно.
-            const items = await addTrackToQueue(track);
+            const items = await addTrackToQueue(
+                track,
+                createSyncMeta(),
+            );
 
             serverQueue.value = items;
             setServerQueueCount(items.length);
+
+            void showPlayerToast(
+                `В очередь добавлено: ${track.title} — ${getTrackArtistLine(track)}`,
+            );
         } catch (error) {
             console.error(
                 '[Player] Не удалось добавить трек в очередь:',
@@ -363,6 +539,25 @@ const usePlayerStore = defineStore('player', () => {
             );
 
             throw error;
+        }
+    }
+
+    /**
+     * Подтянуть очередь с сервера (после событий сокета).
+     */
+    async function refreshServerQueue(): Promise<void> {
+        if (!auth.user) return;
+
+        try {
+            const items = await getPlayerQueue();
+
+            serverQueue.value = items;
+            setServerQueueCount(items.length);
+        } catch (error) {
+            console.warn(
+                '[Player] Не удалось обновить очередь:',
+                error,
+            );
         }
     }
 
@@ -392,15 +587,29 @@ const usePlayerStore = defineStore('player', () => {
     }
 
     function getTrackDuration(track: Track): number {
+        // Длительность меньше секунды считаем отсутствующей:
+        // раньше в meta попадал boolean (1 мс) — такие записи
+        // бэкенд подлечивает при повторном запуске трека.
+        const saneMs = (value: number): boolean =>
+            Number.isFinite(value) && value >= 1000;
+
         const fromFile = Number(track.file?.duration_ms);
 
-        if (Number.isFinite(fromFile) && fromFile > 0) {
+        if (saneMs(fromFile)) {
             return fromFile / 1000;
+        }
+
+        // Длительность на верхнем уровне трека (состояние плеера):
+        // у внешних треков file может отсутствовать целиком.
+        const fromState = Number(track.duration_ms);
+
+        if (saneMs(fromState)) {
+            return fromState / 1000;
         }
 
         const fromResource = Number(track.duration);
 
-        if (Number.isFinite(fromResource) && fromResource > 0) {
+        if (saneMs(fromResource)) {
             return fromResource / 1000;
         }
 
@@ -1278,7 +1487,10 @@ const usePlayerStore = defineStore('player', () => {
         try {
             // Ответ уже содержит очередь целиком —
             // отдельно запрашивать её не нужно.
-            const items = await addTrackToQueue(track);
+            const items = await addTrackToQueue(
+                track,
+                createSyncMeta(),
+            );
 
             // Добавленный трек стоит последним (макс. position) —
             // ставим его первым через reorder.
@@ -1301,6 +1513,10 @@ const usePlayerStore = defineStore('player', () => {
 
             serverQueue.value = reordered;
             setServerQueueCount(reordered.length);
+
+            void showPlayerToast(
+                `Следующим играет: ${track.title} — ${getTrackArtistLine(track)}`,
+            );
         } catch (error) {
             console.error(
                 '[Player] Не удалось поставить трек следующим:',
@@ -1347,6 +1563,11 @@ const usePlayerStore = defineStore('player', () => {
 
     /**
      * Следующий трек: локально, в приоритете — серверная очередь.
+     *
+     * Серверные /next не используем: бэкенд не знает содержимого
+     * списков страниц. Пульт выбирает трек теми же правилами, что и
+     * активное устройство, и запускает его через /play — звук
+     * остаётся на устройстве, которое уже играет.
      */
     async function playNext(
         reason: 'manual' | 'ended' = 'manual',
@@ -1354,28 +1575,13 @@ const usePlayerStore = defineStore('player', () => {
 
         if (!auth.user) return;
 
-        // Мы — пульт: команда уходит на сервер, активное
-        // устройство применит её через сокет.
-        if (!isLocalDeviceActive.value) {
-            try {
-                const response = await nextRemoteTrack(
-                    reason,
-                    createSyncMeta(),
-                );
-
-                await applyRemotePlaybackState(response.state, true);
-            } catch (error) {
-                console.error(
-                    '[Player] Ошибка переключения трека:',
-                    error,
-                );
-            }
-
-            return;
-        }
+        const isActive = isLocalDeviceActive.value;
 
         // Повтор одного трека: просто начинаем сначала.
+        // Срабатывает только на активном устройстве —
+        // событие ended приходит от локального <audio>.
         if (
+            isActive &&
             reason === 'ended' &&
             repeatMode.value === 'one' &&
             currentTrack.value
@@ -1394,68 +1600,76 @@ const usePlayerStore = defineStore('player', () => {
             return;
         }
 
-        finalizeCurrentQueueItem(
-            reason === 'ended' ? 'played' : 'skipped',
-        );
-
         // 1) Серверная очередь в приоритете — всегда,
         // и в волне тоже: волна играет своё, только когда
         // очередь пуста.
-        const queueItem = takeNextFromQueue();
+        if (isActive) {
+            finalizeCurrentQueueItem(
+                reason === 'ended' ? 'played' : 'skipped',
+            );
 
-        if (queueItem) {
-            await playQueueItem(queueItem);
+            const queueItem = takeNextFromQueue();
 
-            return;
+            if (queueItem) {
+                await playQueueItem(queueItem);
+
+                return;
+            }
+        } else {
+            const pending = getPendingQueueItem();
+
+            if (pending) {
+                await playTrack(
+                    pending.track,
+                    PlaySourceListsEnum.QUEUE,
+                );
+
+                return;
+            }
         }
 
         // 2) Список-источник.
         const nextIndex = resolveNextIndex();
 
-        if (nextIndex === -1) {
-            // Волна: очередь кончилась — просим следующую порцию,
-            // независимо от того, как дошли до конца.
-            if (waveMode.value) {
-                const continued = await continueWave();
-
-                if (continued) return;
+        if (nextIndex !== -1) {
+            if (reason !== 'ended') {
+                reportWave('skip', undefined, progress.value);
             }
 
-            // Конец списка: останавливаемся на месте.
-            audio.pause();
-            isPlaying.value = false;
-            reportPause();
+            if (isActive) {
+                await playFromSourceList(queue.value[nextIndex]);
+            } else if (playSource.value) {
+                await playTrack(
+                    queue.value[nextIndex],
+                    playSource.value,
+                );
+            }
 
             return;
         }
 
-        if (reason !== 'ended') {
-            reportWave('skip', undefined, progress.value);
+        // 3) Конец списка: волна просит следующую порцию.
+        if (waveMode.value) {
+            const continued = await continueWave();
+
+            if (continued) return;
         }
 
-        await playFromSourceList(queue.value[nextIndex]);
+        if (!isActive) {
+            // Пульт без списка/очереди: выбрать следующий нечем.
+            return;
+        }
+
+        // Конец списка: останавливаемся на месте.
+        audio.pause();
+        isPlaying.value = false;
+        reportPause();
     }
 
     async function playPrevious(): Promise<void> {
         if (!auth.user) return;
 
-        // Мы — пульт: команда уходит на сервер.
-        if (!isLocalDeviceActive.value) {
-            try {
-                const response = await previousRemoteTrack(
-                    createSyncMeta(),
-                );
-
-                await applyRemotePlaybackState(response.state, true);
-            } catch (error) {
-                console.error(
-                    '[Player] Ошибка переключения трека:',
-                    error,
-                );
-            }
-
-            return;
-        }
+        const isActive = isLocalDeviceActive.value;
 
         // Более 3 секунд — перематываем в начало текущего трека.
         if (progress.value > 3) {
@@ -1464,7 +1678,32 @@ const usePlayerStore = defineStore('player', () => {
             return;
         }
 
-        finalizeCurrentQueueItem('skipped');
+        if (isActive) {
+            finalizeCurrentQueueItem('skipped');
+
+            const previousIndex = resolvePreviousIndex();
+
+            if (previousIndex === -1) {
+                await seekAudio(0);
+
+                return;
+            }
+
+            reportWave('skip', undefined, progress.value);
+
+            await playFromSourceList(queue.value[previousIndex]);
+
+            return;
+        }
+
+        // Пульт: предыдущий трек выбираем из своего списка-источника
+        // и запускаем через /play. Списка нет — серверный previous
+        // не используем: разумный эквивалент — начало текущего трека.
+        if (currentTrackIndex.value < 0 || !playSource.value) {
+            await seekAudio(0);
+
+            return;
+        }
 
         const previousIndex = resolvePreviousIndex();
 
@@ -1474,9 +1713,10 @@ const usePlayerStore = defineStore('player', () => {
             return;
         }
 
-        reportWave('skip', undefined, progress.value);
-
-        await playFromSourceList(queue.value[previousIndex]);
+        await playTrack(
+            queue.value[previousIndex],
+            playSource.value,
+        );
     }
 
     /**
@@ -1564,13 +1804,14 @@ const usePlayerStore = defineStore('player', () => {
         try {
             finalizeCurrentQueueItem('skipped');
 
-            // Внешний трек (поиск/волна) ещё не в базе, /audio по его
+            // Внешний трек (поиск/волна/шара) ещё не в базе, /audio по его
             // внешнему id не сработает. Сначала /play: бэкенд
             // сохранит трек и вернёт его версию с DB id — её
             // и запускаем локально.
             if (
                 playbackSource === PlaySourceListsEnum.SEARCH
                 || playbackSource === PlaySourceListsEnum.YANDEX_WAVE
+                || playbackSource === PlaySourceListsEnum.SINGLE
             ) {
                 const response = await playRemoteTrack(
                     track,
@@ -1640,7 +1881,8 @@ const usePlayerStore = defineStore('player', () => {
         // Мы — пульт: пауза/продолжение идут через сервер.
         if (!isLocalDeviceActive.value) {
             try {
-                const isCurrentlyPlaying = playbackState.value?.is_playing;
+                const isCurrentlyPlaying =
+                    playbackState.value?.is_playing ?? isPlaying.value;
 
                 const response = isCurrentlyPlaying
                     ? await pauseRemotePlayback(
@@ -1663,15 +1905,18 @@ const usePlayerStore = defineStore('player', () => {
         if (audio.paused) {
             if (!audio.src) {
                 // Состояние восстановлено с сервера, но аудио ещё
-                // не загружено: стартуем трек заново из локальной
-                // очереди, с сохранённой позиции.
-                const track = queue.value.find(
-                    item =>
-                        String(item.id)
-                        === String(currentTrack.value?.id),
-                );
+                // не загружено: стартуем текущий трек напрямую,
+                // с сохранённой позиции — без лишнего круга
+                // через resume на сервере.
+                const track =
+                    currentSourceTrack.value ??
+                    queue.value.find(
+                        item =>
+                            String(item.id)
+                            === String(currentTrack.value?.id),
+                    );
 
-                if (track && playSource.value) {
+                if (track) {
                     const position = Math.max(0, progress.value);
 
                     const started = await startLocalTrack(track, {
@@ -1679,14 +1924,18 @@ const usePlayerStore = defineStore('player', () => {
                     });
 
                     if (started) {
-                        reportTrackStarted(
-                            track,
-                            position,
-                            playSource.value,
-                        );
+                        if (playSource.value) {
+                            reportTrackStarted(
+                                track,
+                                position,
+                                playSource.value,
+                            );
+                        } else {
+                            reportResume();
+                        }
                     }
                 } else {
-                    // Трека нет в списке — старая схема через сервер.
+                    // Трека нет локально — продолжаем через сервер.
                     try {
                         const response = await resumeRemotePlayback(
                             createSyncMeta(),
@@ -1793,13 +2042,87 @@ const usePlayerStore = defineStore('player', () => {
         return uuid;
     }
 
+    type NavigatorUaDataBrand = {
+        brand: string;
+        version: string;
+    };
+
+    type NavigatorUaData = {
+        brands?: NavigatorUaDataBrand[];
+        mobile?: boolean;
+        platform?: string;
+        getHighEntropyValues?: (
+            hints: string[],
+        ) => Promise<Record<string, string>>;
+    };
+
+    /**
+     * Client Hints (Chromium): точнее userAgent — видят реальную
+     * ОС даже когда UA-строка переписана (эмуляция, WebView).
+     */
+    function getUaData(): NavigatorUaData | null {
+        return (
+            (
+                navigator as Navigator & {
+                    userAgentData?: NavigatorUaData;
+                }
+            ).userAgentData ?? null
+        );
+    }
+
     function getDeviceType(): PlayerDeviceType {
+        const uaData = getUaData();
+
+        if (typeof uaData?.mobile === 'boolean') {
+            return uaData.mobile ? 'phone' : 'computer';
+        }
+
         return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
             ? 'phone'
             : 'computer';
     }
 
-    function getOSName(): string {
+    async function getOSName(): Promise<string> {
+        const uaData = getUaData();
+
+        if (uaData?.platform) {
+            switch (uaData.platform) {
+                case 'Windows':
+                    // Chromium на Windows 11 сообщает platformVersion >= 13
+                    // (мажорная версия ядра; у Windows 10 — младше).
+                    try {
+                        const values =
+                            await uaData.getHighEntropyValues?.([
+                                'platformVersion',
+                            ]);
+                        const major = parseInt(
+                            values?.platformVersion ?? '',
+                            10,
+                        );
+
+                        if (major >= 13) return 'Windows 11';
+                        if (Number.isFinite(major)) return 'Windows 10';
+                    } catch {
+                        // высокоэнтропийные hints недоступны — остаёмся на UA
+                    }
+
+                    return 'Windows';
+
+                case 'macOS':
+                    return 'macOS';
+                case 'Linux':
+                    return 'Linux';
+                case 'Android':
+                    return 'Android';
+                case 'iOS':
+                    return 'iOS';
+                case 'Chrome OS':
+                    return 'ChromeOS';
+                default:
+                    return uaData.platform;
+            }
+        }
+
         const ua = navigator.userAgent;
         const platform = navigator.platform ?? '';
 
@@ -1814,6 +2137,36 @@ const usePlayerStore = defineStore('player', () => {
     }
 
     function getBrowserName(): string {
+        const uaData = getUaData();
+
+        if (uaData?.brands?.length) {
+            const brands = uaData.brands.map((brand) => brand.brand);
+
+            if (brands.some((brand) => brand.includes('Edge'))) {
+                return 'Microsoft Edge';
+            }
+
+            if (brands.some((brand) => brand.includes('Opera'))) {
+                return 'Opera';
+            }
+
+            if (brands.some((brand) => brand.includes('Samsung Internet'))) {
+                return 'Samsung Internet';
+            }
+
+            if (brands.some((brand) => brand.includes('Yandex'))) {
+                return 'Яндекс Браузер';
+            }
+
+            if (brands.some((brand) => brand.includes('Chromium'))) {
+                return 'Chromium';
+            }
+
+            if (brands.some((brand) => brand.includes('Chrome'))) {
+                return 'Google Chrome';
+            }
+        }
+
         const ua = navigator.userAgent;
 
         if (/Edg\//i.test(ua)) return 'Microsoft Edge';
@@ -1831,8 +2184,8 @@ const usePlayerStore = defineStore('player', () => {
         return 'Неизвестный браузер';
     }
 
-    function getDeviceName(): string {
-        return `${getOSName()} — ${getBrowserName()}`;
+    async function getDeviceName(): Promise<string> {
+        return `${await getOSName()} — ${getBrowserName()}`;
     }
 
     // ============================================
@@ -1902,29 +2255,41 @@ const usePlayerStore = defineStore('player', () => {
 
         deviceInitializationPromise = (async () => {
             try {
-                const  commandID = createCommandId();
                 const response = await getPlayerDevices();
                 devices.value = response.data;
 
                 const uuid = getDeviceUuid();
+                const deviceName = await getDeviceName();
 
                 let currentDevice = devices.value.find(
                     (device) => device.device_uuid === uuid,
                 );
 
-                if (!currentDevice) {
-                    const registration = await registerPlayerDevice({
+                if (!currentDevice || currentDevice.name !== deviceName) {
+                    // Нет записи с таким uuid, либо профиль устройства
+                    // (ОС/браузер) изменился — регистрируем повторно:
+                    // бэкенд обновляет запись с тем же uuid (апсерт),
+                    // а для потерянного uuid подхватывает давно
+                    // неактивную запись с тем же именем.
+                    const registeredDevice = await registerPlayerDevice({
                         origin_device_id: uuid,
-                        command_id: commandID,
-                        name: getDeviceName(),
+                        command_id: createCommandId(),
+                        name: deviceName,
                         type: getDeviceType(),
                     });
 
-                    currentDevice = registration.device;
-                    devices.value = [...devices.value, currentDevice];
+                    currentDevice = registeredDevice;
+                    devices.value = [
+                        ...devices.value.filter(
+                            (device) => device.id !== registeredDevice.id,
+                        ),
+                        registeredDevice,
+                    ];
                 }
 
                 localDeviceId.value = currentDevice.id;
+                startDeviceHeartbeat();
+
                 const commandId = createCommandId();
 
                 const activeDevice = devices.value.find(
@@ -1970,6 +2335,14 @@ const usePlayerStore = defineStore('player', () => {
                 command_id: commandId,
             });
             await applyRemotePlaybackState(response.state, true);
+
+            const device = devices.value.find(
+                (item) => item.id === deviceId,
+            );
+
+            void showPlayerToast(
+                `Воспроизведение на устройстве: ${device?.name ?? 'другое устройство'}`,
+            );
         } catch (error) {
             console.error(
                 '[Player] Не удалось переключить устройство:',
@@ -2042,17 +2415,19 @@ const usePlayerStore = defineStore('player', () => {
             return;
         }
 
-        // Полная изоляция волны: пока она играет — чужие
-        // серверные состояния (эхо /play из избранного и т.п.)
-        // её не переключают; вне волны состояния волны
-        // не применяются. Исключение — восстановление
-        // состояния при загрузке страницы.
-        if (state.play_source && !isRestoringState.value) {
+        // Режим волны определяем серверным состоянием: устройства
+        // показывают одно и то же, а не изолируют локальную волну.
+        // Раньше здесь чужие состояния отбрасывались целиком —
+        // из-за этого устройство вне волны игнорировало вообще
+        // все события, пока на другом устройстве играла волна.
+        if (state.play_source) {
             const isWaveState =
                 state.play_source === PlaySourceListsEnum.YANDEX_WAVE;
 
-            if (waveMode.value !== isWaveState) {
-                return;
+            if (isWaveState) {
+                waveMode.value = true;
+            } else if (waveMode.value) {
+                exitWaveMode();
             }
         }
 
@@ -2064,6 +2439,13 @@ const usePlayerStore = defineStore('player', () => {
 
         playbackState.value = state;
         activeDeviceId.value = state.active_device_id;
+
+        // Очередь едет в составе состояния — применяем её целиком,
+        // чтобы все устройства видели одну и ту же очередь.
+        if (state.queue) {
+            serverQueue.value = state.queue;
+            setServerQueueCount(state.queue.length);
+        }
 
         // Состояние пришло с сервера — локальная привязка
         // к элементу очереди больше не актуальна.
@@ -2274,15 +2656,108 @@ const usePlayerStore = defineStore('player', () => {
     // СОКЕТЫ
     // ============================================
 
+    /**
+     * Отписаться от канала текущего пользователя.
+     * Нужно при выходе из аккаунта и смене пользователя:
+     * канал приватный, события чужого юзера туда не придут.
+     */
+    function unsubscribeFromDeviceChanges(): void {
+        if (subscribedChannelName) {
+            echo.leave(subscribedChannelName);
+            subscribedChannelName = null;
+        }
+
+        isDeviceChangesSubscribed = false;
+    }
+
     function subscribeToDeviceChanges(): void {
         if (!auth.user || isDeviceChangesSubscribed) return;
 
         const channelName = `App.Models.User.${auth.user.id}`;
+        subscribedChannelName = channelName;
 
         echo.private(channelName)
             .listen(
+                '.playback.queue.updated',
+                (event: {
+                    track?: { title: string; artists?: string[] } | null;
+                    origin_device_id?: number | string | null;
+                }) => {
+                    const isOwnEvent =
+                        event.origin_device_id != null &&
+                        localDeviceId.value != null &&
+                        String(event.origin_device_id) ===
+                        String(localDeviceId.value);
+
+                    // Очередь менялась на другом устройстве —
+                    // подтягиваем её, не дожидаясь открытия панели.
+                    if (!isOwnEvent) {
+                        void refreshServerQueue();
+                    }
+
+                    if (!event.track || isOwnEvent) return;
+
+                    const artists = event.track.artists?.length
+                        ? event.track.artists.join(', ')
+                        : 'Неизвестный исполнитель';
+
+                    void showPlayerToast(
+                        `В очередь добавлено: ${event.track.title} — ${artists}`,
+                    );
+                },
+            )
+            .listen(
+                '.playback.device.connected',
+                (event: {
+                    device?: PlayerDevice;
+                    origin_device_id?: number | string | null;
+                }) => {
+                    const device = event.device;
+
+                    if (!device) return;
+
+                    devices.value = [
+                        ...devices.value.filter(
+                            (item) => item.id !== device.id,
+                        ),
+                        device,
+                    ];
+
+                    const isOwnEvent =
+                        event.origin_device_id != null &&
+                        String(event.origin_device_id) ===
+                        String(getDeviceUuid());
+
+                    if (!isOwnEvent) {
+                        void showPlayerToast(
+                            `Подключено устройство: ${device.name}`,
+                        );
+                    }
+                },
+            )
+            .listen(
+                '.playback.device.disconnected',
+                (event: {
+                    device_id: number;
+                    device_name?: string;
+                }) => {
+                    const deviceId = Number(event.device_id);
+
+                    devices.value = devices.value.filter(
+                        (device) => device.id !== deviceId,
+                    );
+
+                    void showPlayerToast(
+                        `Устройство отключено: ${event.device_name ?? 'неизвестное устройство'}`,
+                    );
+                },
+            )
+            .listen(
                 '.playback.device.changed',
-                async (event: { device_id: number }) => {
+                async (event: {
+                    device_id: number;
+                    origin_device_id?: number | string | null;
+                }) => {
                     const deviceId = Number(event.device_id);
 
                     activeDeviceId.value = deviceId;
@@ -2291,6 +2766,22 @@ const usePlayerStore = defineStore('player', () => {
                         ...device,
                         is_active: device.id === deviceId,
                     }));
+
+                    const isOwnEvent =
+                        event.origin_device_id != null &&
+                        localDeviceId.value != null &&
+                        String(event.origin_device_id) ===
+                        String(localDeviceId.value);
+
+                    if (!isOwnEvent) {
+                        const device = devices.value.find(
+                            (item) => item.id === deviceId,
+                        );
+
+                        void showPlayerToast(
+                            `Воспроизведение на устройстве: ${device?.name ?? 'другое устройство'}`,
+                        );
+                    }
 
                     if (localDeviceId.value !== deviceId) {
                         stopLocalPlayback();
@@ -2362,6 +2853,32 @@ const usePlayerStore = defineStore('player', () => {
         isDeviceChangesSubscribed = true;
     }
 
+    // При смене пользователя (выход/повторный вход) канал Echo и
+    // состояние устройства нужно пересобрать: иначе подписка
+    // остаётся на канале прежнего юзера и синхронизация молчит.
+    watch(
+        () => auth.user?.id ?? null,
+        (userId, previousUserId) => {
+            if (userId === previousUserId) return;
+
+            if (!userId) {
+                unsubscribeFromDeviceChanges();
+                stopDeviceHeartbeat();
+                stopLocalPlayback();
+
+                devices.value = [];
+                localDeviceId.value = null;
+                activeDeviceId.value = null;
+                playbackState.value = null;
+                lastAppliedVersion = null;
+
+                return;
+            }
+
+            void initializePlayerDevice();
+        },
+    );
+
 
     // ============================================
     // ЭКСПОРТ
@@ -2416,6 +2933,7 @@ const usePlayerStore = defineStore('player', () => {
         activeDeviceId,
         localDeviceId,
         isLocalDeviceActive,
+        isDeviceOnline,
 
         isDevicesLoading,
         deviceSwitchLoading,

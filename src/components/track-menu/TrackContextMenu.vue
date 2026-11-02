@@ -107,6 +107,16 @@
                 @close="closeMenu"
             />
 
+            <button
+                type="button"
+                role="menuitem"
+                :disabled="loading"
+                @click="openShareModal"
+            >
+              <ion-icon :icon="shareSocialOutline"/>
+              Поделиться
+            </button>
+
             <DownloadTrackItem
                 :track-id="Number(track.id)"
                 @close="closeMenu"
@@ -172,11 +182,27 @@
             @close="closeMenu"
         />
 
+        <button
+            type="button"
+            role="menuitem"
+            :disabled="loading"
+            @click="openShareModal"
+        >
+          <ion-icon :icon="shareSocialOutline"/>
+          Поделиться
+        </button>
+
         <DownloadTrackItem
             :track-id="Number(track.id)"
             @close="closeMenu"
         />
       </div>
+
+      <ShareTrackModal
+          v-if="shareModalOpen"
+          :track="track as unknown as Track"
+          @close="shareModalOpen = false"
+      />
     </Teleport>
   </div>
 </template>
@@ -192,10 +218,13 @@ import {
   musicalNotesOutline,
   playSkipForwardOutline,
   arrowUpOutline,
+  shareSocialOutline,
 } from 'ionicons/icons';
 
 import AddToPlaylistItem from '@/components/track-menu/AddToPlaylistItem.vue';
 import DownloadTrackItem from '@/components/track-menu/DownloadTrackItem.vue';
+import ShareTrackModal from '@/components/track-menu/ShareTrackModal.vue';
+import type {Track} from '@/types/TrackType';
 import type {TrackType} from '@/types/TrackType';
 
 const props = defineProps<{
@@ -223,6 +252,7 @@ const isMobile = ref(false);
 const opensUp = ref(false);
 const desktopMenu = ref<HTMLElement | null>(null);
 const trigger = ref<HTMLButtonElement | null>(null);
+const shareModalOpen = ref(false);
 
 const desktopMenuStyle = ref<Record<string, string>>({
   visibility: 'hidden',
@@ -312,6 +342,12 @@ function runAction(action: 'next' | 'queue' | 'favorite') {
   emit('action', props.track, action, props.isFavorite ?? false);
 
   closeMenu();
+}
+
+function openShareModal() {
+  // Меню закрываем, модалка живёт отдельно (вне v-if меню).
+  closeMenu();
+  shareModalOpen.value = true;
 }
 
 function runMoveToTop() {

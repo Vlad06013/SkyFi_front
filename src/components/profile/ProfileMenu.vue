@@ -43,15 +43,6 @@
         Мой профиль
       </button>
 
-      <button
-          class="dropdown-item"
-          role="menuitem"
-          @click="openLibrary"
-      >
-        <span>♫</span>
-        Моя музыка
-      </button>
-
       <div class="dropdown-divider"></div>
 
       <div v-if="logoutError" class="logout-error">
@@ -106,16 +97,6 @@ function openProfile(): void {
   blurActiveElement();
 
   void router.push('/profile');
-}
-
-function openLibrary(): void {
-  profileMenuOpen.value = false;
-
-  logoutError.value = '';
-
-  blurActiveElement();
-
-  void router.push('/favorite');
 }
 
 /*

@@ -1,4 +1,4 @@
-import {computed, ref} from 'vue';
+import {computed, ref, watch} from 'vue';
 import {defineStore} from 'pinia';
 import {toastController} from '@ionic/vue';
 
@@ -13,9 +13,17 @@ import {
     acceptFriendRequest,
     deleteFriendship,
     searchUsers,
+    getTrackShares,
+    deleteTrackShare,
 } from '@/api/friends';
 
-import type {Friendship, UserSearchResult} from '@/types/FriendshipType';
+import type {
+    Friendship,
+    TrackShareItem,
+    UserSearchResult,
+} from '@/types/FriendshipType';
+
+import type {Track} from '@/types/TrackType';
 
 const useFriendsStore = defineStore('friends', () => {
     const auth = useAuthStore();
@@ -23,11 +31,15 @@ const useFriendsStore = defineStore('friends', () => {
     const friends = ref<Friendship[]>([]);
     const incomingRequests = ref<Friendship[]>([]);
     const outgoingRequests = ref<Friendship[]>([]);
+    /** Треки, которыми поделились с нами (свежие сверху). */
+    const trackShares = ref<TrackShareItem[]>([]);
 
     const isLoading = ref(false);
     const initialized = ref(false);
 
     let isSubscribed = false;
+    /** Канал Echo, на который оформлена текущая подписка. */
+    let subscribedChannelName: string | null = null;
 
     const incomingCount = computed(
         () => incomingRequests.value.length,
@@ -66,6 +78,37 @@ const useFriendsStore = defineStore('friends', () => {
             );
         } finally {
             isLoading.value = false;
+        }
+
+        // Шары не блокируют основную загрузку.
+        void loadTrackShares();
+    }
+
+    async function loadTrackShares(): Promise<void> {
+        if (!auth.user) return;
+
+        try {
+            trackShares.value = await getTrackShares();
+        } catch (error) {
+            console.error(
+                '[Friends] Не удалось загрузить шары:',
+                error,
+            );
+        }
+    }
+
+    async function removeTrackShare(shareId: number): Promise<void> {
+        trackShares.value = trackShares.value.filter(
+            (share) => share.id !== shareId,
+        );
+
+        try {
+            await deleteTrackShare(shareId);
+        } catch (error) {
+            console.error(
+                '[Friends] Не удалось убрать шару:',
+                error,
+            );
         }
     }
 
@@ -123,10 +166,22 @@ const useFriendsStore = defineStore('friends', () => {
     // СОКЕТЫ
     // ============================================
 
+    function unsubscribeFromFriendshipEvents(): void {
+        if (subscribedChannelName) {
+            echo.leave(subscribedChannelName);
+            subscribedChannelName = null;
+        }
+
+        isSubscribed = false;
+    }
+
     function subscribeToFriendshipEvents(): void {
         if (!auth.user || isSubscribed) return;
 
-        echo.private(`App.Models.User.${auth.user.id}`)
+        const channelName = `App.Models.User.${auth.user.id}`;
+        subscribedChannelName = channelName;
+
+        echo.private(channelName)
             .listen(
                 '.friendship.request.sent',
                 (event: { friendship: Friendship }) => {
@@ -178,10 +233,64 @@ const useFriendsStore = defineStore('friends', () => {
                         `${who} добавил трек в очередь: ${artists}${event.track.title}`,
                     );
                 },
+            )
+            .listen(
+                '.track.shared',
+                (event: {
+                    share_id: number;
+                    sender?: { id: number; name: string };
+                    track?: Track;
+                }) => {
+                    if (!event.track) return;
+
+                    const senderName = event.sender?.name ?? 'Друг';
+                    const artists =
+                        event.track.meta?.artists
+                            ?.map((artist) => artist.name)
+                            .join(', ');
+
+                    void showToast(
+                        `${senderName} поделился треком: ${artists ? `${artists} — ` : ''}${event.track.title}`,
+                    );
+
+                    // Шара сразу появляется в списке «поделились со мной».
+                    trackShares.value = [
+                        {
+                            id: Number(event.share_id),
+                            sender: event.sender ?? {
+                                id: 0,
+                                name: senderName,
+                            },
+                            track: event.track,
+                            created_at: new Date().toISOString(),
+                        },
+                        ...trackShares.value,
+                    ];
+                },
             );
 
         isSubscribed = true;
     }
+
+    // При смене пользователя пересобираем подписку на его канал,
+    // иначе события останутся привязанными к прежнему аккаунту.
+    watch(
+        () => auth.user?.id ?? null,
+        (userId, previousUserId) => {
+            if (userId === previousUserId) return;
+
+            unsubscribeFromFriendshipEvents();
+
+            initialized.value = false;
+            friends.value = [];
+            incomingRequests.value = [];
+            outgoingRequests.value = [];
+
+            if (userId) {
+                void ensureInitialized();
+            }
+        },
+    );
 
     async function showToast(message: string): Promise<void> {
         const toast = await toastController.create({
@@ -226,11 +335,14 @@ const useFriendsStore = defineStore('friends', () => {
         friends,
         incomingRequests,
         outgoingRequests,
+        trackShares,
         isLoading,
         incomingCount,
 
         ensureInitialized,
         loadAll,
+        loadTrackShares,
+        removeTrackShare,
         sendRequest,
         acceptRequest,
         rejectRequest,

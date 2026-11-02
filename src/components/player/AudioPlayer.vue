@@ -404,6 +404,15 @@
               {{ device.name }}
             </span>
 
+            <span
+                class="device-option-status"
+                :class="{
+                  'device-option-status-online': player.isDeviceOnline(device),
+                }"
+            >
+              {{ player.isDeviceOnline(device) ? 'онлайн' : 'офлайн' }}
+            </span>
+
             <span v-if="device.id === player.activeDeviceId">
               ✓
             </span>

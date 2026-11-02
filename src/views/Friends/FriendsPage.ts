@@ -14,6 +14,7 @@ import {
     closeOutline,
     trashOutline,
     chevronForwardOutline,
+    playOutline,
 } from 'ionicons/icons';
 
 import {IonContent, IonIcon, IonPage} from '@ionic/vue';
@@ -25,10 +26,14 @@ import ProfileMenu from '@/components/profile/ProfileMenu.vue';
 
 import {useAuthStore} from '@/stores/auth';
 import useFriendsStore from '@/stores/friends';
+import usePlayerStore from '@/stores/player';
+
+import {PlaySourceListsEnum} from '@/types/PlaySourceListsEnum';
 
 import type {
     Friendship,
     FriendshipUser,
+    TrackShareItem,
     UserSearchResult,
 } from '@/types/FriendshipType';
 
@@ -250,6 +255,21 @@ export default defineComponent({
             });
         }
 
+        const player = usePlayerStore();
+
+        /**
+         * Поделившийся трек играет как разовый (источник SINGLE)
+         * и убирается из списка.
+         */
+        function playSharedTrack(share: TrackShareItem): void {
+            void player.playTrack(
+                share.track,
+                PlaySourceListsEnum.SINGLE,
+            );
+
+            void friendsStore.removeTrackShare(share.id);
+        }
+
         return {
             searchOutline,
             personAddOutline,
@@ -257,6 +277,7 @@ export default defineComponent({
             closeOutline,
             trashOutline,
             chevronForwardOutline,
+            playOutline,
 
             searchQuery,
             searchResults,
@@ -279,6 +300,7 @@ export default defineComponent({
             handleCancel,
             handleRemove,
             openFriend,
+            playSharedTrack,
         };
     },
 });

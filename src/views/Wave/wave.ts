@@ -1,6 +1,8 @@
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import usePlayerStore from '@/stores/player';
 import { getWaveTracks } from '@/api/wave';
+import { getYandexMusicDeviceAuthStatus } from '@/api/auth';
+import { yandexMusicConnected } from '@/lib/yandexConnection';
 import { type Track } from '@/types/TrackType';
 
 // ============================================
@@ -68,10 +70,58 @@ export function useWave() {
         } catch {
             waveError.value =
                 'Не удалось загрузить волну. Подключи аккаунт Яндекс Музыки.';
+
+            // Пока висит ошибка — периодически проверяем статус
+            // авторизации: как только Яндекс подключится (в этой
+            // вкладке или любой другой), волна подтянется сама.
+            startAuthStatusPoll();
         } finally {
             waveLoading.value = false;
         }
     }
+
+    let authStatusPollTimer: ReturnType<typeof setInterval> | null = null;
+
+    function stopAuthStatusPoll(): void {
+        if (authStatusPollTimer !== null) {
+            clearInterval(authStatusPollTimer);
+            authStatusPollTimer = null;
+        }
+    }
+
+    function startAuthStatusPoll(): void {
+        stopAuthStatusPoll();
+
+        authStatusPollTimer = setInterval(() => {
+            void checkYandexAuthAndRetry();
+        }, 5000);
+    }
+
+    async function checkYandexAuthAndRetry(): Promise<void> {
+        try {
+            const result = await getYandexMusicDeviceAuthStatus();
+
+            if (result.connected || result.status === 'connected') {
+                yandexMusicConnected.value = true;
+                stopAuthStatusPoll();
+                await loadWave();
+            }
+        } catch {
+            // Статус временно недоступен — попробуем на следующем тике.
+        }
+    }
+
+    // Авторизация Яндекса завершилась (событие компонента авторизации)
+    // — подтягиваем выдачу, не дожидаясь перезахода на страницу.
+    watch(yandexMusicConnected, (connected) => {
+        if (!connected) return;
+
+        stopAuthStatusPoll();
+
+        if (waveTracks.value.length === 0) {
+            void loadWave();
+        }
+    });
 
     /**
      * Большая кнопка запускает только волну:
@@ -101,6 +151,10 @@ export function useWave() {
 
     onMounted(() => {
         void loadWave();
+    });
+
+    onBeforeUnmount(() => {
+        stopAuthStatusPoll();
     });
 
     return {

@@ -31,6 +31,12 @@ export interface Track {
     source_type: string;
     source_id: string | null;
     duration: number | null;
+    /**
+     * Длительность в миллисекундах на верхнем уровне трека.
+     * Бэкенд дублирует её в состояние плеера (file.duration_ms
+     * там может отсутствовать для внешних треков).
+     */
+    duration_ms?: number | null;
     meta: TrackMeta;
     file: TrackFile | null;
     /** Порядок в избранном (favorites.sort): больше = выше. Только у избранного. */
