@@ -527,6 +527,13 @@
               <path d="M4 18h10" />
               <path d="m17 16 3 2-3 2" />
             </svg>
+
+            <span
+                v-if="player.serverQueueCount > 0"
+                class="queue-count"
+            >
+              {{ player.serverQueueCount }}
+            </span>
           </button>
         </header>
 

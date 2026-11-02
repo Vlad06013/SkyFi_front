@@ -194,7 +194,7 @@ export function useSearch() {
         }
 
         // Передаём результаты поиска в очередь.
-        player.setQueue(tracks.value);
+        player.setQueue(tracks.value, sourceList);
 
         // Воспроизводим трек через глобальный плеер.
         await player.playTrack(track, sourceList);

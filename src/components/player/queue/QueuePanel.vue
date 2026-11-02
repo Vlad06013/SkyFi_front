@@ -43,12 +43,18 @@
 
       <div class="queue-list">
         <div
-            v-for="(item, index) in queueItems"
+            v-for="(item, index) in visibleItems"
             :key="item.id"
             class="queue-track"
+            :class="`queue-track-${item.status}`"
+            :role="item.status === 'pending' ? 'button' : undefined"
+            :tabindex="item.status === 'pending' ? 0 : undefined"
+            @click="item.status === 'pending' && playQueueTrack(item)"
+            @keydown.enter="item.status === 'pending' && playQueueTrack(item)"
         >
           <span class="queue-index">
-            {{ index + 1 }}
+            <template v-if="item.status === 'playing_now'">▶</template>
+            <template v-else>{{ index + 1 }}</template>
           </span>
 
           <div class="queue-cover">
@@ -68,6 +74,13 @@
             </span>
           </div>
 
+          <span
+              v-if="item.status === 'playing_now'"
+              class="queue-status-label"
+          >
+            Сейчас играет
+          </span>
+
           <button
               type="button"
               class="queue-remove"
@@ -77,7 +90,7 @@
             "
               :aria-label="`Удалить ${item.track.title} из очереди`"
               title="Удалить из очереди"
-              @click="removeQueueItem(item.id)"
+              @click.stop="removeQueueItem(item.id)"
           >
             {{
               removingIds.has(item.id)
@@ -117,9 +130,11 @@ const {
   player,
   loading,
   queueItems,
+  visibleItems,
   removingIds,
   refreshQueue,
   removeQueueItem,
+  playQueueTrack,
 } = useQueue();
 
 watch(

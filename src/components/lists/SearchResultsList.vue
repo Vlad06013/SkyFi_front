@@ -130,7 +130,7 @@
 </template>
 
 <script setup lang="ts">
-import {computed, watch, ref} from 'vue';
+import {watch, ref} from 'vue';
 import {IonIcon} from '@ionic/vue';
 import {
   musicalNotesOutline,
@@ -213,7 +213,7 @@ async function playTrack(track: Track): Promise<void> {
     return;
   }
 
-  player.setQueue([...props.items]);
+  player.setQueue([...props.items], sourceList);
 
   console.log('[Uploaded] Очередь перед запуском:', {
     count: props.items.length,
@@ -327,7 +327,7 @@ watch(
         return;
       }
 
-      player.setQueue([...tracks]);
+      player.setQueue([...tracks], sourceList);
 
       console.log('[Favorites] Очередь синхронизирована:', {
         count: tracks.length,

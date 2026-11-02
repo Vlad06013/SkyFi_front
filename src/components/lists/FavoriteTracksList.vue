@@ -193,7 +193,7 @@ async function playTrack(track: Track): Promise<void> {
     return;
   }
 
-  player.setQueue([...props.items]);
+  player.setQueue([...props.items], sourceList);
 
   console.log('[Favorites] Очередь перед запуском:', {
     list: sourceList,
@@ -616,7 +616,7 @@ watch(
 
       lastSyncedQueueKey = queueKey;
 
-      player.setQueue([...tracks]);
+      player.setQueue([...tracks], sourceList);
 
       console.log('[Favorites] Очередь синхронизирована:', {
         count: tracks.length,

@@ -385,7 +385,10 @@ export function usePlaylists() {
         }
 
         try {
-            player.setQueue([...playlist.tracks]);
+            player.setQueue(
+                [...playlist.tracks],
+                PlaySourceListsEnum.PLAYLIST,
+            );
 
             const firstTrack = playlist.tracks[0];
 

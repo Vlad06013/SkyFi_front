@@ -164,8 +164,39 @@
     transition: background 0.15s;
 }
 
+/* Ожидающие треки кликабельны. */
+.queue-track-pending {
+    cursor: pointer;
+}
+
 .queue-track:hover {
     background: #ffffff08;
+}
+
+/* Играет сейчас. */
+.queue-track-playing_now {
+    background: #b8a2ff14;
+}
+
+.queue-track-playing_now .queue-index {
+    color: #ffd633;
+}
+
+/* Прослушанные/пропущенные — приглушены в конце списка. */
+.queue-track-played,
+.queue-track-skipped {
+    opacity: 0.45;
+}
+
+.queue-status-label {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #ffd6331f;
+    color: #ffd633;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
 }
 
 .queue-index {

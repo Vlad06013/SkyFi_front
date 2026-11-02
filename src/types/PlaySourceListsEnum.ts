@@ -13,4 +13,5 @@ export enum PlaySourceListsEnum {
     SEARCH = 'search',
     PLAYLIST = 'playlist',
     UPLOAD = 'uploads',
+    YANDEX_WAVE = 'yandex_wave',
 }

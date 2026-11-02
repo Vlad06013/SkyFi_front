@@ -13,6 +13,12 @@ import {PlaySourceListsEnum} from '@/types/PlaySourceListsEnum';
 
 import {isAudioUrlFresh, parseServerDate} from '@/lib/audioUrlTtl';
 
+import {
+    getWaveTracks,
+    sendWaveFeedback,
+    type WaveFeedbackType,
+} from '@/api/wave';
+
 import {type Track} from '@/types/TrackType';
 
 import {
@@ -77,6 +83,27 @@ const usePlayerStore = defineStore('player', () => {
     /** Полный трек текущего воспроизведения (с meta и source_id) —
      *  нужен для запросов по единому контракту (избранное). */
     const currentSourceTrack = ref<Track | null>(null);
+
+    /** Режим «Моя Волна»: очередь собрана из волны Яндекса,
+     *  реакции уходят в ротацию. */
+    const waveMode = ref(false);
+
+    let waveTrackKeys = new Set<string>();
+
+    let waveContinuing = false;
+
+    /** Якорь цепочки Яндекса: id первого трека последней
+     *  порции. Передаётся как queue при подгрузке новых. */
+    let waveAnchor: string | null = null;
+
+    let wavePrefetching = false;
+
+    /** Список страницы, ожидающий явного запуска, пока
+     *  играет волна (см. setQueue). */
+    let pendingSourceList: {
+        tracks: Track[];
+        source: PlaySourceListsEnum | null;
+    } | null = null;
 
     /** Список-источник, из которого запущен текущий трек.
      *  null, пока источник неизвестен: заполняется из play_source
@@ -268,10 +295,32 @@ const usePlayerStore = defineStore('player', () => {
     // ============================================
 
     /**
-     * Заполнение списка-источника каталогом
-     * @param tracks
+     * Заполнение списка-источника каталогом.
+     *
+     * Страницы шлют свой список при монтировании. Пока играет
+     * волна, чужой список её не вытесняет — запоминаем его
+     * и применим, когда из него явно запустят трек (playTrack).
      */
-    function setQueue(tracks: Track[]): void {
+    function setQueue(
+        tracks: Track[],
+        source: PlaySourceListsEnum | null = null,
+    ): void {
+        if (waveMode.value) {
+            pendingSourceList = { tracks: [...tracks], source };
+
+            return;
+        }
+
+        applySourceQueue(tracks, source);
+    }
+
+    function applySourceQueue(
+        tracks: Track[],
+        source: PlaySourceListsEnum | null,
+    ): void {
+        // Любой список страницы вытесняет волну: дальше
+        // следующий/предыдущий работают по его очереди.
+        exitWaveMode();
 
         queue.value = [...tracks];
 
@@ -281,6 +330,10 @@ const usePlayerStore = defineStore('player', () => {
                     String(track.id) === String(currentTrack.value?.id),
             )
             : -1;
+
+        if (source) {
+            playSource.value = source;
+        }
 
         if (isShuffleEnabled.value) {
             rebuildShuffleOrder();
@@ -302,6 +355,7 @@ const usePlayerStore = defineStore('player', () => {
             const items = await addTrackToQueue(track);
 
             serverQueue.value = items;
+            setServerQueueCount(items.length);
         } catch (error) {
             console.error(
                 '[Player] Не удалось добавить трек в очередь:',
@@ -541,6 +595,9 @@ const usePlayerStore = defineStore('player', () => {
             const started = await startLocalTrackOnce(track, options);
 
             if (started) {
+                // Волна: следим за буфером, подгружаем порцию заранее.
+                void ensureWaveBuffer();
+
                 return true;
             }
 
@@ -756,6 +813,25 @@ const usePlayerStore = defineStore('player', () => {
         reportQueueStatus(item.id, 'playing_now');
     }
 
+    /**
+     * Клик по треку в очереди: элемент играет сразу.
+     * Очередь — отдельный источник: волну покидаем.
+     */
+    async function playServerQueueItem(
+        item: PlaybackQueueItem,
+    ): Promise<void> {
+        if (!auth.user || isLoading.value) return;
+
+        serverQueue.value = serverQueue.value.filter(
+            queueItem => queueItem.id !== item.id,
+        );
+
+        exitWaveMode();
+        playSource.value = PlaySourceListsEnum.QUEUE;
+
+        await playQueueItem(item);
+    }
+
     // ============================================
     // ПЕРЕМЕШИВАНИЕ
     // ============================================
@@ -847,6 +923,205 @@ const usePlayerStore = defineStore('player', () => {
         if (current > 0) return current - 1;
 
         return repeatMode.value === 'all' ? total - 1 : -1;
+    }
+
+    // ============================================
+    // МОЯ ВОЛНА
+    // ============================================
+
+    function waveKey(track: Track): string {
+        return `${track.source_type}:${track.source_id ?? track.id}`;
+    }
+
+    function exitWaveMode(): void {
+        waveMode.value = false;
+        waveTrackKeys = new Set();
+        waveAnchor = null;
+    }
+
+    /**
+     * Отправить реакцию в волну, если трек из неё.
+     * Fire-and-forget: воспроизведение не блокируем.
+     * seconds — сколько реально прослушано (для trackFinished).
+     */
+    function reportWave(
+        type: WaveFeedbackType,
+        track?: Track,
+        seconds?: number,
+    ): void {
+        const target = track ?? currentSourceTrack.value;
+
+        if (!waveMode.value || !target) return;
+
+        if (!waveTrackKeys.has(waveKey(target))) return;
+
+        void sendWaveFeedback(
+            target.source_id ?? target.id,
+            type,
+            undefined,
+            seconds,
+        ).catch((error) => {
+            console.warn(
+                '[Player] Реакция волны не отправлена:',
+                error,
+            );
+        });
+    }
+
+    /**
+     * Запустить «Мою Волну»: порция треков из Яндекса становится
+     * очередью плеера. Треки можно передать снаружи (главная
+     * страница уже подгрузила их для показа), иначе запрашиваем
+     * свежую порцию. startIndex — с какого трека начать.
+     */
+    async function startWave(
+        tracks?: Track[],
+        startIndex = 0,
+    ): Promise<boolean> {
+        if (!auth.user || isLoading.value) return false;
+
+        try {
+            tracks ??= await getWaveTracks(20);
+
+            if (tracks.length === 0) {
+                return false;
+            }
+
+            const index = Math.min(
+                Math.max(startIndex, 0),
+                tracks.length - 1,
+            );
+
+            waveTrackKeys = new Set(tracks.map(waveKey));
+            waveMode.value = true;
+            pendingSourceList = null;
+            rememberWaveAnchor(tracks);
+
+            queue.value = [...tracks];
+            currentTrackIndex.value = index;
+            shuffleOrder = [];
+            shuffleCursor = -1;
+
+            await playTrack(
+                tracks[index],
+                PlaySourceListsEnum.YANDEX_WAVE,
+            );
+
+            return true;
+        } catch (error) {
+            exitWaveMode();
+            console.error(
+                '[Player] Не удалось запустить волну:',
+                error,
+            );
+            return false;
+        }
+    }
+
+    /** Якорь цепочки = внешний id первого трека последней порции. */
+    function rememberWaveAnchor(tracks: Track[]): void {
+        const first = tracks[0];
+
+        if (!first) return;
+
+        waveAnchor = String(first.source_id ?? first.id);
+    }
+
+    /**
+     * Подгрузить следующую порцию волны.
+     * Возвращает только треки, которых ещё нет в очереди.
+     */
+    async function fetchWaveBatch(): Promise<Track[]> {
+        const tracks = await getWaveTracks(20, waveAnchor);
+
+        rememberWaveAnchor(tracks);
+
+        return tracks.filter(
+            track => !waveTrackKeys.has(waveKey(track)),
+        );
+    }
+
+    /**
+     * Буфер волны: когда до конца очереди остаётся мало треков,
+     * подгружаем следующую порцию заранее, в фоне, чтобы
+     * переключение не ждало запроса к Яндексу.
+     */
+    async function ensureWaveBuffer(): Promise<void> {
+        if (!auth.user || !waveMode.value) return;
+
+        if (wavePrefetching || waveContinuing) return;
+
+        const remaining =
+            queue.value.length - currentTrackIndex.value - 1;
+
+        if (currentTrackIndex.value >= 0 && remaining > 3) return;
+
+        wavePrefetching = true;
+
+        try {
+            const fresh = await fetchWaveBatch();
+
+            if (fresh.length === 0) return;
+
+            fresh.forEach((track) => {
+                waveTrackKeys.add(waveKey(track));
+            });
+
+            queue.value = [...queue.value, ...fresh];
+        } catch (error) {
+            console.warn(
+                '[Player] Не удалось пополнить волну:',
+                error,
+            );
+        } finally {
+            wavePrefetching = false;
+        }
+    }
+
+    /**
+     * Продолжить волну: очередь кончилась — просим следующую
+     * порцию и играем первый новый трек.
+     */
+    async function continueWave(): Promise<boolean> {
+        if (!auth.user || waveContinuing) return false;
+
+        waveContinuing = true;
+
+        try {
+            const fresh = await fetchWaveBatch();
+
+            if (fresh.length === 0) {
+                return false;
+            }
+
+            fresh.forEach((track) => {
+                waveTrackKeys.add(waveKey(track));
+            });
+
+            queue.value = [...queue.value, ...fresh];
+
+            // Новые треки волны внешние — регистрируем через /play.
+            await playTrack(fresh[0], PlaySourceListsEnum.YANDEX_WAVE);
+
+            return true;
+        } catch (error) {
+            console.warn(
+                '[Player] Не удалось продолжить волну:',
+                error,
+            );
+            return false;
+        } finally {
+            waveContinuing = false;
+        }
+    }
+
+    /**
+     * Дизлайк трека волны: реакция уходит в Яндекс,
+     * избранное не трогаем, играем следующий трек.
+     */
+    async function dislikeCurrentTrack(): Promise<void> {
+        reportWave('dislike');
+        await playNext();
     }
 
     // ============================================
@@ -942,6 +1217,12 @@ const usePlayerStore = defineStore('player', () => {
             ) {
                 liked.value = response.is_favorite;
             }
+
+            // Лайк трека из волны: одновременно реакция
+            // в ротацию Яндекса.
+            if (response.is_favorite) {
+                reportWave('like', targetTrack);
+            }
         } catch (error) {
             console.error('[Player] Ошибка изменения избранного:', error);
         } finally {
@@ -1019,6 +1300,7 @@ const usePlayerStore = defineStore('player', () => {
             const reordered = await reorderPlayerQueue(orderedIds);
 
             serverQueue.value = reordered;
+            setServerQueueCount(reordered.length);
         } catch (error) {
             console.error(
                 '[Player] Не удалось поставить трек следующим:',
@@ -1116,7 +1398,9 @@ const usePlayerStore = defineStore('player', () => {
             reason === 'ended' ? 'played' : 'skipped',
         );
 
-        // 1) Серверная очередь в приоритете.
+        // 1) Серверная очередь в приоритете — всегда,
+        // и в волне тоже: волна играет своё, только когда
+        // очередь пуста.
         const queueItem = takeNextFromQueue();
 
         if (queueItem) {
@@ -1129,6 +1413,14 @@ const usePlayerStore = defineStore('player', () => {
         const nextIndex = resolveNextIndex();
 
         if (nextIndex === -1) {
+            // Волна: очередь кончилась — просим следующую порцию,
+            // независимо от того, как дошли до конца.
+            if (waveMode.value) {
+                const continued = await continueWave();
+
+                if (continued) return;
+            }
+
             // Конец списка: останавливаемся на месте.
             audio.pause();
             isPlaying.value = false;
@@ -1137,12 +1429,11 @@ const usePlayerStore = defineStore('player', () => {
             return;
         }
 
-        const track = queue.value[nextIndex];
-        const started = await startLocalTrack(track);
-
-        if (started && playSource.value) {
-            reportTrackStarted(track, 0, playSource.value);
+        if (reason !== 'ended') {
+            reportWave('skip', undefined, progress.value);
         }
+
+        await playFromSourceList(queue.value[nextIndex]);
     }
 
     async function playPrevious(): Promise<void> {
@@ -1183,11 +1474,33 @@ const usePlayerStore = defineStore('player', () => {
             return;
         }
 
-        const track = queue.value[previousIndex];
+        reportWave('skip', undefined, progress.value);
+
+        await playFromSourceList(queue.value[previousIndex]);
+    }
+
+    /**
+     * Запустить трек из списка-источника. Внешние треки
+     * (поиск/волна) ещё не в базе — /audio по их id даст 404,
+     * поэтому их сначала регистрируем через /play (ветка внешних
+     * треков в playTrack). Треки из базы запускаем локально сразу.
+     */
+    async function playFromSourceList(track: Track): Promise<void> {
+        const source = playSource.value;
+
+        if (
+            source === PlaySourceListsEnum.SEARCH
+            || source === PlaySourceListsEnum.YANDEX_WAVE
+        ) {
+            await playTrack(track, source);
+
+            return;
+        }
+
         const started = await startLocalTrack(track);
 
-        if (started && playSource.value) {
-            reportTrackStarted(track, 0, playSource.value);
+        if (started && source) {
+            reportTrackStarted(track, 0, source);
         }
     }
 
@@ -1233,16 +1546,32 @@ const usePlayerStore = defineStore('player', () => {
 
         playSource.value = playbackSource;
 
+        // Список страницы ждал волну: применяем его очередь,
+        // чтобы следующий/предыдущий шли уже по нему.
+        if (
+            pendingSourceList
+            && pendingSourceList.source === playbackSource
+        ) {
+            applySourceQueue(
+                pendingSourceList.tracks,
+                pendingSourceList.source,
+            );
+            pendingSourceList = null;
+        }
+
         isLoading.value = true;
 
         try {
             finalizeCurrentQueueItem('skipped');
 
-            // Внешний трек поиска ещё не в базе, /audio по его
+            // Внешний трек (поиск/волна) ещё не в базе, /audio по его
             // внешнему id не сработает. Сначала /play: бэкенд
             // сохранит трек и вернёт его версию с DB id — её
             // и запускаем локально.
-            if (playbackSource === PlaySourceListsEnum.SEARCH) {
+            if (
+                playbackSource === PlaySourceListsEnum.SEARCH
+                || playbackSource === PlaySourceListsEnum.YANDEX_WAVE
+            ) {
                 const response = await playRemoteTrack(
                     track,
                     playbackSource,
@@ -1253,7 +1582,7 @@ const usePlayerStore = defineStore('player', () => {
 
                 if (!serverTrack) {
                     throw new Error(
-                        'Сервер не вернул сохранённый трек поиска.',
+                        'Сервер не вернул сохранённый внешний трек.',
                     );
                 }
 
@@ -1550,6 +1879,7 @@ const usePlayerStore = defineStore('player', () => {
         stopServerProgressTimer();
 
         if (isLocalDeviceActive.value && auth.user) {
+            reportWave('trackFinished', undefined, progress.value);
             void playNext('ended');
         }
     });
@@ -1675,6 +2005,7 @@ const usePlayerStore = defineStore('player', () => {
             // Серверная очередь (со статусами) хранится отдельно
             // от списка-источника — она в приоритете при переключении.
             serverQueue.value = queueResponse;
+            setServerQueueCount(queueResponse.length);
 
             console.log(
                 '[Player] Очередь восстановлена с сервера:',
@@ -1709,6 +2040,20 @@ const usePlayerStore = defineStore('player', () => {
             incomingVersion < lastAppliedVersion
         ) {
             return;
+        }
+
+        // Полная изоляция волны: пока она играет — чужие
+        // серверные состояния (эхо /play из избранного и т.п.)
+        // её не переключают; вне волны состояния волны
+        // не применяются. Исключение — восстановление
+        // состояния при загрузке страницы.
+        if (state.play_source && !isRestoringState.value) {
+            const isWaveState =
+                state.play_source === PlaySourceListsEnum.YANDEX_WAVE;
+
+            if (waveMode.value !== isWaveState) {
+                return;
+            }
         }
 
         if (Number.isFinite(incomingVersion)) {
@@ -1764,7 +2109,16 @@ const usePlayerStore = defineStore('player', () => {
             Number(requestedTrackId) === Number(track.id);
         currentTrack.value = mapPlaybackTrack(track);
         currentSourceTrack.value = track;
-        currentTrackIndex.value = findTrackIndex(track);
+
+        const foundIndex = findTrackIndex(track);
+
+        // Не сбрасываем позицию в списке, если пришедший
+        // с сервера трек не совпал ни с одним элементом
+        // очереди (внешний id, список уже перезагружен).
+        if (foundIndex !== -1) {
+            currentTrackIndex.value = foundIndex;
+        }
+
         audioDuration.value = getTrackDuration(track);
 
         if (trackChanged) {
@@ -2020,6 +2374,7 @@ const usePlayerStore = defineStore('player', () => {
         setQueue,
         addToQueue,
         playTrackNext,
+        playServerQueueItem,
         serverQueueCount,
         setServerQueueCount,
 
@@ -2036,6 +2391,11 @@ const usePlayerStore = defineStore('player', () => {
         favoriteLoading,
         updateFavoriteState,
         toggleFavorite,
+
+        // Моя Волна
+        waveMode,
+        startWave,
+        dislikeCurrentTrack,
 
         isSeeking,
         seekAudio,

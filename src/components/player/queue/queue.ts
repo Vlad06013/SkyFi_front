@@ -1,4 +1,4 @@
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import usePlayerStore from '@/stores/player';
 import {
     getPlayerQueue,
@@ -6,6 +6,16 @@ import {
 } from '@/api/queue';
 
 import { PlaybackQueueItem } from '@/types/QueueType';
+
+/** Порядок показа: играющий первым, затем ожидающие,
+ *  прослушанные/пропущенные в конец. */
+const STATUS_RANK: Record<PlaybackQueueItem['status'], number> = {
+    playing_now: 0,
+    pending: 1,
+    played: 2,
+    skipped: 2,
+};
+
 export function useQueue() {
     const player = usePlayerStore();
 
@@ -13,12 +23,32 @@ export function useQueue() {
     const queueItems = ref<PlaybackQueueItem[]>([]);
     const removingIds = ref(new Set<number>());
 
+    const visibleItems = computed(() =>
+        [...queueItems.value].sort(
+            (a, b) =>
+                STATUS_RANK[a.status] - STATUS_RANK[b.status]
+                || a.position - b.position,
+        ),
+    );
+
     function applyQueue(items: PlaybackQueueItem[]): void {
         queueItems.value = items;
         player.setServerQueueCount(items.length);
         player.setQueue(
             items.map(item => item.track),
         );
+    }
+
+    async function playQueueTrack(
+        item: PlaybackQueueItem,
+    ): Promise<void> {
+        if (item.status !== 'pending') return;
+
+        await player.playServerQueueItem(item);
+
+        // Статус элемента обновился на сервере —
+        // подтянем свежую очередь.
+        void refreshQueue();
     }
 
     async function refreshQueue(): Promise<void> {
@@ -75,8 +105,10 @@ export function useQueue() {
         player,
         loading,
         queueItems,
+        visibleItems,
         removingIds,
         refreshQueue,
         removeQueueItem,
+        playQueueTrack,
     };
 }

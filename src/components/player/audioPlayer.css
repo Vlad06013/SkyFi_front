@@ -122,6 +122,32 @@
     color: #e88bae;
 }
 
+/* Дизлайк в Моей Волне: реакция в Яндекс, избранное не трогаем. */
+.dislike-button {
+    flex-shrink: 0;
+    border: 0;
+    padding: 4px;
+    background: transparent;
+    color: #9295a8;
+    cursor: pointer;
+    transition: color 0.2s, transform 0.2s;
+}
+
+.dislike-button:hover:not(:disabled) {
+    color: #f0a5a5;
+    transform: scale(1.08);
+}
+
+.dislike-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.dislike-icon {
+    width: 20px;
+    height: 20px;
+}
+
 .heart-button:disabled {
     opacity: 0.4;
     cursor: not-allowed;
@@ -863,6 +889,8 @@
         font-size: 10px;
     }
 
+    /* На телефоне сердечко, очередь и меню трека скрыты:
+     * всё это есть на деталке трека. */
     .heart-button,
     .queue-toggle,
     .now-playing .track-menu-wrap {
@@ -1065,6 +1093,10 @@
     font-size: 18px;
 
     cursor: pointer;
+}
+
+.track-details-queue {
+    position: relative;
 }
 
 .track-details-cover {

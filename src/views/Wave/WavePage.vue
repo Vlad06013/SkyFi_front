@@ -1,0 +1,399 @@
+<template>
+  <ion-page>
+    <AppNavigation />
+
+    <ion-content class="vibe-content">
+      <div class="vibe-blobs" aria-hidden="true">
+        <span class="vibe-blob vibe-blob-yellow" />
+        <span class="vibe-blob vibe-blob-purple" />
+        <span class="vibe-blob vibe-blob-green" />
+      </div>
+
+      <div class="vibe-page">
+        <header class="vibe-topbar">
+          <div class="vibe-brand">
+            <span class="vibe-brand-mark">♫</span>
+            <strong>SkyFi</strong>
+          </div>
+
+          <ProfileMenu />
+        </header>
+
+        <section class="vibe-hero">
+          <template v-if="!heroDisplay">
+            <h1 class="vibe-logo">
+              <ion-icon :icon="playOutline" />
+              Моя Волна
+            </h1>
+
+            <button
+                class="vibe-play"
+                type="button"
+                :disabled="waveLoading"
+                aria-label="Слушать волну"
+                @click="playWave"
+            >
+              <ion-spinner
+                  v-if="waveLoading || player.isLoading"
+                  name="crescent"
+              />
+              <ion-icon v-else :icon="playOutline" />
+            </button>
+          </template>
+
+          <template v-else>
+            <div class="vibe-cover-wrap">
+              <img
+                  v-if="heroDisplay.cover"
+                  class="vibe-cover"
+                  :src="heroDisplay.cover"
+                  :alt="heroDisplay.title"
+              />
+              <div v-else class="vibe-cover vibe-cover-empty">♫</div>
+            </div>
+
+            <div
+                class="vibe-eq"
+                :class="{ 'vibe-eq-on': isPlaying }"
+                aria-hidden="true"
+            >
+              <span v-for="bar in 5" :key="bar" />
+            </div>
+
+            <h1 class="vibe-title">{{ heroDisplay.title }}</h1>
+
+            <p class="vibe-artist">{{ heroDisplay.artist }}</p>
+
+            <div class="vibe-controls">
+              <button
+                  class="vibe-play vibe-play-small"
+                  type="button"
+                  :disabled="waveLoading"
+                  aria-label="Слушать волну"
+                  @click="playWave"
+              >
+                <ion-spinner
+                    v-if="waveLoading || player.isLoading"
+                    name="crescent"
+                />
+                <ion-icon
+                    v-else
+                    :icon="isPlaying ? pauseOutline : playOutline"
+                />
+              </button>
+            </div>
+          </template>
+        </section>
+
+        <div
+            v-if="waveLoading && !player.waveMode && !heroDisplay"
+            class="vibe-state"
+        >
+          <ion-spinner name="crescent" />
+          <p>Загружаем волну…</p>
+        </div>
+
+        <div
+            v-else-if="waveError && !player.waveMode && !heroDisplay"
+            class="vibe-state vibe-error"
+        >
+          <p>{{ waveError }}</p>
+          <ion-button
+              fill="outline"
+              size="small"
+              @click="loadWave"
+          >
+            Повторить
+          </ion-button>
+        </div>
+      </div>
+    </ion-content>
+  </ion-page>
+</template>
+
+<script setup lang="ts">
+import {
+  IonButton,
+  IonContent,
+  IonIcon,
+  IonPage,
+  IonSpinner,
+} from '@ionic/vue';
+import {
+  playOutline,
+  pauseOutline,
+} from 'ionicons/icons';
+
+import AppNavigation from '@/components/AppNavigation.vue';
+import ProfileMenu from '@/components/profile/ProfileMenu.vue';
+import usePlayerStore from '@/stores/player';
+import { useWave } from './wave';
+
+const player = usePlayerStore();
+
+const {
+  waveLoading,
+  waveError,
+  isPlaying,
+  heroDisplay,
+  loadWave,
+  playWave,
+} = useWave();
+</script>
+
+<style scoped>
+.vibe-content {
+  --background: #050507;
+}
+
+/* Анимированные цветные пятна на весь экран. */
+.vibe-blobs {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.vibe-blob {
+  position: absolute;
+  width: 65vmax;
+  height: 65vmax;
+  border-radius: 50%;
+  filter: blur(70px);
+  opacity: 0.55;
+}
+
+.vibe-blob-yellow {
+  top: -18vmax;
+  left: 50%;
+  background: radial-gradient(
+      circle,
+      rgba(255, 214, 51, 0.85),
+      transparent 65%
+  );
+  animation: vibe-drift 26s ease-in-out infinite alternate;
+}
+
+.vibe-blob-purple {
+  bottom: -22vmax;
+  left: -18vmax;
+  background: radial-gradient(
+      circle,
+      rgba(168, 85, 247, 0.7),
+      transparent 65%
+  );
+  animation: vibe-drift 32s ease-in-out infinite alternate-reverse;
+}
+
+.vibe-blob-green {
+  right: -20vmax;
+  bottom: -14vmax;
+  background: radial-gradient(
+      circle,
+      rgba(34, 197, 94, 0.55),
+      transparent 65%
+  );
+  animation: vibe-drift 38s ease-in-out infinite alternate;
+}
+
+@keyframes vibe-drift {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(6vmax, -4vmax) scale(1.15); }
+}
+
+.vibe-page {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 16px 24px 140px;
+}
+
+.vibe-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8vh;
+}
+
+.vibe-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #f5f3fa;
+  font-size: 16px;
+}
+
+.vibe-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #ffd633, #b8860b);
+  color: #16130a;
+}
+
+/* ---------- ЦЕНТРАЛЬНЫЙ БЛОК ---------- */
+
+.vibe-hero {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.vibe-logo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  color: #f5f3fa;
+  font-size: clamp(30px, 7vw, 42px);
+  font-weight: 800;
+  text-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+}
+
+.vibe-cover-wrap {
+  width: min(230px, 60vw);
+  aspect-ratio: 1;
+  border-radius: 20px;
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.65);
+}
+
+.vibe-cover {
+  width: 100%;
+  height: 100%;
+  border-radius: 20px;
+  object-fit: cover;
+}
+
+.vibe-cover-empty {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(145deg, #2a2a33, #17171d);
+  color: #ffd633;
+  font-size: 56px;
+}
+
+/* Эквалайзер под обложкой. */
+.vibe-eq {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 22px;
+  margin-top: 20px;
+}
+
+.vibe-eq span {
+  width: 4px;
+  height: 18%;
+  border-radius: 2px;
+  background: #ffd633;
+  transition: height 0.3s;
+}
+
+.vibe-eq-on span {
+  animation: vibe-eq 0.85s ease-in-out infinite alternate;
+}
+
+.vibe-eq-on span:nth-child(1) { animation-delay: 0s; }
+.vibe-eq-on span:nth-child(2) { animation-delay: 0.22s; }
+.vibe-eq-on span:nth-child(3) { animation-delay: 0.1s; }
+.vibe-eq-on span:nth-child(4) { animation-delay: 0.3s; }
+.vibe-eq-on span:nth-child(5) { animation-delay: 0.15s; }
+
+@keyframes vibe-eq {
+  from { height: 18%; }
+  to { height: 100%; }
+}
+
+.vibe-title {
+  margin: 16px 0 6px;
+  color: #f5f3fa;
+  font-size: 24px;
+  line-height: 1.2;
+  text-shadow: 0 2px 18px rgba(0, 0, 0, 0.6);
+}
+
+.vibe-artist {
+  margin: 0;
+  color: #cfcfda;
+  font-size: 14px;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.6);
+}
+
+/* ---------- КНОПКИ ---------- */
+
+.vibe-play {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  height: 84px;
+  margin-top: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: #ffd633;
+  color: #16130a;
+  font-size: 36px;
+  cursor: pointer;
+  box-shadow: 0 12px 32px rgba(255, 214, 51, 0.3);
+  transition: transform 0.15s, background 0.2s;
+}
+
+.vibe-play:hover:not(:disabled) {
+  background: #ffdf5c;
+  transform: scale(1.05);
+}
+
+.vibe-play:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.vibe-play ion-spinner {
+  width: 32px;
+  height: 32px;
+  color: #16130a;
+}
+
+.vibe-controls {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-top: 30px;
+}
+
+.vibe-play-small {
+  width: 68px;
+  height: 68px;
+  margin-top: 0;
+  font-size: 30px;
+}
+
+/* ---------- СОСТОЯНИЯ ---------- */
+
+.vibe-state {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: #9295a8;
+}
+
+.vibe-state p {
+  margin: 0;
+}
+
+.vibe-error {
+  color: #f0a5a5;
+}
+</style>

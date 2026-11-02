@@ -258,7 +258,7 @@ export default defineComponent({
                 return;
             }
 
-            player.setQueue(queueResults.value);
+            player.setQueue(queueResults.value, PLAYBACK_SOURCE);
 
             await player.playTrack(track, PLAYBACK_SOURCE);
         }

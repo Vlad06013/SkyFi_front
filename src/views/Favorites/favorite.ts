@@ -417,7 +417,10 @@ export function useLibrary() {
                 validQueue,
             );
 
-            player.setQueue(validQueue);
+            player.setQueue(
+                validQueue,
+                PlaySourceListsEnum.FAVORITES,
+            );
 
             console.log(
                 '[Library] Запускаем воспроизведение:',

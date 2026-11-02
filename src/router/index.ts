@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from '@ionic/vue-router';
 import { RouteRecordRaw } from 'vue-router';
-import HomePage from '../views/Home/HomePage.vue'
+import WavePage from '../views/Wave/WavePage.vue'
 import SearchPage from '@/views/Search/SearchPage.vue';
 // import LibraryPage from '@/views/Library/LibraryPage.vue';
 import PlaylistsPage from '@/views/Playlists/PlaylistsPage.vue';
@@ -16,12 +16,12 @@ import FriendPage from '@/views/Friends/FriendPage.vue';
 const routes: Array<RouteRecordRaw> = [
   {
     path: '/',
-    redirect: '/home'
+    redirect: '/wave'
   },
   {
-    path: '/home',
-    name: 'Home',
-    component: HomePage
+    path: '/wave',
+    name: 'Wave',
+    component: WavePage
   },
   {
     path: '/search',
@@ -92,7 +92,7 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.guestOnly && auth.isAuthenticated) {
-    return '/home';
+    return '/wave';
   }
 
   return true;

@@ -1,7 +1,7 @@
 <template>
   <nav class="app-navigation" @click="handleNavClick">
     <!-- Логотип -->
-    <RouterLink to="/home" class="nav-logo">
+    <RouterLink to="/wave" class="nav-logo">
       <span class="logo-icon">S</span>
       <span class="logo-text">SkyFi</span>
     </RouterLink>
@@ -9,15 +9,15 @@
     <!-- Основное меню -->
     <div class="nav-links">
       <RouterLink
-          to="/home"
+          to="/wave"
           class="nav-link"
           exact-active-class="nav-link-exact-active"
       >
         <span class="nav-icon">
-          <ion-icon :icon="homeOutline" />
+          <ion-icon :icon="pulseOutline" />
         </span>
 
-        <span class="nav-label">Главная</span>
+        <span class="nav-label">Волна</span>
       </RouterLink>
 
       <RouterLink to="/search" class="nav-link">
@@ -73,7 +73,7 @@ import { RouterLink } from 'vue-router';
 import { IonIcon } from '@ionic/vue';
 
 import {
-  homeOutline,
+  pulseOutline,
   searchOutline,
   musicalNotesOutline,
   listOutline,

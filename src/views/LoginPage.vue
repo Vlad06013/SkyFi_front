@@ -2,7 +2,7 @@
   <ion-page>
     <ion-content :fullscreen="true" class="auth-content">
       <div class="auth-layout">
-        <router-link to="/home" class="brand">
+        <router-link to="/wave" class="brand">
           <span class="brand-icon">S</span>
           <span>Sky<span class="brand-light">Fi</span></span>
         </router-link>
@@ -97,7 +97,7 @@ async function submit() {
     await router.replace(
         typeof redirect === 'string' && redirect.startsWith('/')
             ? redirect
-            : '/home',
+            : '/wave',
     );
   }
 }
