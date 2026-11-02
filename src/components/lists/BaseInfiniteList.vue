@@ -102,19 +102,100 @@ function getItemKey(item: T, index: number): string | number {
 }
 
 async function handleInfinite(event: CustomEvent): Promise<void> {
+  const target =
+      event.target as HTMLIonInfiniteScrollElement;
+
+  // Позиция скролла на старте: пока пользователь не прокрутил
+  // ВВЕРХ относительно неё — продолжаем подгрузку страниц.
+  const content = target.closest('ion-content') as
+      | HTMLIonContentElement
+      | null;
+
+  const startScrollTop = content
+      ? (await content.getScrollElement()).scrollTop
+      : 0;
+
   try {
-    if (
-        props.hasMore &&
-        props.loadMore &&
-        !props.loading &&
-        !props.loadingMore
-    ) {
-      await props.loadMore();
-    }
+    await runLoadMore();
   } finally {
-    await (
-        event.target as HTMLIonInfiniteScrollElement
-    ).complete();
+    await target.complete();
+
+    // ion-infinite-scroll стреляет только по событию скролла.
+    // После подгрузки нижний край контента уезжает вниз, и одного
+    // события скролла уже не хватает, чтобы догрузить всё —
+    // продолжаем сами, пока пользователь не полистал вверх.
+    void fillUntilScrolledUp(target, startScrollTop);
+  }
+}
+
+async function runLoadMore(): Promise<void> {
+  if (
+      props.hasMore &&
+      props.loadMore &&
+      !props.loading &&
+      !props.loadingMore &&
+      !props.error
+  ) {
+    await props.loadMore();
+  }
+}
+
+async function fillUntilScrolledUp(
+    target: HTMLIonInfiniteScrollElement,
+    startScrollTop: number,
+    depth = 0,
+): Promise<void> {
+  // Страховка от бесконечной рекурсии на случай зависшего
+  // hasMore. 100 страниц × 20 треков — с запасом выше реальной
+  // глубины источников: конец выдачи цепочка находит сама,
+  // через hasMore, задолго до этого предела.
+  if (depth > 100) {
+    return;
+  }
+
+  // Даём complete() и перерисовке обновить высоту контента.
+  await new Promise((resolve) => setTimeout(resolve, 100));
+
+  if (
+      !props.hasMore ||
+      props.loading ||
+      props.loadingMore ||
+      props.error
+  ) {
+    return;
+  }
+
+  try {
+    const content = target.closest('ion-content') as
+        | HTMLIonContentElement
+        | null;
+
+    if (!content) {
+      return;
+    }
+
+    const scrollEl = await content.getScrollElement();
+
+    if (!scrollEl) {
+      return;
+    }
+
+    // Пользователь прокрутил вверх от места, откуда начали, —
+    // автоподгрузку выключаем, дальше он листает сам.
+    if (scrollEl.scrollTop < startScrollTop - 50) {
+      return;
+    }
+
+    await runLoadMore();
+
+    await fillUntilScrolledUp(
+        target,
+        startScrollTop,
+        depth + 1,
+    );
+  } catch {
+    // Позиция скролла недоступна — оставляем стандартное
+    // поведение infinite scroll.
   }
 }
 </script>

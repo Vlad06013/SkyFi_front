@@ -68,6 +68,24 @@ export function useSearch() {
     /** Отменяет предыдущий полётный запрос поиска. */
     let searchAbortController: AbortController | null = null;
 
+    /** Текущая страница результатов и есть ли следующая. */
+    let searchPage = 1;
+
+    const searchHasMore = ref(false);
+
+    /** Последний выполненный запрос — для подгрузки страниц. */
+    let lastSearchTerm = '';
+
+    const searchLoadingMore = ref(false);
+
+    /** Размер страницы: совпадает с лимитом запроса. */
+    const SEARCH_PAGE_SIZE = 20;
+
+    /** Ключ трека для дедупликации при подгрузке страниц. */
+    function trackKey(track: Track): string {
+        return `${track.source_type}:${track.source_id ?? track.id}`;
+    }
+
     /**
      * Отменённый через AbortController запрос — не ошибка.
      */
@@ -253,14 +271,23 @@ export function useSearch() {
     // ВЫПОЛНЕНИЕ ПОИСКА
     // ==========================================
 
-    async function performSearch(term: string): Promise<void> {
+    /**
+     * Выполнить поиск. page = 1 заменяет список, page > 1
+     * подгружает следующую страницу с дедупликацией.
+     */
+    async function performSearch(
+        term: string,
+        page = 1,
+    ): Promise<void> {
         const requestId = ++searchRequestId;
 
         // Актуален только последний запрос — прерываем предыдущий.
         searchAbortController?.abort();
         searchAbortController = new AbortController();
 
-        searchLoading.value = true;
+        if (page === 1) {
+            searchLoading.value = true;
+        }
 
         searchError.value = '';
 
@@ -268,7 +295,7 @@ export function useSearch() {
             const response = await searchTracks(
                 term,
                 20,
-                1,
+                page,
                 searchAbortController.signal,
             );
 
@@ -277,12 +304,53 @@ export function useSearch() {
                 return;
             }
 
-            tracks.value = response.data.map(
+            const incoming = response.data.map(
                 (track, index) => ({
                     ...track,
                     color: coverColors[index % coverColors.length],
                 }),
             );
+
+            let addedCount = 0;
+
+            if (page === 1) {
+                tracks.value = incoming;
+                addedCount = incoming.length;
+            } else {
+                // Подгрузка: отсекаем треки, уже есть в списке.
+                const existing = new Set(
+                    tracks.value.map(trackKey),
+                );
+
+                const fresh = incoming.filter(
+                    track => !existing.has(trackKey(track)),
+                );
+
+                tracks.value = [
+                    ...tracks.value,
+                    ...fresh,
+                ];
+
+                addedCount = fresh.length;
+            }
+
+            searchPage = page;
+            lastSearchTerm = term;
+
+            // Полная страница, а бэкенд сказал «конец»: total у
+            // Яндекса плавает между запросами. Пробуем ещё одну —
+            // пустая страница или одни повторы (addedCount === 0)
+            // остановят подгрузку, реальные треки продолжат её.
+            searchHasMore.value =
+                response.pagination?.next_cursor != null ||
+                addedCount >= SEARCH_PAGE_SIZE;
+
+            console.log('[Search] Страница получена:', {
+                page,
+                получено: incoming.length,
+                добавлено: addedCount,
+                hasMore: searchHasMore.value,
+            });
         } catch (error) {
             // Прерванный запрос не считаем ошибкой.
             if (isAbortError(error)) {
@@ -298,7 +366,9 @@ export function useSearch() {
                 error,
             );
 
-            tracks.value = [];
+            if (page === 1) {
+                tracks.value = [];
+            }
 
             searchError.value =
                 'Не удалось выполнить поиск. Попробуй ещё раз.';
@@ -306,6 +376,31 @@ export function useSearch() {
             if (requestId === searchRequestId) {
                 searchLoading.value = false;
             }
+        }
+    }
+
+    /**
+     * Подгрузить следующую страницу результатов (скролл вниз).
+     */
+    async function loadMoreSearch(): Promise<void> {
+        if (
+            !searchHasMore.value ||
+            !lastSearchTerm ||
+            searchLoading.value ||
+            searchLoadingMore.value
+        ) {
+            return;
+        }
+
+        searchLoadingMore.value = true;
+
+        try {
+            await performSearch(
+                lastSearchTerm,
+                searchPage + 1,
+            );
+        } finally {
+            searchLoadingMore.value = false;
         }
     }
 
@@ -350,8 +445,14 @@ export function useSearch() {
 
             searchLoading.value = false;
 
+            searchHasMore.value = false;
+
+            lastSearchTerm = '';
+
             return;
         }
+
+        lastSearchTerm = term;
 
         // Ждём 800 мс после ввода: пока переключаешь раскладку,
         // запросы не уходят на каждую букву.
@@ -499,6 +600,9 @@ export function useSearch() {
 
         searchLoading,
         searchError,
+        searchLoadingMore,
+        searchHasMore,
+        loadMoreSearch,
         filteredTracks,
         activeSource,
         sourceFilters,

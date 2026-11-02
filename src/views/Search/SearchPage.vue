@@ -119,6 +119,9 @@
               :loading="searchLoading"
               :error="searchError"
               :retry="retrySearch"
+              :has-more="searchHasMore"
+              :loading-more="searchLoadingMore"
+              :load-more="loadMoreSearch"
               :is-favorite-track="
                 (track) => isFavorite(track.source_id ?? track.id)
               "
@@ -159,6 +162,9 @@ const {
   genres,
   searchLoading,
   searchError,
+  searchLoadingMore,
+  searchHasMore,
+  loadMoreSearch,
   filteredTracks,
   retrySearch,
   isFavorite,

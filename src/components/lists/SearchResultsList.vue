@@ -2,11 +2,11 @@
   <BaseInfiniteList
       :items="items"
       :loading="loading"
-      :loading-more="false"
-      :has-more="false"
+      :loading-more="loadingMore"
+      :has-more="hasMore"
       :error="error"
       :get-key="track => track.id"
-      :load-more="async () => {}"
+      :load-more="loadMore"
       :retry="async () => {
         await props.retry();
       }"
@@ -284,16 +284,26 @@ function getTrackColor(id: number | string): string {
       ];
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   items: Track[];
   loading: boolean;
   error: string | null;
   retry: () => void | Promise<void>;
+  /** Есть ли следующая страница результатов. */
+  hasMore?: boolean;
+  /** Идёт ли подгрузка следующей страницы. */
+  loadingMore?: boolean;
+  /** Подгрузка следующей страницы (скролл вниз). */
+  loadMore?: () => Promise<void>;
   /** Состояние избранного трека (сердечко слева от меню). */
   isFavoriteTrack?: (track: Track) => boolean;
   /** Идёт ли сейчас переключение избранного для трека. */
   isFavoriteLoadingTrack?: (track: Track) => boolean;
-}>();
+}>(), {
+  hasMore: false,
+  loadingMore: false,
+  loadMore: async () => {},
+});
 
 function isTrackFavorite(track: Track): boolean {
   return props.isFavoriteTrack

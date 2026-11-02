@@ -5,13 +5,28 @@ import {type Track} from '@/types/TrackType';
 
 
 /**
+ * Пагинация поиска. Курсоры — это номера страниц (opaque для фронта):
+ * next_cursor не null — есть следующая страница.
+ */
+export interface SearchPagination {
+    limit: number;
+    next_cursor: string | null;
+    prev_cursor: string | null;
+}
+
+export interface SearchResponse extends ApiResponse<Track[]> {
+    pagination: SearchPagination | null;
+}
+
+/**
  * Поиск треков в базе SkyFi и внешних источниках.
  *
- * GET /skyfy/search?q=возраст&limit=20
+ * GET /skyfy/search?q=возраст&limit=20&page=1
  *
- * Ответ — единый контракт: data — плоский массив треков.
+ * Лимит уходит в КАЖДЫЙ источник (база, Яндекс): data может
+ * содержать до источников × limit треков.
  *
- * Внешние источники (Яндекс) могут отвечать долго — таймаут минута
+ * Внешние источники могут отвечать долго — таймаут минута
  * вместо глобальных 15 секунд. signal — для отмены устаревших
  * запросов при продолжающемся вводе.
  */
@@ -20,8 +35,8 @@ export async function searchTracks(
     limit = 20,
     page = 1,
     signal?: AbortSignal,
-): Promise<ApiResponse<Track[]>> {
-    const response = await http.get<ApiResponse<Track[]>>(
+): Promise<SearchResponse> {
+    const response = await http.get<SearchResponse>(
         '/search',
         {
             params: {
