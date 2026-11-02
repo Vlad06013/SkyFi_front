@@ -1,7 +1,6 @@
 import {
     computed,
     onMounted,
-    reactive,
     ref,
     toRaw,
     watch,
@@ -458,7 +457,7 @@ export function useLibrary() {
         const result = new Map<number, Album>();
 
         for (const track of tracks.value) {
-            if (!track.album) {
+            if (!track.meta.album) {
                 continue;
             }
 
@@ -466,7 +465,7 @@ export function useLibrary() {
                 track as Track & {
                     album_id?: number | null;
                 }
-            ).album_id ?? track.album.id;
+            ).album_id ?? track.meta.album.id;
 
             if (
                 albumId === undefined ||
@@ -489,7 +488,7 @@ export function useLibrary() {
             } else {
                 result.set(normalizedAlbumId, {
                     id: normalizedAlbumId,
-                    title: track.album.title,
+                    title: track.meta.album.title,
                     tracksCount: 1,
                     tracks: [track],
                 });
@@ -509,7 +508,7 @@ export function useLibrary() {
         const result = new Map<number, LibraryArtist>();
 
         for (const track of tracks.value) {
-            for (const artist of track.artists ?? []) {
+            for (const artist of track.meta.artists) {
                 const artistId = Number(artist.id);
 
                 if (!Number.isFinite(artistId)) {

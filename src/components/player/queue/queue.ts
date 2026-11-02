@@ -1,4 +1,4 @@
-import { ref, watch } from 'vue';
+import { ref } from 'vue';
 import usePlayerStore from '@/stores/player';
 import {
     getPlayerQueue,

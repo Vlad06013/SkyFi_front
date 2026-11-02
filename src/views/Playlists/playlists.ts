@@ -328,7 +328,9 @@ export function usePlaylists() {
 
     const removingTrackId = ref<number | null>(null);
 
-    async function removeTrack(trackId: number): Promise<void> {
+    async function removeTrack(
+        trackId: number | string,
+    ): Promise<void> {
         if (!selectedPlaylist.value || removingTrackId.value !== null) {
             return;
         }
@@ -416,7 +418,7 @@ export function usePlaylists() {
         '#337E75',
     ];
 
-    function getTrackColor(id: number): string {
+    function getTrackColor(id: number | string): string {
         const normalizedId = Number(id);
 
         if (!Number.isFinite(normalizedId)) {

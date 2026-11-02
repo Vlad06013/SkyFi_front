@@ -98,9 +98,27 @@
           <span/>
         </span>
 
+        <!-- Избранное: состояние приходит снаружи (поиск). -->
+        <button
+            type="button"
+            class="track-favorite-button"
+            :class="{ liked: isTrackFavorite(track) }"
+            :disabled="isTrackFavoriteLoading(track)"
+            :aria-pressed="isTrackFavorite(track)"
+            :aria-label="
+              isTrackFavorite(track)
+                ? 'Удалить из избранного'
+                : 'Добавить в избранное'
+            "
+            @click.stop="emit('favorite', track)"
+        >
+          <ion-icon
+              :icon="isTrackFavorite(track) ? heart : heartOutline"
+          />
+        </button>
+
         <TrackContextMenu
             :track="track"
-            :is-favorite="track.is_favorite ?? false"
             :loading="loadingTrackId === Number(track.id)"
             @open="handleMenuOpen"
             @close="handleMenuClose"
@@ -118,7 +136,9 @@ import {
   musicalNotesOutline,
   pauseOutline,
   playOutline,
-  flashOutline
+  flashOutline,
+  heart,
+  heartOutline,
 } from 'ionicons/icons';
 
 import BaseInfiniteList from '@/components/lists/BaseInfiniteList.vue';
@@ -139,14 +159,13 @@ const emit = defineEmits<{
     track: Track,
     action: 'next' | 'queue' | 'favorite',
   ];
+  favorite: [track: Track];
   menuOpen: [track: Track];
 }>();
 
 async function handleAction(
     track: Track,
     action: 'next' | 'queue' | 'favorite',
-    isFavorite: boolean,
-
 ) {
 
   switch (action) {
@@ -157,15 +176,9 @@ async function handleAction(
     case 'next':
       await player.playTrackNext(track);
       break;
-
-    case 'favorite':
-      await player.toggleFavorite(track, isFavorite);
-      await props.retry();
-      break;
   }
 }
 
-const isPlaying = computed(() => player.isPlaying);
 const sourceList = PlaySourceListsEnum.SEARCH;
 function isTrackPlaying(track: Track): boolean {
   return isCurrentTrack(track) && player.isPlaying;
@@ -276,7 +289,23 @@ const props = defineProps<{
   loading: boolean;
   error: string | null;
   retry: () => void | Promise<void>;
+  /** Состояние избранного трека (сердечко слева от меню). */
+  isFavoriteTrack?: (track: Track) => boolean;
+  /** Идёт ли сейчас переключение избранного для трека. */
+  isFavoriteLoadingTrack?: (track: Track) => boolean;
 }>();
+
+function isTrackFavorite(track: Track): boolean {
+  return props.isFavoriteTrack
+    ? props.isFavoriteTrack(track)
+    : false;
+}
+
+function isTrackFavoriteLoading(track: Track): boolean {
+  return props.isFavoriteLoadingTrack
+    ? props.isFavoriteLoadingTrack(track)
+    : false;
+}
 
 watch(
     () => props.items,
@@ -349,5 +378,41 @@ watch(
   font-size: 15px;
   color: #4ade80;
   filter: drop-shadow(0 0 3px rgb(74 222 128 / 25%));
+}
+
+.track-favorite-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #9296a7;
+  cursor: pointer;
+  transition: color 0.2s, transform 0.2s;
+}
+
+.track-favorite-button:hover:not(:disabled),
+.track-favorite-button:focus-visible {
+  color: #f5f7fa;
+  transform: scale(1.08);
+}
+
+.track-favorite-button.liked {
+  color: #c4b5fd;
+}
+
+.track-favorite-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.track-favorite-button ion-icon {
+  font-size: 19px;
 }
 </style>

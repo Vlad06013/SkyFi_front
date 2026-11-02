@@ -2,6 +2,7 @@ import {
     computed,
     ref,
     watch,
+    onMounted,
     onBeforeUnmount,
 } from 'vue';
 
@@ -329,48 +330,56 @@ export function useSearch() {
     // ИЗБРАННОЕ
     // ==========================================
 
-    const favoriteTrackIds = ref<Set<number>>(
+    /**
+     * Избранные треки поиска. Ключи — строки: source_id внешних
+     * треков или id локальных, чтобы сравнение не зависело
+     * от number/string.
+     */
+    const favoriteTrackIds = ref<Set<string>>(
         new Set(),
     );
 
-    const favoriteLoadingIds = ref<Set<number>>(
+    const favoriteLoadingIds = ref<Set<string | number>>(
         new Set(),
     );
 
     /**
      * Проверить, находится ли трек в избранном.
      */
-    function isFavorite(trackId: number): boolean {
-        return favoriteTrackIds.value.has(trackId);
+    function isFavorite(trackId: string | number): boolean {
+        return favoriteTrackIds.value.has(String(trackId));
     }
 
     // ==========================================
     // ЗАГРУЗКА ИЗБРАННОГО
     // ==========================================
 
-    // async function loadFavorites(): Promise<void> {
-    //     try {
-    //         const response = await getFavorites();
-    //
-    //         favoriteTrackIds.value = new Set(
-    //             response.data.map((track) => track.id),
-    //         );
-    //     } catch (error) {
-    //         console.error(
-    //             'Не удалось загрузить избранное:',
-    //             error,
-    //         );
-    //     }
-    // }
+    async function loadFavorites(): Promise<void> {
+        try {
+            const favorites = await getFavorites();
+
+            favoriteTrackIds.value = new Set(
+                favorites.map((track) =>
+                    String(track.source_id ?? track.id),
+                ),
+            );
+        } catch (error) {
+            console.error(
+                'Не удалось загрузить избранное:',
+                error,
+            );
+        }
+    }
 
     // ==========================================
     // ДОБАВЛЕНИЕ И УДАЛЕНИЕ ИЗБРАННОГО
     // ==========================================
 
     async function toggleFavorite(
-        track: SearchTrack,
+        track: Track,
     ): Promise<void> {
         const trackId = track.id;
+        const trackKey = String(track.source_id ?? track.id);
 
         if (favoriteLoadingIds.value.has(trackId)) {
             return;
@@ -382,14 +391,14 @@ export function useSearch() {
         ]);
 
         try {
-            if (isFavorite(trackId)) {
+            if (isFavorite(trackKey)) {
                 await removeFavorite(track);
 
                 const ids = new Set(
                     favoriteTrackIds.value,
                 );
 
-                ids.delete(trackId);
+                ids.delete(trackKey);
 
                 favoriteTrackIds.value = ids;
             } else {
@@ -399,7 +408,7 @@ export function useSearch() {
                     favoriteTrackIds.value,
                 );
 
-                ids.add(trackId);
+                ids.add(trackKey);
 
                 favoriteTrackIds.value = ids;
             }
@@ -423,9 +432,9 @@ export function useSearch() {
     // ИНИЦИАЛИЗАЦИЯ
     // ==========================================
 
-    // onMounted(() => {
-    //     void loadFavorites();
-    // });
+    onMounted(() => {
+        void loadFavorites();
+    });
 
     // ==========================================
     // ОЧИСТКА

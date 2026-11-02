@@ -52,15 +52,15 @@
 
           <span>
             {{
-              track.artists
-                  ?.map(artist => artist.name)
+              track.meta.artists
+                  .map(artist => artist.name)
                   .join(', ')
               || 'Неизвестный исполнитель'
             }}
           </span>
 
           <small>
-            {{ track.album?.title || 'Без альбома' }}
+            {{ track.meta.album?.title || 'Без альбома' }}
           </small>
         </div>
 
@@ -76,7 +76,7 @@
 
         <TrackContextMenu
             :track="track"
-            :is-favorite="track.is_favorite ?? false"
+            :is-favorite="isTrackFavorite(track)"
             :loading="loadingTrackId === Number(track.id)"
             @open="handleMenuOpen"
             @close="handleMenuClose"
@@ -88,7 +88,7 @@
 </template>
 
 <script setup lang="ts">
-import {computed, watch, ref} from 'vue';
+import {computed, watch, ref, onMounted} from 'vue';
 import {IonIcon} from '@ionic/vue';
 import {
   musicalNotesOutline,
@@ -100,6 +100,7 @@ import BaseInfiniteList from '@/components/lists/BaseInfiniteList.vue';
 import TrackContextMenu from '@/components/track-menu/TrackContextMenu.vue';
 import usePlayerStore from '@/stores/player';
 
+import {getFavorites} from '@/api/favorites';
 import type {Track} from '@/types/TrackType';
 import {PlaySourceListsEnum} from '@/types/PlaySourceListsEnum';
 
@@ -108,6 +109,36 @@ const player = usePlayerStore();
 const loadingTrackId = ref<number | null>(null);
 const openMenuTrackId = ref<string | null>(null);
 const sourceList = PlaySourceListsEnum.UPLOAD;
+
+/** Ключи избранного: у загрузок source_id нет — ключом служит id. */
+const favoriteTrackKeys = ref<Set<string>>(new Set());
+
+function isTrackFavorite(track: Track): boolean {
+  return favoriteTrackKeys.value.has(
+      String(track.source_id ?? track.id),
+  );
+}
+
+async function loadFavoriteKeys(): Promise<void> {
+  try {
+    const favorites = await getFavorites();
+
+    favoriteTrackKeys.value = new Set(
+        favorites.map((track) =>
+            String(track.source_id ?? track.id),
+        ),
+    );
+  } catch (error) {
+    console.warn(
+        '[Uploaded] Не удалось загрузить избранное:',
+        error,
+    );
+  }
+}
+
+onMounted(() => {
+  void loadFavoriteKeys();
+});
 
 const emit = defineEmits<{
   play: [track: Track];
@@ -134,10 +165,21 @@ async function handleAction(
       await player.playTrackNext(track);
       break;
 
-    case 'favorite':
+    case 'favorite': {
       await player.toggleFavorite(track, isFavorite);
-      await props.retry();
+
+      const key = String(track.source_id ?? track.id);
+      const keys = new Set(favoriteTrackKeys.value);
+
+      if (isFavorite) {
+        keys.delete(key);
+      } else {
+        keys.add(key);
+      }
+
+      favoriteTrackKeys.value = keys;
       break;
+    }
   }
 }
 

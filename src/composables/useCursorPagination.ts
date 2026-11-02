@@ -68,7 +68,7 @@ export function useCursorPagination<T>(
 
             const existingKeys = new Set(
                 options.getKey
-                    ? items.value.map(options.getKey)
+                    ? (items.value as T[]).map(options.getKey)
                     : [],
             );
 
@@ -83,7 +83,10 @@ export function useCursorPagination<T>(
                 })
                 : response.data;
 
-            items.value = [...items.value, ...newItems];
+            items.value = [
+                ...items.value,
+                ...newItems,
+            ] as T[];
             nextPageUrl.value = response.next_page_url;
             prevPageUrl.value = response.prev_page_url;
         } catch (err) {

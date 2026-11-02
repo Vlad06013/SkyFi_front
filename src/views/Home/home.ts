@@ -127,12 +127,12 @@ export function useHome() {
     // ========================================
 
     function getTrackArtist(track: ApiTrack): string {
-        if (!track.artists || track.artists.length === 0) {
+        if (track.meta.artists.length === 0) {
             return 'Неизвестный исполнитель';
         }
 
         return (
-            track.artists
+            track.meta.artists
                 .map((artist) => artist.name)
                 .filter(Boolean)
                 .join(', ') || 'Неизвестный исполнитель'

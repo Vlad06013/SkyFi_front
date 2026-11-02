@@ -222,8 +222,8 @@
                 <strong>{{ track.title }}</strong>
                 <span>
                   {{
-                    track.artists
-                        ?.map(artist => artist.name)
+                    track.meta.artists
+                        .map(artist => artist.name)
                         .join(', ') || 'Неизвестный исполнитель'
                   }}
                 </span>

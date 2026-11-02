@@ -119,6 +119,13 @@
               :loading="searchLoading"
               :error="searchError"
               :retry="retrySearch"
+              :is-favorite-track="
+                (track) => isFavorite(track.source_id ?? track.id)
+              "
+              :is-favorite-loading-track="
+                (track) => favoriteLoadingIds.has(track.id)
+              "
+              @favorite="toggleFavorite"
           />
         </section>
 
@@ -137,35 +144,10 @@ import {
   IonPage,
   IonIcon,
 } from '@ionic/vue';
-import { computed, ref } from 'vue';
 import AppNavigation from '@/components/AppNavigation.vue';
 import ProfileMenu from '@/components/profile/ProfileMenu.vue';
 import SearchResultsList from '@/components/lists/SearchResultsList.vue';
 import { useSearch } from './search';
-
-// type SearchSource = 'all' | 'uploads' | 'yandex_music' | 'internet_archive';
-
-// const activeSource = ref<SearchSource>('all');
-
-// const sourceFilters: {
-//   label: string;
-//   value: SearchSource;
-// }[] = [
-//   { label: 'Все', value: 'all' },
-//   { label: 'Загрузки', value: 'uploads' },
-//   { label: 'Яндекс Музыка', value: 'yandex_music' },
-//   { label: 'Internet Archive', value: 'internet_archive' },
-// ];
-
-const sourceFilteredTracks = computed(() => {
-  if (activeSource.value === 'all') {
-    return filteredTracks.value;
-  }
-
-  return filteredTracks.value.filter(
-      track => track.source_type === activeSource.value,
-  );
-});
 
 const {
   query,
@@ -179,6 +161,9 @@ const {
   searchError,
   filteredTracks,
   retrySearch,
+  isFavorite,
+  favoriteLoadingIds,
+  toggleFavorite,
   searchOutline,
   closeOutline,
   trendingUpOutline,

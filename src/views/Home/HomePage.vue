@@ -170,7 +170,6 @@ import AppNavigation from '@/components/AppNavigation.vue';
 import ProfileMenu from '@/components/profile/ProfileMenu.vue';
 
 import { useHome } from './home';
-import YandexMusicAuth from "@/components/Auth/YandexMusic/YandexMusicAuth.vue";
 
 const {
   menu,

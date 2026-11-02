@@ -826,6 +826,8 @@ import FavoriteTracksList from '@/components/lists/FavoriteTracksList.vue';
 import { ref, watch } from 'vue';
 import UploadedTrackList from "@/components/lists/UploadedTrackList.vue";
 
+defineOptions({ name: 'FavoritePage' });
+
 const uploadModalOpen = ref(false);
 
 const {

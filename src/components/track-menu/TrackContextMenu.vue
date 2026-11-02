@@ -92,6 +92,7 @@
             </button>
 
             <button
+                v-if="isFavorite !== undefined"
                 type="button"
                 role="menuitem"
                 :disabled="loading"
@@ -156,6 +157,7 @@
         </button>
 
         <button
+            v-if="isFavorite !== undefined"
             type="button"
             role="menuitem"
             :disabled="loading"
@@ -180,7 +182,7 @@
 </template>
 
 <script setup lang="ts" generic="T extends TrackType">
-import {computed, nextTick, onBeforeUnmount, ref, watch} from 'vue';
+import {nextTick, onBeforeUnmount, ref, watch} from 'vue';
 import {IonIcon, IonSpinner} from '@ionic/vue';
 import {
   closeOutline,
@@ -198,7 +200,8 @@ import type {TrackType} from '@/types/TrackType';
 
 const props = defineProps<{
   track: T;
-  isFavorite: boolean;
+  /** Состояние избранного. Если не передано — пункт меню скрыт. */
+  isFavorite?: boolean;
   loading?: boolean;
   /** Показать действие «В начало списка» (только для списка избранного). */
   movableToTop?: boolean;
@@ -306,7 +309,7 @@ function closeMenu() {
 
 function runAction(action: 'next' | 'queue' | 'favorite') {
   // emit('action', props.track, action);
-  emit('action', props.track, action, props.isFavorite);
+  emit('action', props.track, action, props.isFavorite ?? false);
 
   closeMenu();
 }
