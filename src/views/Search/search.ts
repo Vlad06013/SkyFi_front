@@ -65,6 +65,24 @@ export function useSearch() {
 
     let searchRequestId = 0;
 
+    /** Отменяет предыдущий полётный запрос поиска. */
+    let searchAbortController: AbortController | null = null;
+
+    /**
+     * Отменённый через AbortController запрос — не ошибка.
+     */
+    function isAbortError(error: unknown): boolean {
+        if (error instanceof DOMException) {
+            return error.name === 'AbortError';
+        }
+
+        return (
+            typeof error === 'object' &&
+            error !== null &&
+            (error as { code?: string }).code === 'ERR_CANCELED'
+        );
+    }
+
     const activeSource = ref<SearchSource>('all');
 
     const sourceFilters: {
@@ -238,13 +256,21 @@ export function useSearch() {
     async function performSearch(term: string): Promise<void> {
         const requestId = ++searchRequestId;
 
+        // Актуален только последний запрос — прерываем предыдущий.
+        searchAbortController?.abort();
+        searchAbortController = new AbortController();
+
         searchLoading.value = true;
 
         searchError.value = '';
 
         try {
-            const response = await searchTracks(term, 20);
-            console.log('[Search] Ответ API:', response);
+            const response = await searchTracks(
+                term,
+                20,
+                1,
+                searchAbortController.signal,
+            );
 
             // Игнорируем устаревшие ответы.
             if (requestId !== searchRequestId) {
@@ -258,6 +284,11 @@ export function useSearch() {
                 }),
             );
         } catch (error) {
+            // Прерванный запрос не считаем ошибкой.
+            if (isAbortError(error)) {
+                return;
+            }
+
             if (requestId !== searchRequestId) {
                 return;
             }
@@ -311,6 +342,8 @@ export function useSearch() {
             // Аннулируем предыдущие запросы.
             searchRequestId++;
 
+            searchAbortController?.abort();
+
             tracks.value = [];
 
             searchError.value = '';
@@ -320,10 +353,11 @@ export function useSearch() {
             return;
         }
 
-        // Ждём 400 мс после ввода.
+        // Ждём 800 мс после ввода: пока переключаешь раскладку,
+        // запросы не уходят на каждую букву.
         searchTimeout = setTimeout(() => {
             void performSearch(term);
-        }, 400);
+        }, 800);
     });
 
     // ==========================================
@@ -444,6 +478,9 @@ export function useSearch() {
         if (searchTimeout) {
             clearTimeout(searchTimeout);
         }
+
+        // Уходим со страницы — летящий запрос больше не нужен.
+        searchAbortController?.abort();
 
         // Игнорируем ответы поиска после ухода со страницы.
         searchRequestId++;

@@ -10,11 +10,16 @@ import {type Track} from '@/types/TrackType';
  * GET /skyfy/search?q=возраст&limit=20
  *
  * Ответ — единый контракт: data — плоский массив треков.
+ *
+ * Внешние источники (Яндекс) могут отвечать долго — таймаут минута
+ * вместо глобальных 15 секунд. signal — для отмены устаревших
+ * запросов при продолжающемся вводе.
  */
 export async function searchTracks(
     query: string,
     limit = 20,
     page = 1,
+    signal?: AbortSignal,
 ): Promise<ApiResponse<Track[]>> {
     const response = await http.get<ApiResponse<Track[]>>(
         '/search',
@@ -24,6 +29,8 @@ export async function searchTracks(
                 limit,
                 page,
             },
+            signal,
+            timeout: 60000,
         },
     );
 

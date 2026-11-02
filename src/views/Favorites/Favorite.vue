@@ -796,6 +796,7 @@ import './favorite.css';
 
 import { useLibrary } from './favorite';
 import { useUploaded } from './uploaded';
+import { onIonViewWillEnter } from '@ionic/vue';
 import {
   IonContent,
   IonPage,
@@ -854,6 +855,13 @@ const {
   getTrackColor,
   pluralizeTracks,
 } = useLibrary();
+
+// Ionic кэширует страницы в router-outlet: при возврате из поиска
+// onMounted не сработает. Обновляем библиотеку при каждом входе
+// на экран — лайк, поставленный в поиске, появится сразу.
+onIonViewWillEnter(() => {
+  void loadLibrary();
+});
 
 
 const {
