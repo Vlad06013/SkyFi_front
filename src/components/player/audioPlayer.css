@@ -513,6 +513,19 @@
     transition: opacity 0.16s, visibility 0.16s, transform 0.16s;
 }
 
+/*
+    Невидимый мост над зазором между кнопкой и попапом,
+    чтобы :hover не сбрасывался, пока курсор движется к ползунку.
+*/
+.volume-slider-popover::before {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: -12px;
+    right: -12px;
+    height: 12px;
+}
+
 .volume-control:hover .volume-slider-popover,
 .volume-control:focus-within .volume-slider-popover {
     opacity: 1;
