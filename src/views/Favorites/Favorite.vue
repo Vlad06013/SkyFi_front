@@ -170,7 +170,10 @@
             </span>
           </div>
           <FavoriteTracksList
-              :items="tracks"
+              :items="visibleTracks"
+              :queue-tracks="tracks"
+              :has-more="hasMoreTracks"
+              :load-more="showMoreTracks"
               :loading="loading"
               :error="error"
               :retry="loadLibrary"
@@ -837,6 +840,9 @@ const {
 
   // Избранное
   tracks,
+  visibleTracks,
+  hasMoreTracks,
+  showMoreTracks,
   loading,
   error,
   loadLibrary,

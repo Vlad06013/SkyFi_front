@@ -59,25 +59,28 @@
       <slot name="end">Больше элементов нет</slot>
     </div>
 
-    <ion-infinite-scroll
-        v-if="items.length > 0"
-        :disabled="!hasMore || loading || loadingMore || !!error"
-        threshold="150px"
-        @ionInfinite="handleInfinite"
-    >
-      <ion-infinite-scroll-content
-          loading-spinner="crescent"
-          loading-text="Загрузка..."
-      />
-    </ion-infinite-scroll>
+    <!-- Маркер конца списка: следующая страница подгружается,
+         когда он входит в зону видимости (скролл до низа).
+         Пока контент ниже вьюпорта (телевизоры, широкие экраны),
+         страницы подтянутся подряд автоматически. -->
+    <div
+        ref="sentinelEl"
+        class="list-sentinel"
+        aria-hidden="true"
+    />
   </div>
 </template>
 
 <script setup lang="ts" generic="T">
 import {
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from 'vue';
+import {
   IonButton,
-  IonInfiniteScroll,
-  IonInfiniteScrollContent,
   IonSpinner,
 } from '@ionic/vue';
 
@@ -97,35 +100,24 @@ const props = withDefaults(defineProps<Props>(), {
   loadingMore: false,
 });
 
+const sentinelEl = ref<HTMLElement | null>(null);
+
+let observer: IntersectionObserver | null = null;
+
+/** Идёт ли сейчас цепочка подгрузки — повторные триггеры игнорим. */
+let pumping = false;
+
+/** Запас до нижнего края: страница догружается чуть раньше,
+ *  чем маркер доедет до самого низа. */
+const SENTINEL_MARGIN_PX = 200;
+
+/** Максимум страниц за один заход — страховка от зависшего
+ *  hasMore. 100 страниц × 20 элементов — с большим запасом
+ *  выше реальной глубины списков. */
+const MAX_PAGES_PER_PUMP = 100;
+
 function getItemKey(item: T, index: number): string | number {
   return props.getKey?.(item, index) ?? index;
-}
-
-async function handleInfinite(event: CustomEvent): Promise<void> {
-  const target =
-      event.target as HTMLIonInfiniteScrollElement;
-
-  // Позиция скролла на старте: пока пользователь не прокрутил
-  // ВВЕРХ относительно неё — продолжаем подгрузку страниц.
-  const content = target.closest('ion-content') as
-      | HTMLIonContentElement
-      | null;
-
-  const startScrollTop = content
-      ? (await content.getScrollElement()).scrollTop
-      : 0;
-
-  try {
-    await runLoadMore();
-  } finally {
-    await target.complete();
-
-    // ion-infinite-scroll стреляет только по событию скролла.
-    // После подгрузки нижний край контента уезжает вниз, и одного
-    // события скролла уже не хватает, чтобы догрузить всё —
-    // продолжаем сами, пока пользователь не полистал вверх.
-    void fillUntilScrolledUp(target, startScrollTop);
-  }
 }
 
 async function runLoadMore(): Promise<void> {
@@ -140,64 +132,108 @@ async function runLoadMore(): Promise<void> {
   }
 }
 
-async function fillUntilScrolledUp(
-    target: HTMLIonInfiniteScrollElement,
-    startScrollTop: number,
-    depth = 0,
-): Promise<void> {
-  // Страховка от бесконечной рекурсии на случай зависшего
-  // hasMore. 100 страниц × 20 треков — с запасом выше реальной
-  // глубины источников: конец выдачи цепочка находит сама,
-  // через hasMore, задолго до этого предела.
-  if (depth > 100) {
+/**
+ * Маркер виден в зеркале отступов observer'а (viewport + запас
+ * снизу). Пока контент ниже вьюпорта — виден всегда: страницы
+ * подтягиваются подряд без скролла. Как только список стал
+ * выше экрана — скрыт за нижним краем: дальше только скролл
+ * пользователя.
+ */
+function sentinelVisible(): boolean {
+  const el = sentinelEl.value;
+
+  if (!el) {
+    return false;
+  }
+
+  const rect = el.getBoundingClientRect();
+
+  return (
+      rect.top <= window.innerHeight + SENTINEL_MARGIN_PX &&
+      rect.bottom >= -SENTINEL_MARGIN_PX
+  );
+}
+
+/**
+ * Подгружаем страницы, пока маркер виден. Один заход —
+ * не больше одной «волны»: обычно это одна страница за скролл
+ * до низа; на экранах, куда контент не влезает, — столько,
+ * сколько нужно, чтобы список стал листаемым.
+ */
+async function pumpMore(): Promise<void> {
+  if (pumping) {
     return;
   }
 
-  // Даём complete() и перерисовке обновить высоту контента.
-  await new Promise((resolve) => setTimeout(resolve, 100));
-
-  if (
-      !props.hasMore ||
-      props.loading ||
-      props.loadingMore ||
-      props.error
-  ) {
-    return;
-  }
+  pumping = true;
 
   try {
-    const content = target.closest('ion-content') as
-        | HTMLIonContentElement
-        | null;
+    let pages = 0;
 
-    if (!content) {
-      return;
+    while (
+        pages < MAX_PAGES_PER_PUMP &&
+        props.hasMore &&
+        !props.loading &&
+        !props.loadingMore &&
+        !props.error &&
+        sentinelVisible()
+    ) {
+      await runLoadMore();
+      pages += 1;
+
+      // Даём списку перерендериться: маркер съезжает вниз.
+      await nextTick();
     }
-
-    const scrollEl = await content.getScrollElement();
-
-    if (!scrollEl) {
-      return;
-    }
-
-    // Пользователь прокрутил вверх от места, откуда начали, —
-    // автоподгрузку выключаем, дальше он листает сам.
-    if (scrollEl.scrollTop < startScrollTop - 50) {
-      return;
-    }
-
-    await runLoadMore();
-
-    await fillUntilScrolledUp(
-        target,
-        startScrollTop,
-        depth + 1,
-    );
-  } catch {
-    // Позиция скролла недоступна — оставляем стандартное
-    // поведение infinite scroll.
+  } finally {
+    pumping = false;
   }
 }
+
+function handleSentinel(
+    entries: IntersectionObserverEntry[],
+): void {
+  for (const entry of entries) {
+    if (entry.isIntersecting) {
+      void pumpMore();
+
+      return;
+    }
+  }
+}
+
+onMounted(() => {
+  if (!sentinelEl.value) {
+    return;
+  }
+
+  // root не указываем: observer сам учитывает обрезку
+  // ближайшими прокручиваемыми контейнерами (ion-content).
+  observer = new IntersectionObserver(handleSentinel, {
+    rootMargin: `${SENTINEL_MARGIN_PX}px 0px`,
+  });
+
+  observer.observe(sentinelEl.value);
+});
+
+onBeforeUnmount(() => {
+  observer?.disconnect();
+  observer = null;
+});
+
+// После смены данных снова проверяем маркер: первая порция
+// могла не заполнить экран, флаги загрузки снялись — догружаем.
+watch(
+    () => [
+      props.loading,
+      props.loadingMore,
+      props.hasMore,
+      props.error,
+      props.items.length,
+    ],
+    () => {
+      void nextTick().then(() => pumpMore());
+    },
+);
 </script>
 
 <style scoped>
@@ -238,6 +274,12 @@ async function fillUntilScrolledUp(
 
 .list-error {
   color: var(--ion-color-danger);
+}
+
+/* Маркер конца списка для IntersectionObserver:
+   не должен занимать места в раскладке. */
+.list-sentinel {
+  height: 1px;
 }
 
 

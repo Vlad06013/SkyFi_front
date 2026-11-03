@@ -3,10 +3,10 @@
       :items="items"
       :loading="loading"
       :loading-more="false"
-      :has-more="false"
+      :has-more="hasMore"
       :error="error"
       :get-key="track => track.id"
-      :load-more="async () => {}"
+      :load-more="loadMore"
       :retry="async () => {
         await props.retry();
       }"
@@ -202,12 +202,12 @@ async function playTrack(track: Track): Promise<void> {
     return;
   }
 
-  player.setQueue([...props.items], sourceList);
+  player.setQueue([...props.queueTracks], sourceList);
 
   console.log('[Favorites] Очередь перед запуском:', {
     list: sourceList,
-    count: props.items.length,
-    ids: props.items.map(item => item.id),
+    count: props.queueTracks.length,
+    ids: props.queueTracks.map(item => item.id),
     selectedTrackId: track.id,
   });
 
@@ -661,7 +661,12 @@ function getTrackColor(id: number | string): string {
 }
 
 const props = defineProps<{
+  /** Страница списка для отрисовки (показываем частями). */
   items: Track[];
+  /** Полный список: очередь плеера формируем по нему целиком. */
+  queueTracks: Track[];
+  hasMore: boolean;
+  loadMore: () => Promise<void>;
   loading: boolean;
   error: string | null;
   retry: () => void | Promise<void>;
@@ -670,11 +675,11 @@ const props = defineProps<{
 let lastSyncedQueueKey = '';
 
 watch(
-    () => props.items,
-    (tracks) => {
+    () => props.queueTracks,
+    (queueTracks) => {
       if (
           !player.isServerSyncEnabled ||
-          tracks.length === 0
+          queueTracks.length === 0
       ) {
         return;
       }
@@ -682,7 +687,7 @@ watch(
       // Очередь обновляем, только если состав или порядок
       // реально изменились — иначе каждая перезапись списка
       // (кеш → сервер) дублировала бы синхронизацию.
-      const queueKey = tracks
+      const queueKey = queueTracks
           .map(track => String(track.id))
           .join(',');
 
@@ -692,11 +697,11 @@ watch(
 
       lastSyncedQueueKey = queueKey;
 
-      player.setQueue([...tracks], sourceList);
+      player.setQueue([...queueTracks], sourceList);
 
       console.log('[Favorites] Очередь синхронизирована:', {
-        count: tracks.length,
-        ids: tracks.map(track => track.id),
+        count: queueTracks.length,
+        ids: queueTracks.map(track => track.id),
       });
     },
     { immediate: true },

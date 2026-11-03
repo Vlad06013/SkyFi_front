@@ -114,6 +114,32 @@ export function useLibrary() {
     const loading = ref(false);
     const error = ref('');
 
+    // Показываем список частями: весь массив грузим из API сразу
+    // (очереди плеера и коллекции строим по нему целиком), а на
+    // экран отрисовываем по странице — тяжёлые списки не
+    // вываливаются разом, остальное дорисовываем по скроллу.
+    const TRACKS_PAGE_SIZE = 20;
+    const visibleTracksCount = ref(TRACKS_PAGE_SIZE);
+
+    const visibleTracks = computed<Track[]>(() =>
+        tracks.value.slice(0, visibleTracksCount.value),
+    );
+
+    const hasMoreTracks = computed(
+        () => visibleTracksCount.value < tracks.value.length,
+    );
+
+    async function showMoreTracks(): Promise<void> {
+        visibleTracksCount.value = Math.min(
+            visibleTracksCount.value + TRACKS_PAGE_SIZE,
+            tracks.value.length,
+        );
+    }
+
+    function resetTracksPaging(): void {
+        visibleTracksCount.value = TRACKS_PAGE_SIZE;
+    }
+
     let libraryRequestId = 0;
 
     const FAVORITES_CACHE_KEY = 'favorites';
@@ -151,6 +177,7 @@ export function useLibrary() {
                     tracks.value = cached.tracks.map(
                         item => item.track,
                     );
+                    resetTracksPaging();
                 }
             } catch (cacheError) {
                 console.warn(
@@ -175,6 +202,7 @@ export function useLibrary() {
 
             // Сервер — источник актуальных данных.
             tracks.value = favorites;
+            resetTracksPaging();
             favoritesLoadedAt = Date.now();
 
             // Сохраняем свежий список в IndexedDB. Проблемы кеша
@@ -674,6 +702,9 @@ export function useLibrary() {
 
         // Избранное
         tracks,
+        visibleTracks,
+        hasMoreTracks,
+        showMoreTracks,
         loading,
         error,
         loadLibrary,
