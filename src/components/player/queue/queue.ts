@@ -3,6 +3,7 @@ import usePlayerStore from '@/stores/player';
 import {
     getPlayerQueue,
     removeTrackFromQueue,
+    reorderPlayerQueue,
 } from '@/api/queue';
 
 import { PlaybackQueueItem } from '@/types/QueueType';
@@ -22,6 +23,7 @@ export function useQueue() {
     const loading = ref(false);
     const queueItems = ref<PlaybackQueueItem[]>([]);
     const removingIds = ref(new Set<number>());
+    const reordering = ref(false);
 
     const visibleItems = computed(() =>
         [...queueItems.value].sort(
@@ -30,6 +32,20 @@ export function useQueue() {
                 || a.position - b.position,
         ),
     );
+
+    /** Ожидающие треки в порядке позиций — их можно переставлять. */
+    const pendingItems = computed(() =>
+        visibleItems.value.filter(
+            (item) => item.status === 'pending',
+        ),
+    );
+
+    /** Индекс ожидающего трека в списке (для кнопок вверх/вниз). */
+    function pendingIndex(item: PlaybackQueueItem): number {
+        return pendingItems.value.findIndex(
+            (queueItem) => queueItem.id === item.id,
+        );
+    }
 
     function applyQueue(items: PlaybackQueueItem[]): void {
         queueItems.value = items;
@@ -101,14 +117,63 @@ export function useQueue() {
         }
     }
 
+    /**
+     * Сдвинуть ожидающий трек на одну позицию вверх/вниз.
+     * Бэкенду передаём ID всех ожидающих элементов в новом порядке.
+     */
+    async function moveQueueItem(
+        item: PlaybackQueueItem,
+        direction: -1 | 1,
+    ): Promise<void> {
+        if (
+            reordering.value
+            || !player.isServerSyncEnabled
+            || item.status !== 'pending'
+        ) {
+            return;
+        }
+
+        const ids = pendingItems.value.map(
+            (queueItem) => queueItem.id,
+        );
+        const index = ids.indexOf(item.id);
+        const targetIndex = index + direction;
+
+        if (index === -1 || targetIndex < 0 || targetIndex >= ids.length) {
+            return;
+        }
+
+        [ids[index], ids[targetIndex]] = [ids[targetIndex], ids[index]];
+
+        reordering.value = true;
+
+        try {
+            // Ответ уже содержит очередь целиком —
+            // отдельно запрашивать её не нужно.
+            applyQueue(await reorderPlayerQueue(ids));
+        } catch (error) {
+            console.error(
+                '[QueuePanel] Не удалось изменить порядок:',
+                error,
+            );
+            await refreshQueue();
+        } finally {
+            reordering.value = false;
+        }
+    }
+
     return {
         player,
         loading,
         queueItems,
         visibleItems,
+        pendingItems,
         removingIds,
+        reordering,
         refreshQueue,
         removeQueueItem,
         playQueueTrack,
+        moveQueueItem,
+        pendingIndex,
     };
 }

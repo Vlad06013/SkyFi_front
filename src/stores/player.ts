@@ -1012,6 +1012,10 @@ const usePlayerStore = defineStore('player', () => {
     }
 
     async function playQueueItem(item: PlaybackQueueItem): Promise<void> {
+        // Прежний играющий элемент завершаем: новый займёт его место.
+        // Без этого старый остаётся playing_now на сервере навсегда.
+        finalizeCurrentQueueItem('skipped');
+
         const started = await startLocalTrack(item.track, {
             queueItemId: item.id,
         });

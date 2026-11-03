@@ -81,6 +81,38 @@
             Сейчас играет
           </span>
 
+          <template v-if="item.status === 'pending'">
+            <button
+                type="button"
+                class="queue-move"
+                :disabled="
+                reordering
+                || !player.isServerSyncEnabled
+                || pendingIndex(item) <= 0
+              "
+                :aria-label="`Выше: ${item.track.title}`"
+                title="Выше"
+                @click.stop="moveQueueItem(item, -1)"
+            >
+              ↑
+            </button>
+
+            <button
+                type="button"
+                class="queue-move"
+                :disabled="
+                reordering
+                || !player.isServerSyncEnabled
+                || pendingIndex(item) === pendingItems.length - 1
+              "
+                :aria-label="`Ниже: ${item.track.title}`"
+                title="Ниже"
+                @click.stop="moveQueueItem(item, 1)"
+            >
+              ↓
+            </button>
+          </template>
+
           <button
               type="button"
               class="queue-remove"
@@ -131,10 +163,14 @@ const {
   loading,
   queueItems,
   visibleItems,
+  pendingItems,
   removingIds,
+  reordering,
   refreshQueue,
   removeQueueItem,
   playQueueTrack,
+  moveQueueItem,
+  pendingIndex,
 } = useQueue();
 
 watch(

@@ -10,6 +10,28 @@
     font-size: 16px;
 }
 
+.queue-move {
+    flex-shrink: 0;
+    width: 30px;
+    height: 34px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--ion-color-medium, #888);
+    cursor: pointer;
+    font-size: 15px;
+}
+
+.queue-move:hover:not(:disabled) {
+    background: #b8a2ff14;
+    color: #b8a2ff;
+}
+
+.queue-move:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
 .queue-remove:hover:not(:disabled) {
     background: rgba(255, 70, 70, 0.12);
     color: #ff5252;
