@@ -1,5 +1,6 @@
 import {http} from '@/api/http';
 import type {ApiResponse} from '@/types/TypeApiRespone';
+import type {PlaybackQueueItem} from '@/types/QueueType';
 import type {Track} from '@/types/TrackType';
 import type {
     FriendNowPlaying,
@@ -122,6 +123,31 @@ export async function addTrackToFriendQueue(
     const response = await http.post<ApiResponse<{ message: string }>>(
         `/friends/${userId}/queue`,
         track,
+    );
+    return response.data.data;
+}
+
+/**
+ * Очередь воспроизведения друга (ожидающие треки по позициям).
+ */
+export async function getFriendQueue(userId: number): Promise<PlaybackQueueItem[]> {
+    const response = await http.get<ApiResponse<PlaybackQueueItem[]>>(
+        `/friends/${userId}/queue`,
+    );
+    return response.data.data;
+}
+
+/**
+ * Изменить порядок ожидающих треков в очереди друга.
+ * Передаём ID элементов очереди в нужном порядке.
+ */
+export async function reorderFriendQueue(
+    userId: number,
+    itemIds: number[],
+): Promise<PlaybackQueueItem[]> {
+    const response = await http.patch<ApiResponse<PlaybackQueueItem[]>>(
+        `/friends/${userId}/queue/reorder`,
+        {items: itemIds},
     );
     return response.data.data;
 }

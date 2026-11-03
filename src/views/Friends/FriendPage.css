@@ -20,14 +20,13 @@
 ========================================= */
 
 .friend-header {
-    margin-bottom: 28px;
+    margin-bottom: 24px;
 }
 
 .back-button {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 20px;
     padding: 12px 16px;
     border: 1px solid #302d3c;
     border-radius: 12px;
@@ -50,40 +49,17 @@
     font-size: 15px;
 }
 
-.friend-heading .eyebrow {
-    color: #9295a8;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 1.8px;
-}
-
-.friend-heading h1 {
-    margin: 12px 0;
-    color: #fff;
-    font-size: clamp(30px, 3.2vw, 42px);
-    line-height: 1.15;
-    letter-spacing: -1.5px;
-    overflow-wrap: anywhere;
-}
-
-.friend-heading .subtitle {
-    margin: 0;
-    color: #a7a4b3;
-    font-size: 13px;
-    line-height: 1.7;
-    overflow-wrap: anywhere;
-}
-
 /* =========================================
-   КАРТОЧКА ДРУГА
+   КАРТОЧКА ДРУГА: АВАТАР, ИМЯ, ИГРАЕТ СЕЙЧАС
 ========================================= */
 
 .friend-card {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 20px;
+    text-align: center;
     width: 100%;
-    padding: 26px;
+    padding: 32px 26px;
     box-sizing: border-box;
     border: 1px solid #292633;
     border-radius: 20px;
@@ -93,14 +69,14 @@
 .friend-card__avatar {
     display: grid;
     place-items: center;
-    flex: 0 0 72px;
-    width: 72px;
-    height: 72px;
+    flex: 0 0 92px;
+    width: 92px;
+    height: 92px;
     overflow: hidden;
-    border-radius: 22px;
+    border-radius: 50%;
     background: linear-gradient(135deg, #9274f6, #5741b7);
     color: #fff;
-    font-size: 30px;
+    font-size: 38px;
     font-weight: 700;
 }
 
@@ -111,28 +87,65 @@
 }
 
 .friend-card__info {
-    flex: 1;
+    margin-top: 16px;
     min-width: 0;
-}
-
-.friend-card__overline {
-    color: #9295a8;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 1.8px;
+    max-width: 100%;
 }
 
 .friend-card__info h2 {
-    margin: 8px 0;
+    margin: 0;
     color: #f5f3fa;
-    font-size: 23px;
+    font-size: 24px;
     overflow-wrap: anywhere;
 }
 
 .friend-card__info p {
-    margin: 0;
+    margin: 8px 0 0;
     color: #aaa6b7;
+    font-size: 13px;
     overflow-wrap: anywhere;
+}
+
+.friend-card__now-playing {
+    margin-top: 20px;
+    width: 100%;
+    max-width: 440px;
+    text-align: left;
+}
+
+.friend-card__now-playing .now-playing {
+    padding: 10px 12px;
+}
+
+.friend-card__now-playing .now-playing__icon {
+    flex-basis: 34px;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    font-size: 16px;
+}
+
+/* =========================================
+   КОЛОНКИ: ОЧЕРЕДЬ СЛЕВА, ИЗБРАННОЕ СПРАВА
+========================================= */
+
+.friend-columns {
+    display: flex;
+    align-items: flex-start;
+    gap: 22px;
+    margin-top: 34px;
+}
+
+.friend-columns__column {
+    flex: 1 1 0;
+    min-width: 0;
+    margin-top: 0;
+}
+
+@media (max-width: 900px) {
+    .friend-columns {
+        flex-direction: column;
+    }
 }
 
 /* =========================================
@@ -375,6 +388,119 @@
     flex-shrink: 0;
 }
 
+.track-row__index {
+    flex: 0 0 20px;
+    text-align: right;
+    color: #6f7285;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.track-row__actions--reorder {
+    display: flex;
+    gap: 4px;
+}
+
+.reorder-button {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid #302d3c;
+    border-radius: 9px;
+    background: #15141c;
+    color: #d8d6e5;
+    font: inherit;
+    cursor: pointer;
+    transition:
+        background 0.2s,
+        border-color 0.2s,
+        color 0.2s;
+}
+
+.reorder-button ion-icon {
+    font-size: 15px;
+}
+
+.reorder-button:hover:not(:disabled) {
+    background: #201b2d;
+    border-color: #a78bfa70;
+    color: #c6b5ff;
+}
+
+.reorder-button:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+/* =========================================
+   ДОБАВЛЕНИЕ В ОЧЕРЕДЬ
+========================================= */
+
+.queue-add {
+    margin-top: 14px;
+}
+
+.queue-add__toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 16px;
+    border: 1px dashed #3a3648;
+    border-radius: 12px;
+    background: transparent;
+    color: #a7a4b3;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+    transition:
+        background 0.2s,
+        border-color 0.2s,
+        color 0.2s;
+}
+
+.queue-add__toggle ion-icon {
+    font-size: 16px;
+}
+
+.queue-add__toggle:hover {
+    border-color: #a78bfa70;
+    background: #8b5cf610;
+    color: #c6b5ff;
+}
+
+.queue-add .friend-search {
+    margin-bottom: 4px;
+}
+
+.queue-add__close {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: #85899c;
+    font: inherit;
+    cursor: pointer;
+    transition:
+        background 0.2s,
+        color 0.2s;
+}
+
+.queue-add__close ion-icon {
+    font-size: 17px;
+}
+
+.queue-add__close:hover {
+    background: #201b2d;
+    color: #c6b5ff;
+}
+
 /* =========================================
    КНОПКИ
 ========================================= */
@@ -447,15 +573,18 @@
     }
 
     .friend-card {
-        padding: 18px;
+        padding: 24px 16px;
     }
 
     .friend-card__avatar {
-        flex-basis: 58px;
-        width: 58px;
-        height: 58px;
-        border-radius: 17px;
-        font-size: 25px;
+        flex-basis: 72px;
+        width: 72px;
+        height: 72px;
+        font-size: 30px;
+    }
+
+    .friend-columns {
+        gap: 0;
     }
 
     .friend-section {

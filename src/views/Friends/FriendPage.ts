@@ -1,8 +1,8 @@
 import {
     defineComponent,
+    nextTick,
     onBeforeUnmount,
     onMounted,
-    reactive,
     ref,
     watch,
 } from 'vue';
@@ -14,7 +14,10 @@ import {
     pauseOutline,
     addOutline,
     checkmarkOutline,
+    closeOutline,
     searchOutline,
+    chevronUpOutline,
+    chevronDownOutline,
     musicalNotesOutline,
 } from 'ionicons/icons';
 
@@ -32,16 +35,18 @@ import {
     getFriendProfile,
     getFriendNowPlaying,
     getFriendFavorites,
+    getFriendQueue,
     addTrackToFriendQueue,
+    reorderFriendQueue,
 } from '@/api/friends';
 
 import {searchTracks} from '@/api/search';
 
 import type {FriendProfile} from '@/types/FriendshipType';
+import type {PlaybackQueueItem} from '@/types/QueueType';
+import type {PlaybackState} from '@/types/PlayerType';
 import type {Track} from '@/types/TrackType';
 import {PlaySourceListsEnum} from '@/types/PlaySourceListsEnum';
-
-const NOW_PLAYING_REFRESH_MS = 30000;
 
 /**
  * Источник воспроизведения для треков со страницы друга:
@@ -66,8 +71,9 @@ export default defineComponent({
         const friendId = Number(route.params.id);
 
         /*
-         * Канал дружбы: сюда бэкенд дублирует playback.state.updated,
-         * чтобы друзья видели смену треков в реальном времени.
+         * Канал дружбы: сюда бэкенд дублирует playback.state.updated
+         * и playback.queue.updated, чтобы друзья видели, что он слушает
+         * сейчас и какая у него очередь, в реальном времени.
          */
         const friendChannelName = `friends.${friendId}`;
 
@@ -77,47 +83,85 @@ export default defineComponent({
             track: Track | null;
         } | null>(null);
         const favorites = ref<Track[]>([]);
+        const friendQueue = ref<PlaybackQueueItem[]>([]);
 
         const isLoadingProfile = ref(false);
         const isLoadingNowPlaying = ref(false);
         const isLoadingFavorites = ref(false);
+        const isLoadingFriendQueue = ref(false);
 
         const profileError = ref('');
         const nowPlayingError = ref('');
         const favoritesError = ref('');
-
-        let nowPlayingTimer: ReturnType<typeof setInterval> | null = null;
+        const friendQueueError = ref('');
 
         onMounted(() => {
             void loadProfile();
             void loadNowPlaying();
             void loadFavorites();
+            void loadFriendQueue();
 
             subscribeToFriendPlayer();
-
-            nowPlayingTimer = setInterval(() => {
-                void loadNowPlaying();
-            }, NOW_PLAYING_REFRESH_MS);
         });
 
         onBeforeUnmount(() => {
-            if (nowPlayingTimer) {
-                clearInterval(nowPlayingTimer);
-            }
-
             echo.leave(friendChannelName);
         });
 
         /**
-         * Смена трека/состояния у друга — обновляем блок «Слушает сейчас».
+         * Смена трека/состояния/очереди у друга.
+         *
+         * В пейлоаде playback.state.updated едет полное состояние
+         * (current_track, is_playing, queue) — применяем его напрямую,
+         * без запросов now-playing: активное устройство друга шлёт
+         * позицию каждые ~10 секунд, и на каждый такой бродкаст
+         * дёргать API — страница бы заметно мигала.
          */
         function subscribeToFriendPlayer(): void {
-            echo.private(friendChannelName).listen(
-                '.playback.state.updated',
-                () => {
-                    void loadNowPlaying();
-                },
-            );
+            echo.private(friendChannelName)
+                .listen('.playback.state.updated', (event: {state: PlaybackState}) => {
+                    applyFriendState(event.state);
+                })
+                .listen('.playback.queue.updated', () => {
+                    void loadFriendQueue();
+                });
+        }
+
+        /**
+         * Применить состояние плеера друга из сокета.
+         * Объекты пересоздаём только при реальном изменении,
+         * чтобы Vue не перерисовывала блок без нужды.
+         */
+        function applyFriendState(state: PlaybackState): void {
+            const track = state.current_track ?? null;
+            const isPlayingNow = !!state.is_playing;
+            const previous = nowPlaying.value;
+
+            if (
+                !previous ||
+                (previous.track?.id ?? null) !== (track?.id ?? null) ||
+                previous.is_playing !== isPlayingNow
+            ) {
+                nowPlaying.value = {
+                    is_playing: isPlayingNow,
+                    track,
+                };
+            }
+
+            if (state.queue) {
+                const pending = state.queue
+                    .filter((item) => item.status === 'pending')
+                    .sort((a, b) => a.position - b.position);
+
+                const previousIds = friendQueue.value
+                    .map((item) => item.id)
+                    .join(',');
+                const nextIds = pending.map((item) => item.id).join(',');
+
+                if (previousIds !== nextIds) {
+                    friendQueue.value = pending;
+                }
+            }
         }
 
         async function loadProfile(): Promise<void> {
@@ -168,6 +212,23 @@ export default defineComponent({
                 favoritesError.value = getErrorMessage(error);
             } finally {
                 isLoadingFavorites.value = false;
+            }
+        }
+
+        async function loadFriendQueue(): Promise<void> {
+            isLoadingFriendQueue.value = true;
+            friendQueueError.value = '';
+
+            try {
+                friendQueue.value = await getFriendQueue(friendId);
+            } catch (error) {
+                console.error(
+                    '[Friend] Не удалось загрузить очередь друга:',
+                    error,
+                );
+                friendQueueError.value = getErrorMessage(error);
+            } finally {
+                isLoadingFriendQueue.value = false;
             }
         }
 
@@ -285,12 +346,54 @@ export default defineComponent({
         // ОЧЕРЕДЬ ДРУГА
         // ============================================
 
+        const isReorderPending = ref(false);
+
+        /**
+         * Сдвинуть трек в очереди друга на одну позицию вверх/вниз.
+         */
+        async function handleMove(item: PlaybackQueueItem, direction: -1 | 1): Promise<void> {
+            if (isReorderPending.value) {
+                return;
+            }
+
+            const ids = friendQueue.value.map((queueItem) => queueItem.id);
+            const index = ids.indexOf(item.id);
+            const targetIndex = index + direction;
+
+            if (index === -1 || targetIndex < 0 || targetIndex >= ids.length) {
+                return;
+            }
+
+            [ids[index], ids[targetIndex]] = [ids[targetIndex], ids[index]];
+
+            isReorderPending.value = true;
+            friendQueueError.value = '';
+
+            try {
+                friendQueue.value = await reorderFriendQueue(friendId, ids);
+            } catch (error) {
+                console.error(
+                    '[Friend] Не удалось изменить порядок очереди:',
+                    error,
+                );
+                friendQueueError.value = getErrorMessage(error);
+                await loadFriendQueue();
+            } finally {
+                isReorderPending.value = false;
+            }
+        }
+
+        // ============================================
+        // ПОИСК + ДОБАВЛЕНИЕ В ОЧЕРЕДЬ
+        // ============================================
+
+        const isQueueAddOpen = ref(false);
+        const queueSearchInput = ref<HTMLInputElement | null>(null);
         const queueQuery = ref('');
         const queueResults = ref<Track[]>([]);
         const isQueueSearching = ref(false);
         const queueError = ref('');
-        const queuedTrackIds = reactive<Record<string, boolean>>({});
-        const queuePending = reactive<Record<string, boolean>>({});
+        const queuePending = ref<Record<string, boolean>>({});
 
         let queueSearchTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -303,6 +406,29 @@ export default defineComponent({
                 void runQueueSearch();
             }, 350);
         });
+
+        async function openQueueAdd(): Promise<void> {
+            isQueueAddOpen.value = true;
+
+            await nextTick();
+
+            queueSearchInput.value?.focus();
+        }
+
+        function closeQueueAdd(): void {
+            isQueueAddOpen.value = false;
+            queueQuery.value = '';
+            queueResults.value = [];
+        }
+
+        /**
+         * Трек уже есть в очереди друга (пометка «В очереди» в поиске).
+         */
+        function isTrackInFriendQueue(track: Track): boolean {
+            return friendQueue.value.some(
+                (item) => String(item.track_id) === String(track.id),
+            );
+        }
 
         async function runQueueSearch(): Promise<void> {
             const query = queueQuery.value.trim();
@@ -334,18 +460,19 @@ export default defineComponent({
         async function handleAddToQueue(track: Track): Promise<void> {
             const key = String(track.id);
 
-            if (queuePending[key]) {
+            if (queuePending.value[key]) {
                 return;
             }
 
-            queuePending[key] = true;
+            queuePending.value[key] = true;
             queueError.value = '';
 
             try {
                 await addTrackToFriendQueue(friendId, track);
-                queuedTrackIds[key] = true;
 
                 await showToast(`«${track.title}» добавлен в очередь`);
+
+                await loadFriendQueue();
             } catch (error) {
                 console.error(
                     '[Friend] Не удалось добавить трек в очередь:',
@@ -353,7 +480,7 @@ export default defineComponent({
                 );
                 queueError.value = getErrorMessage(error);
             } finally {
-                queuePending[key] = false;
+                queuePending.value[key] = false;
             }
         }
 
@@ -374,28 +501,36 @@ export default defineComponent({
             pauseOutline,
             addOutline,
             checkmarkOutline,
+            closeOutline,
             searchOutline,
+            chevronUpOutline,
+            chevronDownOutline,
             musicalNotesOutline,
 
             profile,
             nowPlaying,
             favorites,
+            friendQueue,
 
             player,
 
             isLoadingProfile,
             isLoadingNowPlaying,
             isLoadingFavorites,
+            isLoadingFriendQueue,
+            isReorderPending,
 
             profileError,
             nowPlayingError,
             favoritesError,
+            friendQueueError,
 
+            isQueueAddOpen,
+            queueSearchInput,
             queueQuery,
             queueResults,
             isQueueSearching,
             queueError,
-            queuedTrackIds,
             queuePending,
 
             goBack,
@@ -403,10 +538,14 @@ export default defineComponent({
             trackArtists,
             trackCover,
             formatDuration,
-            handleAddToQueue,
             isCurrentTrack,
             handleTrackClick,
             handleNowPlayingClick,
+            handleMove,
+            openQueueAdd,
+            closeQueueAdd,
+            isTrackInFriendQueue,
+            handleAddToQueue,
         };
     },
 });
