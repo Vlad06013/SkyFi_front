@@ -50,9 +50,6 @@ export function useQueue() {
     function applyQueue(items: PlaybackQueueItem[]): void {
         queueItems.value = items;
         player.setServerQueueCount(items.length);
-        player.setQueue(
-            items.map(item => item.track),
-        );
     }
 
     async function playQueueTrack(

@@ -987,17 +987,26 @@ const usePlayerStore = defineStore('player', () => {
     }
 
     /**
-     * Завершить играющий элемент серверной очереди:
-     * played — если трек доиграл, skipped — если переключили.
+     * Уход с играющего элемента серверной очереди. Сыгранное
+     * и пропущенное в очереди не храним: элемент удаляется
+     * сразу — локально и на сервере.
      */
-    function finalizeCurrentQueueItem(
-        outcome: 'played' | 'skipped',
-    ): void {
+    function finalizeCurrentQueueItem(): void {
         if (currentQueueItemId === null) return;
 
-        reportQueueStatus(currentQueueItemId, outcome);
+        const queueItemId = currentQueueItemId;
 
         currentQueueItemId = null;
+
+        serverQueue.value = serverQueue.value.filter(
+            queueItem => queueItem.id !== queueItemId,
+        );
+        setServerQueueCount(serverQueue.value.length);
+
+        backgroundSync(
+            () => removeTrackFromQueue(queueItemId),
+            'queue-remove-current',
+        );
     }
 
     // ============================================
@@ -1031,9 +1040,8 @@ const usePlayerStore = defineStore('player', () => {
     }
 
     async function playQueueItem(item: PlaybackQueueItem): Promise<void> {
-        // Прежний играющий элемент завершаем: новый займёт его место.
-        // Без этого старый остаётся playing_now на сервере навсегда.
-        finalizeCurrentQueueItem('skipped');
+        // Прежний играющий элемент удаляем: новый займёт его место.
+        finalizeCurrentQueueItem();
 
         const started = await startLocalTrack(item.track, {
             queueItemId: item.id,
@@ -1738,7 +1746,7 @@ const usePlayerStore = defineStore('player', () => {
             repeatMode.value === 'one' &&
             currentTrack.value
         ) {
-            finalizeCurrentQueueItem('played');
+            finalizeCurrentQueueItem();
 
             audio.currentTime = 0;
 
@@ -1767,9 +1775,7 @@ const usePlayerStore = defineStore('player', () => {
                 rememberPreviousPlaySource(reason === 'ended');
             }
 
-            finalizeCurrentQueueItem(
-                reason === 'ended' ? 'played' : 'skipped',
-            );
+            finalizeCurrentQueueItem();
 
             const queueItem = takeNextFromQueue();
 
@@ -1795,6 +1801,18 @@ const usePlayerStore = defineStore('player', () => {
                 await playTrack(
                     pending.track,
                     PlaySourceListsEnum.QUEUE,
+                );
+
+                // Пульт запустил элемент очереди — удаляем его
+                // сразу, как это делает активное устройство.
+                serverQueue.value = serverQueue.value.filter(
+                    queueItem => queueItem.id !== pending.id,
+                );
+                setServerQueueCount(serverQueue.value.length);
+
+                backgroundSync(
+                    () => removeTrackFromQueue(pending.id),
+                    'queue-remove-remote',
                 );
 
                 return;
@@ -1852,7 +1870,7 @@ const usePlayerStore = defineStore('player', () => {
         }
 
         if (isActive) {
-            finalizeCurrentQueueItem('skipped');
+            finalizeCurrentQueueItem();
 
             const previousIndex = resolvePreviousIndex();
 
@@ -1975,7 +1993,7 @@ const usePlayerStore = defineStore('player', () => {
         isLoading.value = true;
 
         try {
-            finalizeCurrentQueueItem('skipped');
+            finalizeCurrentQueueItem();
 
             // Внешний трек (поиск/волна/шара) ещё не в базе, /audio по его
             // внешнему id не сработает. Сначала /play: бэкенд
