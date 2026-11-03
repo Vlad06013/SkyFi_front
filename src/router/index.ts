@@ -21,11 +21,13 @@ const routes: Array<RouteRecordRaw> = [
   {
     path: '/wave',
     name: 'Wave',
-    component: WavePage
+    component: WavePage,
+    meta: { requiresAuth: true },
   },
   {
     path: '/search',
     component: SearchPage,
+    meta: { requiresAuth: true },
   },
   {
     path: '/profile',

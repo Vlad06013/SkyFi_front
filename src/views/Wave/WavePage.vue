@@ -199,10 +199,14 @@ const {
   z-index: 1;
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
   max-width: 560px;
   margin: 0 auto;
-  padding: 72px 24px 140px;
+  /* Низ запасаем под фиксированный футер-плеер, иначе hero
+   * центрируется на всю высоту и кнопка play уходит под плеер. */
+  padding: 72px 24px 160px;
 }
 
 /* Кнопка профиля на волне — крупнее стандартной. */

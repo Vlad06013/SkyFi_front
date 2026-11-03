@@ -1,6 +1,8 @@
 import {computed, ref, watch} from 'vue';
 import {defineStore} from 'pinia';
 import {toastController} from '@ionic/vue';
+import {Capacitor} from '@capacitor/core';
+import {Device} from '@capacitor/device';
 import echo from '@/lib/echo';
 import {useAuthStore} from '@/stores/auth';
 
@@ -2162,12 +2164,14 @@ const usePlayerStore = defineStore('player', () => {
                 return 'Яндекс Браузер';
             }
 
-            if (brands.some((brand) => brand.includes('Chromium'))) {
-                return 'Chromium';
+            // У Google Chrome бренды тоже содержат "Chromium" —
+            // полное имя проверяем первым, иначе весь хром зовётся "Chromium".
+            if (brands.some((brand) => brand.includes('Google Chrome'))) {
+                return 'Google Chrome';
             }
 
-            if (brands.some((brand) => brand.includes('Chrome'))) {
-                return 'Google Chrome';
+            if (brands.some((brand) => brand.includes('Chromium'))) {
+                return 'Chromium';
             }
         }
 
@@ -2189,7 +2193,47 @@ const usePlayerStore = defineStore('player', () => {
     }
 
     async function getDeviceName(): Promise<string> {
-        return `${await getOSName()} — ${getBrowserName()}`;
+        const osName = await getOSName();
+
+        // 1) Нативно (APK): реальные производитель и модель устройства.
+        if (Capacitor.isNativePlatform()) {
+            try {
+                const info = await Device.getInfo();
+
+                if (info.model) {
+                    const manufacturer = info.manufacturer
+                        ? `${info.manufacturer} `
+                        : '';
+                    const osVersion = info.osVersion
+                        ? ` ${info.osVersion}`
+                        : '';
+
+                    return `${manufacturer}${info.model} (${osName}${osVersion})`;
+                }
+            } catch {
+                // плагин недоступен — пробуем Client Hints
+            }
+        }
+
+        // 2) Client Hints: Chromium на Android отдаёт модель устройства.
+        try {
+            const values =
+                await getUaData()?.getHighEntropyValues?.(['model']);
+
+            if (values?.model) {
+                return `${values.model} (${osName})`;
+            }
+        } catch {
+            // высокоэнтропийные hints недоступны
+        }
+
+        // 3) Только ОС и браузер (+ разрешение, чтобы различать компьютеры).
+        const screenSize =
+            typeof screen !== 'undefined'
+                ? ` · ${screen.width}×${screen.height}`
+                : '';
+
+        return `${osName} — ${getBrowserName()}${screenSize}`;
     }
 
     // ============================================

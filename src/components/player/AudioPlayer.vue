@@ -3,6 +3,9 @@
       class="player"
       :style="{ '--player-progress': `${player.progressPercent}%` }"
       @click="handlePlayerSurfaceClick"
+      @pointerdown="onSwipePointerDown"
+      @pointerup="onSwipePointerUp"
+      @pointercancel="onSwipePointerCancel"
   >
     <!-- Информация о текущем треке -->
     <div class="now-playing">
@@ -42,6 +45,7 @@
 
       <!-- Кнопка очереди воспроизведения -->
       <button
+          ref="queueToggleRef"
           type="button"
           class="queue-toggle"
           :class="{ 'queue-toggle-active': showQueue }"
@@ -77,6 +81,7 @@
 
       <!-- Избранное -->
       <button
+          ref="heartButtonRef"
           class="heart-button"
           :class="{ liked: player.liked }"
           :disabled="
@@ -176,6 +181,7 @@
 
         <!-- Play / Pause -->
         <button
+            ref="playButtonRef"
             class="play-button"
             type="button"
             :disabled="player.isLoading || !player.currentTrack"
@@ -320,6 +326,8 @@
                 player.audioDuration <= 0 ||
                 player.isLoading
               "
+            @keydown="onProgressKeyDown"
+            @blur="onProgressBlur"
             @pointerdown="player.isSeeking = true"
             @input="player.progress = Number(($event.target as HTMLInputElement).value)"
             @change="player.seekAudio(player.progress); player.isSeeking = false"
@@ -336,6 +344,7 @@
     <div class="player-right">
       <div class="device-selector">
         <button
+            ref="deviceButtonRef"
             type="button"
             class="device-button mode-button"
             :class="{ 'mode-active': showDeviceMenu }"
@@ -469,6 +478,7 @@
               max="100"
               step="1"
               aria-label="Громкость"
+              @keydown="onVolumeKeyDown"
               :style="{
                 '--range-progress': `${player.volume}%`,
               }"
@@ -482,7 +492,10 @@
     <div
         v-if="showTrackDetails && player.currentTrack"
         class="track-details-backdrop"
-        @click.self="showTrackDetails = false"
+        @click.self="onBackdropClick"
+        @pointerdown="onSwipePointerDown"
+        @pointerup="onSwipePointerUp"
+        @pointercancel="onSwipePointerCancel"
     >
       <section
           class="track-details-modal"
@@ -492,6 +505,7 @@
       >
         <header class="track-details-header">
           <button
+              ref="trackDetailsCloseRef"
               type="button"
               class="track-details-close"
               aria-label="Закрыть плеер"
@@ -683,6 +697,7 @@
           </button>
 
           <button
+              ref="trackDetailsPlayRef"
               type="button"
               class="track-details-play"
               :disabled="player.isLoading || !player.currentTrack"
@@ -788,12 +803,33 @@ import { computed, onMounted, ref, watch } from 'vue';
 import usePlayerStore from '@/stores/player';
 import QueuePanel from '@/components/player/queue/QueuePanel.vue';
 import TrackContextMenu from '@/components/track-menu/TrackContextMenu.vue';
+import { registerHardwareBackHandler } from '@/lib/hardwareBack';
 
 const player = usePlayerStore();
 
 const showQueue = ref(false);
 const showDeviceMenu = ref(false);
 const showTrackDetails = ref(false);
+
+// Цели для перехода фокуса с прогресс-бара пультом (Android TV).
+const playButtonRef = ref<HTMLButtonElement | null>(null);
+const queueToggleRef = ref<HTMLButtonElement | null>(null);
+const heartButtonRef = ref<HTMLButtonElement | null>(null);
+const deviceButtonRef = ref<HTMLButtonElement | null>(null);
+const trackDetailsCloseRef = ref<HTMLButtonElement | null>(null);
+const trackDetailsPlayRef = ref<HTMLButtonElement | null>(null);
+
+// Счётчик повторов keydown при удержании клавиши пульта.
+let seekKeyRepeat = 0;
+
+// Короткое нажатие — ±10 с, удержание — прыжки по минуте.
+function seekStep(): number {
+  return seekKeyRepeat >= 6 ? 60 : 10;
+}
+
+function clampSeekTarget(value: number): number {
+  return Math.min(Math.max(0, value), Math.max(1, player.audioDuration));
+}
 
 // ============================================
 // ПЕРЕМОТКА В ПОЛНОЭКРАННОМ ПЛЕЕРЕ
@@ -897,21 +933,189 @@ function onSeekKeyDown(event: KeyboardEvent): void {
         return;
     }
 
-    const step = 5;
-    let value = seekValue.value;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+        event.preventDefault();
+        seekKeyRepeat = event.repeat ? seekKeyRepeat + 1 : 0;
 
-    if (event.key === 'ArrowRight') {
-        value = Math.min(seekDuration.value, value + step);
-    } else if (event.key === 'ArrowLeft') {
-        value = Math.max(0, value - step);
-    } else {
+        const delta = event.key === 'ArrowRight' ? seekStep() : -seekStep();
+
+        void player.seekAudio(clampSeekTarget(seekValue.value + delta));
         return;
     }
 
-    event.preventDefault();
+    if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        seekKeyRepeat = 0;
+        trackDetailsPlayRef.value?.focus();
+        return;
+    }
 
-    player.isSeeking = true;
-    void player.seekAudio(value);
+    if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        seekKeyRepeat = 0;
+        trackDetailsCloseRef.value?.focus();
+    }
+}
+
+/*
+ * Прогресс-бар нижнего плеера и пульт Android TV: нативный
+ * input[type=range] съедает стрелки сам (шаг 0.1 с) и не отпускает
+ * фокус. Перехватываем клавиши: влево/вправо — перемотка,
+ * вверх/вниз — переход фокуса на соседние кнопки.
+ */
+function onProgressKeyDown(event: KeyboardEvent): void {
+    const input = event.currentTarget;
+
+    if (!(input instanceof HTMLInputElement) || input.disabled) {
+        return;
+    }
+
+    if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+        event.preventDefault();
+
+        const direction = event.key === 'ArrowRight' ? 1 : -1;
+        const duration = Math.max(0, player.audioDuration);
+
+        // На краю трека стрелка уводит фокус с ползунка дальше по экрану.
+        if (direction < 0 && player.progress < 1) {
+            seekKeyRepeat = 0;
+            heartButtonRef.value?.focus();
+            return;
+        }
+
+        if (direction > 0 && duration > 0 && player.progress >= duration - 0.5) {
+            seekKeyRepeat = 0;
+            deviceButtonRef.value?.focus();
+            return;
+        }
+
+        seekKeyRepeat = event.repeat ? seekKeyRepeat + 1 : 0;
+
+        const delta = direction * seekStep();
+
+        void player.seekAudio(clampSeekTarget(player.progress + delta));
+        return;
+    }
+
+    if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        seekKeyRepeat = 0;
+        playButtonRef.value?.focus();
+        return;
+    }
+
+    if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        seekKeyRepeat = 0;
+        queueToggleRef.value?.focus();
+    }
+}
+
+function onProgressBlur(): void {
+    seekKeyRepeat = 0;
+}
+
+// Вертикальный слайдер громкости не отпускает фокус по горизонтали.
+function onVolumeKeyDown(event: KeyboardEvent): void {
+    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        event.preventDefault();
+
+        const control = (event.currentTarget as HTMLElement | null)
+            ?.closest('.volume-control');
+        const button = control?.querySelector<HTMLButtonElement>('.volume-button');
+
+        button?.focus();
+    }
+}
+
+// ============================================
+// СВАЙПЫ ПО ПЛЕЕРУ: влево — следующий трек, вправо — предыдущий
+// ============================================
+
+const swipeStart = ref<{
+    x: number;
+    y: number;
+    pointerId: number;
+} | null>(null);
+let swipeFired = false;
+
+const SWIPE_MIN_DISTANCE = 60;
+
+function onSwipePointerDown(event: PointerEvent): void {
+    // Мышь — только левой кнопкой; trailing click после драга
+    // глушится флагом swipeFired в handlePlayerSurfaceClick/onBackdropClick.
+    if (event.pointerType === 'mouse' && event.button !== 0) {
+        return;
+    }
+
+    const target = event.target;
+
+    if (!(target instanceof Element)) {
+        return;
+    }
+
+    // На элементах управления свайп не начинаем: у ползунков
+    // свои drag-жесты, у кнопок — короткие нажатия.
+    if (
+        target.closest(
+            'button, input, a, .seek-bar, .device-menu, .volume-slider-popover, .track-menu-wrap',
+        )
+    ) {
+        return;
+    }
+
+    swipeStart.value = {
+        x: event.clientX,
+        y: event.clientY,
+        pointerId: event.pointerId,
+    };
+}
+
+function onSwipePointerUp(event: PointerEvent): void {
+    const start = swipeStart.value;
+
+    swipeStart.value = null;
+
+    if (!start || start.pointerId !== event.pointerId) {
+        return;
+    }
+
+    const deltaX = event.clientX - start.x;
+    const deltaY = event.clientY - start.y;
+
+    // Только горизонталь и заметная длина — иначе это просто касание.
+    if (
+        Math.abs(deltaX) < SWIPE_MIN_DISTANCE ||
+        Math.abs(deltaX) < Math.abs(deltaY) * 2
+    ) {
+        return;
+    }
+
+    if (!player.currentTrack || player.isLoading) {
+        return;
+    }
+
+    swipeFired = true;
+
+    if (deltaX < 0) {
+        void player.playNext();
+    } else {
+        void player.playPrevious();
+    }
+}
+
+function onSwipePointerCancel(): void {
+    swipeStart.value = null;
+}
+
+// Клик по фону модалки закрывает её, но не после свайпа.
+function onBackdropClick(): void {
+    if (swipeFired) {
+        swipeFired = false;
+        return;
+    }
+
+    showTrackDetails.value = false;
 }
 
 async function selectDevice(deviceId: number): Promise<void> {
@@ -921,6 +1125,26 @@ async function selectDevice(deviceId: number): Promise<void> {
 }
 
 onMounted(async () => {
+  // Кнопка «назад» пульта сначала закрывает оверлеи плеера.
+  registerHardwareBackHandler(() => {
+    if (showTrackDetails.value) {
+      showTrackDetails.value = false;
+      return true;
+    }
+
+    if (showQueue.value) {
+      showQueue.value = false;
+      return true;
+    }
+
+    if (showDeviceMenu.value) {
+      showDeviceMenu.value = false;
+      return true;
+    }
+
+    return false;
+  });
+
   await player.initializePlayerDevice();
 
   if (player.isServerSyncEnabled) {
@@ -959,6 +1183,12 @@ function handleTrackMenuAction(
 }
 
 function handlePlayerSurfaceClick(event: MouseEvent) {
+  // После свайпа клик вверх не должен открывать модалку.
+  if (swipeFired) {
+    swipeFired = false;
+    return;
+  }
+
   const target = event.target;
 
   if (!(target instanceof Element)) return;

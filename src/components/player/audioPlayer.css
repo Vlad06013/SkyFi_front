@@ -23,6 +23,13 @@
     background: rgba(17, 18, 27, 0.97);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
+
+    /* Горизонтальные свайпы по плееру обрабатываем сами (pointer-события),
+     * иначе браузер на таче забирает жест как панораму и шлёт pointercancel.
+     * Вертикальная прокрутка страницы сохраняется. */
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .player,
@@ -1048,6 +1055,12 @@
     background: rgba(7, 8, 15, 0.82);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
+
+    /* Свайпы влево/вправо по модалке: та же защита от pointercancel,
+     * что и у нижнего плеера. Вертикальный скролл модалки работает. */
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
 
     animation: track-details-fade-in 0.2s ease;
 }

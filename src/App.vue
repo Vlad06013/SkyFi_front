@@ -9,11 +9,17 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import { IonApp, IonRouterOutlet } from '@ionic/vue';
 import AudioPlayer from '@/components/player/AudioPlayer.vue';
 import { useAuthStore } from '@/stores/auth';
+import { initHardwareBackButton } from '@/lib/hardwareBack';
 
 const auth = useAuthStore();
+
+onMounted(() => {
+  initHardwareBackButton();
+});
 </script>
 
 <style>
