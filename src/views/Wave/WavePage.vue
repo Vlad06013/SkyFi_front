@@ -3,8 +3,6 @@
     <AppNavigation />
 
     <ion-content class="vibe-content">
-      <ProfileMenu floating />
-
       <div class="vibe-blobs" aria-hidden="true">
         <span class="vibe-blob vibe-blob-yellow" />
         <span class="vibe-blob vibe-blob-purple" />
@@ -121,7 +119,6 @@ import {
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 
 import AppNavigation from '@/components/AppNavigation.vue';
-import ProfileMenu from '@/components/profile/ProfileMenu.vue';
 import usePlayerStore from '@/stores/player';
 import { useWave } from './wave';
 

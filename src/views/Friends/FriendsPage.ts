@@ -22,7 +22,6 @@ import {IonContent, IonIcon, IonPage} from '@ionic/vue';
 import './FriendsPage.css';
 
 import AppNavigation from '@/components/AppNavigation.vue';
-import ProfileMenu from '@/components/profile/ProfileMenu.vue';
 
 import {useAuthStore} from '@/stores/auth';
 import useFriendsStore from '@/stores/friends';
@@ -44,7 +43,6 @@ export default defineComponent({
         IonContent,
         IonIcon,
         AppNavigation,
-        ProfileMenu,
     },
     setup() {
         const router = useRouter();

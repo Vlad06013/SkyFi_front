@@ -27,7 +27,6 @@ import './FriendPage.css';
 
 import echo from '@/lib/echo';
 import AppNavigation from '@/components/AppNavigation.vue';
-import ProfileMenu from '@/components/profile/ProfileMenu.vue';
 
 import usePlayerStore from '@/stores/player';
 
@@ -61,7 +60,6 @@ export default defineComponent({
         IonContent,
         IonIcon,
         AppNavigation,
-        ProfileMenu,
     },
     setup() {
         const route = useRoute();

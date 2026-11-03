@@ -18,10 +18,6 @@
                   Управляй своим аккаунтом и подключёнными музыкальными сервисами.
                 </p>
               </div>
-
-              <div class="heading-actions">
-                <ProfileMenu />
-              </div>
             </header>
 
             <!-- Информация о пользователе -->
@@ -95,6 +91,26 @@
                 ↓ Скачать APK
               </a>
             </section>
+
+            <!-- Выход из аккаунта -->
+            <section class="logout-section">
+              <p v-if="logoutError" class="logout-error">
+                {{ logoutError }}
+              </p>
+
+              <button
+                  type="button"
+                  class="logout-button"
+                  :disabled="loggingOut"
+                  @click="logout"
+              >
+                {{
+                  loggingOut
+                      ? 'Выходим...'
+                      : 'Выйти из аккаунта'
+                }}
+              </button>
+            </section>
           </div>
         </div>
       </div>
@@ -112,7 +128,6 @@ import { IonPage, IonContent } from '@ionic/vue';
 import YandexMusicImport from '@/components/Auth/YandexMusic/YandexMusicImport.vue';
 import YandexMusicAuth from '@/components/Auth/YandexMusic/YandexMusicAuth.vue';
 import AppNavigation from '@/components/AppNavigation.vue';
-import ProfileMenu from '@/components/profile/ProfileMenu.vue';
 import { useAuthStore } from '@/stores/auth';
 
 const router = useRouter();
@@ -146,6 +161,36 @@ function onYandexDisconnected(): void {
 
 function goToLibrary(): void {
   void router.push('/library');
+}
+
+const loggingOut = ref(false);
+
+const logoutError = ref('');
+
+async function logout(): Promise<void> {
+  if (loggingOut.value) {
+    return;
+  }
+
+  loggingOut.value = true;
+
+  logoutError.value = '';
+
+  try {
+    await auth.logout();
+
+    await router.replace('/login');
+  } catch (error) {
+    console.error(
+        'Ошибка выхода из аккаунта:',
+        error,
+    );
+
+    logoutError.value =
+        'Не удалось выйти. Попробуй ещё раз.';
+  } finally {
+    loggingOut.value = false;
+  }
 }
 </script>
 
@@ -471,6 +516,55 @@ function goToLibrary(): void {
 .download-button:focus-visible {
   outline: 2px solid #c4b5fd;
   outline-offset: 3px;
+}
+
+/* =========================
+   ВЫХОД ИЗ АККАУНТА
+========================= */
+
+.logout-section {
+  margin-top: 10px;
+}
+
+.logout-button {
+  width: 100%;
+  padding: 13px 16px;
+
+  border: 1px solid #f05b7740;
+  border-radius: 12px;
+
+  background: #f05b770f;
+  color: #f09aab;
+
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  transition:
+      background 0.2s,
+      border-color 0.2s,
+      color 0.2s;
+}
+
+.logout-button:hover {
+  background: #f05b7720;
+  border-color: #f05b7766;
+  color: #ffb0bf;
+}
+
+.logout-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.logout-error {
+  margin: 0 0 10px;
+
+  color: #ff9ba9;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 /* Планшеты: соответствует home.css */

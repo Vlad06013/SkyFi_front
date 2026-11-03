@@ -6,8 +6,6 @@
         :fullscreen="true"
         class="library-content"
     >
-      <ProfileMenu floating />
-
       <main class="library-layout">
         <!-- Заголовок -->
         <header class="library-header">
@@ -824,7 +822,7 @@ import {
 } from 'ionicons/icons';
 
 import AppNavigation from '@/components/AppNavigation.vue';
-import ProfileMenu from '@/components/profile/ProfileMenu.vue';
+
 import FavoriteTracksList from '@/components/lists/FavoriteTracksList.vue';
 
 import { ref, watch } from 'vue';

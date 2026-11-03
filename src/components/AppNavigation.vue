@@ -8,6 +8,19 @@
 
     <!-- Основное меню -->
     <div class="nav-links">
+      <!-- Профиль -->
+      <RouterLink
+          to="/profile"
+          class="nav-link nav-profile"
+          :aria-label="`Профиль: ${userName}`"
+      >
+        <span class="nav-profile-avatar">
+          {{ userInitial }}
+        </span>
+
+        <span class="nav-label">{{ userName }}</span>
+      </RouterLink>
+
       <RouterLink
           to="/wave"
           class="nav-link"
@@ -81,11 +94,21 @@ import {
 } from 'ionicons/icons';
 
 import useFriendsStore from '@/stores/friends';
+import {useAuthStore} from '@/stores/auth';
 
 const friendsStore = useFriendsStore();
+const auth = useAuthStore();
 
 const friendsIncomingCount = computed(
     () => friendsStore.incomingCount,
+);
+
+const userName = computed(
+    () => auth.user?.name ?? 'Профиль',
+);
+
+const userInitial = computed(
+    () => auth.user?.name?.charAt(0).toUpperCase() ?? 'U',
 );
 
 onMounted(() => {
@@ -331,6 +354,45 @@ function handleNavClick(event: MouseEvent): void {
 }
 
 /* =========================================
+   ПРОФИЛЬ
+========================================= */
+
+/* Первый пункт меню: отделяем его
+   от навигации по разделам. */
+.nav-profile {
+  margin-bottom: 14px;
+}
+
+.nav-profile-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  flex: 0 0 24px;
+
+  width: 24px;
+  height: 24px;
+
+  box-sizing: border-box;
+
+  border: 1px solid #c0adff55;
+  border-radius: 50%;
+
+  background: #a78bfa18;
+  color: #d5c9ff;
+
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.nav-profile .nav-label {
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+}
+
+/* =========================================
    НАВЕДЕНИЕ
 ========================================= */
 
@@ -458,6 +520,12 @@ function handleNavClick(event: MouseEvent): void {
     height: 100%;
 
     gap: 4px;
+  }
+
+  /* Профиль — первый пункт панели,
+     отступ от остальных не нужен. */
+  .nav-profile {
+    margin-bottom: 0;
   }
 
   /* Каждый пункт имеет одинаковую ширину */

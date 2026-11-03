@@ -17,8 +17,6 @@
               <ion-icon :icon="addOutline" />
               <span>Создать</span>
             </button>
-
-            <ProfileMenu />
           </div>
         </div>
 
@@ -328,7 +326,6 @@ import {
 } from 'ionicons/icons';
 
 import AppNavigation from '@/components/AppNavigation.vue';
-import ProfileMenu from '@/components/profile/ProfileMenu.vue';
 
 const {
   tabs,

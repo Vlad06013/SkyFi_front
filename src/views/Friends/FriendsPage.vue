@@ -3,8 +3,6 @@
         <AppNavigation />
 
         <ion-content :fullscreen="true" class="friends-content">
-            <ProfileMenu floating />
-
             <main class="friends-layout">
                 <header class="friends-header">
                     <div class="eyebrow">
