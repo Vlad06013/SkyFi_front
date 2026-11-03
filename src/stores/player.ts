@@ -42,6 +42,7 @@ import {
     addTrackToQueue,
     getPlayerQueue,
     reorderPlayerQueue,
+    removeTrackFromQueue,
     updateQueueItemStatus,
 } from '@/api/queue';
 
@@ -115,6 +116,22 @@ const usePlayerStore = defineStore('player', () => {
      *  null, пока источник неизвестен: заполняется из play_source
      *  серверного состояния или при запуске трека из списка. */
     const playSource = ref<PlaySourceListsEnum | null>(null);
+
+    /**
+     * Локальный снимок previous_play_source: что играло до входа
+     * в серверную очередь. На активном устройстве broadcast-события
+     * собственного origin игнорируются, поэтому playbackState из
+     * эфира не обновится — переход в очередь запоминаем сами,
+     * а состоянием сервера только подтверждаем (restore/пульт).
+     *
+     * resumeAfter: true — трек списка доиграл до входа в очередь,
+     * возвращаться нужно к СЛЕДУЮЩЕМУ треку, а не к нему самому.
+     */
+    const previousPlaySourceSnapshot = ref<{
+        source: PlaySourceListsEnum;
+        trackId: number | string | null;
+        resumeAfter: boolean;
+    } | null>(null);
 
     const isPlaying = ref(false);
     const isLoading = ref(false);
@@ -1041,10 +1058,139 @@ const usePlayerStore = defineStore('player', () => {
             queueItem => queueItem.id !== item.id,
         );
 
+        // Клик по очереди прерывает играющий список — запоминаем,
+        // куда возвращаться, когда очередь закончится.
+        if (currentQueueItemId === null) {
+            rememberPreviousPlaySource(false);
+        }
+
         exitWaveMode();
         playSource.value = PlaySourceListsEnum.QUEUE;
 
         await playQueueItem(item);
+    }
+
+    /**
+     * Очередь отыграна полностью — сыгранное и пропущенное
+     * не храним: чистим локальную копию и серверную очередь.
+     */
+    function clearFinishedServerQueue(): void {
+        const finished = serverQueue.value.filter(
+            item => item.status !== 'pending',
+        );
+
+        if (finished.length === 0) return;
+
+        serverQueue.value = serverQueue.value.filter(
+            item => item.status === 'pending',
+        );
+
+        setServerQueueCount(serverQueue.value.length);
+
+        for (const item of finished) {
+            backgroundSync(
+                () => removeTrackFromQueue(item.id),
+                'queue-clear-finished',
+            );
+        }
+    }
+
+    /**
+     * Запомнить, что играло до входа в серверную очередь.
+     * resumeAfter — трек списка доиграл (а не был прерван),
+     * поэтому возвращаться нужно к следующему треку списка.
+     */
+    function rememberPreviousPlaySource(resumeAfter: boolean): void {
+        if (
+            !playSource.value
+            || playSource.value === PlaySourceListsEnum.QUEUE
+            || !currentSourceTrack.value
+        ) {
+            return;
+        }
+
+        previousPlaySourceSnapshot.value = {
+            source: playSource.value,
+            trackId: currentSourceTrack.value.id,
+            resumeAfter,
+        };
+    }
+
+    /**
+     * Очередь закончилась — возвращаемся к списку, который играл
+     * до неё. Источник и трек берём из локального снимка (см.
+     * previousPlaySourceSnapshot), при его отсутствии — из полей
+     * previous_play_source / previous_play_source_track_id /
+     * last_source_track_id серверного состояния. Трек ищем
+     * в текущем списке: по DB id, для внешних — по source_id.
+     */
+    async function returnToPreviousPlaySource(
+        reason: 'manual' | 'ended',
+    ): Promise<boolean> {
+        const state = playbackState.value;
+        const snapshot = previousPlaySourceSnapshot.value;
+
+        const previousSource =
+            snapshot?.source
+            ?? (state?.previous_play_source as
+                | PlaySourceListsEnum
+                | undefined);
+
+        const previousTrackId =
+            snapshot?.trackId
+            ?? state?.previous_play_source_track_id
+            ?? state?.last_source_track_id;
+
+        if (
+            !previousSource
+            || previousTrackId === null
+            || previousTrackId === undefined
+            || previousSource === PlaySourceListsEnum.QUEUE
+        ) {
+            return false;
+        }
+
+        const findSourceTrackIndex = (
+            trackId: number | string,
+        ): number =>
+            queue.value.findIndex(
+                track =>
+                    String(track.id) === String(trackId)
+                    || (
+                        track.source_id !== null
+                        && String(track.source_id) === String(trackId)
+                    ),
+            );
+
+        let targetIndex = findSourceTrackIndex(previousTrackId);
+
+        if (targetIndex === -1) return false;
+
+        if (snapshot?.resumeAfter) {
+            // Трек доиграл до входа в очередь — продолжаем
+            // со следующего. Если он был последним — возврата нет.
+            const nextIndex = targetIndex + 1;
+
+            if (nextIndex >= queue.value.length) {
+                previousPlaySourceSnapshot.value = null;
+
+                return false;
+            }
+
+            targetIndex = nextIndex;
+        }
+
+        const previousTrack = queue.value[targetIndex];
+
+        if (reason !== 'ended') {
+            reportWave('skip', undefined, progress.value);
+        }
+
+        await playTrack(previousTrack, previousSource);
+
+        previousPlaySourceSnapshot.value = null;
+
+        return true;
     }
 
     // ============================================
@@ -1610,6 +1756,17 @@ const usePlayerStore = defineStore('player', () => {
         // и в волне тоже: волна играет своё, только когда
         // очередь пуста.
         if (isActive) {
+            // Чем закончился шаг — элементом очереди или треком
+            // списка: от этого зависит возврат к прежнему списку.
+            const wasQueueItem = currentQueueItemId !== null;
+
+            // Плеер переходит от списка к очереди: запоминаем,
+            // откуда пришли (серверное состояние на активном
+            // устройстве собственными событиями не обновляется).
+            if (!wasQueueItem) {
+                rememberPreviousPlaySource(reason === 'ended');
+            }
+
             finalizeCurrentQueueItem(
                 reason === 'ended' ? 'played' : 'skipped',
             );
@@ -1620,6 +1777,16 @@ const usePlayerStore = defineStore('player', () => {
                 await playQueueItem(queueItem);
 
                 return;
+            }
+
+            // Очередь отыграна полностью: сыгранное не храним,
+            // возвращаемся к списку, который играл до очереди.
+            clearFinishedServerQueue();
+
+            if (wasQueueItem) {
+                const returned = await returnToPreviousPlaySource(reason);
+
+                if (returned) return;
             }
         } else {
             const pending = getPendingQueueItem();
@@ -2510,6 +2677,23 @@ const usePlayerStore = defineStore('player', () => {
 
         if (state.play_source) {
             playSource.value = state.play_source as PlaySourceListsEnum;
+
+            // Пока играет очередь, previous_play_source состояния —
+            // источник, к которому вернёмся после неё: синхронизируем
+            // локальный снимок (актуально после restore и для команд
+            // с другого устройства).
+            if (
+                state.play_source === PlaySourceListsEnum.QUEUE
+                && state.previous_play_source
+                && state.previous_play_source !== PlaySourceListsEnum.QUEUE
+            ) {
+                previousPlaySourceSnapshot.value = {
+                    source: state.previous_play_source as PlaySourceListsEnum,
+                    trackId:
+                        state.previous_play_source_track_id ?? null,
+                    resumeAfter: false,
+                };
+            }
         }
 
         updateServerProgress(state);

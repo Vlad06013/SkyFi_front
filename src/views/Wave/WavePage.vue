@@ -20,6 +20,7 @@
             </h1>
 
             <button
+                ref="heroPlayRef"
                 class="vibe-play"
                 type="button"
                 :disabled="waveLoading"
@@ -66,6 +67,7 @@
 
             <div class="vibe-controls">
               <button
+                  ref="heroPlayRef"
                   class="vibe-play vibe-play-small"
                   type="button"
                   :disabled="waveLoading"
@@ -116,6 +118,8 @@ import {
   pauseOutline,
 } from 'ionicons/icons';
 
+import { onBeforeUnmount, onMounted, ref } from 'vue';
+
 import AppNavigation from '@/components/AppNavigation.vue';
 import ProfileMenu from '@/components/profile/ProfileMenu.vue';
 import usePlayerStore from '@/stores/player';
@@ -131,6 +135,58 @@ const {
   loadWave,
   playWave,
 } = useWave();
+
+// Кнопка play волны — цель для фокуса с пульта ТВ.
+const heroPlayRef = ref<HTMLButtonElement | null>(null);
+
+function isInsideNavigation(target: EventTarget | null): boolean {
+  return (
+      target instanceof Element
+      && target.closest('.app-navigation') !== null
+  );
+}
+
+/*
+ * Пульт Android TV: нативный spatial-фокус редко попадает на
+ * кнопку волны (рядом меню, профиль и плеер) — ведём его явно:
+ * вправо из бокового меню → кнопка волны, влево с кнопки → меню.
+ */
+function onWaveKeyDown(event: KeyboardEvent): void {
+  if (!(event.target instanceof HTMLElement)) {
+    return;
+  }
+
+  if (event.key === 'ArrowRight' && isInsideNavigation(event.target)) {
+    event.preventDefault();
+    heroPlayRef.value?.focus();
+    return;
+  }
+
+  if (
+      event.key === 'ArrowLeft'
+      && event.target instanceof HTMLButtonElement
+      && event.target.classList.contains('vibe-play')
+  ) {
+    event.preventDefault();
+
+    const activeNavLink = document.querySelector<HTMLElement>(
+        '.app-navigation .nav-link.router-link-active',
+    );
+
+    (
+        activeNavLink
+        ?? document.querySelector<HTMLElement>('.app-navigation .nav-link')
+    )?.focus();
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', onWaveKeyDown);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', onWaveKeyDown);
+});
 </script>
 
 <style scoped>
@@ -360,6 +416,93 @@ const {
   margin: 18px 0 0;
   color: #9295a8;
   font-size: 13px;
+}
+
+/* =========================================
+   НЕВЫСОКИЕ ЭКРАНЫ (ТВ-БОКСЫ, LANDSCAPE)
+   Героический блок компактим, чтобы кнопка
+   play не уходила под фиксированный плеер.
+========================================= */
+
+@media (max-height: 760px) {
+  .vibe-page {
+    padding-top: 40px;
+    /* Низ держим свободным под мобильный плеер (72px навигация
+     * + 68px плеер) с запасом — на ТВ широкий layout, там меньше. */
+    padding-bottom: 170px;
+  }
+
+  .vibe-logo {
+    font-size: clamp(26px, 5vw, 32px);
+  }
+
+  .vibe-cover-wrap {
+    width: min(190px, 45vw, 32dvh);
+  }
+
+  /* Декоративный эквалайзер на низком экране не нужен. */
+  .vibe-eq {
+    display: none;
+  }
+
+  .vibe-title {
+    margin-top: 12px;
+    font-size: 20px;
+  }
+
+  .vibe-artist {
+    font-size: 13px;
+  }
+
+  .vibe-play {
+    width: 72px;
+    height: 72px;
+    margin-top: 22px;
+    font-size: 30px;
+  }
+
+  .vibe-controls {
+    margin-top: 20px;
+  }
+
+  .vibe-play-small {
+    width: 60px;
+    height: 60px;
+    font-size: 26px;
+  }
+}
+
+@media (max-height: 560px) {
+  .vibe-page {
+    padding-top: 24px;
+    padding-bottom: 150px;
+  }
+
+  .vibe-cover-wrap {
+    width: min(140px, 40vw, 30dvh);
+  }
+
+  .vibe-title {
+    margin-top: 10px;
+    font-size: 17px;
+  }
+
+  .vibe-play {
+    width: 60px;
+    height: 60px;
+    margin-top: 16px;
+    font-size: 26px;
+  }
+
+  .vibe-controls {
+    margin-top: 14px;
+  }
+
+  .vibe-play-small {
+    width: 52px;
+    height: 52px;
+    font-size: 22px;
+  }
 }
 
 /* ---------- СОСТОЯНИЯ ---------- */

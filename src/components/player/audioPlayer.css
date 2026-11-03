@@ -1421,12 +1421,13 @@
 @media (max-width: 700px) {
     .track-details-backdrop {
         padding: 12px;
+        padding-top: calc(12px + var(--app-safe-top));
     }
 
     .track-details-modal {
         width: 100%;
         max-width: 400px;
-        max-height: calc(100dvh - 24px);
+        max-height: calc(100dvh - 24px - var(--app-safe-top));
         padding: 16px;
         border-radius: 20px;
     }

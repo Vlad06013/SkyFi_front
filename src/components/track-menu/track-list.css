@@ -29,6 +29,28 @@
     background: #171a23;
 }
 
+/* Фокус пульта ТВ: строка — единая фокусная зона,
+ * выглядит как наведение + рамка. */
+.track-row:focus {
+    outline: none;
+}
+
+.track-row:focus-visible {
+    outline: 2px solid #a78bfa;
+    outline-offset: 2px;
+    background: #171a23;
+}
+
+.track-row:focus-visible .cover-play,
+.track-row:focus .cover-play {
+    opacity: 1;
+}
+
+.track-row:focus-visible .cover > ion-icon,
+.track-row:focus .cover > ion-icon {
+    opacity: 0;
+}
+
 .track-row:active {
     transform: scale(0.995);
 }

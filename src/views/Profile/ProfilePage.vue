@@ -20,14 +20,6 @@
               </div>
 
               <div class="heading-actions">
-                <button
-                    class="back-button"
-                    type="button"
-                    @click="goHome"
-                >
-                  ← На главную
-                </button>
-
                 <ProfileMenu />
               </div>
             </header>
@@ -81,14 +73,28 @@
               </div>
             </section>
 
-            <div class="profile-note">
-              <span>ⓘ</span>
+            <!-- Скачивание приложения -->
+            <section class="app-download">
+              <div class="app-download-info">
+                <div class="eyebrow">ANDROID</div>
 
-              <p>
-                Авторизация Яндекс Музыки выполняется через сервер SkyFi.
-                Не передавай токен другим людям.
-              </p>
-            </div>
+                <h2>Приложение SkyFi</h2>
+
+                <p>
+                  Актуальная версия для телефона и телевизора.
+                  Скачай APK и открой его, чтобы установить.
+                </p>
+              </div>
+
+              <a
+                  class="download-button"
+                  :href="APK_DOWNLOAD_URL"
+                  target="_blank"
+                  rel="noopener"
+              >
+                ↓ Скачать APK
+              </a>
+            </section>
           </div>
         </div>
       </div>
@@ -120,9 +126,15 @@ const userInitial = computed(() => {
 
 const yandexConnected = ref(false);
 
-function goHome(): void {
-  void router.push('/');
-}
+/*
+ * Прямая ссылка на APK в публичном репозитории (ветка dev).
+ * raw.githubusercontent отдаёт файл как вложение: браузер скачает
+ * его, а не попытается открыть внутри страницы. В приложении
+ * внешние адреса уходят в системный браузер (как и скачивание
+ * треков) — тот и сохранит APK.
+ */
+const APK_DOWNLOAD_URL =
+    'https://raw.githubusercontent.com/Vlad06013/SkyFi_front/dev/skyFy.apk';
 
 function onYandexConnected(): void {
   yandexConnected.value = true;
@@ -178,7 +190,7 @@ function goToLibrary(): void {
 .profile-card,
 .services-section,
 .service-card,
-.profile-note {
+.app-download {
   box-sizing: border-box;
   min-width: 0;
   max-width: 100%;
@@ -221,27 +233,6 @@ function goToLibrary(): void {
   color: #a7a4b3;
   font-size: 13px;
   line-height: 1.7;
-}
-
-.back-button {
-  flex: 0 0 auto;
-  max-width: 100%;
-  padding: 12px 16px;
-  border: 1px solid #302d3c;
-  border-radius: 12px;
-  background: #15141c;
-  color: #fff;
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-  transition:
-      background 0.2s,
-      border-color 0.2s;
-}
-
-.back-button:hover {
-  background: #201b2d;
-  border-color: #a78bfa70;
 }
 
 .heading-actions {
@@ -407,29 +398,79 @@ function goToLibrary(): void {
   max-width: 100%;
 }
 
-.profile-note {
+.app-download {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
   width: 100%;
   margin-top: 22px;
-  padding: 16px 18px;
+  padding: 20px 22px;
   border: 1px solid #292633;
   border-radius: 14px;
-  color: #aaa6b7;
-  font-size: 13px;
-  line-height: 1.7;
+  background: linear-gradient(135deg, #191721, #111117);
 }
 
-.profile-note > span {
-  flex-shrink: 0;
-  color: #b8a5ff;
-}
-
-.profile-note p {
+.app-download-info {
   min-width: 0;
+}
+
+.app-download-info .eyebrow {
+  margin-bottom: 8px;
+  color: #a78bfa;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 2px;
+}
+
+.app-download-info h2 {
   margin: 0;
-  overflow-wrap: anywhere;
+  color: #f5f7fa;
+  font-size: 19px;
+  font-weight: 750;
+  letter-spacing: -0.4px;
+}
+
+.app-download-info p {
+  margin: 8px 0 0;
+  color: #9296a7;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.download-button {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 12px;
+  background: #8b5cf6;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+      background 0.2s,
+      transform 0.2s;
+}
+
+.download-button:hover {
+  background: #9d71f8;
+  transform: translateY(-1px);
+}
+
+.download-button:active {
+  transform: translateY(0);
+}
+
+.download-button:focus-visible {
+  outline: 2px solid #c4b5fd;
+  outline-offset: 3px;
 }
 
 /* Планшеты: соответствует home.css */
@@ -467,6 +508,16 @@ function goToLibrary(): void {
   .profile-card,
   .service-card {
     padding: 18px;
+  }
+
+  .app-download {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+  }
+
+  .download-button {
+    width: 100%;
   }
 
   .profile-card {

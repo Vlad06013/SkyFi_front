@@ -194,9 +194,9 @@ onBeforeUnmount(() => {
 
 .profile-menu--floating {
     position: fixed;
-    /* env(safe-area-inset-top): на Android 15+ вебвью уходит
-     * под статус-бар — без инсета кнопка оказывается под ним. */
-    top: calc(26px + env(safe-area-inset-top, 0px));
+    /* --app-safe-top: на Android вебвью уходит под статус-бар,
+     * а env(safe-area-inset-top) там почти всегда 0. */
+    top: calc(26px + var(--app-safe-top));
     right: 4.5%;
     z-index: 900;
     margin-left: 0;
@@ -374,7 +374,7 @@ onBeforeUnmount(() => {
     }
 
     .profile-menu--floating {
-        top: calc(18px + env(safe-area-inset-top, 0px));
+        top: calc(18px + var(--app-safe-top));
         right: 17px;
     }
 

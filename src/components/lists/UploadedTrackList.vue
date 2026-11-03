@@ -14,15 +14,20 @@
     <template #item="{ item: track }">
       <div
           class="track-row"
+          role="button"
+          tabindex="0"
+          :aria-label="`Воспроизвести: ${track.title}`"
           :class="{
           'track-row-active': isCurrentTrack(track),
           'track-row-menu-open':
             openMenuTrackId === String(track.id),
         }"
-          @click="playTrack(track)"
+          @click="onRowClick(track)"
+          @keydown="onRowKeyDown($event, track)"
       >
         <button
             type="button"
+            tabindex="-1"
             class="uploaded-track-play"
             :aria-label="`Воспроизвести ${track.title}`"
             @click.stop="playTrack(track)"
@@ -88,6 +93,8 @@
 </template>
 
 <script setup lang="ts">
+import '@/components/track-menu/track-list.css';
+
 import {computed, watch, ref, onMounted} from 'vue';
 import {IonIcon} from '@ionic/vue';
 import {
@@ -208,6 +215,73 @@ async function playTrack(track: Track): Promise<void> {
   });
 
   await player.playTrack(track, sourceList);
+}
+
+// ============================================
+// НАВИГАЦИЯ ПУЛЬТОМ ТВ: СТРОКА — ЕДИНАЯ ФОКУСНАЯ ЗОНА
+// ============================================
+
+/*
+ * Центральная клавиша пульта на части устройств шлёт и keydown,
+ * и синтезированный click — без защиты трек стартовал бы дважды
+ * (второй «клик» тут же ставил бы его на паузу).
+ */
+let rowKeyActivatedAt = 0;
+const ROW_KEY_CLICK_GUARD_MS = 400;
+
+function onRowClick(track: Track): void {
+  if (Date.now() - rowKeyActivatedAt < ROW_KEY_CLICK_GUARD_MS) {
+    return;
+  }
+
+  void playTrack(track);
+}
+
+function focusRow(row: HTMLElement | null): void {
+  if (!(row instanceof HTMLElement)) return;
+
+  row.focus();
+  row.scrollIntoView({ block: 'nearest' });
+}
+
+function onRowKeyDown(event: KeyboardEvent, track: Track): void {
+  const row = event.currentTarget;
+
+  if (!(row instanceof HTMLElement)) return;
+
+  switch (event.key) {
+    case 'Enter':
+    case ' ':
+      event.preventDefault();
+      rowKeyActivatedAt = Date.now();
+      void playTrack(track);
+      return;
+
+    case 'ArrowDown':
+    case 'ArrowUp': {
+      event.preventDefault();
+
+      const sibling = (
+          event.key === 'ArrowDown'
+              ? row.nextElementSibling
+              : row.previousElementSibling
+      ) as HTMLElement | null;
+
+      if (
+          sibling instanceof HTMLElement
+          && sibling.classList.contains('track-row')
+      ) {
+        focusRow(sibling);
+      }
+      return;
+    }
+
+    case 'ArrowRight':
+      // Меню трека остаётся достижимым: вправо — на «три точки».
+      event.preventDefault();
+      row.querySelector<HTMLElement>('.track-menu-trigger')?.focus();
+      return;
+  }
 }
 
 

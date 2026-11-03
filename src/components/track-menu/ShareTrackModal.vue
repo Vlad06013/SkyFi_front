@@ -521,6 +521,12 @@ onBeforeUnmount(() => {
   }
 }
 
+@media (max-width: 700px) {
+  .share-backdrop {
+    padding-top: calc(20px + var(--app-safe-top));
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .share-backdrop,
   .share-modal {

@@ -29,6 +29,11 @@ export interface PlaybackState {
     last_source_track_id: number | null;
     active_device_id: number | null;
 
+    /** Список, который играл до входа в очередь: к нему возвращаемся, когда очередь закончится. */
+    previous_play_source?: string | null;
+    /** Трек списка, который играл до входа в очередь. */
+    previous_play_source_track_id?: number | null;
+
     position_seconds: number;
     is_playing: boolean;
 
