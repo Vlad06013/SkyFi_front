@@ -89,13 +89,14 @@
           <small>
             {{ track.meta?.album?.title || 'Без альбома' }}
           </small>
-          <span
-              class="source-badge"
-              :class="getSourceTypeClass(track.source_type)"
-          >
-            {{ getSourceTypeLabel(track.source_type) }}
-          </span>
         </div>
+
+        <span
+            class="source-badge"
+            :class="getSourceTypeClass(track.source_type)"
+        >
+          {{ getSourceTypeLabel(track.source_type) }}
+        </span>
 
         <span
             v-if="isCurrentTrack(track)"
@@ -737,11 +738,16 @@ watch(
   transition: none;
 }
 
+.track-row {
+  width: auto;
+  margin: 5px 10px;
+}
+
 .source-badge {
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
   width: fit-content;
-  margin-top: 5px;
   padding: 3px 8px;
   border-radius: 6px;
   font-size: 10px;
