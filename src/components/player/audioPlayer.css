@@ -46,6 +46,68 @@
 }
 
 /* ========================================
+   СЛАЙДЕР ТРЕКОВ: при драге сбоку подъезжает
+   соседний трек, недотянул — текущий
+   возвращается на место.
+======================================== */
+
+.now-slider {
+    position: relative;
+
+    min-width: 0;
+    min-height: 46px;
+
+    overflow: hidden;
+}
+
+/* Плавное движение после отпускания (снап-бек и вылет).
+ * Без will-change: transform создаёт containing block
+ * и ломает position: fixed у меню трека внутри карточки. */
+.now-slider-slide {
+    transition: transform 0.28s cubic-bezier(0.25, 0.8, 0.3, 1);
+}
+
+/* Во время драга трансформации следуют за пальцем без анимации. */
+.now-slider-dragging .now-slider-slide {
+    transition: none;
+}
+
+/* Соседние треки снаружи вьюпорта. */
+.now-slide-side {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    width: 100%;
+    min-width: 0;
+
+    pointer-events: none;
+}
+
+/* Соседние карточки приглушены: акцент на текущем треке. */
+.now-slide-side .now-info {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.now-slide-side .now-info strong {
+    color: #a09cad;
+}
+
+.now-slide-side .now-info span {
+    color: #6d6a7c;
+}
+
+.mini-cover-side {
+    opacity: 0.7;
+}
+
+/* ========================================
    ОБЛОЖКА И ИНФОРМАЦИЯ О ТРЕКЕ
 ======================================== */
 
@@ -724,6 +786,13 @@
     color: #4ade80;
 }
 
+/* Пометка записи этого устройства в списке. */
+.device-option-current {
+    flex-shrink: 0;
+    font-size: 10px;
+    color: #8b7fd6;
+}
+
 .device-option:disabled {
     opacity: 0.5;
     cursor: wait;
@@ -989,6 +1058,32 @@
         bottom: calc(100% + 8px);
         width: 210px;
     }
+}
+
+/* ========================================
+   ТВ / АВТОМАГНИТОЛЫ: ПЛЕЕР НАД НИЖНЕЙ ПАНЕЛЬЮ
+
+   Класс app--bottom-nav вешает useAppLayout.
+   Плеер занимает всю ширину и встаёт над
+   навигацией, как на телефонах.
+======================================== */
+
+body.app--bottom-nav .player {
+    left: 0;
+    right: 0;
+    bottom: var(--app-bottom-nav-height, 84px);
+
+    min-height: 76px;
+
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-rows: auto;
+    gap: 14px;
+
+    padding: 12px 20px;
+}
+
+body.app--bottom-nav .player-right .volume-control {
+    display: none;
 }
 
 /* ========================================

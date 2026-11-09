@@ -69,6 +69,45 @@
               </div>
             </section>
 
+            <!-- Режим навигации -->
+            <section class="navmode-section">
+              <div class="section-heading">
+                <div>
+                  <div class="eyebrow">ИНТЕРФЕЙС</div>
+                  <h2>Навигация</h2>
+                </div>
+              </div>
+
+              <div class="navmode-card">
+                <p class="navmode-description">
+                  На телевизоре и автомагнитоле удобнее панель
+                  навигации снизу и крупные элементы. Обычно режим
+                  определяется автоматически — включите вручную,
+                  если устройство не распозналось.
+                </p>
+
+                <div class="navmode-options">
+                  <button
+                      type="button"
+                      class="navmode-option"
+                      :class="{ 'navmode-option--active': navMode === 'auto' }"
+                      @click="setNavMode('auto')"
+                  >
+                    Авто
+                  </button>
+
+                  <button
+                      type="button"
+                      class="navmode-option"
+                      :class="{ 'navmode-option--active': navMode === 'tv' }"
+                      @click="setNavMode('tv')"
+                  >
+                    ТВ / магнитола
+                  </button>
+                </div>
+              </div>
+            </section>
+
             <!-- Скачивание приложения -->
             <section class="app-download">
               <div class="app-download-info">
@@ -129,9 +168,11 @@ import YandexMusicImport from '@/components/Auth/YandexMusic/YandexMusicImport.v
 import YandexMusicAuth from '@/components/Auth/YandexMusic/YandexMusicAuth.vue';
 import AppNavigation from '@/components/AppNavigation.vue';
 import { useAuthStore } from '@/stores/auth';
+import { useAppLayout } from '@/composables/useAppLayout';
 
 const router = useRouter();
 const auth = useAuthStore();
+const { navMode, setNavMode } = useAppLayout();
 
 const user = computed(() => auth.user);
 
@@ -441,6 +482,67 @@ async function logout(): Promise<void> {
 .service-auth :deep(.ym-auth__submit) {
   box-sizing: border-box;
   max-width: 100%;
+}
+
+/* =========================
+   РЕЖИМ НАВИГАЦИИ
+========================= */
+
+.navmode-section {
+  width: 100%;
+  margin-top: 42px;
+}
+
+.navmode-card {
+  width: 100%;
+  padding: 24px;
+  border: 1px solid #292633;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #191721, #111117);
+}
+
+.navmode-description {
+  margin: 0 0 18px;
+  color: #9296a7;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.navmode-options {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.navmode-option {
+  padding: 11px 20px;
+  border: 1px solid #35324a;
+  border-radius: 12px;
+  background: transparent;
+  color: #d8d6e5;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+      background 0.2s,
+      border-color 0.2s,
+      color 0.2s;
+}
+
+.navmode-option:hover {
+  border-color: #8b5cf6;
+}
+
+.navmode-option--active {
+  border-color: #8b5cf6;
+  background: #8b5cf626;
+  color: #c4b2ff;
+}
+
+.navmode-option:focus-visible {
+  outline: 2px solid #c4b5fd;
+  outline-offset: 3px;
 }
 
 .app-download {

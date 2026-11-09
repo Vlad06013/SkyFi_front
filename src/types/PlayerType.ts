@@ -43,6 +43,9 @@ export interface PlaybackState {
     /** Источник списка, из которого играет трек (favorites, search, ...). */
     play_source?: string;
 
+    /** Якорь цепочки «Моей Волны»: общая для устройств ротация. */
+    wave_anchor?: string | null;
+
     /** Очередь воспроизведения (приходит в broadcast-состоянии). */
     queue?: PlaybackQueueItem[];
 

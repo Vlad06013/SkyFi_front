@@ -2,23 +2,49 @@
   <ion-app>
     <ion-router-outlet />
 
+    <!-- Верхняя панель: профиль слева, поиск справа.
+         На страницах входа/регистрации не нужна. -->
+    <AppTopBar v-if="showTopBar" />
+
     <!-- Глобальный футер-плеер: монтируется один раз,
-         переходы между страницами его не пересоздают. -->
+         переходы между страницами его не пересоздают.
+         На странице волны сам бар скрывается (см. AudioPlayer),
+         но компонент остаётся смонтированным: карточка трека
+         открывается и с волны, и при возврате бар мгновенно
+         показывает текущий трек. -->
     <AudioPlayer v-if="auth.isAuthenticated" />
   </ion-app>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { computed, onMounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { IonApp, IonRouterOutlet } from '@ionic/vue';
 import AudioPlayer from '@/components/player/AudioPlayer.vue';
+import AppTopBar from '@/components/AppTopBar.vue';
 import { useAuthStore } from '@/stores/auth';
 import { initHardwareBackButton } from '@/lib/hardwareBack';
+import { useAppLayout } from '@/composables/useAppLayout';
 
 const auth = useAuthStore();
+const appLayout = useAppLayout();
+const route = useRoute();
+
+const showTopBar = computed(
+    () =>
+        auth.isAuthenticated
+        && route.path !== '/login'
+        && route.path !== '/register',
+);
+
+// Отступ контента под верхнюю панель (см. variables.css).
+watch(showTopBar, (show) => {
+  document.body.classList.toggle('app--top-bar', show);
+}, { immediate: true });
 
 onMounted(() => {
   initHardwareBackButton();
+  appLayout.start();
 });
 </script>
 

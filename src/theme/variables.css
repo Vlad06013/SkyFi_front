@@ -57,3 +57,45 @@ http://ionicframework.com/docs/theming/ */
         --padding-top: var(--app-safe-top);
     }
 }
+
+/* =========================================
+   ТВ / АВТОМАГНИТОЛЫ: НИЖНЯЯ НАВИГАЦИЯ
+   (класс вешает useAppLayout, см. composables)
+========================================= */
+
+body.app--bottom-nav {
+    --app-safe-top: max(env(safe-area-inset-top, 0px), 24px);
+    --app-bottom-nav-height: 84px;
+}
+
+/* Меню снизу — боковой отступ контента не нужен.
+ * Специфичность выше, чем у медиа-правил выше. */
+body.app--bottom-nav .ion-page > ion-content:not(.auth-content):not(.content--full) {
+    --padding-start: 0;
+}
+
+body.app--bottom-nav .ion-page > ion-content {
+    --padding-top: var(--app-safe-top);
+}
+
+/*
+ * Верхняя панель (профиль слева, поиск справа): контент
+ * страниц опускаем ниже неё. --app-safe-top учитывает
+ * статус-бар (часы, батарея) телефонов и магнитол.
+ */
+body.app--top-bar .ion-page > ion-content {
+    --padding-top: calc(var(--app-safe-top, 0px) + 54px);
+}
+
+/*
+ * Управление пультом (DPAD): фокус должен быть заметен
+ * на любом интерактивном элементе. Android WebView сама
+ * водит фокус по стрелкам — осталось его показать.
+ */
+body.app--bottom-nav button:focus-visible,
+body.app--bottom-nav [role='button']:focus-visible,
+body.app--bottom-nav a:focus-visible,
+body.app--bottom-nav input:focus-visible {
+    outline: 3px solid #c4b5fd;
+    outline-offset: 3px;
+}

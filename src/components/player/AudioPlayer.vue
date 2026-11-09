@@ -1,47 +1,82 @@
 <template>
+  <!-- На странице волны бар скрыт: там свой интерфейс.
+       Компонент остаётся смонтированным — модалка карточки
+       трека доступна, при переходе на другую страницу бар
+       возвращается мгновенно, с текущим треком. -->
   <footer
+      v-show="!isWaveRoute"
       class="player"
       :style="{ '--player-progress': `${player.progressPercent}%` }"
       @click="handlePlayerSurfaceClick"
       @pointerdown="onSwipePointerDown"
-      @pointerup="onSwipePointerUp"
-      @pointercancel="onSwipePointerCancel"
   >
-    <!-- Информация о текущем треке -->
-    <div class="now-playing">
+    <!-- Информация о текущем треке: слайдер. При горизонтальном
+         драге сбоку подъезжает соседний трек; не дотянул —
+         текущий возвращается на место. -->
+    <div
+        ref="nowSliderRef"
+        class="now-slider"
+        :class="{ 'now-slider-dragging': isTrackDragging }"
+    >
+      <!-- Предыдущий трек: за левым краем, подъезжает при драге вправо -->
       <div
-          v-if="player.currentTrack"
-          class="mini-cover"
-          :class="player.currentTrack.cover"
+          class="now-slide-side now-slider-slide"
+          :style="prevSlideStyle"
+          aria-hidden="true"
       >
-        <img
-            v-if="player.currentTrack.coverPath"
-            :src="player.currentTrack.coverPath"
-            alt=""
-            class="mini-cover__img"
+        <div class="mini-cover mini-cover-side">
+          <img
+              v-if="prevLine.cover"
+              :src="prevLine.cover"
+              alt=""
+              class="mini-cover__img"
+          >
+          <template v-else>♫</template>
+        </div>
+
+        <div class="now-info">
+          <strong>{{ prevLine.title }}</strong>
+          <span>{{ prevLine.artist }}</span>
+        </div>
+      </div>
+
+      <div
+          class="now-playing now-slider-slide"
+          :style="currentSlideStyle"
+      >
+        <div
+            v-if="player.currentTrack"
+            class="mini-cover"
+            :class="player.currentTrack.cover"
         >
+          <img
+              v-if="player.currentTrack.coverPath"
+              :src="player.currentTrack.coverPath"
+              alt=""
+              class="mini-cover__img"
+          >
 
-        <template v-else>
-          {{ player.currentTrack.symbol }}
-        </template>
-      </div>
+          <template v-else>
+            {{ player.currentTrack.symbol }}
+          </template>
+        </div>
 
-      <div v-else class="mini-cover mini-empty">
-        ♫
-      </div>
+        <div v-else class="mini-cover mini-empty">
+          ♫
+        </div>
 
-      <div class="now-info">
-        <strong>
-          {{ player.currentTrack?.title ?? 'Выбери свой трек' }}
-        </strong>
+        <div class="now-info">
+          <strong>
+            {{ player.currentTrack?.title ?? 'Выбери свой трек' }}
+          </strong>
 
-        <span>
+          <span>
       {{
-            player.currentTrack?.artist
-            ?? 'SkyFi · музыкальное пространство'
-          }}
+              player.currentTrack?.artist
+              ?? 'SkyFi · музыкальное пространство'
+            }}
     </span>
-      </div>
+        </div>
 
       <!-- Кнопка очереди воспроизведения -->
       <button
@@ -116,6 +151,29 @@
           :loading="player.isLoading || player.favoriteLoading"
           @action="handleTrackMenuAction"
       />
+      </div>
+
+      <!-- Следующий трек: за правым краем, подъезжает при драге влево -->
+      <div
+          class="now-slide-side now-slider-slide"
+          :style="nextSlideStyle"
+          aria-hidden="true"
+      >
+        <div class="mini-cover mini-cover-side">
+          <img
+              v-if="nextLine.cover"
+              :src="nextLine.cover"
+              alt=""
+              class="mini-cover__img"
+          >
+          <template v-else>♫</template>
+        </div>
+
+        <div class="now-info">
+          <strong>{{ nextLine.title }}</strong>
+          <span>{{ nextLine.artist }}</span>
+        </div>
+      </div>
     </div>
 
     <!-- Центральное управление -->
@@ -422,6 +480,14 @@
               {{ player.isDeviceOnline(device) ? 'онлайн' : 'офлайн' }}
             </span>
 
+            <span
+                v-if="device.id === player.localDeviceId"
+                class="device-option-current"
+                title="Приложение запущено на этом устройстве"
+            >
+              это устройство
+            </span>
+
             <span v-if="device.id === player.activeDeviceId">
               ✓
             </span>
@@ -490,12 +556,10 @@
   </footer>
   <Teleport to="body">
     <div
-        v-if="showTrackDetails && player.currentTrack"
+        v-if="ui.trackDetailsOpen && player.currentTrack"
         class="track-details-backdrop"
         @click.self="onBackdropClick"
         @pointerdown="onSwipePointerDown"
-        @pointerup="onSwipePointerUp"
-        @pointercancel="onSwipePointerCancel"
     >
       <section
           class="track-details-modal"
@@ -509,7 +573,7 @@
               type="button"
               class="track-details-close"
               aria-label="Закрыть плеер"
-              @click="showTrackDetails = false"
+              @click="ui.closeTrackDetails()"
           >
             <svg
                 viewBox="0 0 24 24"
@@ -532,7 +596,7 @@
               type="button"
               class="track-details-queue"
               aria-label="Открыть очередь"
-              @click="showQueue = true; showTrackDetails = false"
+              @click="showQueue = true; ui.closeTrackDetails()"
           >
             <svg
                 viewBox="0 0 24 24"
@@ -799,17 +863,24 @@
 <script setup lang="ts">
 import './audioPlayer.css';
 
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import usePlayerStore from '@/stores/player';
+import { useUiStore } from '@/stores/ui';
 import QueuePanel from '@/components/player/queue/QueuePanel.vue';
 import TrackContextMenu from '@/components/track-menu/TrackContextMenu.vue';
 import { registerHardwareBackHandler } from '@/lib/hardwareBack';
+import type { Track } from '@/types/TrackType';
 
 const player = usePlayerStore();
+const ui = useUiStore();
+const route = useRoute();
+
+// Бар скрывается на странице волны (см. template), модалка — нет.
+const isWaveRoute = computed(() => route.path === '/wave');
 
 const showQueue = ref(false);
 const showDeviceMenu = ref(false);
-const showTrackDetails = ref(false);
 
 // Цели для перехода фокуса с прогресс-бара пультом (Android TV).
 const playButtonRef = ref<HTMLButtonElement | null>(null);
@@ -1029,22 +1100,98 @@ function onVolumeKeyDown(event: KeyboardEvent): void {
 }
 
 // ============================================
-// СВАЙПЫ ПО ПЛЕЕРУ: влево — следующий трек, вправо — предыдущий
+// СЛАЙДЕР ТРЕКОВ: драг влево — следующий, вправо — предыдущий.
+// При драге соседний трек подъезжает сбоку; не дотянул —
+// текущий возвращается на место.
 // ============================================
+
+const nowSliderRef = ref<HTMLElement | null>(null);
 
 const swipeStart = ref<{
     x: number;
     y: number;
     pointerId: number;
 } | null>(null);
+
+/** Текущее смещение текущего трека в px (драг и вылет при свайпе). */
+const dragOffset = ref(0);
+
+/** Идёт драг: трансформации без анимации, следуют за пальцем. */
+const isTrackDragging = ref(false);
+
+/** Трек вылетает по завершённому свайпу ('next' | 'prev'). */
+const slideCommit = ref<null | 'next' | 'prev'>(null);
+
 let swipeFired = false;
 
 const SWIPE_MIN_DISTANCE = 60;
+
+/** Соседние треки для подъезжающих карточек. */
+function sideLine(track: Track | null, fallbackTitle: string): {
+    title: string;
+    artist: string;
+    cover: string | null;
+} {
+    if (!track) {
+        return { title: fallbackTitle, artist: '—', cover: null };
+    }
+
+    return {
+        title: track.title,
+        artist:
+            track.meta?.artists?.map(artist => artist.name).join(', ')
+            || 'Неизвестный исполнитель',
+        cover: track.meta?.album?.cover_path ?? null,
+    };
+}
+
+const prevLine = computed(() =>
+    sideLine(
+        player.isLocalDeviceActive
+            ? player.previewPreviousTrack
+            : null,
+        'Предыдущий трек',
+    ),
+);
+
+const nextLine = computed(() =>
+    sideLine(
+        player.isLocalDeviceActive
+            ? player.previewNextTrack
+            : null,
+        'Следующий трек',
+    ),
+);
+
+const currentSlideStyle = computed(() => {
+    // Покой: transform: none — иначе любое значение transform
+    // (даже нулевое) ломает position: fixed у выпадающего
+    // меню трека внутри карточки.
+    if (dragOffset.value === 0) {
+        return { transform: 'none' };
+    }
+
+    return { transform: `translate3d(${dragOffset.value}px, 0, 0)` };
+});
+
+const prevSlideStyle = computed(() => ({
+    transform: `translate3d(calc(-100% + ${dragOffset.value}px), 0, 0)`,
+}));
+
+const nextSlideStyle = computed(() => ({
+    transform: `translate3d(calc(100% + ${dragOffset.value}px), 0, 0)`,
+}));
 
 function onSwipePointerDown(event: PointerEvent): void {
     // Мышь — только левой кнопкой; trailing click после драга
     // глушится флагом swipeFired в handlePlayerSurfaceClick/onBackdropClick.
     if (event.pointerType === 'mouse' && event.button !== 0) {
+        return;
+    }
+
+    // Пока карточка вылетает по завершённому свайпу — новый
+    // жест не начинаем.
+    if (slideCommit.value) {
         return;
     }
 
@@ -1071,6 +1218,33 @@ function onSwipePointerDown(event: PointerEvent): void {
     };
 }
 
+function onSwipePointerMove(event: PointerEvent): void {
+    const start = swipeStart.value;
+
+    if (!start || start.pointerId !== event.pointerId) {
+        return;
+    }
+
+    const deltaX = event.clientX - start.x;
+    const deltaY = event.clientY - start.y;
+
+    if (!isTrackDragging.value) {
+        // Жест ещё не определён: ждём явного горизонтального
+        // сдвига, вертикаль оставляем прокрутке страницы.
+        if (Math.abs(deltaX) < 10 || Math.abs(deltaX) < Math.abs(deltaY) * 1.5) {
+            return;
+        }
+
+        if (!player.currentTrack) {
+            return;
+        }
+
+        isTrackDragging.value = true;
+    }
+
+    dragOffset.value = deltaX;
+}
+
 function onSwipePointerUp(event: PointerEvent): void {
     const start = swipeStart.value;
 
@@ -1083,7 +1257,14 @@ function onSwipePointerUp(event: PointerEvent): void {
     const deltaX = event.clientX - start.x;
     const deltaY = event.clientY - start.y;
 
-    // Только горизонталь и заметная длина — иначе это просто касание.
+    if (isTrackDragging.value) {
+        isTrackDragging.value = false;
+        releaseTrackDrag(deltaX);
+        return;
+    }
+
+    // Резкий короткий свайп без визуального драга: прежнее
+    // поведение, только на заметной длине.
     if (
         Math.abs(deltaX) < SWIPE_MIN_DISTANCE ||
         Math.abs(deltaX) < Math.abs(deltaY) * 2
@@ -1104,8 +1285,92 @@ function onSwipePointerUp(event: PointerEvent): void {
     }
 }
 
-function onSwipePointerCancel(): void {
+function releaseTrackDrag(deltaX: number): void {
+    const width = nowSliderRef.value?.clientWidth ?? 320;
+    const threshold = Math.min(SWIPE_MIN_DISTANCE, width * 0.3);
+
+    if (
+        Math.abs(deltaX) < threshold ||
+        !player.currentTrack ||
+        player.isLoading
+    ) {
+        // Не дотянул — текущий трек возвращается на место.
+        dragOffset.value = 0;
+        return;
+    }
+
+    swipeFired = true;
+
+    const direction = deltaX < 0 ? 'next' : 'prev';
+
+    slideCommit.value = direction;
+
+    // Карточка улетает за край, соседняя встаёт на её место.
+    dragOffset.value = direction === 'next' ? -width : width;
+
+    if (direction === 'next') {
+        void player.playNext();
+    } else {
+        void player.playPrevious();
+    }
+
+    // Страховка: если трек не сменился (конец списка без
+    // повтора и т.п.) — карточка возвращается.
+    setTimeout(() => {
+        if (slideCommit.value === direction) {
+            slideCommit.value = null;
+            dragOffset.value = 0;
+        }
+    }, 500);
+}
+
+function onSwipePointerCancel(event: PointerEvent): void {
+    if (
+        swipeStart.value &&
+        event.pointerId !== undefined &&
+        swipeStart.value.pointerId !== event.pointerId
+    ) {
+        return;
+    }
+
     swipeStart.value = null;
+
+    if (isTrackDragging.value) {
+        isTrackDragging.value = false;
+        dragOffset.value = 0;
+    }
+}
+
+// Трек сменился: позиции слайдера сбрасываем БЕЗ анимации —
+// на экране уже тот трек, что только что подъехал сбоку.
+watch(() => player.currentTrack?.id, () => {
+    if (dragOffset.value === 0 && !slideCommit.value) {
+        return;
+    }
+
+    slideCommit.value = null;
+    dragOffset.value = 0;
+    isTrackDragging.value = true;
+
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            isTrackDragging.value = false;
+        });
+    });
+});
+
+// Драг может увести палец за пределы футера — слушаем
+// движение и отпускание на window.
+function bindSwipeListeners(): void {
+    window.addEventListener('pointermove', onSwipePointerMove);
+    window.addEventListener('pointerup', onSwipePointerUp);
+    window.addEventListener('pointercancel', onSwipePointerCancel);
+}
+
+function unbindSwipeListeners(): void {
+    window.removeEventListener('pointermove', onSwipePointerMove);
+    window.removeEventListener('pointerup', onSwipePointerUp);
+    window.removeEventListener('pointercancel', onSwipePointerCancel);
 }
 
 // Клик по фону модалки закрывает её, но не после свайпа.
@@ -1115,7 +1380,7 @@ function onBackdropClick(): void {
         return;
     }
 
-    showTrackDetails.value = false;
+    ui.closeTrackDetails();
 }
 
 async function selectDevice(deviceId: number): Promise<void> {
@@ -1127,8 +1392,8 @@ async function selectDevice(deviceId: number): Promise<void> {
 onMounted(async () => {
   // Кнопка «назад» пульта сначала закрывает оверлеи плеера.
   registerHardwareBackHandler(() => {
-    if (showTrackDetails.value) {
-      showTrackDetails.value = false;
+    if (ui.trackDetailsOpen) {
+      ui.closeTrackDetails();
       return true;
     }
 
@@ -1150,6 +1415,12 @@ onMounted(async () => {
   if (player.isServerSyncEnabled) {
     player.subscribeToDeviceChanges();
   }
+
+  bindSwipeListeners();
+});
+
+onBeforeUnmount(() => {
+  unbindSwipeListeners();
 });
 
 watch(
@@ -1203,7 +1474,7 @@ function handlePlayerSurfaceClick(event: MouseEvent) {
   }
 
   if (player.currentTrack) {
-    showTrackDetails.value = true;
+    ui.openTrackDetails();
   }
 }
 </script>

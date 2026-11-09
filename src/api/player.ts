@@ -17,6 +17,7 @@ export async function playRemoteTrack(
     meta?: {
         origin_device_id: number | null;
         command_id: string;
+        wave_anchor?: string | null;
     },
 ): Promise<PlayerStateResponse> {
     const response = (

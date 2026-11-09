@@ -1,6 +1,7 @@
 import {computed, ref, watch} from 'vue';
 import {defineStore} from 'pinia';
 import {toastController} from '@ionic/vue';
+import axios from 'axios';
 import {Capacitor} from '@capacitor/core';
 import {Device} from '@capacitor/device';
 import echo from '@/lib/echo';
@@ -15,6 +16,13 @@ import {
 import {PlaySourceListsEnum} from '@/types/PlaySourceListsEnum';
 
 import {isAudioUrlFresh, parseServerDate} from '@/lib/audioUrlTtl';
+
+import {
+    initMediaSession,
+    updateMediaSessionTrack,
+    updateMediaSessionPlaybackState,
+    updateMediaSessionPosition,
+} from '@/lib/mediaSession';
 
 import {
     getWaveTracks,
@@ -286,7 +294,27 @@ const usePlayerStore = defineStore('player', () => {
         try {
             await sendPlayerHeartbeat(getDeviceUuid());
         } catch (error) {
-            console.warn('[Player] Heartbeat не отправлен:', error);
+            // Запись устройства могла быть удалена серверной
+            // уборкой: устройства — присутствие, молчащие
+            // забываются. Перерегистрируемся, иначе все
+            // команды плеера посыплются по 404/422
+            // (origin_device_id перестанет существовать).
+            if (
+                axios.isAxiosError(error) &&
+                error.response?.status === 404
+            ) {
+                console.warn(
+                    '[Player] Устройство забыто сервером, перерегистрация...',
+                );
+
+                void initializePlayerDevice();
+            } else {
+                console.warn(
+                    '[Player] Heartbeat не отправлен:',
+                    error,
+                );
+            }
+
             return;
         }
 
@@ -661,14 +689,31 @@ const usePlayerStore = defineStore('player', () => {
         });
     }
 
-    function createSyncMeta(): {
+    /**
+     * Мета команд плеера. Якорь волны передаём только
+     * для её треков: бэкенд хранит его в состоянии,
+     * а /play из других источников (null) цепочку
+     * сбрасывает.
+     */
+    function createSyncMeta(source?: PlaySourceListsEnum): {
         origin_device_id: number | null;
         command_id: string;
+        wave_anchor?: string | null;
     } {
-        return {
+        const meta: {
+            origin_device_id: number | null;
+            command_id: string;
+            wave_anchor?: string | null;
+        } = {
             origin_device_id: localDeviceId.value,
             command_id: createCommandId(),
         };
+
+        if (source === PlaySourceListsEnum.YANDEX_WAVE) {
+            meta.wave_anchor = waveAnchor;
+        }
+
+        return meta;
     }
 
     /**
@@ -917,7 +962,7 @@ const usePlayerStore = defineStore('player', () => {
             const response = await playRemoteTrack(
                 track,
                 source,
-                createSyncMeta(),
+                createSyncMeta(source),
             );
 
             const version = Number(response?.state?.version);
@@ -1269,6 +1314,9 @@ const usePlayerStore = defineStore('player', () => {
     /**
      * Предыдущий индекс списка-источника с учётом shuffle/repeat.
      * -1 — переключаться некуда, достаточно перемотать в начало.
+     *
+     * Не мутирует курсор shuffle: используется для превью
+     * соседнего трека в слайдере плеера.
      */
     function resolvePreviousIndex(): number {
         const total = queue.value.length;
@@ -1293,6 +1341,86 @@ const usePlayerStore = defineStore('player', () => {
 
         return repeatMode.value === 'all' ? total - 1 : -1;
     }
+
+    /**
+     * Подгляд следующего трека БЕЗ побочных эффектов
+     * (resolveNextIndex двигает курсор shuffle). Для слайдера.
+     */
+    function peekNextListIndex(): number {
+        const total = queue.value.length;
+
+        if (total === 0) return -1;
+
+        if (isShuffleEnabled.value) {
+            if (shuffleOrder.length === 0) return -1;
+
+            const next = shuffleCursor + 1;
+
+            if (next >= shuffleOrder.length) {
+                return repeatMode.value === 'all' ? 0 : -1;
+            }
+
+            return shuffleOrder[next];
+        }
+
+        const current = currentTrackIndex.value;
+
+        if (current < 0) return 0;
+
+        const next = current + 1;
+
+        if (next < total) return next;
+
+        return repeatMode.value === 'all' ? 0 : -1;
+    }
+
+    /** Подгляд предыдущего трека без побочных эффектов. */
+    function peekPreviousListIndex(): number {
+        const total = queue.value.length;
+
+        if (total === 0) return -1;
+
+        if (isShuffleEnabled.value) {
+            if (shuffleCursor > 0) {
+                return shuffleOrder[shuffleCursor - 1];
+            }
+
+            return -1;
+        }
+
+        const current = currentTrackIndex.value;
+
+        if (current < 0) return total - 1;
+
+        if (current > 0) return current - 1;
+
+        return repeatMode.value === 'all' ? total - 1 : -1;
+    }
+
+    /**
+     * Соседние треки для слайдера: что подъедет при свайпе.
+     * Приблизительно для пульта (его список может отличаться) —
+     * плеер показывает эти превью только на активном устройстве.
+     */
+    const previewNextTrack = computed<Track | null>(() => {
+        if (!auth.user) return null;
+
+        const pending = getPendingQueueItem();
+
+        if (pending) return pending.track;
+
+        const index = peekNextListIndex();
+
+        return index === -1 ? null : queue.value[index] ?? null;
+    });
+
+    const previewPreviousTrack = computed<Track | null>(() => {
+        if (!auth.user) return null;
+
+        const index = peekPreviousListIndex();
+
+        return index === -1 ? null : queue.value[index] ?? null;
+    });
 
     // ============================================
     // МОЯ ВОЛНА
@@ -1954,7 +2082,7 @@ const usePlayerStore = defineStore('player', () => {
                 const response = await playRemoteTrack(
                     track,
                     playbackSource,
-                    createSyncMeta(),
+                    createSyncMeta(playbackSource),
                 );
 
                 if (requestId !== playbackRequestId) return;
@@ -2007,7 +2135,7 @@ const usePlayerStore = defineStore('player', () => {
                 const response = await playRemoteTrack(
                     track,
                     playbackSource,
-                    createSyncMeta(),
+                    createSyncMeta(playbackSource),
                 );
 
                 const serverTrack = response.state?.current_track;
@@ -2664,6 +2792,15 @@ const usePlayerStore = defineStore('player', () => {
             }
         }
 
+        // Якорь волны общий для устройств: серверное состояние
+        // знает цепочку лучше локального снимка — другой клиент
+        // мог уже продвинуть её. Без этого пульт продолжает
+        // волну с пустым якорем, и Яндекс каждый раз отдаёт
+        // стартовую порцию (круг из нескольких песен).
+        if (state.wave_anchor !== undefined) {
+            waveAnchor = state.wave_anchor;
+        }
+
         if (Number.isFinite(incomingVersion)) {
             lastAppliedVersion = incomingVersion;
         }
@@ -2680,9 +2817,28 @@ const usePlayerStore = defineStore('player', () => {
             setServerQueueCount(state.queue.length);
         }
 
-        // Состояние пришло с сервера — локальная привязка
-        // к элементу очереди больше не актуальна.
-        currentQueueItemId = null;
+        // Состояние пришло с сервера. Локальную привязку
+        // к элементу очереди сохраняем, только если сервер
+        // подтверждает, что играет именно этот элемент;
+        // иначе (трек списка, чужая команда) сбрасываем —
+        // иначе «сыгранный» элемент остаётся призраком
+        // в очереди и потом играет повторно.
+        if (currentQueueItemId !== null) {
+            const currentItem = state.queue?.find(
+                (item) => item.id === currentQueueItemId,
+            );
+
+            const serverTrackId = state.current_track?.id ?? null;
+
+            const stillCurrent =
+                currentItem !== undefined &&
+                serverTrackId !== null &&
+                String(currentItem.track?.id) === String(serverTrackId);
+
+            if (!stillCurrent) {
+                currentQueueItemId = null;
+            }
+        }
 
         devices.value = devices.value.map((device) => ({
             ...device,
@@ -3103,6 +3259,98 @@ const usePlayerStore = defineStore('player', () => {
         isDeviceChangesSubscribed = true;
     }
 
+    // ============================================
+    // MEDIA SESSION
+    //
+    // Метаданные и обработчики системных медиакнопок:
+    // руль, гарнитура, lockscreen. Пульт и активное
+    // устройство обрабатываются одинаково — команды
+    // тех же togglePlay/playNext/playPrevious,
+    // сами разбираются, локально им управлять.
+    // ============================================
+
+    initMediaSession({
+        onPlay: () => {
+            if (!isPlaying.value) void togglePlay();
+        },
+        onPause: () => {
+            if (isPlaying.value) void togglePlay();
+        },
+        onNext: () => {
+            void playNext();
+        },
+        onPrevious: () => {
+            void playPrevious();
+        },
+        onSeekBackward: (offset) => {
+            void seekAudio(progress.value - offset);
+        },
+        onSeekForward: (offset) => {
+            void seekAudio(progress.value + offset);
+        },
+        onSeekTo: (seconds) => {
+            void seekAudio(seconds);
+        },
+    });
+
+    function syncMediaSession(): void {
+        const track = currentTrack.value;
+
+        updateMediaSessionTrack(
+            track
+                ? {
+                      title: track.title,
+                      artist: track.artist,
+                      album: track.albumTitle,
+                      artworkUrl: track.coverPath,
+                  }
+                : null,
+        );
+
+        updateMediaSessionPlaybackState(
+            track !== null,
+            isPlaying.value,
+        );
+
+        if (track) {
+            updateMediaSessionPosition(
+                progress.value,
+                audioDuration.value,
+            );
+        }
+    }
+
+    // Позиция в уведомлении — не чаще раза в 10 секунд:
+    // watch на каждый тик прогресса слишком шумный.
+    let lastMediaPositionSyncSeconds = 0;
+
+    watch(
+        () => Math.floor(progress.value),
+        (seconds) => {
+            if (!currentTrack.value || !isPlaying.value) return;
+
+            if (
+                seconds !== 0 &&
+                Math.abs(seconds - lastMediaPositionSyncSeconds) < 10
+            ) {
+                return;
+            }
+
+            lastMediaPositionSyncSeconds = seconds;
+
+            updateMediaSessionPosition(
+                progress.value,
+                audioDuration.value,
+            );
+        },
+    );
+
+    watch(() => currentTrack.value?.id, syncMediaSession, {
+        immediate: true,
+    });
+
+    watch(isPlaying, syncMediaSession);
+
     // При смене пользователя (выход/повторный вход) канал Echo и
     // состояние устройства нужно пересобрать: иначе подписка
     // остаётся на канале прежнего юзера и синхронизация молчит.
@@ -3148,6 +3396,9 @@ const usePlayerStore = defineStore('player', () => {
         currentTrack,
         isPlaying,
         isLoading,
+
+        previewNextTrack,
+        previewPreviousTrack,
 
         progress,
         audioDuration,

@@ -8,19 +8,6 @@
 
     <!-- Основное меню -->
     <div class="nav-links">
-      <!-- Профиль -->
-      <RouterLink
-          to="/profile"
-          class="nav-link nav-profile"
-          :aria-label="`Профиль: ${userName}`"
-      >
-        <span class="nav-profile-avatar">
-          {{ userInitial }}
-        </span>
-
-        <span class="nav-label">{{ userName }}</span>
-      </RouterLink>
-
       <RouterLink
           to="/wave"
           class="nav-link"
@@ -33,18 +20,6 @@
         <span class="nav-label">Волна</span>
       </RouterLink>
 
-      <RouterLink to="/search" class="nav-link">
-        <span class="nav-icon">
-          <ion-icon :icon="searchOutline" />
-        </span>
-
-        <span class="nav-label">Поиск</span>
-      </RouterLink>
-
-<!--      <RouterLink to="/library" class="nav-link">-->
-<!--        <span class="nav-icon">-->
-<!--          <ion-icon :icon="musicalNotesOutline" />-->
-<!--        </span>-->
       <RouterLink to="/favorite" class="nav-link">
         <span class="nav-icon">
           <ion-icon :icon="musicalNotesOutline" />
@@ -87,28 +62,17 @@ import { IonIcon } from '@ionic/vue';
 
 import {
   pulseOutline,
-  searchOutline,
   musicalNotesOutline,
   listOutline,
   peopleOutline,
 } from 'ionicons/icons';
 
 import useFriendsStore from '@/stores/friends';
-import {useAuthStore} from '@/stores/auth';
 
 const friendsStore = useFriendsStore();
-const auth = useAuthStore();
 
 const friendsIncomingCount = computed(
     () => friendsStore.incomingCount,
-);
-
-const userName = computed(
-    () => auth.user?.name ?? 'Профиль',
-);
-
-const userInitial = computed(
-    () => auth.user?.name?.charAt(0).toUpperCase() ?? 'U',
 );
 
 onMounted(() => {
@@ -354,45 +318,6 @@ function handleNavClick(event: MouseEvent): void {
 }
 
 /* =========================================
-   ПРОФИЛЬ
-========================================= */
-
-/* Первый пункт меню: отделяем его
-   от навигации по разделам. */
-.nav-profile {
-  margin-bottom: 14px;
-}
-
-.nav-profile-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  flex: 0 0 24px;
-
-  width: 24px;
-  height: 24px;
-
-  box-sizing: border-box;
-
-  border: 1px solid #c0adff55;
-  border-radius: 50%;
-
-  background: #a78bfa18;
-  color: #d5c9ff;
-
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-.nav-profile .nav-label {
-  overflow: hidden;
-
-  text-overflow: ellipsis;
-}
-
-/* =========================================
    НАВЕДЕНИЕ
 ========================================= */
 
@@ -522,12 +447,6 @@ function handleNavClick(event: MouseEvent): void {
     gap: 4px;
   }
 
-  /* Профиль — первый пункт панели,
-     отступ от остальных не нужен. */
-  .nav-profile {
-    margin-bottom: 0;
-  }
-
   /* Каждый пункт имеет одинаковую ширину */
 
   .nav-link {
@@ -601,6 +520,134 @@ function handleNavClick(event: MouseEvent): void {
     text-align: center;
     white-space: nowrap;
   }
+}
+
+/* =========================================
+   ТВ / АВТОМАГНИТОЛЫ: НИЖНЯЯ ПАНЕЛЬ
+
+   Класс app--bottom-nav вешает useAppLayout
+   (автодетект ТВ/магнитол или ручной режим
+   из профиля). Стили зеркалят мобильные,
+   но крупнее — управление с кресла/дивана.
+========================================= */
+
+body.app--bottom-nav .app-navigation {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+
+    width: 100%;
+    height: var(--app-bottom-nav-height, 84px);
+
+    padding: 6px 14px;
+
+    box-sizing: border-box;
+
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+
+    gap: 0;
+
+    background: #0b0d12;
+
+    border-top: 1px solid #292d3b;
+    border-right: none;
+}
+
+body.app--bottom-nav .nav-logo {
+    display: none;
+}
+
+body.app--bottom-nav .nav-links {
+    display: flex;
+    flex-direction: row;
+
+    align-items: stretch;
+    justify-content: space-around;
+
+    width: 100%;
+    height: 100%;
+
+    max-width: 900px;
+
+    gap: 8px;
+}
+
+body.app--bottom-nav .nav-link {
+    display: flex;
+    flex: 1 1 0;
+
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    min-width: 0;
+    min-height: 0;
+
+    margin: 0;
+    padding: 4px 2px;
+
+    box-sizing: border-box;
+
+    gap: 5px;
+
+    border-radius: 12px;
+
+    font-size: 11px;
+    line-height: 15px;
+
+    text-align: center;
+}
+
+body.app--bottom-nav .nav-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    flex: 0 0 28px;
+
+    width: 28px;
+    height: 28px;
+
+    margin: 0;
+    padding: 0;
+
+    font-size: 24px;
+    line-height: 1;
+}
+
+body.app--bottom-nav .nav-icon ion-icon {
+    width: 27px;
+    height: 27px;
+}
+
+body.app--bottom-nav .nav-label {
+    display: block;
+
+    flex: 0 0 auto;
+
+    width: 100%;
+    min-width: 0;
+    min-height: 15px;
+
+    margin: 0;
+    padding: 0;
+
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 15px;
+
+    text-align: center;
+    white-space: nowrap;
+}
+
+/* Управление пультом (DPAD): заметный фокус. */
+body.app--bottom-nav .nav-link:focus-visible,
+body.app--bottom-nav .nav-logo:focus-visible {
+    outline: 3px solid #c4b5fd;
+    outline-offset: 3px;
 }
 
 /* =========================================
