@@ -37,7 +37,7 @@ import {PlaySourceListsEnum} from '@/types/PlaySourceListsEnum';
 // ТИПЫ
 // ============================================
 
-type LibraryTab = 'tracks' | 'albums' | 'artists' | 'upload';
+type LibraryTab = 'tracks' | 'albums' | 'artists' | 'upload' | 'offline';
 
 interface Album {
     id: number;

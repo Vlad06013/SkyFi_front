@@ -25,6 +25,7 @@ import AppTopBar from '@/components/AppTopBar.vue';
 import { useAuthStore } from '@/stores/auth';
 import { initHardwareBackButton } from '@/lib/hardwareBack';
 import { useAppLayout } from '@/composables/useAppLayout';
+import { useDownloadsStore } from '@/stores/downloads';
 
 const auth = useAuthStore();
 const appLayout = useAppLayout();
@@ -45,6 +46,9 @@ watch(showTopBar, (show) => {
 onMounted(() => {
   initHardwareBackButton();
   appLayout.start();
+
+  // Маркеры скачанных треков в списках — из локальной базы.
+  void useDownloadsStore().initialize();
 });
 </script>
 

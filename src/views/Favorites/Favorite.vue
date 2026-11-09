@@ -56,6 +56,16 @@
 
           <button
               type="button"
+              class="tab"
+              :class="{ active: activeTab === 'offline' }"
+              @click="openOfflineTab"
+          >
+            <ion-icon :icon="downloadOutline" />
+            Скачанное
+          </button>
+
+          <button
+              type="button"
               class="tab upload-tab"
               @click="openUpload"
           >
@@ -147,6 +157,26 @@
         </section>
 
         <!-- =====================================
+              СКАЧАННОЕ (ОФЛАЙН)
+         ====================================== -->
+        <section
+            v-else-if="activeTab === 'offline'"
+            class="library-section"
+        >
+          <div class="section-heading">
+            <div>
+              <div class="section-eyebrow">
+                ОФЛАЙН
+              </div>
+
+              <h2>Скачанное</h2>
+            </div>
+          </div>
+
+          <DownloadedTracksList />
+        </section>
+
+        <!-- =====================================
               ИЗБРАННОЕ
          ====================================== -->
         <section
@@ -162,10 +192,22 @@
               <h2>Избранное</h2>
             </div>
 
-            <span class="count-badge">
-              {{ tracks.length }}
-              {{ pluralizeTracks(tracks.length) }}
-            </span>
+            <div class="heading-side">
+              <button
+                  type="button"
+                  class="download-all-button"
+                  title="Скачать всё избранное для офлайна"
+                  @click="downloadAllFavorites"
+              >
+                <ion-icon :icon="cloudDownloadOutline" />
+                Скачать все
+              </button>
+
+              <span class="count-badge">
+                {{ tracks.length }}
+                {{ pluralizeTracks(tracks.length) }}
+              </span>
+            </div>
           </div>
           <FavoriteTracksList
               :items="visibleTracks"
@@ -810,6 +852,8 @@ import {
   musicalNotesOutline,
   discOutline,
   cloudUploadOutline,
+  cloudDownloadOutline,
+  downloadOutline,
   checkmarkCircleOutline,
   alertCircleOutline,
   informationCircleOutline,
@@ -824,6 +868,8 @@ import {
 import AppNavigation from '@/components/AppNavigation.vue';
 
 import FavoriteTracksList from '@/components/lists/FavoriteTracksList.vue';
+import DownloadedTracksList from '@/components/lists/DownloadedTracksList.vue';
+import {useDownloadsStore} from '@/stores/downloads';
 
 import { ref, watch } from 'vue';
 import UploadedTrackList from "@/components/lists/UploadedTrackList.vue";
@@ -906,6 +952,20 @@ async function openUploadedTab(): Promise<void> {
   await loadUploadedTracks();
 }
 
+async function openOfflineTab(): Promise<void> {
+  activeTab.value = 'offline';
+
+  // Список строится из локальной базы — подтягиваем её.
+  await useDownloadsStore().initialize();
+}
+
+/** Всё избранное — в очередь скачивания (по одному, не мешает плееру). */
+function downloadAllFavorites(): void {
+  if (tracks.value.length === 0) return;
+
+  void useDownloadsStore().downloadAll(tracks.value);
+}
+
 function openUpload(): void {
   // Форма открывается отдельно и не подменяет загрузку списка.
   uploadModalOpen.value = true;
@@ -921,6 +981,51 @@ watch(uploadSuccess, async (success) => {
 </script>
 
 <style scoped>
+/* Оборка правой части заголовка: «Скачать все» + счётчик. */
+.heading-side {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.download-all-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+
+    padding: 9px 14px;
+
+    border: 1px solid #35324a;
+    border-radius: 999px;
+
+    background: transparent;
+    color: #d5c9ff;
+
+    font: inherit;
+    font-size: 12px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition:
+        background 0.2s,
+        border-color 0.2s;
+}
+
+.download-all-button:hover {
+    border-color: #8b5cf6;
+    background: #8b5cf615;
+}
+
+.download-all-button:focus-visible {
+    outline: 2px solid #c4b5fd;
+    outline-offset: 2px;
+}
+
+.download-all-button ion-icon {
+    font-size: 15px;
+}
 .track-menu-wrap { position: relative; z-index: 2; flex: 0 0 auto; }
 .track-menu-trigger { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border: 0; border-radius: 50%; background: transparent; color: var(--ion-color-medium, #888); cursor: pointer; transition: background .18s ease, color .18s ease; }
 .track-menu-trigger:hover, .track-menu-trigger:focus-visible { background: var(--ion-color-step-100, rgba(128,128,128,.14)); color: var(--ion-text-color); outline: none; }

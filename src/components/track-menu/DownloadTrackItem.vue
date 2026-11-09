@@ -3,55 +3,92 @@
       type="button"
       role="menuitem"
       class="download-item"
-      :disabled="downloading || !validTrackId"
-      @click.stop="onDownload"
+      :disabled="status === 'downloading'"
+      @click.stop="onAction"
   >
-    <ion-spinner v-if="downloading" name="crescent" />
-    <ion-icon v-else :icon="downloadOutline" />
+    <ion-spinner
+        v-if="status === 'downloading'"
+        name="crescent"
+    />
+    <ion-icon
+        v-else
+        :icon="icon"
+    />
 
-    <span>{{ downloading ? 'Подготовка...' : 'Скачать' }}</span>
+    <span>{{ label }}</span>
   </button>
 </template>
 
 <script setup lang="ts">
-import {computed, ref} from 'vue';
+import {computed} from 'vue';
 import {IonIcon, IonSpinner} from '@ionic/vue';
-import {downloadOutline} from 'ionicons/icons';
-import {downloadTrackAudio} from '@/api/player';
+import {
+  cloudDownloadOutline,
+  refreshOutline,
+  trashOutline,
+} from 'ionicons/icons';
 
+import type {Track} from '@/types/TrackType';
+import {useDownloadsStore} from '@/stores/downloads';
+
+/**
+ * Скачать трек для офлайна / удалить скачанное.
+ * Независимо от избранного: скачивание ≠ лайк,
+ * удаление скачанного избранное не трогает.
+ */
 const props = defineProps<{
-  trackId: number;
+  track: Track;
 }>();
 
 const emit = defineEmits<{
   (event: 'close'): void;
 }>();
 
-const downloading = ref(false);
+const downloads = useDownloadsStore();
 
-const validTrackId = computed(
-    () => Number.isFinite(props.trackId) && props.trackId > 0,
-);
+const status = computed(() => downloads.statusOf(props.track));
 
-function onDownload(): void {
-  if (!validTrackId.value || downloading.value) {
+const percent = computed(() => downloads.progressOf(props.track));
+
+const label = computed(() => {
+  switch (status.value) {
+    case 'downloading':
+      return percent.value !== null
+          ? `Скачивается… ${percent.value}%`
+          : 'Скачивается…';
+    case 'done':
+      return 'Удалить скачанное';
+    case 'error':
+      return 'Повторить скачивание';
+    default:
+      return 'Скачать для офлайна';
+  }
+});
+
+const icon = computed(() => {
+  switch (status.value) {
+    case 'done':
+      return trashOutline;
+    case 'error':
+      return refreshOutline;
+    default:
+      return cloudDownloadOutline;
+  }
+});
+
+function onAction(): void {
+  if (status.value === 'downloading') {
     return;
   }
 
-  // This endpoint returns the file itself with Content-Disposition: attachment.
-  // Because this is a direct browser navigation, JavaScript does not need to
-  // fetch the MP3 bytes, so the static-file CORS issue is avoided.
-  downloading.value = true;
-  // const downloadUrl = `http://127.0.0.1:8080/api/v1/skyfy/tracks/${props.trackId}/download`;
-  window.location.href = downloadTrackAudio(props.trackId);
+  if (status.value === 'done') {
+    void downloads.remove(props.track);
+  } else {
+    void downloads.download(props.track);
+  }
+
   emit('close');
-
-  // Reset the button state in case navigation is not performed (e.g. an error).
-  window.setTimeout(() => {
-    downloading.value = false;
-  }, 1500);
 }
-
 </script>
 
 <style scoped>

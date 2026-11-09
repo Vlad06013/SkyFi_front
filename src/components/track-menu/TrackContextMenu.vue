@@ -1,5 +1,7 @@
 <template>
   <div class="track-menu-wrap" @click.stop @pointerdown.stop>
+    <DownloadStatusIcon :track="track as unknown as Track" />
+
     <button
         type="button"
         class="track-menu-trigger"
@@ -118,7 +120,7 @@
             </button>
 
             <DownloadTrackItem
-                :track-id="Number(track.id)"
+                :track="track as unknown as Track"
                 @close="closeMenu"
             />
           </div>
@@ -193,7 +195,7 @@
         </button>
 
         <DownloadTrackItem
-            :track-id="Number(track.id)"
+            :track="track as unknown as Track"
             @close="closeMenu"
         />
       </div>
@@ -223,6 +225,7 @@ import {
 
 import AddToPlaylistItem from '@/components/track-menu/AddToPlaylistItem.vue';
 import DownloadTrackItem from '@/components/track-menu/DownloadTrackItem.vue';
+import DownloadStatusIcon from '@/components/track-menu/DownloadStatusIcon.vue';
 import ShareTrackModal from '@/components/track-menu/ShareTrackModal.vue';
 import type {Track} from '@/types/TrackType';
 import type {TrackType} from '@/types/TrackType';

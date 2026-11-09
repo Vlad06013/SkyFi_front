@@ -31,6 +31,7 @@ import {
 } from '@/api/wave';
 
 import {type Track} from '@/types/TrackType';
+import {useDownloadsStore} from '@/stores/downloads';
 
 import {
     getTrackAudio,
@@ -732,6 +733,16 @@ const usePlayerStore = defineStore('player', () => {
         track: Track,
         forceFresh = false,
     ): Promise<string> {
+        // Скачанный трек играем локально: без сети и TTL.
+        if (!forceFresh) {
+            const localUrl =
+                await useDownloadsStore().getLocalAudioUrl(track);
+
+            if (localUrl) {
+                return localUrl;
+            }
+        }
+
         const trackId = Number(track.id);
         const ttlSec = track.file?.path_ttl_sec ?? null;
 
@@ -2072,6 +2083,24 @@ const usePlayerStore = defineStore('player', () => {
     ): Promise<void> {
         if (!track?.id || !auth.user || isLoading.value) return;
 
+        // Офлайн: скачанный трек играем локально,
+        // сервер недоступен — синк молчит.
+        if (!window.navigator.onLine && isLocalDeviceActive.value) {
+            const downloads = useDownloadsStore();
+
+            if (await downloads.hasLocalAudio(track)) {
+                playSource.value = playbackSource;
+
+                const started = await startLocalTrack(track);
+
+                if (started) {
+                    isPlaying.value = true;
+                }
+
+                return;
+            }
+        }
+
         // Мы — пульт: старая схема, сервер дёрнёт активное устройство.
         if (!isLocalDeviceActive.value) {
             const requestId = ++playbackRequestId;
@@ -3394,6 +3423,7 @@ const usePlayerStore = defineStore('player', () => {
         setServerQueueCount,
 
         currentTrack,
+        currentSourceTrack,
         isPlaying,
         isLoading,
 
