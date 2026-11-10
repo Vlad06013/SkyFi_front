@@ -374,6 +374,56 @@ describe('player store', () => {
         });
     });
 
+    describe('восстановление состояния после перезагрузки', () => {
+        it('сервер говорит «playing», но звук не пошёл — показываем паузу', async () => {
+            const track = makeTrack('Восстановленный');
+
+            mocks.getPlayerDevices.mockResolvedValue({
+                data: [
+                    {
+                        id: 7,
+                        device_uuid: 'test-uuid',
+                        name: 'Tester',
+                        is_active: true,
+                        last_seen_at: new Date().toISOString(),
+                    },
+                ],
+            });
+
+            mocks.registerPlayerDevice.mockResolvedValue({
+                id: 7,
+                device_uuid: 'test-uuid',
+                name: 'Tester',
+                is_active: true,
+                last_seen_at: new Date().toISOString(),
+            });
+
+            localStorage.setItem('skyfi_device_uuid', 'test-uuid');
+
+            mocks.getPlayerState.mockResolvedValue({
+                state: {
+                    version: 1,
+                    is_playing: true,
+                    position_seconds: 30,
+                    active_device_id: 7,
+                    play_source: 'favorites',
+                    shuffle_enabled: false,
+                    repeat_mode: 'off',
+                    current_track: track,
+                    queue: [],
+                },
+                queue: [],
+            });
+
+            await player.initializePlayerDevice();
+
+            // Без пользовательского жеста браузер звук не пустил:
+            // честная пауза, а не «крутится без звука».
+            expect(player.isPlaying).toBe(false);
+            expect(player.currentTrack?.title).toBe('Восстановленный');
+        });
+    });
+
     describe('play/pause', () => {
         it('togglePlay переключает паузу и продолжение', async () => {
             await playList(['A', 'B']);
