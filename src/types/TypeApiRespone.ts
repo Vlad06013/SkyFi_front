@@ -52,6 +52,7 @@ export interface YandexMusicImportStart {
 }
 
 export interface YandexMusicImportStatus {
+    job_id?: string;
     status: string;
     total?: number;
     processed?: number;

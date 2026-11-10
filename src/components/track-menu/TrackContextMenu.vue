@@ -209,8 +209,19 @@
   </div>
 </template>
 
+<script lang="ts">
+import {ref} from 'vue';
+
+// Все экземпляры меню на экране делят одну «активную» метку:
+// открытие одного меню закрывает остальные (клики по чужим
+// кнопкам останавливаются stop-обработчиками, иначе открытые
+// меню висели бы друг над другом).
+let menuSeq = 0;
+const activeMenuId = ref<number | null>(null);
+</script>
+
 <script setup lang="ts" generic="T extends TrackType">
-import {nextTick, onBeforeUnmount, ref, watch} from 'vue';
+import {nextTick, onBeforeUnmount, watch} from 'vue';
 import {IonIcon, IonSpinner} from '@ionic/vue';
 import {
   closeOutline,
@@ -256,6 +267,9 @@ const opensUp = ref(false);
 const desktopMenu = ref<HTMLElement | null>(null);
 const trigger = ref<HTMLButtonElement | null>(null);
 const shareModalOpen = ref(false);
+
+// Уникальный номер экземпляра в общем «реестре» меню (см. блок script выше).
+const menuId = ++menuSeq;
 
 const desktopMenuStyle = ref<Record<string, string>>({
   visibility: 'hidden',
@@ -325,6 +339,7 @@ function toggleMenu() {
       : null;
 
   isOpen.value = true;
+  activeMenuId.value = menuId;
   emit('open', props.track);
 
   if (!isMobile.value) {
@@ -337,6 +352,11 @@ function closeMenu() {
 
   isOpen.value = false;
   desktopMenuStyle.value = {visibility: 'hidden'};
+
+  if (activeMenuId.value === menuId) {
+    activeMenuId.value = null;
+  }
+
   emit('close', props.track);
 }
 
@@ -401,6 +421,13 @@ watch(isOpen, open => {
   document.removeEventListener('keydown', handleKeydown);
   window.removeEventListener('resize', handleViewportChange);
   window.removeEventListener('scroll', handleViewportChange, true);
+});
+
+// Открыто другое меню — закрываем это.
+watch(activeMenuId, id => {
+  if (id !== menuId && isOpen.value) {
+    closeMenu();
+  }
 });
 
 onBeforeUnmount(() => {

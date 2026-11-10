@@ -66,51 +66,87 @@
         </button>
       </div>
 
-      <template v-if="importLoading">
-        <div class="ym-import__progress">
-          <div class="ym-import__progress-heading">
-            <span>{{ progressLabel }}</span>
-            <span v-if="progress !== null">{{ progress }}%</span>
-          </div>
-
-          <div
-              class="ym-import__progress-track"
-              role="progressbar"
-              :aria-valuenow="progress ?? undefined"
-              aria-valuemin="0"
-              aria-valuemax="100"
-          >
-            <div
-                class="ym-import__progress-value"
-                :style="{ width: `${progress ?? 0}%` }"
-            />
-          </div>
-
-          <p class="ym-import__progress-detail">
-            Обработано {{ processed }} из {{ importTotal }} треков
-          </p>
+      <div v-if="importStore.active" class="ym-import__progress">
+        <div class="ym-import__progress-heading">
+          <span>{{ progressLabel }}</span>
+          <span v-if="importStore.total > 0">{{ importStore.progress }}%</span>
         </div>
-      </template>
 
-      <div v-if="importError" class="ym-import__error" role="alert">
-        {{ importError }}
+        <div
+            class="ym-import__progress-track"
+            role="progressbar"
+            :aria-valuenow="importStore.progress"
+            aria-valuemin="0"
+            aria-valuemax="100"
+        >
+          <div
+              class="ym-import__progress-value"
+              :style="{ width: `${importStore.progress}%` }"
+          />
+        </div>
+
+        <p class="ym-import__progress-detail">
+          Обработано {{ importStore.processed }} из
+          {{ importStore.total > 0 ? importStore.total : '…' }} треков
+        </p>
       </div>
 
-      <div v-if="completed" class="ym-import__success" role="status">
+      <div v-if="startError" class="ym-import__error" role="alert">
+        {{ startError }}
+      </div>
+
+      <div
+          v-if="importStore.status === 'failed'"
+          class="ym-import__error"
+          role="alert"
+      >
+        {{ importStore.message || 'Импорт завершился с ошибкой.' }}
+      </div>
+
+      <div v-if="importStore.pollError" class="ym-import__error" role="alert">
+        {{ importStore.pollError }}
+      </div>
+
+      <div v-if="importStore.completed" class="ym-import__success" role="status">
         <span class="ym-import__success-icon">✓</span>
         <div>
           <strong>Импорт завершён</strong>
           <p>
-            Добавлено: {{ importedCount }}.
-            Пропущено: {{ skippedCount }}.
-            Ошибок: {{ failedCount }}.
+            Добавлено: {{ importStore.imported }}.
+            Пропущено: {{ importStore.skipped }}.
+            Ошибок: {{ importStore.failed }}.
+          </p>
+        </div>
+      </div>
+
+      <div
+          v-if="importStore.status === 'cancelled'"
+          class="ym-import__notice"
+          role="status"
+      >
+        <span class="ym-import__notice-icon">✕</span>
+        <div>
+          <strong>Импорт отменён</strong>
+          <p>
+            Успели: {{ importStore.imported }} из
+            {{ importStore.processed }} обработанных.
+            Повторный запуск продолжит с учётом уже добавленных.
           </p>
         </div>
       </div>
 
       <div class="ym-import__actions">
         <button
-            v-if="!completed"
+            v-if="importStore.active"
+            type="button"
+            class="ym-import__button ym-import__button--cancel"
+            @click="onCancelImport"
+        >
+          Отменить импорт
+        </button>
+
+        <button
+            v-else-if="!importStore.completed"
             type="button"
             class="ym-import__button"
             :disabled="
@@ -118,19 +154,19 @@
             !!summaryError ||
             total === null ||
             total === 0 ||
-            importLoading
+            startPending
           "
-            @click="startImport"
+            @click="onStartImport"
         >
-          <span v-if="importLoading" class="ym-import__spinner" />
+          <span v-if="startPending" class="ym-import__spinner" />
           <span>
             {{
-              importLoading
-                  ? 'Импортируем…'
+              startPending
+                  ? 'Запускаем…'
                   : 'Импортировать избранное'
             }}
           </span>
-          <span v-if="!importLoading" aria-hidden="true">→</span>
+          <span v-if="!startPending" aria-hidden="true">→</span>
         </button>
 
         <button
@@ -152,43 +188,16 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, watch, ref } from 'vue';
+import {computed, onBeforeUnmount, watch, ref} from 'vue';
 
-import {
-  getYandexMusicFavoriteSummary,
-  startYandexMusicFavoriteImport,
-  getYandexMusicFavoriteImportStatus,
-} from '@/api/auth';
+import {getYandexMusicFavoriteSummary} from '@/api/auth';
+import {useYandexImportStore} from '@/stores/yandexImport';
 
 interface FavoriteSummary {
   total: number;
   existing?: number;
   new_tracks?: number;
   already_imported?: number;
-}
-
-interface ImportStart {
-  job_id?: string;
-  jobId?: string;
-  status?: string;
-  total?: number;
-  processed?: number;
-  imported?: number;
-  skipped?: number;
-  failed?: number;
-  progress?: number;
-  message?: string;
-}
-
-interface ImportStatus {
-  status: string;
-  total?: number;
-  processed?: number;
-  imported?: number;
-  skipped?: number;
-  failed?: number;
-  progress?: number;
-  message?: string;
 }
 
 const props = defineProps<{
@@ -199,51 +208,26 @@ defineEmits<{
   'open-library': [];
 }>();
 
+const importStore = useYandexImportStore();
+
 const total = ref<number | null>(null);
 const existing = ref<number | null>(null);
 const newTracks = ref<number | null>(null);
 
 const summaryLoading = ref(false);
 const summaryError = ref('');
-const importLoading = ref(false);
-const importError = ref('');
+const startPending = ref(false);
+const startError = ref('');
 
-const jobId = ref<string | null>(null);
-const importTotal = ref(0);
-const processed = ref(0);
-const importedCount = ref(0);
-const skippedCount = ref(0);
-const failedCount = ref(0);
-const progress = ref<number | null>(null);
-const progressLabel = ref('Подготовка импорта…');
-const completed = ref(false);
+const progressLabel = computed(() => {
+  if (importStore.status === 'queued' || importStore.status === 'pending') {
+    return 'Импорт в очереди…';
+  }
+
+  return 'Импортируем треки…';
+});
 
 let summaryRequestId = 0;
-let pollTimer: ReturnType<typeof setTimeout> | undefined;
-let pollRequestInProgress = false;
-
-function clearPolling(): void {
-  if (pollTimer !== undefined) {
-    clearTimeout(pollTimer);
-    pollTimer = undefined;
-  }
-}
-
-function resetImport(): void {
-  clearPolling();
-  jobId.value = null;
-  importLoading.value = false;
-  importError.value = '';
-  completed.value = false;
-  importTotal.value = 0;
-  processed.value = 0;
-  importedCount.value = 0;
-  skippedCount.value = 0;
-  failedCount.value = 0;
-  progress.value = null;
-  progressLabel.value = 'Подготовка импорта…';
-  pollRequestInProgress = false;
-}
 
 function hasApiErrors(errors: unknown): boolean {
   if (errors === null || errors === undefined) return false;
@@ -301,10 +285,10 @@ async function loadSummary(): Promise<void> {
   }
 }
 
-async function startImport(): Promise<void> {
+async function onStartImport(): Promise<void> {
   if (
     !props.connected ||
-    importLoading.value ||
+    startPending.value ||
     summaryLoading.value ||
     total.value === null ||
     total.value === 0
@@ -312,166 +296,52 @@ async function startImport(): Promise<void> {
     return;
   }
 
-  resetImport();
-  importLoading.value = true;
-  progressLabel.value = 'Запускаем импорт…';
-  importError.value = '';
+  startPending.value = true;
+  startError.value = '';
 
   try {
-    const response = await startYandexMusicFavoriteImport();
-
-    if (hasApiErrors(response.errors)) {
-      throw new Error('API вернул ошибку при запуске импорта.');
-    }
-
-    const result = response.data as ImportStart;
-    const id = result.job_id ?? result.jobId;
-
-    if (!id) {
-      if (
-        result.status === 'completed' ||
-        result.status === 'finished' ||
-        result.status === 'success'
-      ) {
-        applyStatus(result as ImportStatus);
-        finishImport();
-        await loadSummary();
-        return;
-      }
-
-      throw new Error('Сервер не вернул идентификатор задачи импорта.');
-    }
-
-    jobId.value = id;
-
-    if (typeof result.total === 'number') importTotal.value = result.total;
-    applyStatus(result as ImportStatus);
-
-    await pollImportStatus();
-  } catch (error) {
-    importLoading.value = false;
-    importError.value = 'Не удалось запустить импорт. Попробуй ещё раз.';
-
-    console.error('[YandexMusicImport] Import start failed:', error);
-  }
-}
-
-function applyStatus(status: ImportStatus): void {
-  if (typeof status.total === 'number') {
-    importTotal.value = status.total;
-  }
-
-  if (typeof status.processed === 'number') {
-    processed.value = status.processed;
-  }
-
-  if (typeof status.imported === 'number') {
-    importedCount.value = status.imported;
-  }
-
-  if (typeof status.skipped === 'number') {
-    skippedCount.value = status.skipped;
-  }
-
-  if (typeof status.failed === 'number') {
-    failedCount.value = status.failed;
-  }
-
-  if (typeof status.progress === 'number') {
-    progress.value = Math.min(100, Math.max(0, status.progress));
-  } else if (importTotal.value > 0) {
-    progress.value = Math.min(
-      100,
-      Math.round((processed.value / importTotal.value) * 100),
-    );
-  }
-
-  if (status.message) {
-    progressLabel.value = status.message;
-  } else if (status.status === 'queued' || status.status === 'pending') {
-    progressLabel.value = 'Импорт в очереди…';
-  } else if (status.status === 'running' || status.status === 'processing') {
-    progressLabel.value = 'Импортируем треки…';
-  }
-}
-
-async function pollImportStatus(): Promise<void> {
-  if (
-    !jobId.value ||
-    !importLoading.value ||
-    pollRequestInProgress
-  ) {
-    return;
-  }
-
-  pollRequestInProgress = true;
-
-  try {
-    const response = await getYandexMusicFavoriteImportStatus(jobId.value);
-
-    if (!importLoading.value || !jobId.value) return;
-
-    if (hasApiErrors(response.errors)) {
-      throw new Error('API вернул ошибку при получении статуса импорта.');
-    }
-
-    const status = response.data as ImportStatus;
-    applyStatus(status);
-
-    if (['completed', 'finished', 'success'].includes(status.status)) {
-      finishImport();
-      await loadSummary();
-      return;
-    }
-
-    if (['failed', 'error'].includes(status.status)) {
-      importLoading.value = false;
-      importError.value = status.message || 'Импорт завершился с ошибкой.';
-      clearPolling();
-      return;
-    }
-
-    pollTimer = setTimeout(() => {
-      void pollImportStatus();
-    }, 1500);
-  } catch (error) {
-    if (!importLoading.value) return;
-
-    importError.value =
-      'Не удалось получить состояние импорта. Повторяем запрос…';
-
-    console.error('[YandexMusicImport] Status request failed:', error);
-
-    pollTimer = setTimeout(() => {
-      void pollImportStatus();
-    }, 3000);
+    await importStore.start();
+  } catch {
+    startError.value = importStore.message
+        || 'Не удалось запустить импорт. Попробуй ещё раз.';
   } finally {
-    pollRequestInProgress = false;
+    startPending.value = false;
   }
 }
 
-function finishImport(): void {
-  progress.value = 100;
-  progressLabel.value = 'Импорт завершён';
-  completed.value = true;
-  importLoading.value = false;
-  clearPolling();
+async function onCancelImport(): Promise<void> {
+  await importStore.cancel();
 }
+
+watch(
+  () => importStore.status,
+  (status, previous) => {
+    // Импорт доехал до конца (в т.ч. подхваченный после перезахода) —
+    // освежаем статистику «уже в SkyFi».
+    if (status === 'completed' && previous !== 'completed') {
+      void loadSummary();
+    }
+  },
+);
 
 watch(
   () => props.connected,
   (connected) => {
     summaryRequestId++;
-    resetImport();
+    startError.value = '';
 
     if (connected) {
       void loadSummary();
+      // Подхватываем импорт, который мог идти в фоне
+      // или начаться до перезапуска приложения.
+      void importStore.resume();
     } else {
       total.value = null;
       existing.value = null;
       newTracks.value = null;
       summaryError.value = '';
       summaryLoading.value = false;
+      importStore.reset();
     }
   },
   { immediate: true },
@@ -479,7 +349,6 @@ watch(
 
 onBeforeUnmount(() => {
   summaryRequestId++;
-  clearPolling();
 });
 </script>
 
@@ -506,6 +375,8 @@ onBeforeUnmount(() => {
 .ym-import__button { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 46px; padding: 12px 16px; border: 1px solid #a78bfa; border-radius: 12px; background: linear-gradient(135deg, #9878f5, #7554d8); color: #fff; font: inherit; font-size: 13px; font-weight: 650; cursor: pointer; transition: filter .2s, opacity .2s; }
 .ym-import__button:hover:not(:disabled) { filter: brightness(1.1); }
 .ym-import__button:disabled { cursor: not-allowed; opacity: .7; }
+.ym-import__button--cancel { border-color: #4a4458; background: #221f2c; color: #c6c1d2; }
+.ym-import__button--cancel:hover { filter: brightness(1.25); }
 .ym-import__hint { margin: 11px 0 0; color: #858195; font-size: 11px; line-height: 1.6; text-align: center; }
 .ym-import__notice, .ym-import__success { display: flex; align-items: flex-start; gap: 12px; padding: 15px; border: 1px solid #302d3c; border-radius: 13px; background: #ffffff03; }
 .ym-import__notice-icon, .ym-import__success-icon { display: grid; place-items: center; flex: 0 0 28px; width: 28px; height: 28px; border-radius: 9px; background: #a78bfa15; color: #b9a3ff; font-size: 16px; }

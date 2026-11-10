@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SkyFi</string>
+    <string name="title_activity_main">SkyFi</string>
+    <string name="package_name">com.skyfi.app</string>
+    <string name="custom_url_scheme">com.skyfi.app</string>
+</resources>

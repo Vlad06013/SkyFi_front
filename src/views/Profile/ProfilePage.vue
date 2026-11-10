@@ -201,7 +201,7 @@ function onYandexDisconnected(): void {
 }
 
 function goToLibrary(): void {
-  void router.push('/library');
+  void router.push('/favorite');
 }
 
 const loggingOut = ref(false);

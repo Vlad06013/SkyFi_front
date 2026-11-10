@@ -90,6 +90,29 @@ export async function getYandexMusicFavoriteImportStatus(
     return response.data;
 }
 
+/**
+ * Текущая запись импорта пользователя (одна на пользователя).
+ * data === null — импорт ещё ни разу не запускался.
+ */
+export async function getYandexMusicCurrentImport() {
+    const response = await http.get<
+        ApiResponse<YandexMusicImportStatus | null>
+    >('yandex-music/favorite/import/current');
+
+    return response.data;
+}
+
+/**
+ * Отменяет активный импорт избранного.
+ */
+export async function cancelYandexMusicImport() {
+    const response = await http.post<
+        ApiResponse<YandexMusicImportStatus | null>
+    >('yandex-music/favorite/import/cancel');
+
+    return response.data;
+}
+
 export async function loginRequest(
     payload: LoginPayload,
 ) {
