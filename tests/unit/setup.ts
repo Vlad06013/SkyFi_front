@@ -43,3 +43,63 @@ class FakeAudioElement extends EventTarget {
 }
 
 vi.stubGlobal('Audio', FakeAudioElement);
+
+// jsdom не реализует matchMedia, а меню трека выбирает
+// мобильную/десктопную вёрстку через него.
+window.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(() => false),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+})) as any;
+
+// Фокус-навигация стрелками по спискам зовёт scrollIntoView.
+(Element.prototype as {scrollIntoView: unknown}).scrollIntoView = vi.fn();
+
+// IntersectionObserver: заглушка с ручным триггером — тесты сами
+// решают, когда маркер конца списка «вошёл в зону видимости».
+class FakeIntersectionObserver {
+    static instances: FakeIntersectionObserver[] = [];
+
+    private readonly callback: IntersectionObserverCallback;
+
+    private readonly elements: Element[] = [];
+
+    readonly observe = vi.fn((el: Element) => {
+        this.elements.push(el);
+    });
+
+    readonly unobserve = vi.fn();
+
+    readonly disconnect = vi.fn();
+
+    constructor(callback: IntersectionObserverCallback) {
+        this.callback = callback;
+        FakeIntersectionObserver.instances.push(this);
+    }
+
+    trigger(isIntersecting = true): void {
+        this.callback(
+            [
+                {
+                    isIntersecting,
+                    target: this.elements[0],
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                } as any,
+            ],
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            this as any,
+        );
+    }
+}
+
+vi.stubGlobal('IntersectionObserver', FakeIntersectionObserver);
+
+(globalThis as Record<string, unknown>).__fakeIO = {
+    instances: FakeIntersectionObserver.instances,
+};
