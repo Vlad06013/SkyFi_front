@@ -59,7 +59,7 @@ export function useWave() {
         waveError.value = '';
 
         try {
-            waveTracks.value = await getWaveTracks(20);
+            waveTracks.value = await getWaveTracks(5);
 
             if (waveTracks.value.length === 0) {
                 waveError.value = 'Волна пока пуста.';

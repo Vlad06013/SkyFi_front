@@ -179,8 +179,9 @@
     <!-- Центральное управление -->
     <div class="player-center">
       <div class="player-controls">
-        <!-- Перемешивание -->
+        <!-- Перемешивание (в волне недоступно: она сама рандом) -->
         <button
+            v-if="!player.waveMode"
             type="button"
             class="mode-button shuffle-button"
             :class="{ 'mode-active': player.isShuffleEnabled }"
@@ -283,8 +284,10 @@
             <path d="M18 5v14M5 5l11 7-11 7V5Z" />
           </svg>
         </button>
-        <!-- Режим повтора: выключен / всё / один трек -->
+        <!-- Режим повтора: выключен / всё / один трек
+             (в волне недоступен: конец порции — следующая порция) -->
         <button
+            v-if="!player.waveMode"
             type="button"
             class="mode-button repeat-button"
             :class="{ 'mode-active': player.repeatMode !== 'off' }"
@@ -964,7 +967,10 @@
           </button>
         </div>
 
-        <div class="track-details-modes">
+        <div
+            v-if="!player.waveMode"
+            class="track-details-modes"
+        >
           <button
               type="button"
               class="track-details-mode"

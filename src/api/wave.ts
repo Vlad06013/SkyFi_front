@@ -22,7 +22,7 @@ export type WaveFeedbackType =
  * через единый контракт, как результаты поиска.
  */
 export async function getWaveTracks(
-    limit = 20,
+    limit = 5,
     queue?: string | null,
 ): Promise<Track[]> {
     const response = await http.get<{ data: Track[] }>(

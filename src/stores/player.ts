@@ -221,9 +221,22 @@ const usePlayerStore = defineStore('player', () => {
     /** ID играющего сейчас элемента серверной очереди (если трек из неё). */
     let currentQueueItemId: number | null = null;
 
-    /** Порядок индексов при перемешивании и текущая позиция в нём. */
-    let shuffleOrder: number[] = [];
-    let shuffleCursor = -1;
+    /**
+     * План воспроизведения: индексы queue, которые ещё сыграют.
+     * Материализован заранее — превью следующего всегда честное.
+     * Реактивен: превью-вычисления слайдеров следят за ним.
+     * В волне не используется: там порядок вычисляемый,
+     * shuffle и repeat не действуют.
+     */
+    const plan = ref<number[]>([]);
+
+    /**
+     * Сыгранные в текущем списке треки (индексы queue) — единственная
+     * правда о «предыдущем». Живёт, пока жив список: смена списка
+     * стирает историю. Потреблённые треки серверной очереди сюда
+     * не попадают — забываем.
+     */
+    const backStack = ref<number[]>([]);
 
     /** Кеш полученных через /tracks/{id}/audio ссылок (на время сессии).
      *  fetchedAt — когда ссылка получена, для проверки по TTL источника. */
@@ -553,6 +566,20 @@ const usePlayerStore = defineStore('player', () => {
         // следующий/предыдущий работают по его очереди.
         exitWaveMode();
 
+        // Тот же список подрос (дозагрузка страницы): источник
+        // прежний и текущий трек в нём есть — историю и план
+        // не трогаем, новые треки вольются в план.
+        const sameList =
+            source !== null
+            && source === playSource.value
+            && currentTrack.value !== null
+            && tracks.some(
+                track =>
+                    String(track.id) === String(currentTrack.value?.id),
+            );
+
+        const knownIds = new Set(queue.value.map(track => track.id));
+
         queue.value = [...tracks];
 
         currentTrackIndex.value = currentTrack.value
@@ -566,9 +593,23 @@ const usePlayerStore = defineStore('player', () => {
             playSource.value = source;
         }
 
-        if (isShuffleEnabled.value) {
-            rebuildShuffleOrder();
+        if (sameList) {
+            const fresh: number[] = [];
+
+            queue.value.forEach((track, index) => {
+                if (!knownIds.has(track.id)) fresh.push(index);
+            });
+
+            if (fresh.length > 0) {
+                plan.value = [...plan.value, ...fresh];
+            }
+
+            return;
         }
+
+        // Новый список: история стёрта, план строится заново.
+        backStack.value = [];
+        plan.value = buildPlan();
     }
 
     /**
@@ -1272,154 +1313,151 @@ const usePlayerStore = defineStore('player', () => {
     }
 
     // ============================================
-    // ПЕРЕМЕШИВАНИЕ
+    // ПОРЯДОК ВОСПРОИЗВЕДЕНИЯ: ПЛАН + ИСТОРИЯ
     // ============================================
 
-    function rebuildShuffleOrder(): void {
-        const total = queue.value.length;
-        const current = currentTrackIndex.value;
+    /** Перемешивание Фишера—Йётса (возвращает копию). */
+    function shuffled(indices: number[]): number[] {
+        const result = [...indices];
 
-        const indices: number[] = [];
-
-        for (let index = 0; index < total; index++) {
-            if (index !== current) {
-                indices.push(index);
-            }
-        }
-
-        // Перемешивание Фишера—Йейтса.
-        for (let i = indices.length - 1; i > 0; i--) {
+        for (let i = result.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
 
-            [indices[i], indices[j]] = [indices[j], indices[i]];
+            [result[i], result[j]] = [result[j], result[i]];
         }
 
-        shuffleOrder = indices;
-        shuffleCursor = -1;
+        return result;
     }
 
     /**
-     * Следующий индекс списка-источника с учётом shuffle/repeat.
+     * Построить план от текущего трека.
+     * Без shuffle — естественный порядок после текущего;
+     * с shuffle — перемешанные непрослушанные (круг списка
+     * без повторов); всё прослушано — перемешиваем всех.
+     * Волна shuffle игнорирует: она и есть рандом.
+     */
+    function buildPlan(): number[] {
+        const total = queue.value.length;
+        const current = currentTrackIndex.value;
+
+        const others: number[] = [];
+
+        for (let index = 0; index < total; index++) {
+            if (index !== current) others.push(index);
+        }
+
+        if (!isShuffleEnabled.value || waveMode.value) {
+            const after = others.filter(index => index > current);
+
+            // Повтор всего: последний трек — план с начала списка.
+            if (after.length === 0 && repeatMode.value === 'all') {
+                return others;
+            }
+
+            return after;
+        }
+
+        const played = new Set(backStack.value);
+        const unplayed = others.filter(index => !played.has(index));
+
+        return shuffled(unplayed.length > 0 ? unplayed : others);
+    }
+
+    /**
+     * План исчерпан при включённом повторе всего — новый круг.
+     * Волна сюда не попадает: конец её порции — это continueWave,
+     * а не повтор.
+     */
+    function ensurePlan(): void {
+        if (plan.value.length > 0) return;
+        if (waveMode.value) return;
+        if (queue.value.length < 2) return;
+        if (repeatMode.value !== 'all') return;
+
+        plan.value = buildPlan();
+    }
+
+    /** Прерванный трек списка уходит в историю (без дублей подряд). */
+    function pushCurrentToBackStack(): void {
+        const current = currentTrackIndex.value;
+
+        if (current < 0) return;
+        if (backStack.value[backStack.value.length - 1] === current) return;
+
+        backStack.value.push(current);
+    }
+
+    /**
+     * Ручной запуск трека списка состоялся: прежний текущий
+     * уходит в историю, план строится заново от нового трека.
+     */
+    function commitManualStart(previousIndex: number): void {
+        if (
+            previousIndex >= 0
+            && previousIndex !== currentTrackIndex.value
+            && backStack.value[backStack.value.length - 1] !== previousIndex
+        ) {
+            backStack.value.push(previousIndex);
+        }
+
+        plan.value = buildPlan();
+    }
+
+    /**
+     * Следующий индекс списка-источника.
      * -1 — воспроизведение дальше невозможно.
+     * Волна — строго по очереди (shuffle/repeat не действуют).
      */
     function resolveNextIndex(): number {
-        const total = queue.value.length;
+        if (queue.value.length === 0) return -1;
 
-        if (total === 0) return -1;
+        if (waveMode.value) {
+            const next = currentTrackIndex.value + 1;
 
-        if (isShuffleEnabled.value) {
-            if (shuffleOrder.length === 0) {
-                rebuildShuffleOrder();
-            }
-
-            shuffleCursor++;
-
-            if (shuffleCursor >= shuffleOrder.length) {
-                if (repeatMode.value !== 'all') {
-                    return -1;
-                }
-
-                shuffleCursor = 0;
-            }
-
-            return shuffleOrder[shuffleCursor];
+            return next < queue.value.length ? next : -1;
         }
 
-        const current = currentTrackIndex.value;
+        ensurePlan();
 
-        if (current < 0) return 0;
-
-        const next = current + 1;
-
-        if (next < total) return next;
-
-        return repeatMode.value === 'all' ? 0 : -1;
+        return plan.value.length > 0 ? plan.value.shift()! : -1;
     }
 
     /**
-     * Предыдущий индекс списка-источника с учётом shuffle/repeat.
-     * -1 — переключаться некуда, достаточно перемотать в начало.
-     *
-     * Не мутирует курсор shuffle: используется для превью
-     * соседнего трека в слайдере плеера.
+     * Предыдущий индекс: вершина истории списка.
+     * -1 — истории нет, достаточно перемотать в начало.
      */
     function resolvePreviousIndex(): number {
-        const total = queue.value.length;
+        if (queue.value.length === 0) return -1;
 
-        if (total === 0) return -1;
-
-        if (isShuffleEnabled.value) {
-            if (shuffleCursor > 0) {
-                shuffleCursor--;
-
-                return shuffleOrder[shuffleCursor];
-            }
-
-            return -1;
-        }
-
-        const current = currentTrackIndex.value;
-
-        if (current < 0) return total - 1;
-
-        if (current > 0) return current - 1;
-
-        return repeatMode.value === 'all' ? total - 1 : -1;
+        return backStack.value.length > 0
+            ? backStack.value[backStack.value.length - 1]
+            : -1;
     }
 
     /**
-     * Подгляд следующего трека БЕЗ побочных эффектов
-     * (resolveNextIndex двигает курсор shuffle). Для слайдера.
+     * Подгляд следующего трека без побочных эффектов. Для слайдера.
      */
     function peekNextListIndex(): number {
-        const total = queue.value.length;
+        if (queue.value.length === 0) return -1;
 
-        if (total === 0) return -1;
+        if (waveMode.value) {
+            const next = currentTrackIndex.value + 1;
 
-        if (isShuffleEnabled.value) {
-            if (shuffleOrder.length === 0) return -1;
-
-            const next = shuffleCursor + 1;
-
-            if (next >= shuffleOrder.length) {
-                return repeatMode.value === 'all' ? 0 : -1;
-            }
-
-            return shuffleOrder[next];
+            return next < queue.value.length ? next : -1;
         }
 
-        const current = currentTrackIndex.value;
+        ensurePlan();
 
-        if (current < 0) return 0;
-
-        const next = current + 1;
-
-        if (next < total) return next;
-
-        return repeatMode.value === 'all' ? 0 : -1;
+        return plan.value.length > 0 ? plan.value[0] : -1;
     }
 
     /** Подгляд предыдущего трека без побочных эффектов. */
     function peekPreviousListIndex(): number {
-        const total = queue.value.length;
+        if (queue.value.length === 0) return -1;
 
-        if (total === 0) return -1;
-
-        if (isShuffleEnabled.value) {
-            if (shuffleCursor > 0) {
-                return shuffleOrder[shuffleCursor - 1];
-            }
-
-            return -1;
-        }
-
-        const current = currentTrackIndex.value;
-
-        if (current < 0) return total - 1;
-
-        if (current > 0) return current - 1;
-
-        return repeatMode.value === 'all' ? total - 1 : -1;
+        return backStack.value.length > 0
+            ? backStack.value[backStack.value.length - 1]
+            : -1;
     }
 
     /**
@@ -1503,7 +1541,7 @@ const usePlayerStore = defineStore('player', () => {
         if (!auth.user || isLoading.value) return false;
 
         try {
-            tracks ??= await getWaveTracks(20);
+            tracks ??= await getWaveTracks(5);
 
             if (tracks.length === 0) {
                 return false;
@@ -1519,10 +1557,13 @@ const usePlayerStore = defineStore('player', () => {
             pendingSourceList = null;
             rememberWaveAnchor(tracks);
 
+            // Новый список: история стёрта. План в волне не нужен —
+            // порядок вычисляемый, shuffle и repeat не действуют.
+            backStack.value = [];
+            plan.value = [];
+
             queue.value = [...tracks];
             currentTrackIndex.value = index;
-            shuffleOrder = [];
-            shuffleCursor = -1;
 
             await playTrack(
                 tracks[index],
@@ -1554,7 +1595,7 @@ const usePlayerStore = defineStore('player', () => {
      * Возвращает только треки, которых ещё нет в очереди.
      */
     async function fetchWaveBatch(): Promise<Track[]> {
-        const tracks = await getWaveTracks(20, waveAnchor);
+        const tracks = await getWaveTracks(5, waveAnchor);
 
         rememberWaveAnchor(tracks);
 
@@ -1604,6 +1645,11 @@ const usePlayerStore = defineStore('player', () => {
      * Продолжить волну: очередь кончилась — просим следующую
      * порцию и играем первый новый трек.
      */
+    /**
+     * Подгрузить следующую порцию волны и дописать в очередь.
+     * Играть не начинаем: playNext сам возьмёт первый трек
+     * новой порции через resolveNextIndex.
+     */
     async function continueWave(): Promise<boolean> {
         if (!auth.user || waveContinuing) return false;
 
@@ -1621,9 +1667,6 @@ const usePlayerStore = defineStore('player', () => {
             });
 
             queue.value = [...queue.value, ...fresh];
-
-            // Новые треки волны внешние — регистрируем через /play.
-            await playTrack(fresh[0], PlaySourceListsEnum.YANDEX_WAVE);
 
             return true;
         } catch (error) {
@@ -1845,20 +1888,23 @@ const usePlayerStore = defineStore('player', () => {
     async function toggleShuffle(): Promise<void> {
         if (!auth.user) return;
 
+        // Волна — сама рандом: перемешивание на ней не действует.
+        if (waveMode.value) return;
+
         isShuffleEnabled.value = !isShuffleEnabled.value;
 
-        if (isShuffleEnabled.value) {
-            rebuildShuffleOrder();
-        } else {
-            shuffleOrder = [];
-            shuffleCursor = -1;
-        }
+        // План перестраивается сразу: превью следующего честное.
+        // История не трогается — «назад» ходит по реально игранному.
+        plan.value = buildPlan();
 
         reportOptions();
     }
 
     async function toggleRepeatMode(): Promise<void> {
         if (!auth.user) return;
+
+        // Волна не повторяется: конец порции — следующая порция.
+        if (waveMode.value) return;
 
         repeatMode.value =
             repeatMode.value === 'off'
@@ -1875,8 +1921,9 @@ const usePlayerStore = defineStore('player', () => {
     // ============================================
 
     /**
-     * Офлайн-перебор списка: от следующей позиции ищем трек
-     * с локальным файлом. Всё пройдено — останавливаемся.
+     * Офлайн-перебор списка: от уже извлечённого кандидата ищем
+     * трек с локальным файлом. Нескачанные выбывают из плана.
+     * Всё пройдено — останавливаемся.
      */
     async function playNextDownloaded(
         nextIndex: number,
@@ -1899,9 +1946,6 @@ const usePlayerStore = defineStore('player', () => {
                 return;
             }
 
-            // Трек не запустился — «текущий» не сдвинулся,
-            // продвигаем индекс вручную для resolveNextIndex.
-            currentTrackIndex.value = index;
             index = resolveNextIndex();
         }
 
@@ -1929,8 +1973,10 @@ const usePlayerStore = defineStore('player', () => {
         // Повтор одного трека: просто начинаем сначала.
         // Срабатывает только на активном устройстве —
         // событие ended приходит от локального <audio>.
+        // Волна не повторяется: repeat на ней не действует.
         if (
             isActive &&
+            !waveMode.value &&
             reason === 'ended' &&
             repeatMode.value === 'one' &&
             currentTrack.value
@@ -1969,6 +2015,10 @@ const usePlayerStore = defineStore('player', () => {
             const queueItem = takeNextFromQueue();
 
             if (queueItem) {
+                // История: прерванный трек списка запоминаем,
+                // потреблённый элемент очереди — забываем.
+                pushCurrentToBackStack();
+
                 await playQueueItem(queueItem);
 
                 return;
@@ -2009,12 +2059,25 @@ const usePlayerStore = defineStore('player', () => {
         }
 
         // 2) Список-источник.
-        const nextIndex = resolveNextIndex();
+        let nextIndex = resolveNextIndex();
+
+        // 3) Конец порции волны: просим следующую и берём
+        // первый трек новой порции через resolveNextIndex.
+        if (nextIndex === -1 && waveMode.value) {
+            const continued = await continueWave();
+
+            if (continued) {
+                nextIndex = resolveNextIndex();
+            }
+        }
 
         if (nextIndex !== -1) {
             if (reason !== 'ended') {
                 reportWave('skip', undefined, progress.value);
             }
+
+            // История: прерываемый трек списка запоминаем.
+            pushCurrentToBackStack();
 
             if (isActive) {
                 if (useNetworkStore().isOnline) {
@@ -2032,13 +2095,6 @@ const usePlayerStore = defineStore('player', () => {
             }
 
             return;
-        }
-
-        // 3) Конец списка: волна просит следующую порцию.
-        if (waveMode.value) {
-            const continued = await continueWave();
-
-            if (continued) return;
         }
 
         if (!isActive) {
@@ -2067,7 +2123,13 @@ const usePlayerStore = defineStore('player', () => {
         if (isActive) {
             finalizeCurrentQueueItem();
 
-            const previousIndex = resolvePreviousIndex();
+            let previousIndex = resolvePreviousIndex();
+
+            // Офлайн: из истории берём ближайший скачанный,
+            // нескачанные позади пропускаем — забываем.
+            if (!useNetworkStore().isOnline) {
+                previousIndex = await findPreviousDownloadedIndex();
+            }
 
             if (previousIndex === -1) {
                 await seekAudio(0);
@@ -2075,15 +2137,17 @@ const usePlayerStore = defineStore('player', () => {
                 return;
             }
 
+            // Текущий — обратно в голову плана: следующий
+            // вернёт его, история двигается честно.
+            if (!waveMode.value && currentTrackIndex.value >= 0) {
+                plan.value.unshift(currentTrackIndex.value);
+            }
+
+            backStack.value.pop();
+
             reportWave('skip', undefined, progress.value);
 
-            if (useNetworkStore().isOnline) {
-                await playFromSourceList(queue.value[previousIndex]);
-            } else {
-                // Офлайн: не скачанные треки пропускаем,
-                // ищем предыдущий доступный локально.
-                await playPreviousDownloaded(previousIndex);
-            }
+            await playFromSourceList(queue.value[previousIndex]);
 
             return;
         }
@@ -2105,6 +2169,12 @@ const usePlayerStore = defineStore('player', () => {
             return;
         }
 
+        if (!waveMode.value && currentTrackIndex.value >= 0) {
+            plan.value.unshift(currentTrackIndex.value);
+        }
+
+        backStack.value.pop();
+
         await playTrack(
             queue.value[previousIndex],
             playSource.value,
@@ -2112,38 +2182,28 @@ const usePlayerStore = defineStore('player', () => {
     }
 
     /**
-     * Офлайн-перебор назад: от предыдущей позиции ищем трек
-     * с локальным файлом. Скачанных позади нет — возвращаемся
-     * в начало текущего трека.
+     * Офлайн-поиск назад: ближайший скачанный трек в истории.
+     * Нескачанные позади пропускаем — выбывают из истории.
+     * -1 — скачанных позади нет, остаётся начало текущего трека.
      */
-    async function playPreviousDownloaded(
-        previousIndex: number,
-    ): Promise<void> {
+    async function findPreviousDownloadedIndex(): Promise<number> {
         const downloads = useDownloadsStore();
-        const visited = new Set<number>();
-        let index = previousIndex;
 
-        while (index >= 0 && !visited.has(index)) {
-            visited.add(index);
-
+        while (backStack.value.length > 0) {
+            const index = backStack.value[backStack.value.length - 1];
             const candidate = queue.value[index];
 
             if (
                 candidate
                 && await downloads.hasLocalAudio(candidate)
             ) {
-                await playFromSourceList(candidate);
-
-                return;
+                return index;
             }
 
-            // Трек не запустился — «текущий» не сдвинулся,
-            // продвигаем индекс вручную для resolvePreviousIndex.
-            currentTrackIndex.value = index;
-            index = resolvePreviousIndex();
+            backStack.value.pop();
         }
 
-        await seekAudio(0);
+        return -1;
     }
 
     /**
@@ -2192,10 +2252,13 @@ const usePlayerStore = defineStore('player', () => {
             if (await downloads.hasLocalAudio(track)) {
                 playSource.value = playbackSource;
 
+                const previousIndex = currentTrackIndex.value;
+
                 const started = await startLocalTrack(track);
 
                 if (started) {
                     isPlaying.value = true;
+                    commitManualStart(previousIndex);
                 }
 
                 return;
@@ -2253,6 +2316,10 @@ const usePlayerStore = defineStore('player', () => {
             pendingSourceList = null;
         }
 
+        // История: что играло до ручного запуска — запоминаем
+        // до смены текущего трека.
+        const previousIndex = currentTrackIndex.value;
+
         isLoading.value = true;
 
         try {
@@ -2300,6 +2367,8 @@ const usePlayerStore = defineStore('player', () => {
 
                 await startLocalTrack(serverTrack);
 
+                commitManualStart(previousIndex);
+
                 return;
             }
 
@@ -2307,6 +2376,7 @@ const usePlayerStore = defineStore('player', () => {
 
             if (started) {
                 reportTrackStarted(track, 0, playbackSource);
+                commitManualStart(previousIndex);
             }
         } finally {
             isLoading.value = false;
@@ -3045,6 +3115,13 @@ const usePlayerStore = defineStore('player', () => {
         // очереди (внешний id, список уже перезагружен).
         if (foundIndex !== -1) {
             currentTrackIndex.value = foundIndex;
+        }
+
+        // Свежая сессия (перезагрузка, восстановление): план
+        // пуст — строим один раз. Непустой не трогаем: активное
+        // устройство знает порядок лучше серверного снимка.
+        if (plan.value.length === 0 && !waveMode.value) {
+            plan.value = buildPlan();
         }
 
         audioDuration.value = getTrackDuration(track);

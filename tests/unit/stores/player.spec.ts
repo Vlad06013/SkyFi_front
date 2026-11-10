@@ -275,7 +275,7 @@ describe('player store', () => {
             expect(player.progress).toBe(0);
         });
 
-        it('прогресс меньше 3 секунд — переключение на предыдущий', async () => {
+        it('прогресс меньше 3 секунд — возврат по истории к реально игранному', async () => {
             const tracks = await playList(['A', 'B', 'C']);
 
             await player.playTrack(tracks[2], PlaySourceListsEnum.FAVORITES);
@@ -283,7 +283,8 @@ describe('player store', () => {
 
             await player.playPrevious();
 
-            expect(player.currentTrack?.title).toBe('B');
+            // История честная: прыжок был A → C, B не играл.
+            expect(player.currentTrack?.title).toBe('A');
         });
 
         it('первый трек без repeat: предыдущего нет — перемотка в 0', async () => {
@@ -294,6 +295,244 @@ describe('player store', () => {
 
             expect(player.currentTrack?.title).toBe('A');
             expect(player.progress).toBe(0);
+        });
+    });
+
+    describe('план и история', () => {
+        it('shuffle: «назад» после первого next возвращает к игравшему', async () => {
+            await playList(['A', 'B', 'C', 'D']);
+            await player.toggleShuffle();
+
+            const first = player.previewNextTrack?.title;
+            expect(first).toBeTypeOf('string');
+
+            await player.playNext();
+            expect(player.currentTrack?.title).toBe(first);
+
+            player.progress = 1;
+            await player.playPrevious();
+
+            expect(player.currentTrack?.title).toBe('A');
+        });
+
+        it('shuffle: «назад» шагает по реальной истории, в начале — перемотка', async () => {
+            await playList(['A', 'B', 'C', 'D']);
+            await player.toggleShuffle();
+
+            await player.playNext();
+            const second = player.currentTrack?.title;
+
+            await player.playNext();
+
+            player.progress = 1;
+            await player.playPrevious();
+            expect(player.currentTrack?.title).toBe(second);
+
+            player.progress = 1;
+            await player.playPrevious();
+            expect(player.currentTrack?.title).toBe('A');
+
+            // История кончилась — перемотка в начало.
+            player.progress = 1;
+            await player.playPrevious();
+            expect(player.currentTrack?.title).toBe('A');
+            expect(player.progress).toBe(0);
+        });
+
+        it('next после previous возвращает трек, откуда пришли', async () => {
+            await playList(['A', 'B', 'C', 'D']);
+            await player.toggleShuffle();
+
+            await player.playNext();
+            const target = player.currentTrack?.title;
+
+            player.progress = 1;
+            await player.playPrevious();
+            expect(player.currentTrack?.title).toBe('A');
+
+            await player.playNext();
+            expect(player.currentTrack?.title).toBe(target);
+        });
+
+        it('превью следующего совпадает с реальным next (shuffle)', async () => {
+            await playList(['A', 'B', 'C', 'D']);
+            await player.toggleShuffle();
+
+            for (let step = 0; step < 3; step++) {
+                const preview = player.previewNextTrack?.title;
+
+                expect(preview).toBeTypeOf('string');
+
+                await player.playNext();
+
+                expect(player.currentTrack?.title).toBe(preview);
+            }
+
+            // План исчерпан — превью честно пустое.
+            expect(player.previewNextTrack).toBeNull();
+        });
+
+        it('repeat all в shuffle: круг закончился — начинается новый, не стоп', async () => {
+            await playList(['A', 'B', 'C']);
+            await player.toggleShuffle();
+            player.repeatMode = 'all';
+
+            for (let step = 0; step < 3; step++) {
+                await player.playNext();
+            }
+
+            expect(player.isPlaying).toBe(true);
+
+            // Новый круг: воспроизведение живо, трек из списка.
+            await player.playNext();
+
+            expect(player.isPlaying).toBe(true);
+            expect(['A', 'B', 'C']).toContain(player.currentTrack?.title);
+        });
+
+        it('дозагрузка того же списка: история и план сохраняются', async () => {
+            const tracks = await playList(['A', 'B']);
+
+            await player.playNext();
+            expect(player.currentTrack?.title).toBe('B');
+
+            // Infinite-список подгрузил следующую страницу.
+            player.setQueue(
+                [...tracks, makeTrack('C'), makeTrack('D')],
+                PlaySourceListsEnum.FAVORITES,
+            );
+
+            player.progress = 1;
+            await player.playPrevious();
+            expect(player.currentTrack?.title).toBe('A');
+
+            await player.playNext();
+            expect(player.currentTrack?.title).toBe('B');
+
+            await player.playNext();
+            expect(player.currentTrack?.title).toBe('C');
+        });
+
+        it('новый список: история стёрта, следующий — первый трек нового', async () => {
+            await playList(['A', 'B', 'C']);
+
+            await player.playNext();
+            expect(player.currentTrack?.title).toBe('B');
+
+            const fresh = [makeTrack('X'), makeTrack('Y')];
+            player.setQueue(fresh, PlaySourceListsEnum.PLAYLIST);
+
+            player.progress = 1;
+            await player.playPrevious();
+
+            // Истории в новом списке нет — перемотка.
+            expect(player.currentTrack?.title).toBe('B');
+            expect(player.progress).toBe(0);
+
+            await player.playNext();
+            expect(player.currentTrack?.title).toBe('X');
+        });
+
+        it('очередь: прерванный трек списка помнится, next ходит по плану', async () => {
+            await playList(['A', 'B', 'C']);
+            const queued = makeQueueItem(51, makeTrack('Из очереди'));
+
+            player.serverQueue = [queued];
+
+            await player.playNext();
+            expect(player.currentTrack?.title).toBe('Из очереди');
+
+            // «Назад» из очереди — к прерванному треку списка.
+            player.progress = 1;
+            await player.playPrevious();
+            expect(player.currentTrack?.title).toBe('A');
+
+            // Очередь после ухода с её трека потреблена.
+            expect(player.serverQueue).toHaveLength(0);
+
+            await player.playNext();
+            expect(player.currentTrack?.title).toBe('B');
+        });
+    });
+
+    describe('волна: shuffle/repeat не действуют', () => {
+        function makeWaveTrack(title: string): Track {
+            const track = makeTrack(title);
+
+            track.source_type = 'yandex_music';
+            track.source_id = `ym-${title}`;
+
+            return track;
+        }
+
+        async function startTestWave(): Promise<void> {
+            const batch = ['W1', 'W2', 'W3', 'W4', 'W5'].map(makeWaveTrack);
+
+            mocks.playRemoteTrack.mockImplementation(
+                async (track: Track) => ({
+                    state: {version: 1, current_track: track},
+                }),
+            );
+
+            mocks.getWaveTracks.mockResolvedValue([]);
+            mocks.sendWaveFeedback.mockResolvedValue(undefined);
+
+            await player.startWave(batch, 0);
+        }
+
+        it('toggleShuffle и toggleRepeatMode в волне — no-op', async () => {
+            await startTestWave();
+
+            expect(player.waveMode).toBe(true);
+
+            await player.toggleShuffle();
+            expect(player.isShuffleEnabled).toBe(false);
+
+            await player.toggleRepeatMode();
+            expect(player.repeatMode).toBe('off');
+        });
+
+        it('repeat one не действует: ended в волне переключает трек', async () => {
+            await startTestWave();
+
+            player.repeatMode = 'one';
+
+            await player.playNext('ended');
+
+            expect(player.currentTrack?.title).toBe('W2');
+        });
+
+        it('конец порции: волна подгружает следующую и играет дальше', async () => {
+            await startTestWave();
+
+            mocks.getWaveTracks.mockResolvedValue(
+                ['W6', 'W7'].map(makeWaveTrack),
+            );
+
+            for (let step = 0; step < 4; step++) {
+                await player.playNext();
+            }
+
+            expect(player.currentTrack?.title).toBe('W5');
+
+            await player.playNext();
+
+            expect(mocks.getWaveTracks).toHaveBeenCalledWith(
+                5,
+                expect.anything(),
+            );
+            expect(player.currentTrack?.title).toBe('W6');
+        });
+
+        it('«назад» в волне возвращает предыдущий трек волны', async () => {
+            await startTestWave();
+
+            await player.playNext();
+            expect(player.currentTrack?.title).toBe('W2');
+
+            player.progress = 1;
+            await player.playPrevious();
+            expect(player.currentTrack?.title).toBe('W1');
         });
     });
 
