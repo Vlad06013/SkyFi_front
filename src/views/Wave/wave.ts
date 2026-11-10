@@ -18,21 +18,18 @@ export function useWave() {
 
     const waveError = ref('');
 
-    /** Волна звучит сейчас (эквалайзер и кнопка в режиме паузы). */
-    const isPlaying = computed(
-        () => player.waveMode && player.isPlaying,
-    );
+    /** Звучит любой трек (эквалайзер и кнопка в режиме паузы). */
+    const isPlaying = computed(() => player.isPlaying);
 
     /**
-     * Трек для центрального блока: только волна.
-     * Играет волна — её текущий трек; иначе (тишина, чужой
-     * источник в плеере, очередь) — первый из свежей выдачи.
-     * Чужие списки на странице волны не показываем.
+     * Трек для центрального блока: что реально звучит в плеере —
+     * волна или другой источник (избранное, плейлист, поиск).
+     * В тишине — первый трек свежей выдачи как превью волны.
      */
     const heroDisplay = computed(() => {
         const current = player.currentTrack;
 
-        if (player.waveMode && current) {
+        if (current) {
             return {
                 title: current.title,
                 artist: current.artist,
@@ -124,21 +121,32 @@ export function useWave() {
     });
 
     /**
-     * Большая кнопка запускает только волну:
-     * она играет свой список и не продолжает чужой
-     * (пауза/продолжение другого источника — плеер внизу).
-     * Запускаем ту порцию, что показана на обложке: страница
-     * при каждом входе заново грузит выдачу (loadWave),
-     * так что буфер всегда свежий и по кругу не ходим.
+     * Большая кнопка работает как плеерная: звучит (или стоит
+     * на паузе) любой источник — пауза/продолжение текущего
+     * трека. Волна запускается только в тишине. Переход в волну
+     * при живом чужом источнике — кнопкой «В волну».
      */
     async function playWave(): Promise<void> {
         if (player.isLoading) return;
 
-        if (player.waveMode) {
+        if (player.currentTrack) {
             await player.togglePlay();
 
             return;
         }
+
+        await switchToWave();
+    }
+
+    /**
+     * «В волну»: гасим чужой источник и запускаем волну —
+     * очередь плеера подменяется свежей выдачей. Играем ту
+     * порцию, что показана на обложке: страница при каждом
+     * входе заново грузит выдачу (loadWave), так что буфер
+     * всегда свежий и по кругу не ходим.
+     */
+    async function switchToWave(): Promise<void> {
+        if (player.isLoading) return;
 
         if (waveTracks.value.length === 0) {
             await loadWave();
@@ -165,5 +173,6 @@ export function useWave() {
         heroDisplay,
         loadWave,
         playWave,
+        switchToWave,
     };
 }

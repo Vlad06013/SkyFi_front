@@ -44,6 +44,7 @@ http://ionicframework.com/docs/theming/ */
  */
 :root {
     --app-safe-top: env(safe-area-inset-top, 0px);
+    --app-top-bar-height: 54px;
 }
 
 @media (max-width: 700px) {
@@ -68,6 +69,21 @@ body.app--bottom-nav {
     --app-bottom-nav-height: 84px;
 }
 
+/* Невысокие экраны (магнитолы, ТВ 720p): панель компактнее,
+ * чтобы не съедать высоту контента. Переменная общая — по ней
+ * же футер-плеер поднимается над панелью (audioPlayer.css). */
+@media (max-height: 760px) {
+    body.app--bottom-nav {
+        --app-bottom-nav-height: 64px;
+    }
+}
+
+@media (max-height: 560px) {
+    body.app--bottom-nav {
+        --app-bottom-nav-height: 56px;
+    }
+}
+
 /* Меню снизу — боковой отступ контента не нужен.
  * Специфичность выше, чем у медиа-правил выше. */
 body.app--bottom-nav .ion-page > ion-content:not(.auth-content):not(.content--full) {
@@ -84,7 +100,7 @@ body.app--bottom-nav .ion-page > ion-content {
  * статус-бар (часы, батарея) телефонов и магнитол.
  */
 body.app--top-bar .ion-page > ion-content {
-    --padding-top: calc(var(--app-safe-top, 0px) + 54px);
+    --padding-top: calc(var(--app-safe-top, 0px) + var(--app-top-bar-height, 54px));
 }
 
 /*

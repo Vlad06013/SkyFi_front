@@ -651,6 +651,48 @@ body.app--bottom-nav .nav-logo:focus-visible {
 }
 
 /* =========================================
+   НЕВЫСОКИЕ ЭКРАНЫ (МАГНИТОЛЫ, ТВ 720p)
+
+   Высота панели задаётся переменной
+   --app-bottom-nav-height (variables.css),
+   здесь содержимое компактим под неё.
+========================================= */
+
+@media (max-height: 760px) {
+    body.app--bottom-nav .app-navigation {
+        padding: 4px 14px;
+    }
+
+    body.app--bottom-nav .nav-link {
+        gap: 3px;
+
+        font-size: 10px;
+        line-height: 14px;
+    }
+
+    body.app--bottom-nav .nav-icon {
+        flex-basis: 24px;
+
+        width: 24px;
+        height: 24px;
+
+        font-size: 21px;
+    }
+
+    body.app--bottom-nav .nav-icon ion-icon {
+        width: 23px;
+        height: 23px;
+    }
+
+    body.app--bottom-nav .nav-label {
+        min-height: 14px;
+
+        font-size: 10px;
+        line-height: 14px;
+    }
+}
+
+/* =========================================
    ОЧЕНЬ УЗКИЕ ЭКРАНЫ
 ========================================= */
 

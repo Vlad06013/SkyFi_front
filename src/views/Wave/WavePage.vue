@@ -14,13 +14,27 @@
             class="vibe-hero"
             @pointerdown="onHeroPointerDown"
         >
+          <!-- Играет не волна (избранное, плейлист, поиск): кнопка
+               возврата, как тэг у Яндекса. Жмём — чужой источник
+               гасится и запускается волна. -->
+          <button
+              v-if="showReturnTag"
+              ref="returnTagRef"
+              type="button"
+              class="vibe-return-tag"
+              aria-label="Переключиться на волну"
+              @click="switchToWave"
+          >
+            В волну
+          </button>
+
           <template v-if="heroDisplay">
             <!-- Слайдер треков: карточка = обложка + строка трека.
-                 При драге сбоку подъезжает соседний трек волны,
+                 При драге сбоку подъезжает соседний трек очереди,
                  недотянул — карточка возвращается на место.
                  Текущая карточка (с аурой) над соседями: они
                  подъезжают под неё и огонь не перекрывают. -->
-            <!-- Трек волны: обложка + плашка. Аура — статичный
+            <!-- Трек: обложка + плашка. Аура — статичный
                  слой под слайдером, светится сквозь него.
                  Соседи подъезжают сбоку на расстоянии и только
                  пока тянешь; соседа нет — карточки нет. -->
@@ -150,12 +164,12 @@
               ref="heroPlayRef"
               class="vibe-play"
               type="button"
-              :disabled="waveLoading"
-              aria-label="Слушать волну"
+              :disabled="playBusy"
+              :aria-label="isPlaying ? 'Пауза' : 'Слушать'"
               @click="playWave"
           >
             <ion-spinner
-                v-if="waveLoading || player.isLoading"
+                v-if="playBusy"
                 name="crescent"
             />
             <ion-icon
@@ -165,7 +179,7 @@
           </button>
 
           <p
-              v-if="waveLoading && !player.waveMode"
+              v-if="waveInitialLoading"
               class="vibe-loading"
           >
             Загружаем волну…
@@ -218,33 +232,59 @@ const player = usePlayerStore();
 const ui = useUiStore();
 
 const {
+  waveTracks,
   waveLoading,
   waveError,
   isPlaying,
   heroDisplay,
   loadWave,
   playWave,
+  switchToWave,
 } = useWave();
 
 /**
- * Карточку открываем только для реально играющей волны:
- * иначе плашка показывает первый трек свежей выдачи,
+ * Карточку открываем только для реально играющего трека:
+ * в тишине плашка показывает первый трек свежей выдачи,
  * которого в плеере ещё нет.
  */
 const canOpenTrack = computed(
-    () => player.waveMode && player.currentTrack !== null,
+    () => player.currentTrack !== null,
 );
 
-/** Заполнение плашки: прогресс текущего трека волны. */
+/** Заполнение плашки: прогресс текущего трека (волны или чужого). */
 const pillProgress = computed(() =>
-    player.waveMode ? player.progressPercent : 0,
+    player.currentTrack ? player.progressPercent : 0,
+);
+
+/** Ждём первую порцию волны: список пуст и в плеере тишина. */
+const waveInitialLoading = computed(
+    () =>
+        waveLoading.value
+        && waveTracks.value.length === 0
+        && !player.currentTrack,
+);
+
+/**
+ * Спиннер и блокировка кнопки play — только осмысленное
+ * ожидание: первая порция волны или старт/переключение трека.
+ * Фоновые перезагрузки выдачи (вход на страницу, авторизация)
+ * спиннера не дают.
+ */
+const playBusy = computed(
+    () => waveInitialLoading.value || player.isLoading,
+);
+
+/** В плеере звучит не волна (избранное, плейлист...) — показываем кнопку «В волну». */
+const showReturnTag = computed(
+    () => !player.waveMode && player.currentTrack !== null,
 );
 
 // ============================================
-// СЛАЙДЕР ТРЕКОВ ВОЛНЫ
+// СЛАЙДЕР ТРЕКОВ
 //
 // Драг по обложке/плашке: сбоку подъезжает соседний
-// трек волны. Не дотянул — обложка возвращается.
+// трек текущей очереди (волна или чужой источник).
+// Не дотянул — обложка возвращается.
 // Логика зеркалит слайдер мини-плеера (AudioPlayer).
 // ============================================
 
@@ -282,13 +322,14 @@ function sideLine(track: Track | null, fallbackTitle: string): {
   };
 }
 
-/* Соседних треков нет — карточки нет: заглушки не рисуем. */
+/* Соседних треков нет — карточки нет: заглушки не рисуем.
+ * Соседи из текущей очереди плеера: волна или чужой источник. */
 const prevPreview = computed<Track | null>(() =>
-    player.waveMode ? player.previewPreviousTrack : null,
+    player.currentTrack ? player.previewPreviousTrack : null,
 );
 
 const nextPreview = computed<Track | null>(() =>
-    player.waveMode ? player.previewNextTrack : null,
+    player.currentTrack ? player.previewNextTrack : null,
 );
 
 const prevLine = computed(() =>
@@ -341,7 +382,7 @@ function onHeroPointerDown(event: PointerEvent): void {
   }
 
   // Кнопки управления свайпом не трогаем: у них свои нажатия.
-  if (target.closest('.vibe-like, .vibe-play, a, input')) {
+  if (target.closest('.vibe-like, .vibe-play, .vibe-return-tag, a, input')) {
     return;
   }
 
@@ -371,7 +412,7 @@ function onHeroPointerMove(event: PointerEvent): void {
       return;
     }
 
-    if (!player.waveMode || !player.currentTrack) {
+    if (!player.currentTrack) {
       return;
     }
 
@@ -475,8 +516,9 @@ function openTrackCard(): void {
   ui.openTrackDetails();
 }
 
-// Кнопка play волны — цель для фокуса с пульта ТВ.
+// Кнопки страницы — цели для фокуса с пульта ТВ.
 const heroPlayRef = ref<HTMLButtonElement | null>(null);
+const returnTagRef = ref<HTMLButtonElement | null>(null);
 
 function isInsideNavigation(target: EventTarget | null): boolean {
   return (
@@ -485,10 +527,22 @@ function isInsideNavigation(target: EventTarget | null): boolean {
   );
 }
 
+function focusActiveNavLink(): void {
+  const activeNavLink = document.querySelector<HTMLElement>(
+      '.app-navigation .nav-link.router-link-active',
+  );
+
+  (
+      activeNavLink
+      ?? document.querySelector<HTMLElement>('.app-navigation .nav-link')
+  )?.focus();
+}
+
 /*
  * Пульт Android TV: нативный spatial-фокус редко попадает на
- * кнопку волны (рядом меню, профиль и плеер) — ведём его явно:
- * вправо из бокового меню → кнопка волны, влево с кнопки → меню.
+ * кнопки страницы (рядом меню, профиль и плеер) — ведём его явно:
+ * вправо из меню → «В волну» (если видна) → кнопка волны,
+ * влево — обратно по той же цепочке.
  */
 function onWaveKeyDown(event: KeyboardEvent): void {
   if (!(event.target instanceof HTMLElement)) {
@@ -497,7 +551,25 @@ function onWaveKeyDown(event: KeyboardEvent): void {
 
   if (event.key === 'ArrowRight' && isInsideNavigation(event.target)) {
     event.preventDefault();
+
+    if (showReturnTag.value) {
+      returnTagRef.value?.focus();
+    } else {
+      heroPlayRef.value?.focus();
+    }
+
+    return;
+  }
+
+  if (event.key === 'ArrowRight' && event.target === returnTagRef.value) {
+    event.preventDefault();
     heroPlayRef.value?.focus();
+    return;
+  }
+
+  if (event.key === 'ArrowLeft' && event.target === returnTagRef.value) {
+    event.preventDefault();
+    focusActiveNavLink();
     return;
   }
 
@@ -508,14 +580,11 @@ function onWaveKeyDown(event: KeyboardEvent): void {
   ) {
     event.preventDefault();
 
-    const activeNavLink = document.querySelector<HTMLElement>(
-        '.app-navigation .nav-link.router-link-active',
-    );
-
-    (
-        activeNavLink
-        ?? document.querySelector<HTMLElement>('.app-navigation .nav-link')
-    )?.focus();
+    if (showReturnTag.value) {
+      returnTagRef.value?.focus();
+    } else {
+      focusActiveNavLink();
+    }
   }
 }
 
@@ -540,6 +609,18 @@ onBeforeUnmount(() => {
 <style scoped>
 .vibe-content {
   --background: #050507;
+  /* Страница статична: контент помещается в экран,
+   * скролл не нужен. */
+  --overflow: hidden;
+}
+
+/* Глобальный отступ под шапку (variables.css) на волне
+ * не нужен: страница сама резервирует место шапки и нижней
+ * навигации в своих отступах. Специфичность — выше
+ * глобальных правил app--top-bar / app--bottom-nav. */
+body.app--top-bar .vibe-content,
+body.app--bottom-nav .vibe-content {
+  --padding-top: 0;
 }
 
 /* Анимированные цветные пятна на весь экран. */
@@ -608,9 +689,14 @@ onBeforeUnmount(() => {
   box-sizing: border-box;
   max-width: 560px;
   margin: 0 auto;
-  /* Низ запасаем под нижнюю навигацию (телефон/ТВ-режим);
-   * футер-плеер на волне скрыт, больший отступ не нужен. */
-  padding: 72px 24px 96px;
+  padding-right: 24px;
+  padding-left: 24px;
+  /* Верх — под шапку (профиль/поиск) и статус-бар, низ — под
+   * нижнюю навигацию (телефон/ТВ-режим): высоты берутся из
+   * переменных и ужимаются на низких экранах. Футер-плеер
+   * на волне скрыт, больший отступ не нужен. */
+  padding-top: calc(var(--app-top-bar-height, 54px) + var(--app-safe-top, 0px) + 18px);
+  padding-bottom: calc(var(--app-bottom-nav-height, 72px) + 16px);
 }
 
 /* Кнопка профиля на волне — крупнее стандартной. */
@@ -637,6 +723,47 @@ onBeforeUnmount(() => {
  * остаётся прокрутке страницы. */
 .vibe-hero {
   touch-action: pan-y;
+}
+
+/* ---------- КНОПКА «В ВОЛНУ» ---------- */
+
+/* Плашка над блоком трека, пока в плеере звучит не волна:
+ * избранное, плейлист, поиск. Жмём — чужой источник
+ * гасится и запускается волна. В потоке hero — едет
+ * вместе с карточкой; z-index — поверх огненной ауры. */
+.vibe-return-tag {
+  position: relative;
+  z-index: 2;
+
+  margin: 0 auto 22px;
+  padding: 11px 24px;
+
+  border: 1px solid #ffffff14;
+  border-radius: 999px;
+
+  background: #14131bd9;
+  backdrop-filter: blur(10px);
+
+  color: #f5f3fa;
+  font-size: 14px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition: background 0.2s, transform 0.15s;
+}
+
+.vibe-return-tag:hover {
+  background: #1d1c27e6;
+}
+
+.vibe-return-tag:active {
+  transform: scale(0.96);
+}
+
+.vibe-return-tag:focus-visible {
+  outline: 3px solid #c4b5fd;
+  outline-offset: 3px;
 }
 
 /* Вьюпорт слайдера. По бокам — 32px под свечение ауры,
@@ -1074,6 +1201,11 @@ onBeforeUnmount(() => {
 /* ---------- КНОПКИ ---------- */
 
 .vibe-play {
+  /* Поверх огненной ауры: пламя размазано за пределы
+   * слайдера и перекрывало бы кнопку. */
+  position: relative;
+  z-index: 2;
+
   display: grid;
   place-items: center;
   width: 84px;
@@ -1113,16 +1245,20 @@ onBeforeUnmount(() => {
 }
 
 /* =========================================
-   НЕВЫСОКИЕ ЭКРАНЫ (ТВ-БОКСЫ, LANDSCAPE)
-   Героический блок компактим, чтобы кнопка
-   play не уходила под фиксированный плеер.
+   НЕВЫСОКИЕ ЭКРАНЫ (ТВ-БОКСЫ, МАГНИТОЛЫ, LANDSCAPE)
+   Героический блок компактим, чтобы целиком
+   помещаться между шапкой и нижней навигацией.
 ========================================= */
 
 @media (max-height: 760px) {
+  /* Воздух под шапкой ужимаем; низ сам подстроится —
+   * высота нижней навигации берётся из переменной. */
   .vibe-page {
-    padding-top: 40px;
-    /* Низ держим свободным под нижнюю навигацию. */
-    padding-bottom: 100px;
+    padding-top: calc(var(--app-top-bar-height, 54px) + var(--app-safe-top, 0px) + 8px);
+  }
+
+  .vibe-return-tag {
+    margin-bottom: 16px;
   }
 
   .vibe-track-slider {
@@ -1144,9 +1280,9 @@ onBeforeUnmount(() => {
 }
 
 @media (max-height: 560px) {
-  .vibe-page {
-    padding-top: 24px;
-    padding-bottom: 90px;
+  .vibe-return-tag {
+    margin-bottom: 12px;
+    padding: 9px 20px;
   }
 
   .vibe-track-slider {
@@ -1163,6 +1299,33 @@ onBeforeUnmount(() => {
 
   .vibe-pill {
     margin-top: 14px;
+  }
+}
+
+/* Совсем низкие экраны (800×480 магнитолы): блок трека
+ * ужимаем до минимума, чтобы целиком помещаться между
+ * шапкой и нижней навигацией. */
+@media (max-height: 500px) {
+  .vibe-return-tag {
+    margin-bottom: 8px;
+    padding: 8px 18px;
+  }
+
+  .vibe-track-slider {
+    --vibe-cover-size: min(110px, 30dvh);
+    padding-top: 18px;
+  }
+
+  .vibe-play {
+    width: 52px;
+    height: 52px;
+    margin-top: 12px;
+    font-size: 24px;
+  }
+
+  .vibe-pill {
+    min-height: 46px;
+    margin-top: 10px;
   }
 }
 
