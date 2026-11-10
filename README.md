@@ -6,3 +6,8 @@
 # pm2 logs skyfi-front
 # pm2 restart skyfi-front
 # pm2 stop skyfi-front
+
+ТЕСТЫ
+
+• npm run test:unit — интерактивный режим (перезапускает при правках);                                                                                                                                                          
+• npm run test:unit:run — один прогон (для проверки перед коммитом). 
