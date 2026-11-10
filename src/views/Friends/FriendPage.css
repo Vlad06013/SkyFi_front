@@ -319,8 +319,8 @@
 .track-row {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
+    gap: 8px;
+    padding: 2px 2px;
     border: 1px solid transparent;
     border-radius: 14px;
     background: #ffffff06;

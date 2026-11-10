@@ -57,11 +57,11 @@ const label = computed(() => {
           ? `Скачивается… ${percent.value}%`
           : 'Скачивается…';
     case 'done':
-      return 'Удалить скачанное';
+      return 'Удалить';
     case 'error':
       return 'Повторить скачивание';
     default:
-      return 'Скачать для офлайна';
+      return 'Скачать';
   }
 });
 

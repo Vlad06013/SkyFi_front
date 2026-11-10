@@ -7,19 +7,6 @@
         class="library-content"
     >
       <main class="library-layout">
-        <!-- Заголовок -->
-        <header class="library-header">
-          <div class="eyebrow">
-            ТВОЯ КОЛЛЕКЦИЯ
-          </div>
-
-          <h1>Моя музыка</h1>
-
-          <p class="subtitle">
-            Всё любимое — в одном месте
-          </p>
-        </header>
-
         <!-- Вкладки -->
         <nav
             class="library-tabs"
@@ -36,11 +23,6 @@
             "
               @click="activeTab = tab.value"
           >
-            <ion-icon
-                v-if="tab.icon"
-                :icon="tab.icon"
-            />
-
             {{ tab.label }}
           </button>
 
@@ -50,7 +32,6 @@
               :class="{ active: activeTab === 'upload' }"
               @click="openUploadedTab"
           >
-            <ion-icon :icon="musicalNotesOutline" />
             Загруженное
           </button>
 
@@ -60,7 +41,6 @@
               :class="{ active: activeTab === 'offline' }"
               @click="openOfflineTab"
           >
-            <ion-icon :icon="downloadOutline" />
             Скачанное
           </button>
 
@@ -69,8 +49,6 @@
               class="tab upload-tab"
               @click="openUpload"
           >
-            <ion-icon :icon="cloudUploadOutline" />
-
             Загрузить трек
           </button>
         </nav>
@@ -88,10 +66,6 @@
           <section class="library-section uploads-section">
             <div class="section-heading">
               <div>
-                <div class="section-eyebrow">
-                  ТВОЯ МУЗЫКА
-                </div>
-
                 <h2>Загруженное</h2>
               </div>
 
@@ -165,10 +139,6 @@
         >
           <div class="section-heading">
             <div>
-              <div class="section-eyebrow">
-                ОФЛАЙН
-              </div>
-
               <h2>Скачанное</h2>
             </div>
           </div>
@@ -185,10 +155,6 @@
         >
           <div class="section-heading">
             <div>
-              <div class="section-eyebrow">
-                ТВОЯ МУЗЫКА
-              </div>
-
               <h2>Избранное</h2>
             </div>
 
@@ -230,10 +196,6 @@
         >
           <div class="section-heading">
             <div>
-              <div class="section-eyebrow">
-                ТВОИ РЕЛИЗЫ
-              </div>
-
               <h2>Альбомы</h2>
             </div>
 
@@ -310,10 +272,6 @@
         >
           <div class="section-heading">
             <div>
-              <div class="section-eyebrow">
-                ТВОИ АРТИСТЫ
-              </div>
-
               <h2>Исполнители</h2>
             </div>
 
@@ -851,7 +809,6 @@ import {
   musicalNotesOutline,
   discOutline,
   cloudUploadOutline,
-  downloadOutline,
   checkmarkCircleOutline,
   alertCircleOutline,
   informationCircleOutline,

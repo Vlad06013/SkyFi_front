@@ -11,21 +11,7 @@
     box-sizing: border-box;
 
     margin: 0 auto;
-    padding: 42px 36px 130px;
-}
-
-.library-header {
-    margin-bottom: 30px;
-}
-
-.eyebrow {
-    margin-bottom: 10px;
-
-    color: #a78bfa;
-
-    font-size: 11px;
-    font-weight: 800;
-    letter-spacing: 2px;
+    padding: 28px 5px 120px;
 }
 
 h1 {
@@ -37,15 +23,6 @@ h1 {
     font-weight: 800;
     letter-spacing: -1.5px;
     line-height: 1.15;
-}
-
-.subtitle {
-    margin: 10px 0 0;
-
-    color: #9296a7;
-
-    font-size: 14px;
-    line-height: 1.6;
 }
 
 h2 {
@@ -68,12 +45,19 @@ h3 {
 
 .library-tabs {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
 
-    gap: 9px;
+    gap: 8px;
 
-    margin-bottom: 34px;
+    margin-bottom: 26px;
+
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.library-tabs::-webkit-scrollbar {
+    display: none;
 }
 
 .tab {
@@ -81,17 +65,17 @@ h3 {
     align-items: center;
     justify-content: center;
 
-    gap: 8px;
+    flex: 0 0 auto;
 
-    min-height: 42px;
-    padding: 10px 16px;
+    min-height: 36px;
+    padding: 8px 16px;
 
-    border: 1px solid #292d3b;
-    border-radius: 12px;
+    border: 1px solid transparent;
+    border-radius: 999px;
 
-    background: #171a23;
+    background: #ffffff10;
 
-    color: #a5a8b7;
+    color: #e6e7ee;
 
     font-family: inherit;
     font-size: 13px;
@@ -109,11 +93,9 @@ h3 {
 }
 
 .tab:hover {
-    border-color: #514078;
+    background: #ffffff18;
 
-    background: #201a30;
-
-    color: #e5dcff;
+    color: #ffffff;
 }
 
 .tab:active {
@@ -121,15 +103,11 @@ h3 {
 }
 
 .tab.active {
-    border-color: #8b5cf6;
+    border-color: #e6e7ee;
 
-    background: #8b5cf6;
+    background: #ffffff14;
 
-    color: white;
-}
-
-.tab ion-icon {
-    font-size: 17px;
+    color: #ffffff;
 }
 
 .upload-tab:not(.active) {
@@ -154,16 +132,6 @@ h3 {
     gap: 16px;
 
     margin-bottom: 20px;
-}
-
-.section-eyebrow {
-    margin-bottom: 7px;
-
-    color: #a78bfa;
-
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 1.7px;
 }
 
 .count-badge {
@@ -1374,11 +1342,7 @@ h3 {
 
 @media (max-width: 650px) {
     .library-layout {
-        padding: 28px 18px 120px;
-    }
-
-    .library-header {
-        margin-bottom: 24px;
+        padding: 28px 5px 120px;
     }
 
     h1 {
@@ -1387,37 +1351,16 @@ h3 {
         letter-spacing: -1.2px;
     }
 
-    .subtitle {
-        margin-top: 8px;
-
-        font-size: 13px;
-    }
-
     .library-tabs {
-        display: flex;
-        flex-wrap: wrap;
-        align-items: center;
-        gap: 8px;
-
-        width: 100%;
-        max-width: 100%;
-        box-sizing: border-box;
-
-        margin: 0 0 26px;
+        margin: 0 0 22px;
         padding: 0 0 5px;
-
-        overflow: visible;
     }
 
     .tab {
-        flex: 0 1 auto;
-        min-width: 0;
-        max-width: 100%;
-        white-space: normal;
-    }
+        min-height: 34px;
+        padding: 7px 14px;
 
-    .library-tabs::-webkit-scrollbar {
-        display: none;
+        font-size: 12px;
     }
 
 

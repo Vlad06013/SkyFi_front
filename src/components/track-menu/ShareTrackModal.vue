@@ -17,10 +17,7 @@
             <strong>{{ track.title }}</strong>
 
             <span>
-              {{
-                track.meta?.artists?.map(artist => artist.name).join(', ')
-                || 'Неизвестный исполнитель'
-              }}
+              {{ artistLine }}
             </span>
           </div>
 
@@ -137,6 +134,21 @@ const emit = defineEmits<{
 
 const auth = useAuthStore();
 const friendsStore = useFriendsStore();
+
+// Исполнитель: полный Track несёт meta.artists, а плеер
+// передаёт свой PlayerTrack с плоским полем artist —
+// иначе в окне шаринга сидел «Неизвестный исполнитель».
+const artistLine = computed(() => {
+    const fromMeta = props.track.meta?.artists
+        ?.map((artist) => artist.name)
+        .join(', ');
+
+    if (fromMeta) return fromMeta;
+
+    const flat = (props.track as unknown as { artist?: string }).artist;
+
+    return flat || 'Неизвестный исполнитель';
+});
 
 const searchQuery = ref('');
 const isLoading = ref(false);

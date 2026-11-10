@@ -54,7 +54,7 @@ const title = computed(() =>
     align-items: center;
     gap: 3px;
 
-    margin-right: 4px;
+    margin-right: 2px;
 
     color: #4ade80;
 }

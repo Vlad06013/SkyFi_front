@@ -592,36 +592,131 @@
 
           <span>СЕЙЧАС ИГРАЕТ</span>
 
-          <button
-              type="button"
-              class="track-details-queue"
-              aria-label="Открыть очередь"
-              @click="showQueue = true; ui.closeTrackDetails()"
-          >
-            <svg
-                viewBox="0 0 24 24"
-                width="19"
-                height="19"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.8"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-            >
-              <path d="M4 6h16" />
-              <path d="M4 12h16" />
-              <path d="M4 18h10" />
-              <path d="m17 16 3 2-3 2" />
-            </svg>
+          <div class="track-details-actions">
+            <div class="track-details-device-selector">
+              <button
+                  type="button"
+                  class="track-details-queue"
+                  :disabled="
+                    player.isDevicesLoading ||
+                    player.deviceSwitchLoading
+                  "
+                  aria-label="Выбрать устройство воспроизведения"
+                  title="Устройство воспроизведения"
+                  @click="showCardDeviceMenu = !showCardDeviceMenu"
+              >
+                <svg
+                    viewBox="0 0 24 24"
+                    width="19"
+                    height="19"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                >
+                  <rect x="3" y="5" width="13" height="11" rx="2" />
+                  <path d="M7 20h5" />
+                  <path d="M9.5 16v4" />
+                  <rect x="17" y="8" width="4" height="11" rx="1.2" />
+                  <path d="M18.5 16.5h1" />
+                </svg>
+              </button>
 
-            <span
-                v-if="player.serverQueueCount > 0"
-                class="queue-count"
+              <div
+                  v-if="showCardDeviceMenu"
+                  class="device-menu track-details-device-menu"
+              >
+                <strong>Устройство воспроизведения</strong>
+
+                <p v-if="player.isDevicesLoading">
+                  Загрузка устройств…
+                </p>
+
+                <p
+                    v-else-if="player.devices.length === 0"
+                    class="device-empty"
+                >
+                  Нет зарегистрированных устройств
+                </p>
+
+                <button
+                    v-for="device in player.devices"
+                    :key="device.id"
+                    type="button"
+                    class="device-option"
+                    :class="{
+                      'device-option-active':
+                        device.id === player.activeDeviceId,
+                    }"
+                    :disabled="player.deviceSwitchLoading"
+                    @click="selectDevice(device.id)"
+                >
+                  <span>
+                    {{ device.type === 'phone' ? '▯' : '▣' }}
+                  </span>
+
+                  <span class="device-option-name">
+                    {{ device.name }}
+                  </span>
+
+                  <span
+                      class="device-option-status"
+                      :class="{
+                        'device-option-status-online':
+                          player.isDeviceOnline(device),
+                      }"
+                  >
+                    {{ player.isDeviceOnline(device) ? 'онлайн' : 'офлайн' }}
+                  </span>
+
+                  <span
+                      v-if="device.id === player.localDeviceId"
+                      class="device-option-current"
+                      title="Приложение запущено на этом устройстве"
+                  >
+                    это устройство
+                  </span>
+
+                  <span v-if="device.id === player.activeDeviceId">
+                    ✓
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <button
+                type="button"
+                class="track-details-queue"
+                aria-label="Открыть очередь"
+                @click="showQueue = true; ui.closeTrackDetails()"
             >
-              {{ player.serverQueueCount }}
-            </span>
-          </button>
+              <svg
+                  viewBox="0 0 24 24"
+                  width="19"
+                  height="19"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+              >
+                <path d="M4 6h16" />
+                <path d="M4 12h16" />
+                <path d="M4 18h10" />
+                <path d="m17 16 3 2-3 2" />
+              </svg>
+
+              <span
+                  v-if="player.serverQueueCount > 0"
+                  class="queue-count"
+              >
+                {{ player.serverQueueCount }}
+              </span>
+            </button>
+          </div>
         </header>
 
         <div
@@ -642,7 +737,84 @@
 
         <div class="track-details-info">
           <div class="track-details-text">
-            <h2>{{ player.currentTrack.title }}</h2>
+            <div class="track-details-title-row">
+              <h2
+                  ref="titleMarqueeRef"
+                  class="track-details-title marquee"
+                  :class="{ 'marquee--active': titleOverflows }"
+              >
+                <span class="marquee-track">
+                  <span class="marquee-chunk">
+                    {{ player.currentTrack.title }}
+                  </span><span
+                      class="marquee-chunk"
+                      aria-hidden="true"
+                  >{{ player.currentTrack.title }}</span>
+                </span>
+              </h2>
+
+              <DownloadStatusIcon
+                  :track="player.currentTrack as unknown as Track"
+              />
+
+              <button
+                  type="button"
+                  class="track-details-share"
+                  aria-label="Поделиться треком"
+                  title="Поделиться треком"
+                  @click="shareModalOpen = true"
+              >
+                <svg
+                    viewBox="0 0 24 24"
+                    width="18"
+                    height="18"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                >
+                  <path d="M12 15V4" />
+                  <path d="m7.5 8.5 4.5-4.5 4.5 4.5" />
+                  <path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" />
+                </svg>
+              </button>
+
+              <div class="track-details-menu-wrap">
+                <button
+                    type="button"
+                    class="track-details-share"
+                    :class="{ 'track-details-share-active': downloadMenuOpen }"
+                    aria-label="Действия с треком"
+                    title="Действия с треком"
+                    @click="downloadMenuOpen = !downloadMenuOpen"
+                >
+                  <svg
+                      viewBox="0 0 24 24"
+                      width="18"
+                      height="18"
+                      fill="currentColor"
+                      aria-hidden="true"
+                  >
+                    <circle cx="12" cy="5" r="1.7" />
+                    <circle cx="12" cy="12" r="1.7" />
+                    <circle cx="12" cy="19" r="1.7" />
+                  </svg>
+                </button>
+
+                <div
+                    v-if="downloadMenuOpen"
+                    class="track-details-menu"
+                >
+                  <DownloadTrackItem
+                      :track="player.currentTrack as unknown as Track"
+                      @close="downloadMenuOpen = false"
+                  />
+                </div>
+              </div>
+            </div>
+
             <p>
               {{ player.currentTrack.artist || 'Неизвестный исполнитель' }}
             </p>
@@ -654,21 +826,6 @@
               {{ player.currentTrack.albumTitle }}
             </p>
           </div>
-
-          <button
-              type="button"
-              class="track-details-heart"
-              :class="{ liked: player.liked }"
-              :disabled="player.favoriteLoading"
-              :aria-label="
-            player.liked
-              ? 'Убрать из избранного'
-              : 'Добавить в избранное'
-          "
-              @click="player.toggleFavorite()"
-          >
-            {{ player.liked ? '♥' : '♡' }}
-          </button>
         </div>
 
         <div class="track-details-progress">
@@ -715,6 +872,99 @@
         </div>
 
         <div class="track-details-controls">
+          <div class="track-details-controls-main">
+            <button
+                type="button"
+                aria-label="Предыдущий трек"
+                :disabled="player.isLoading || !player.currentTrack"
+                @click="player.playPrevious()"
+            >
+              <svg viewBox="0 0 24 24" class="control-icon" aria-hidden="true">
+                <path d="M6 5v14M19 5 8 12l11 7V5Z" />
+              </svg>
+            </button>
+
+            <button
+                ref="trackDetailsPlayRef"
+                type="button"
+                class="track-details-play"
+                :disabled="player.isLoading || !player.currentTrack"
+                :aria-label="player.isPlaying ? 'Пауза' : 'Воспроизвести'"
+                @click="player.togglePlay()"
+            >
+              <svg
+                  v-if="player.isPlaying"
+                  class="control-icon"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+              >
+                <rect x="6" y="4" width="4" height="16" rx="1" />
+                <rect x="14" y="4" width="4" height="16" rx="1" />
+              </svg>
+
+              <svg
+                  v-else
+                  class="control-icon"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+              >
+                <path d="M7 4.5L20 12 7 19.5Z" />
+              </svg>
+            </button>
+
+            <button
+                type="button"
+                aria-label="Следующий трек"
+                :disabled="player.isLoading || !player.currentTrack"
+                @click="player.playNext()"
+            >
+              <svg viewBox="0 0 24 24" class="control-icon" aria-hidden="true">
+                <path d="M18 5v14M5 5l11 7-11 7V5Z" />
+              </svg>
+            </button>
+          </div>
+
+          <button
+              type="button"
+              class="track-details-like"
+              :class="{ liked: player.liked }"
+              :disabled="
+                player.favoriteLoading || !player.currentTrack
+              "
+              :aria-pressed="player.liked"
+              :aria-label="
+                player.liked
+                  ? 'Убрать из избранного'
+                  : 'Добавить в избранное'
+              "
+              @click="player.toggleFavorite()"
+          >
+            <svg
+                viewBox="0 0 24 24"
+                class="control-icon track-details-like-icon"
+                aria-hidden="true"
+            >
+              <defs>
+                <linearGradient
+                    id="track-details-like-gradient"
+                    x1="0"
+                    y1="0"
+                    x2="1"
+                    y2="1"
+                >
+                  <stop offset="0" stop-color="#ff8fa3" />
+                  <stop offset="1" stop-color="#ef2d56" />
+                </linearGradient>
+              </defs>
+
+              <path
+                  d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div class="track-details-modes">
           <button
               type="button"
               class="track-details-mode"
@@ -747,56 +997,6 @@
                 class="shuffle-indicator"
                 aria-hidden="true"
             ></span>
-          </button>
-
-          <button
-              type="button"
-              aria-label="Предыдущий трек"
-              :disabled="player.isLoading || !player.currentTrack"
-              @click="player.playPrevious()"
-          >
-            <svg viewBox="0 0 24 24" class="control-icon" aria-hidden="true">
-              <path d="M6 5v14M19 5 8 12l11 7V5Z" />
-            </svg>
-          </button>
-
-          <button
-              ref="trackDetailsPlayRef"
-              type="button"
-              class="track-details-play"
-              :disabled="player.isLoading || !player.currentTrack"
-              :aria-label="player.isPlaying ? 'Пауза' : 'Воспроизвести'"
-              @click="player.togglePlay()"
-          >
-            <svg
-                v-if="player.isPlaying"
-                class="control-icon"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-            >
-              <rect x="6" y="4" width="4" height="16" rx="1" />
-              <rect x="14" y="4" width="4" height="16" rx="1" />
-            </svg>
-
-            <svg
-                v-else
-                class="control-icon"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-            >
-              <path d="M7 4.5L20 12 7 19.5Z" />
-            </svg>
-          </button>
-
-          <button
-              type="button"
-              aria-label="Следующий трек"
-              :disabled="player.isLoading || !player.currentTrack"
-              @click="player.playNext()"
-          >
-            <svg viewBox="0 0 24 24" class="control-icon" aria-hidden="true">
-              <path d="M18 5v14M5 5l11 7-11 7V5Z" />
-            </svg>
           </button>
 
           <button
@@ -847,9 +1047,11 @@
           </button>
         </div>
 
-        <p class="track-details-hint">
-          Перемещай ползунок, чтобы перейти к нужному моменту
-        </p>
+        <ShareTrackModal
+            v-if="shareModalOpen"
+            :track="player.currentTrack as unknown as Track"
+            @close="shareModalOpen = false"
+        />
       </section>
     </div>
   </Teleport>
@@ -863,12 +1065,15 @@
 <script setup lang="ts">
 import './audioPlayer.css';
 
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import usePlayerStore from '@/stores/player';
 import { useUiStore } from '@/stores/ui';
 import QueuePanel from '@/components/player/queue/QueuePanel.vue';
 import TrackContextMenu from '@/components/track-menu/TrackContextMenu.vue';
+import ShareTrackModal from '@/components/track-menu/ShareTrackModal.vue';
+import DownloadTrackItem from '@/components/track-menu/DownloadTrackItem.vue';
+import DownloadStatusIcon from '@/components/track-menu/DownloadStatusIcon.vue';
 import { registerHardwareBackHandler } from '@/lib/hardwareBack';
 import type { Track } from '@/types/TrackType';
 
@@ -881,6 +1086,39 @@ const isWaveRoute = computed(() => route.path === '/wave');
 
 const showQueue = ref(false);
 const showDeviceMenu = ref(false);
+// Меню устройств в карточке трека живёт отдельно от бара:
+// бэкдроп закрывает бар, дропдаун внутри карточки должен быть виден.
+const showCardDeviceMenu = ref(false);
+const shareModalOpen = ref(false);
+const downloadMenuOpen = ref(false);
+
+// Бегущая строка названия: замеряем, влезает ли текст целиком.
+const titleMarqueeRef = ref<HTMLElement | null>(null);
+const titleOverflows = ref(false);
+
+async function measureTitleOverflow(): Promise<void> {
+    await nextTick();
+
+    const el = titleMarqueeRef.value;
+
+    titleOverflows.value =
+        el !== null && el.scrollWidth > el.clientWidth + 4;
+}
+
+watch(
+    () => player.currentTrack?.id,
+    () => {
+        titleOverflows.value = false;
+        void measureTitleOverflow();
+    },
+);
+
+watch(
+    () => ui.trackDetailsOpen,
+    (open) => {
+        if (open) void measureTitleOverflow();
+    },
+);
 
 // Цели для перехода фокуса с прогресс-бара пультом (Android TV).
 const playButtonRef = ref<HTMLButtonElement | null>(null);
@@ -1387,6 +1625,7 @@ async function selectDevice(deviceId: number): Promise<void> {
   await player.switchDevice(deviceId);
 
   showDeviceMenu.value = false;
+  showCardDeviceMenu.value = false;
 }
 
 onMounted(async () => {
@@ -1404,6 +1643,21 @@ onMounted(async () => {
 
     if (showDeviceMenu.value) {
       showDeviceMenu.value = false;
+      return true;
+    }
+
+    if (showCardDeviceMenu.value) {
+      showCardDeviceMenu.value = false;
+      return true;
+    }
+
+    if (downloadMenuOpen.value) {
+      downloadMenuOpen.value = false;
+      return true;
+    }
+
+    if (shareModalOpen.value) {
+      shareModalOpen.value = false;
       return true;
     }
 

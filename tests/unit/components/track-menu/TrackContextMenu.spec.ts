@@ -179,7 +179,7 @@ describe('TrackContextMenu', () => {
                     buttonByText(wrapper, 'Поделиться'),
                 ).toBeUndefined();
                 expect(
-                    buttonByText(wrapper, 'Скачать для офлайна'),
+                    buttonByText(wrapper, 'Скачать'),
                 ).toBeUndefined();
 
                 const removeButton = buttonByText(

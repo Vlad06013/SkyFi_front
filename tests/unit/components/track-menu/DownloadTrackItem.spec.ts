@@ -63,7 +63,7 @@ describe('DownloadTrackItem', () => {
     it('не скачан: предлагает скачать и запускает скачивание', async () => {
         const wrapper = mountItem();
 
-        expect(wrapper.text()).toContain('Скачать для офлайна');
+        expect(wrapper.text()).toContain('Скачать');
 
         await wrapper.find('button').trigger('click');
 
@@ -77,7 +77,7 @@ describe('DownloadTrackItem', () => {
 
         const wrapper = mountItem();
 
-        expect(wrapper.text()).toContain('Удалить скачанное');
+        expect(wrapper.text()).toContain('Удалить');
 
         await wrapper.find('button').trigger('click');
 

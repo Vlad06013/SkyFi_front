@@ -39,46 +39,55 @@
           <ion-icon :icon="reorderTwoOutline" />
         </button>
 
-        <button
-            type="button"
-            tabindex="-1"
-            class="uploaded-track-play"
-            :aria-label="`Воспроизвести ${track.title}`"
-            @click.stop="playTrack(track)"
-        >
-          <div
-              class="cover"
-              :style="{
-              '--cover-color': getTrackColor(track.id),
-            }"
+        <div class="track-cover-col">
+          <button
+              type="button"
+              tabindex="-1"
+              class="uploaded-track-play"
+              :aria-label="`Воспроизвести ${track.title}`"
+              @click.stop="playTrack(track)"
           >
-            <img
-                v-if="track.meta?.album?.cover_path"
-                :src="track.meta?.album?.cover_path"
-                :alt="track.meta?.album?.title || track.title"
-                class="track-cover"
-            />
-
-            <div v-else class="track-cover-placeholder">
-              <ion-icon :icon="musicalNotesOutline" />
-            </div>
-
-            <span class="cover-play">
-              <ion-icon
-                  :icon="
-                  isCurrentTrack(track) && isPlaying
-                    ? pauseOutline
-                    : playOutline
-                "
+            <div
+                class="cover"
+                :style="{
+                '--cover-color': getTrackColor(track.id),
+              }"
+            >
+              <img
+                  v-if="track.meta?.album?.cover_path"
+                  :src="track.meta?.album?.cover_path"
+                  :alt="track.meta?.album?.title || track.title"
+                  class="track-cover"
               />
-            </span>
-          </div>
-        </button>
+
+              <div v-else class="track-cover-placeholder">
+                <ion-icon :icon="musicalNotesOutline" />
+              </div>
+
+              <span class="cover-play">
+                <ion-icon
+                    :icon="
+                    isCurrentTrack(track) && isPlaying
+                      ? pauseOutline
+                      : playOutline
+                  "
+                />
+              </span>
+            </div>
+          </button>
+
+          <span
+              class="track-source-caption"
+              :class="getSourceTypeClass(track.source_type)"
+          >
+            {{ getSourceTypeLabel(track.source_type) }}
+          </span>
+        </div>
 
         <div class="track-info">
-          <strong>{{ track.title }}</strong>
+          <strong class="track-title">{{ track.title }}</strong>
 
-          <span>
+          <span class="track-artist">
             {{
               track.meta?.artists
                   ?.map(artist => artist.name)
@@ -86,18 +95,7 @@
               || 'Неизвестный исполнитель'
             }}
           </span>
-
-          <small>
-            {{ track.meta?.album?.title || 'Без альбома' }}
-          </small>
         </div>
-
-        <span
-            class="source-badge"
-            :class="getSourceTypeClass(track.source_type)"
-        >
-          {{ getSourceTypeLabel(track.source_type) }}
-        </span>
 
         <span
             v-if="isCurrentTrack(track)"
@@ -662,12 +660,12 @@ const coverColors = [
 ];
 
 const sourceTypeLabels: Record<string, string> = {
-  yandex_music: 'Yandex Music',
-  upload: 'Загруженное',
+  yandex_music: 'Yandex',
+  upload: 'Загружено',
 };
 
 function getSourceTypeLabel(sourceType: string): string {
-  return sourceTypeLabels[sourceType] ?? 'Другой источник';
+  return sourceTypeLabels[sourceType] ?? 'Другой';
 }
 
 function getSourceTypeClass(sourceType: string): string {
@@ -783,8 +781,8 @@ watch(
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  width: 26px;
-  height: 42px;
+  width: 22px;
+  height: 40px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -814,38 +812,59 @@ watch(
 }
 
 .track-row {
-  width: auto;
-  margin: 5px 10px;
+  width: 100%;
+  margin: 3px 0;
 }
 
-.source-badge {
-  display: inline-flex;
+/* Обложка + подпись источника под ней (вместо бейджа справа). */
+.track-cover-col {
+  display: flex;
+  flex-direction: column;
   align-items: center;
+  gap: 2px;
   flex: 0 0 auto;
-  width: fit-content;
-  padding: 3px 8px;
-  border-radius: 6px;
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 1.4;
-  letter-spacing: 0.02em;
+  width: 58px;
 }
 
-.source-badge--yandex {
+.track-source-caption {
+  max-width: 100%;
+  overflow: hidden;
+
+  color: #9296a7;
+  font-size: 9px;
+  line-height: 1.2;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.track-source-caption.source-badge--yandex {
   color: #d8c8ff;
-  background: rgb(139 92 246 / 16%);
-  border: 1px solid rgb(139 92 246 / 25%);
 }
 
-.source-badge--uploads {
+.track-source-caption.source-badge--uploads {
   color: #8ce9d4;
-  background: rgb(45 212 191 / 12%);
-  border: 1px solid rgb(45 212 191 / 22%);
 }
 
-.source-badge--other {
-  color: var(--ion-color-medium);
-  background: rgb(128 128 128 / 10%);
-  border: 1px solid rgb(128 128 128 / 20%);
+/* Длинные названия и исполнители не сдвигают строку:
+ * обрезаем многоточием, как в списке-референсе. */
+.track-info .track-title,
+.track-info .track-artist {
+  display: block;
+  overflow: hidden;
+
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 650px) {
+  .track-cover-col {
+    width: 49px;
+  }
+}
+
+@media (max-width: 360px) {
+  .track-cover-col {
+    width: 43px;
+  }
 }
 </style>

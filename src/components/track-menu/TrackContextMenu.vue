@@ -506,6 +506,8 @@ if (typeof window !== 'undefined') {
 .track-menu-wrap {
   position: relative;
   z-index: 2;
+  display: flex;
+  align-items: center;
   flex: 0 0 auto;
 }
 
