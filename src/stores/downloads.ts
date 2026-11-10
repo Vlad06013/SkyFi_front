@@ -120,6 +120,20 @@ export const useDownloadsStore = defineStore('downloads', () => {
     const queue: {track: Track; key: string}[] = [];
     let processing = false;
 
+    /** Отмена активного HTTP-запроса (см. fetchTrackFile). */
+    let activeAbort: AbortController | null = null;
+
+    /** Ошибка отменена пользователем (AbortController axios). */
+    function isCancelError(error: unknown): boolean {
+        return (
+            axios.isCancel(error)
+            || (
+                error instanceof Error
+                && error.name === 'CanceledError'
+            )
+        );
+    }
+
     async function download(track: Track): Promise<void> {
         await initialize();
 
@@ -133,6 +147,22 @@ export const useDownloadsStore = defineStore('downloads', () => {
         queue.push({track, key});
 
         void processQueue();
+    }
+
+    /**
+     * Остановить всё: прервать текущую закачку и выкинуть
+     * ожидающие из очереди. Недокачанные треки возвращаются
+     * в обычное состояние — «Скачать» сработает снова.
+     */
+    function cancelAll(): void {
+        queue.length = 0;
+        activeAbort?.abort();
+
+        for (const [key, status] of pendingStatuses.value) {
+            if (status === 'downloading') {
+                pendingStatuses.value.delete(key);
+            }
+        }
     }
 
     async function processQueue(): Promise<void> {
@@ -152,6 +182,10 @@ export const useDownloadsStore = defineStore('downloads', () => {
                         `Скачано для офлайна: ${job.track.title}`,
                     );
                 } catch (error) {
+                    // Отменено кнопкой «стоп» — не ошибка: статус
+                    // уже снят в cancelAll(), тост не нужен.
+                    if (isCancelError(error)) continue;
+
                     console.error(
                         '[Downloads] Не удалось скачать трек:',
                         error,
@@ -240,6 +274,10 @@ export const useDownloadsStore = defineStore('downloads', () => {
         dbId: number,
         key: string,
     ): Promise<Blob> {
+        const abort = new AbortController();
+
+        activeAbort = abort;
+
         try {
             // Наш axios-инстанс: подставляет Bearer-токен.
             const {data} = await http.get<Blob>(
@@ -247,6 +285,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
                 {
                     responseType: 'blob',
                     timeout: FETCH_TIMEOUT_MS,
+                    signal: abort.signal,
                     onDownloadProgress: (event) => {
                         if (!event.total) return;
 
@@ -265,6 +304,10 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
             return data;
         } finally {
+            if (activeAbort === abort) {
+                activeAbort = null;
+            }
+
             progressMap.value.delete(key);
         }
     }
@@ -408,6 +451,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
         progressOf,
         download,
         downloadAll,
+        cancelAll,
         remove,
         getLocalAudioUrl,
         hasLocalAudio,
