@@ -32,6 +32,7 @@ import {
 
 import {type Track} from '@/types/TrackType';
 import {useDownloadsStore} from '@/stores/downloads';
+import {useNetworkStore} from '@/stores/network';
 
 import {
     getTrackAudio,
@@ -160,6 +161,19 @@ const usePlayerStore = defineStore('player', () => {
         () =>
             localDeviceId.value !== null &&
             activeDeviceId.value === localDeviceId.value,
+    );
+
+    /**
+     * Это приложение реально воспроизводит звук: либо сервер
+     * подтвердил активность устройства, либо сервер недоступен —
+     * тогда звук всё равно локальный, управляем аудио напрямую
+     * (офлайн-режим). Серверные «пультовые» ветки в этом режиме
+     * бессмысленны: командовать некому.
+     */
+    const isLocalPlayback = computed(
+        () =>
+            isLocalDeviceActive.value
+            || !useNetworkStore().isOnline,
     );
 
     const audio = new Audio();
@@ -424,7 +438,7 @@ const usePlayerStore = defineStore('player', () => {
             const elapsed = (now - lastTick) / 1000;
             lastTick = now;
 
-            if (isLocalDeviceActive.value) {
+            if (isLocalPlayback.value) {
                 if (!audio.paused && Number.isFinite(audio.currentTime)) {
                     progress.value = audio.currentTime;
                 }
@@ -1861,6 +1875,42 @@ const usePlayerStore = defineStore('player', () => {
     // ============================================
 
     /**
+     * Офлайн-перебор списка: от следующей позиции ищем трек
+     * с локальным файлом. Всё пройдено — останавливаемся.
+     */
+    async function playNextDownloaded(
+        nextIndex: number,
+    ): Promise<void> {
+        const downloads = useDownloadsStore();
+        const visited = new Set<number>();
+        let index = nextIndex;
+
+        while (index >= 0 && !visited.has(index)) {
+            visited.add(index);
+
+            const candidate = queue.value[index];
+
+            if (
+                candidate
+                && await downloads.hasLocalAudio(candidate)
+            ) {
+                await playFromSourceList(candidate);
+
+                return;
+            }
+
+            // Трек не запустился — «текущий» не сдвинулся,
+            // продвигаем индекс вручную для resolveNextIndex.
+            currentTrackIndex.value = index;
+            index = resolveNextIndex();
+        }
+
+        audio.pause();
+        isPlaying.value = false;
+        reportPause();
+    }
+
+    /**
      * Следующий трек: локально, в приоритете — серверная очередь.
      *
      * Серверные /next не используем: бэкенд не знает содержимого
@@ -1874,7 +1924,7 @@ const usePlayerStore = defineStore('player', () => {
 
         if (!auth.user) return;
 
-        const isActive = isLocalDeviceActive.value;
+        const isActive = isLocalPlayback.value;
 
         // Повтор одного трека: просто начинаем сначала.
         // Срабатывает только на активном устройстве —
@@ -1967,7 +2017,13 @@ const usePlayerStore = defineStore('player', () => {
             }
 
             if (isActive) {
-                await playFromSourceList(queue.value[nextIndex]);
+                if (useNetworkStore().isOnline) {
+                    await playFromSourceList(queue.value[nextIndex]);
+                } else {
+                    // Офлайн: не скачанные треки пропускаем,
+                    // ищем следующий доступный локально.
+                    await playNextDownloaded(nextIndex);
+                }
             } else if (playSource.value) {
                 await playTrack(
                     queue.value[nextIndex],
@@ -1999,7 +2055,7 @@ const usePlayerStore = defineStore('player', () => {
     async function playPrevious(): Promise<void> {
         if (!auth.user) return;
 
-        const isActive = isLocalDeviceActive.value;
+        const isActive = isLocalPlayback.value;
 
         // Более 3 секунд — перематываем в начало текущего трека.
         if (progress.value > 3) {
@@ -2021,7 +2077,13 @@ const usePlayerStore = defineStore('player', () => {
 
             reportWave('skip', undefined, progress.value);
 
-            await playFromSourceList(queue.value[previousIndex]);
+            if (useNetworkStore().isOnline) {
+                await playFromSourceList(queue.value[previousIndex]);
+            } else {
+                // Офлайн: не скачанные треки пропускаем,
+                // ищем предыдущий доступный локально.
+                await playPreviousDownloaded(previousIndex);
+            }
 
             return;
         }
@@ -2047,6 +2109,41 @@ const usePlayerStore = defineStore('player', () => {
             queue.value[previousIndex],
             playSource.value,
         );
+    }
+
+    /**
+     * Офлайн-перебор назад: от предыдущей позиции ищем трек
+     * с локальным файлом. Скачанных позади нет — возвращаемся
+     * в начало текущего трека.
+     */
+    async function playPreviousDownloaded(
+        previousIndex: number,
+    ): Promise<void> {
+        const downloads = useDownloadsStore();
+        const visited = new Set<number>();
+        let index = previousIndex;
+
+        while (index >= 0 && !visited.has(index)) {
+            visited.add(index);
+
+            const candidate = queue.value[index];
+
+            if (
+                candidate
+                && await downloads.hasLocalAudio(candidate)
+            ) {
+                await playFromSourceList(candidate);
+
+                return;
+            }
+
+            // Трек не запустился — «текущий» не сдвинулся,
+            // продвигаем индекс вручную для resolvePreviousIndex.
+            currentTrackIndex.value = index;
+            index = resolvePreviousIndex();
+        }
+
+        await seekAudio(0);
     }
 
     /**
@@ -2083,9 +2180,13 @@ const usePlayerStore = defineStore('player', () => {
     ): Promise<void> {
         if (!track?.id || !auth.user || isLoading.value) return;
 
-        // Офлайн: скачанный трек играем локально,
-        // сервер недоступен — синк молчит.
-        if (!window.navigator.onLine && isLocalDeviceActive.value) {
+        // Офлайн (в т.ч. сервер не отвечает): дистанционное
+        // управление невозможно — играем локально, если трек
+        // скачан. Активность устройства сервер не подтвердит,
+        // поэтому ей здесь не определяемся: иначе после
+        // перезагрузки страницы без сети скачанные треки
+        // уходили в серверную ветку и падали с Network Error.
+        if (!useNetworkStore().isOnline) {
             const downloads = useDownloadsStore();
 
             if (await downloads.hasLocalAudio(track)) {
@@ -2102,7 +2203,12 @@ const usePlayerStore = defineStore('player', () => {
         }
 
         // Мы — пульт: старая схема, сервер дёрнёт активное устройство.
-        if (!isLocalDeviceActive.value) {
+        // Только онлайн: офлайн сервер недоступен, «пультовать»
+        // некому — звук остаётся локальным (см. isLocalPlayback).
+        if (
+            !isLocalDeviceActive.value
+            && useNetworkStore().isOnline
+        ) {
             const requestId = ++playbackRequestId;
 
             isLoading.value = true;
@@ -2227,7 +2333,11 @@ const usePlayerStore = defineStore('player', () => {
         }
 
         // Мы — пульт: пауза/продолжение идут через сервер.
-        if (!isLocalDeviceActive.value) {
+        // Офлайн пульт не работает — остаёмся в локальной ветке.
+        if (
+            !isLocalDeviceActive.value
+            && useNetworkStore().isOnline
+        ) {
             try {
                 const isCurrentlyPlaying =
                     playbackState.value?.is_playing ?? isPlaying.value;
@@ -2333,10 +2443,11 @@ const usePlayerStore = defineStore('player', () => {
         isSeeking.value = true;
         progress.value = target;
 
-        // Применяем мгновенно: на активном устройстве — к аудио,
-        // на пульте — только в UI (сервер пришлёт состояние).
+        // Применяем мгновенно: на активном устройстве (или офлайн,
+        // где звук всегда локальный) — к аудио, на пульте — только
+        // в UI (сервер пришлёт состояние).
         if (
-            isLocalDeviceActive.value &&
+            isLocalPlayback.value &&
             audio.src &&
             audio.readyState >= HTMLMediaElement.HAVE_METADATA
         ) {
@@ -2592,7 +2703,7 @@ const usePlayerStore = defineStore('player', () => {
     audio.addEventListener('timeupdate', () => {
         if (
             isSeeking.value ||
-            !isLocalDeviceActive.value ||
+            !isLocalPlayback.value ||
             !Number.isFinite(audio.currentTime)
         ) {
             return;
@@ -2608,7 +2719,7 @@ const usePlayerStore = defineStore('player', () => {
     });
 
     audio.addEventListener('play', () => {
-        if (isLocalDeviceActive.value) {
+        if (isLocalPlayback.value) {
             isPlaying.value = true;
             startServerProgressTimer();
         }
@@ -2621,7 +2732,7 @@ const usePlayerStore = defineStore('player', () => {
     audio.addEventListener('ended', () => {
         stopServerProgressTimer();
 
-        if (isLocalDeviceActive.value && auth.user) {
+        if (isLocalPlayback.value && auth.user) {
             reportWave('trackFinished', undefined, progress.value);
             void playNext('ended');
         }
@@ -3300,10 +3411,32 @@ const usePlayerStore = defineStore('player', () => {
 
     initMediaSession({
         onPlay: () => {
-            if (!isPlaying.value) void togglePlay();
+            // Реагируем на реальное состояние, а не на флаг:
+            // после обрывов связи/стопов флаг isPlaying может
+            // расходиться с истиной, и браузер шлёт 'pause'
+            // туда, где пользователь жмёт «play», — тогда
+            // обработчик no-op'ился, и клавиша «не работала».
+            const paused = isLocalPlayback.value
+                ? audio.paused
+                : !isPlaying.value;
+
+            if (paused) void togglePlay();
         },
         onPause: () => {
-            if (isPlaying.value) void togglePlay();
+            const playing = isLocalPlayback.value
+                ? !audio.paused
+                : isPlaying.value;
+
+            if (playing) void togglePlay();
+        },
+        onStop: () => {
+            const playing = isLocalPlayback.value
+                ? !audio.paused
+                : isPlaying.value;
+
+            if (playing) void togglePlay();
+
+            void seekAudio(0);
         },
         onNext: () => {
             void playNext();
@@ -3403,6 +3536,24 @@ const usePlayerStore = defineStore('player', () => {
             }
 
             void initializePlayerDevice();
+        },
+    );
+
+    // Возврат онлайна после старта/сессии без сети: устройство
+    // не зарегистрировалось (init упал на запросах к мёртвому
+    // серверу), localDeviceId пуст — команды уходили с
+    // origin_device_id: null. Сервер снова доступен —
+    // догоняем регистрацию, heartbeat и состояние.
+    watch(
+        () => useNetworkStore().isOnline,
+        (isOnline) => {
+            if (
+                isOnline
+                && auth.user
+                && localDeviceId.value === null
+            ) {
+                void initializePlayerDevice();
+            }
         },
     );
 

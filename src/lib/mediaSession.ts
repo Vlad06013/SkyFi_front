@@ -25,6 +25,7 @@ export interface MediaSessionTrack {
 export interface MediaSessionHandlers {
     onPlay(): void;
     onPause(): void;
+    onStop(): void;
     onNext(): void;
     onPrevious(): void;
     onSeekBackward(offsetSeconds: number): void;
@@ -108,6 +109,7 @@ export function initMediaSession(
             action:
                 | 'play'
                 | 'pause'
+                | 'stop'
                 | 'previoustrack'
                 | 'nexttrack'
                 | 'seekto'
@@ -124,6 +126,7 @@ export function initMediaSession(
 
         register('play', () => callHandler((h) => h.onPlay()));
         register('pause', () => callHandler((h) => h.onPause()));
+        register('stop', () => callHandler((h) => h.onStop()));
         register('previoustrack', () => callHandler((h) => h.onPrevious()));
         register('nexttrack', () => callHandler((h) => h.onNext()));
         register('seekto', (details: {seekTime?: number | null}) =>
@@ -157,6 +160,10 @@ export function initMediaSession(
 
     navigator.mediaSession.setActionHandler('pause', () =>
         callHandler((h) => h.onPause()),
+    );
+
+    navigator.mediaSession.setActionHandler('stop', () =>
+        callHandler((h) => h.onStop()),
     );
 
     navigator.mediaSession.setActionHandler('previoustrack', () =>

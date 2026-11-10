@@ -23,6 +23,7 @@ import { IonApp, IonRouterOutlet } from '@ionic/vue';
 import AudioPlayer from '@/components/player/AudioPlayer.vue';
 import AppTopBar from '@/components/AppTopBar.vue';
 import { useAuthStore } from '@/stores/auth';
+import { useNetworkStore } from '@/stores/network';
 import { initHardwareBackButton } from '@/lib/hardwareBack';
 import { useAppLayout } from '@/composables/useAppLayout';
 import { useDownloadsStore } from '@/stores/downloads';
@@ -46,6 +47,9 @@ watch(showTopBar, (show) => {
 onMounted(() => {
   initHardwareBackButton();
   appLayout.start();
+
+  // Офлайн-режим: затемнение несохранённых треков и пр.
+  useNetworkStore().bind();
 
   // Маркеры скачанных треков в списках — из локальной базы.
   void useDownloadsStore().initialize();

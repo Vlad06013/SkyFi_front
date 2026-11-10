@@ -8,6 +8,8 @@
         ref="trigger"
         :aria-label="`Действия для трека ${track.title}`"
         :aria-expanded="isOpen"
+        :disabled="loading || isUnavailableOffline"
+        :class="{'track-menu-trigger-offline': isUnavailableOffline}"
         @click.stop="toggleMenu"
     >
       <ion-spinner
@@ -66,7 +68,7 @@
                 v-if="movableToTop"
                 type="button"
                 role="menuitem"
-                :disabled="loading"
+                :disabled="loading || isOffline"
                 @click="runMoveToTop"
             >
               <ion-icon :icon="arrowUpOutline"/>
@@ -76,7 +78,7 @@
             <button
                 type="button"
                 role="menuitem"
-                :disabled="loading"
+                :disabled="loading || isOffline"
                 @click="runAction('next')"
             >
               <ion-icon :icon="playSkipForwardOutline"/>
@@ -86,7 +88,7 @@
             <button
                 type="button"
                 role="menuitem"
-                :disabled="loading"
+                :disabled="loading || isOffline"
                 @click="runAction('queue')"
             >
               <ion-icon :icon="listOutline"/>
@@ -97,7 +99,7 @@
                 v-if="isFavorite !== undefined"
                 type="button"
                 role="menuitem"
-                :disabled="loading"
+                :disabled="loading || isOffline"
                 @click="runAction('favorite')"
             >
               <ion-icon :icon="heartOutline"/>
@@ -105,11 +107,13 @@
             </button>
 
             <AddToPlaylistItem
+                v-if="!isOffline"
                 :track-id="Number(track.id)"
                 @close="closeMenu"
             />
 
             <button
+                v-if="!isOffline"
                 type="button"
                 role="menuitem"
                 :disabled="loading"
@@ -120,9 +124,21 @@
             </button>
 
             <DownloadTrackItem
+                v-if="!isOffline"
                 :track="track as unknown as Track"
                 @close="closeMenu"
             />
+
+            <button
+                v-if="isOffline && isDownloaded"
+                type="button"
+                role="menuitem"
+                :disabled="loading"
+                @click="runRemoveDownload"
+            >
+              <ion-icon :icon="trashOutline"/>
+              Удалить с устройства
+            </button>
           </div>
         </section>
       </div>
@@ -141,7 +157,7 @@
             v-if="movableToTop"
             type="button"
             role="menuitem"
-            :disabled="loading"
+            :disabled="loading || isOffline"
             @click="runMoveToTop"
         >
           <ion-icon :icon="arrowUpOutline"/>
@@ -151,7 +167,7 @@
         <button
             type="button"
             role="menuitem"
-            :disabled="loading"
+            :disabled="loading || isOffline"
             @click="runAction('next')"
         >
           <ion-icon :icon="playSkipForwardOutline"/>
@@ -161,7 +177,7 @@
         <button
             type="button"
             role="menuitem"
-            :disabled="loading"
+            :disabled="loading || isOffline"
             @click="runAction('queue')"
         >
           <ion-icon :icon="listOutline"/>
@@ -172,7 +188,7 @@
             v-if="isFavorite !== undefined"
             type="button"
             role="menuitem"
-            :disabled="loading"
+            :disabled="loading || isOffline"
             @click="runAction('favorite')"
         >
           <ion-icon :icon="heartOutline"/>
@@ -180,11 +196,13 @@
         </button>
 
         <AddToPlaylistItem
+            v-if="!isOffline"
             :track-id="Number(track.id)"
             @close="closeMenu"
         />
 
         <button
+            v-if="!isOffline"
             type="button"
             role="menuitem"
             :disabled="loading"
@@ -195,9 +213,21 @@
         </button>
 
         <DownloadTrackItem
+            v-if="!isOffline"
             :track="track as unknown as Track"
             @close="closeMenu"
         />
+
+        <button
+            v-if="isOffline && isDownloaded"
+            type="button"
+            role="menuitem"
+            :disabled="loading"
+            @click="runRemoveDownload"
+        >
+          <ion-icon :icon="trashOutline"/>
+          Удалить с устройства
+        </button>
       </div>
 
       <ShareTrackModal
@@ -221,7 +251,7 @@ const activeMenuId = ref<number | null>(null);
 </script>
 
 <script setup lang="ts" generic="T extends TrackType">
-import {nextTick, onBeforeUnmount, watch} from 'vue';
+import {computed, nextTick, onBeforeUnmount, watch} from 'vue';
 import {IonIcon, IonSpinner} from '@ionic/vue';
 import {
   closeOutline,
@@ -232,12 +262,15 @@ import {
   playSkipForwardOutline,
   arrowUpOutline,
   shareSocialOutline,
+  trashOutline,
 } from 'ionicons/icons';
 
 import AddToPlaylistItem from '@/components/track-menu/AddToPlaylistItem.vue';
 import DownloadTrackItem from '@/components/track-menu/DownloadTrackItem.vue';
 import DownloadStatusIcon from '@/components/track-menu/DownloadStatusIcon.vue';
 import ShareTrackModal from '@/components/track-menu/ShareTrackModal.vue';
+import {useDownloadsStore} from '@/stores/downloads';
+import {useNetworkStore} from '@/stores/network';
 import type {Track} from '@/types/TrackType';
 import type {TrackType} from '@/types/TrackType';
 
@@ -270,6 +303,24 @@ const shareModalOpen = ref(false);
 
 // Уникальный номер экземпляра в общем «реестре» меню (см. блок script выше).
 const menuId = ++menuSeq;
+
+const network = useNetworkStore();
+const downloads = useDownloadsStore();
+
+/** Нет сети — действия, требующие сервера, недоступны. */
+const isOffline = computed(() => !network.isOnline);
+
+/** Офлайн и трек не скачан — меню недоступно целиком. */
+const isUnavailableOffline = computed(
+    () =>
+        isOffline.value
+        && !downloads.isDownloaded(props.track as unknown as Track),
+);
+
+/** Офлайн и трек скачан — предлагаем удаление с устройства. */
+const isDownloaded = computed(() =>
+    downloads.isDownloaded(props.track as unknown as Track),
+);
 
 const desktopMenuStyle = ref<Record<string, string>>({
   visibility: 'hidden',
@@ -379,6 +430,12 @@ function runMoveToTop() {
   closeMenu();
 }
 
+function runRemoveDownload() {
+  void downloads.remove(props.track as unknown as Track);
+
+  closeMenu();
+}
+
 function handleOutsidePointer(event: PointerEvent) {
   const target = event.target;
 
@@ -474,6 +531,16 @@ if (typeof window !== 'undefined') {
 
 .track-menu-trigger ion-icon {
   font-size: 21px;
+}
+
+/* Офлайн и трек не скачан: действия недоступны. */
+.track-menu-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.track-menu-trigger-offline {
+  opacity: 0.4;
 }
 
 .track-context-menu {

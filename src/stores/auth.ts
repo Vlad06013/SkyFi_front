@@ -13,7 +13,19 @@ import type { User } from '@/types/AuthType';
 import { invalidatePlaylistsCache } from '@/api/playlists';
 
 export const useAuthStore = defineStore('auth', () => {
-    const user = ref<User | null>(null);
+    const USER_CACHE_KEY = 'skyfi_user';
+
+    function readCachedUser(): User | null {
+        try {
+            const raw = localStorage.getItem(USER_CACHE_KEY);
+
+            return raw ? JSON.parse(raw) as User : null;
+        } catch {
+            return null;
+        }
+    }
+
+    const user = ref<User | null>(readCachedUser());
 
     const token = ref<string | null>(
         localStorage.getItem('skyfi_token'),
@@ -32,6 +44,7 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = null;
 
         localStorage.removeItem('skyfi_token');
+        localStorage.removeItem(USER_CACHE_KEY);
 
         invalidatePlaylistsCache();
     }
@@ -44,6 +57,10 @@ export const useAuthStore = defineStore('auth', () => {
         user.value = data.user;
 
         localStorage.setItem('skyfi_token', data.token);
+        localStorage.setItem(
+            USER_CACHE_KEY,
+            JSON.stringify(data.user),
+        );
     }
 
     function getErrorMessage(exception: unknown): string {
@@ -144,6 +161,10 @@ export const useAuthStore = defineStore('auth', () => {
             const response = await getCurrentUserRequest();
 
             user.value = response.data.user;
+            localStorage.setItem(
+                USER_CACHE_KEY,
+                JSON.stringify(response.data.user),
+            );
 
             return true;
         } catch (exception) {
@@ -151,15 +172,18 @@ export const useAuthStore = defineStore('auth', () => {
                 axios.isAxiosError(exception)
                 && exception.response?.status === 401
             ) {
+                // Токен реально отклонён сервером — сбрасываем сессию.
                 clearAuth();
             } else {
+                // Сети нет (или сервер лежит): остаёмся на локальном
+                // кэше пользователя — приложение продолжает работать
+                // в офлайн-режиме со скачанными треками.
                 console.error(
                     'Не удалось получить пользователя:',
                     exception,
                 );
             }
 
-            user.value = null;
             return false;
         }
     }

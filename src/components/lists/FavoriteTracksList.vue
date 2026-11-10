@@ -23,6 +23,7 @@
           'track-row-menu-open':
             openMenuTrackId === String(track.id),
           'is-dragging': draggingIndex === index,
+          'track-row-offline-unavailable': isUnavailableOffline(track),
         }"
           @click="onRowClick(track)"
           @keydown="onRowKeyDown($event, track)"
@@ -127,7 +128,7 @@
 import '@/components/track-menu/track-list.css';
 
 import {computed, onBeforeUnmount, watch, ref} from 'vue';
-import {IonIcon} from '@ionic/vue';
+import {IonIcon, toastController} from '@ionic/vue';
 import {
   musicalNotesOutline,
   pauseOutline,
@@ -138,12 +139,39 @@ import {
 import BaseInfiniteList from '@/components/lists/BaseInfiniteList.vue';
 import TrackContextMenu from '@/components/track-menu/TrackContextMenu.vue';
 import usePlayerStore from '@/stores/player';
+import {useDownloadsStore} from '@/stores/downloads';
+import {useNetworkStore} from '@/stores/network';
 
 // import { getFavorites } from '@/api/favorites';
 import type {Track} from '@/types/TrackType';
 import {PlaySourceListsEnum} from '@/types/PlaySourceListsEnum';
 
 const player = usePlayerStore();
+const downloads = useDownloadsStore();
+const network = useNetworkStore();
+
+/** Офлайн и трек не скачан — воспроизвести нельзя. */
+function isUnavailableOffline(track: Track): boolean {
+  return !network.isOnline && !downloads.isDownloaded(track);
+}
+
+let offlineToastAt = 0;
+
+async function notifyUnavailableOffline(): Promise<void> {
+  // Не душим тостами при быстрых кликах.
+  if (Date.now() - offlineToastAt < 1500) return;
+
+  offlineToastAt = Date.now();
+
+  const toast = await toastController.create({
+    message: 'Трек не скачан — офлайн недоступен',
+    duration: 2000,
+    position: 'top',
+    cssClass: 'player-toast',
+  });
+
+  await toast.present();
+}
 
 const loadingTrackId = ref<number | null>(null);
 const openMenuTrackId = ref<string | null>(null);
@@ -193,6 +221,12 @@ function isCurrentTrack(track: Track): boolean {
 
 async function playTrack(track: Track): Promise<void> {
   if (!track?.id || player.isLoading) return;
+
+  // Офлайн без скачанного файла — не запускаем.
+  if (isUnavailableOffline(track)) {
+    await notifyUnavailableOffline();
+    return;
+  }
 
   console.log('playTrack', track, sourceList);
   // Повторный клик по текущему треку — пауза/продолжение,
@@ -705,6 +739,42 @@ watch(
       });
     },
     { immediate: true },
+);
+
+// Медиаклавиши/пульт переключили трек: переносим фокус на
+// играющую строку. Иначе фиолетовый обвод фокуса остаётся
+// на прежнем треке, и «выделенные границы» расходятся
+// с эквалайзером. Поля ввода и другие контролы не трогаем.
+watch(
+    () => player.currentTrack?.id,
+    (trackId) => {
+      if (trackId === undefined || trackId === null) return;
+
+      const active = document.activeElement;
+
+      const focusFree =
+          !active ||
+          active === document.body ||
+          (
+              active instanceof HTMLElement &&
+              active.closest('.track-list') !== null
+          );
+
+      if (!focusFree) return;
+
+      const index = props.items.findIndex(
+          (item) => Number(item.id) === Number(trackId),
+      );
+
+      const row = index === -1 ? null : rowEls.get(index) ?? null;
+
+      // Строка скрыта (страница в фоне у Ionic) — не трогаем.
+      if (!(row instanceof HTMLElement) || row.offsetParent === null) {
+        return;
+      }
+
+      focusRow(row);
+    },
 );
 </script>
 <style scoped>

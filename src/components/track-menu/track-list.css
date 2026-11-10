@@ -29,6 +29,20 @@
     background: #171a23;
 }
 
+/* Офлайн: трек не скачан — недоступен для воспроизведения. */
+.track-row.track-row-offline-unavailable {
+    opacity: 0.42;
+    cursor: not-allowed;
+}
+
+.track-row.track-row-offline-unavailable:hover {
+    background: transparent;
+}
+
+.track-row.track-row-offline-unavailable .cover-play {
+    display: none;
+}
+
 /* Фокус пульта ТВ: строка — единая фокусная зона,
  * выглядит как наведение + рамка. */
 .track-row:focus {
