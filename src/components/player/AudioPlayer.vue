@@ -1670,7 +1670,10 @@ onMounted(async () => {
     return false;
   });
 
-  await player.initializePlayerDevice();
+  // Регистрация устройства и стартовое состояние — фоном:
+  // UI не ждёт сеть (единый офлайн-сценарий: без сети
+  // инициализация внутри сразу нет-оп).
+  void player.initializePlayerDevice();
 
   if (player.isServerSyncEnabled) {
     player.subscribeToDeviceChanges();
@@ -1687,7 +1690,7 @@ watch(
     () => Boolean(player.isServerSyncEnabled),
     async (isAuthenticated) => {
       if (isAuthenticated) {
-        await player.initializePlayerDevice();
+        void player.initializePlayerDevice();
         player.subscribeToDeviceChanges();
       }
     },

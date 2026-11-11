@@ -382,8 +382,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
      * списков/очередей Vue — их прокси нельзя сериализовать
      * в IndexedDB (DataCloneError).
      */
-    function toPlainTrack(track: Track): Track {
-        return JSON.parse(JSON.stringify(track)) as Track;
+    function toPlainTrack(track: Track): Track {        return JSON.parse(JSON.stringify(track)) as Track;
     }
 
     // ============================================
@@ -443,6 +442,16 @@ export const useDownloadsStore = defineStore('downloads', () => {
         return (await getLocalAudioUrl(track)) !== null;
     }
 
+    /**
+     * Все скачанные треки (свежие первыми) — офлайн-очередь
+     * волны. Полностью локально, без сети.
+     */
+    async function listDownloadedTracks(): Promise<Track[]> {
+        const rows = await listDownloads();
+
+        return rows.map((row) => row.track);
+    }
+
     return {
         records,
         initialize,
@@ -455,5 +464,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
         remove,
         getLocalAudioUrl,
         hasLocalAudio,
+        listDownloadedTracks,
     };
 });

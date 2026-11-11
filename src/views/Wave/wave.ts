@@ -3,6 +3,9 @@ import usePlayerStore from '@/stores/player';
 import { getWaveTracks } from '@/api/wave';
 import { getYandexMusicDeviceAuthStatus } from '@/api/auth';
 import { yandexMusicConnected } from '@/lib/yandexConnection';
+import { useDownloadsStore } from '@/stores/downloads';
+import { useNetworkStore } from '@/stores/network';
+import { PlaySourceListsEnum } from '@/types/PlaySourceListsEnum';
 import { type Track } from '@/types/TrackType';
 
 // ============================================
@@ -11,12 +14,21 @@ import { type Track } from '@/types/TrackType';
 
 export function useWave() {
     const player = usePlayerStore();
+    const network = useNetworkStore();
 
     const waveTracks = ref<Track[]>([]);
 
     const waveLoading = ref(false);
 
     const waveError = ref('');
+
+    /**
+     * Офлайн-режим: волна не запрашивается, очередь собрана
+     * из скачанного. Автостарта нет — играет по действию
+     * пользователя (большая кнопка/свайп), порядок — как
+     * стоит в состоянии плеера (shuffle/repeat общие).
+     */
+    const offlineMode = ref(false);
 
     /** Звучит любой трек (эквалайзер и кнопка в режиме паузы). */
     const isPlaying = computed(() => player.isPlaying);
@@ -55,6 +67,14 @@ export function useWave() {
     async function loadWave(): Promise<void> {
         if (waveLoading.value) return;
 
+        // Единый офлайн-сценарий: сети нет — не ждём таймаут
+        // соединения, сразу встаём на скачанное.
+        if (!network.isOnline) {
+            await enterOfflineMode();
+            return;
+        }
+
+        offlineMode.value = false;
         waveLoading.value = true;
         waveError.value = '';
 
@@ -65,6 +85,13 @@ export function useWave() {
                 waveError.value = 'Волна пока пуста.';
             }
         } catch {
+            // Сеть отвалилась прямо во время запроса — тот же
+            // офлайн-режим, без экрана ошибки.
+            if (!network.isOnline) {
+                await enterOfflineMode();
+                return;
+            }
+
             waveError.value =
                 'Не удалось загрузить волну. Подключи аккаунт Яндекс Музыки.';
 
@@ -75,6 +102,27 @@ export function useWave() {
         } finally {
             waveLoading.value = false;
         }
+    }
+
+    /**
+     * Офлайн-режим волны: очередь из скачанных треков (полностью
+     * локально, Dexie). Стартуем только по действию пользователя.
+     * Скачанного нет — пустое состояние с подсказкой.
+     */
+    async function enterOfflineMode(): Promise<void> {
+        stopAuthStatusPoll();
+
+        waveError.value = '';
+        offlineMode.value = true;
+
+        const downloaded =
+            await useDownloadsStore().listDownloadedTracks();
+
+        waveTracks.value = downloaded;
+
+        if (downloaded.length === 0) return;
+
+        player.setQueue(downloaded, PlaySourceListsEnum.UPLOAD);
     }
 
     let authStatusPollTimer: ReturnType<typeof setInterval> | null = null;
@@ -120,6 +168,28 @@ export function useWave() {
         }
     });
 
+    // Единый офлайн-сценарий по переходам сети:
+    // — сеть пропала: очередь на скачанное бесшовно переводит
+    //   сам плеер (откуда угодно: волна, избранное, плейлист) —
+    //   здесь только состояние страницы (флаг + превью).
+    // — сеть вернулась, что-то играет (скачанное): волну не
+    //   натягиваем насильно — дослушивает текущее, в волну
+    //   переходит кнопкой «В волну». Тишина — волну
+    //   подгружаем сами.
+    watch(
+        () => network.isOnline,
+        (online) => {
+            if (!online) {
+                void enterOfflineMode();
+                return;
+            }
+
+            if (offlineMode.value && !player.currentTrack) {
+                void loadWave();
+            }
+        },
+    );
+
     /**
      * Большая кнопка работает как плеерная: звучит (или стоит
      * на паузе) любой источник — пауза/продолжение текущего
@@ -135,6 +205,20 @@ export function useWave() {
             return;
         }
 
+        // Офлайн-режим: стартуем скачанное обычным списком —
+        // НЕ в waveMode: shuffle/repeat работают как стоят
+        // в плеере (волна их игнорирует).
+        if (offlineMode.value) {
+            if (waveTracks.value.length === 0) return;
+
+            await player.playTrack(
+                waveTracks.value[0],
+                PlaySourceListsEnum.UPLOAD,
+            );
+
+            return;
+        }
+
         await switchToWave();
     }
 
@@ -146,6 +230,16 @@ export function useWave() {
      * всегда свежий и по кругу не ходим.
      */
     async function switchToWave(): Promise<void> {
+        // Вернулись онлайн, а волна так и не подгрузилась
+        // (играли скачанное): waveTracks — это ещё офлайн-
+        // очередь. Сначала свежая выдача, потом запуск —
+        // иначе скачанное уйдёт в старт волны и полезет
+        // перерегистрироваться на сервере.
+        if (offlineMode.value) {
+            offlineMode.value = false;
+            await loadWave();
+        }
+
         if (player.isLoading) return;
 
         if (waveTracks.value.length === 0) {
@@ -169,6 +263,7 @@ export function useWave() {
         waveTracks,
         waveLoading,
         waveError,
+        offlineMode,
         isPlaying,
         heroDisplay,
         loadWave,

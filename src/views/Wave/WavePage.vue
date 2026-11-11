@@ -199,6 +199,16 @@
             Повторить
           </ion-button>
         </div>
+
+        <!-- Офлайн без скачанных: волна недоступна, играть нечего. -->
+        <div
+            v-if="offlineMode && !heroDisplay"
+            class="vibe-state vibe-offline"
+        >
+          <p>Нет сети — волна недоступна.</p>
+          <p>Скачанных треков тоже нет.</p>
+          <p>Подключись к интернету — волна загрузится сама.</p>
+        </div>
       </div>
     </ion-content>
   </ion-page>
@@ -225,16 +235,19 @@ import type { CSSProperties } from 'vue';
 import AppNavigation from '@/components/AppNavigation.vue';
 import usePlayerStore from '@/stores/player';
 import { useUiStore } from '@/stores/ui';
+import { useNetworkStore } from '@/stores/network';
 import type { Track } from '@/types/TrackType';
 import { useWave } from './wave';
 
 const player = usePlayerStore();
 const ui = useUiStore();
+const network = useNetworkStore();
 
 const {
   waveTracks,
   waveLoading,
   waveError,
+  offlineMode,
   isPlaying,
   heroDisplay,
   loadWave,
@@ -274,9 +287,12 @@ const playBusy = computed(
     () => waveInitialLoading.value || player.isLoading,
 );
 
-/** В плеере звучит не волна (избранное, плейлист...) — показываем кнопку «В волну». */
+/** В плеере звучит не волна (избранное, плейлист...) — показываем кнопку «В волну». Офлайн она бессмысленна: волна недоступна. */
 const showReturnTag = computed(
-    () => !player.waveMode && player.currentTrack !== null,
+    () =>
+        !player.waveMode
+        && player.currentTrack !== null
+        && network.isOnline,
 );
 
 // ============================================

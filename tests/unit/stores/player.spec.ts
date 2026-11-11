@@ -47,6 +47,7 @@ const mocks = vi.hoisted(() => ({
         download: vi.fn(),
         remove: vi.fn(),
         initialize: vi.fn(),
+        listDownloadedTracks: vi.fn(),
     },
 }));
 
@@ -171,6 +172,7 @@ describe('player store', () => {
         mocks.downloads.getLocalAudioUrl.mockResolvedValue(
             'blob:local-audio',
         );
+        mocks.downloads.listDownloadedTracks.mockResolvedValue([]);
         mocks.checkFavorite.mockResolvedValue({is_favorite: false});
 
         // backgroundSync у плеера вызывает .catch на результате —
@@ -541,20 +543,23 @@ describe('player store', () => {
         });
 
         it('предзагрузка: следующие треки порции греются из ресурса без регистрации', async () => {
+            // Треки волны не скачаны — ссылки только из ресурса.
+            mocks.downloads.getLocalAudioUrl.mockResolvedValue(null);
+
             await startTestWave();
 
-            // W1 играет (тест считает его скачанным), W2–W5
-            // предзагружаются из ресурса — без регистрации в базе.
+            // Текущий (W1) + W2–W5 — весь батч из ресурса,
+            // без регистрации в базе.
             await vi.waitFor(() => {
                 expect(mocks.getExternalTrackAudioUrl)
-                    .toHaveBeenCalledTimes(4);
+                    .toHaveBeenCalledTimes(5);
             });
 
             // Следующий по свайпу: ссылка в кеше, новых запросов нет.
             await player.playNext();
 
             expect(mocks.getExternalTrackAudioUrl)
-                .toHaveBeenCalledTimes(4);
+                .toHaveBeenCalledTimes(5);
             expect(player.currentTrack?.title).toBe('W2');
         });
     });
@@ -674,19 +679,21 @@ describe('player store', () => {
                 PlaySourceListsEnum.FAVORITES,
             );
 
+            // Восстановленный трек + следующие по плану (C, D):
+            // ссылки уходят в фон сразу.
             await vi.waitFor(() => {
-                expect(mocks.getTrackAudio).toHaveBeenCalledTimes(2);
+                expect(mocks.getTrackAudio).toHaveBeenCalledTimes(3);
             });
 
             const requested = mocks.getTrackAudio.mock.calls
                 .map(call => Number(call[0]));
 
             expect(requested).toEqual(
-                [c, d].map(track => Number(track.id)),
+                [restored, c, d].map(track => Number(track.id)),
             );
 
-            // Клик по восстановленному треку: его ссылка — третий
-            // запрос; предзагрузка уже в кеше, новых не нужно.
+            // Клик по восстановленному треку: ссылка уже в кеше,
+            // новых запросов не нужно.
             await player.playTrack(
                 restored,
                 PlaySourceListsEnum.FAVORITES,
@@ -748,6 +755,42 @@ describe('player store', () => {
 
             expect(mocks.getTrackAudio).not.toHaveBeenCalled();
         });
+
+        it('внешний трек с протухшим file.path идёт в ресурс, не в /audio', async () => {
+            mocks.downloads.getLocalAudioUrl.mockResolvedValue(null);
+            mocks.getTrackAudio.mockResolvedValue({url: 'blob:audio'});
+
+            const track = makeTrack('Y');
+
+            track.source_type = 'yandex_music';
+            track.source_id = 'ym-154955092';
+            track.file = {
+                id: 1,
+                track_id: 1,
+                disk: 'local',
+                path: 'https://example.com/stale.mp3',
+                mime_type: 'audio/mpeg',
+                size_bytes: null,
+                duration_ms: null,
+                sha256: null,
+                // Протух по TTL — file.path выше отсёкнут,
+                // но запись есть, и /audio по внешнему id
+                // работать не будет.
+                path_fetch_at: '2020-01-01 00:00:00',
+                path_ttl_sec: 3600,
+                created_at: '',
+                updated_at: '',
+            };
+
+            player.setQueue([track], PlaySourceListsEnum.SEARCH);
+
+            await vi.waitFor(() => {
+                expect(mocks.getExternalTrackAudioUrl)
+                    .toHaveBeenCalledTimes(1);
+            });
+
+            expect(mocks.getTrackAudio).not.toHaveBeenCalled();
+        });
     });
 
     describe('серверная очередь', () => {
@@ -770,6 +813,38 @@ describe('player store', () => {
     });
 
     describe('офлайн', () => {
+        it('уход в офлайн: очередь бесшовно меняется на скачанное, играющий живёт', async () => {
+            await playList(['A', 'B']);
+
+            const downloaded = [makeTrack('D1'), makeTrack('D2')];
+            mocks.downloads.listDownloadedTracks.mockResolvedValue(
+                downloaded,
+            );
+
+            // Сеть пропала посреди прослушивания избранного.
+            await whileOffline(async () => {
+                await vi.waitFor(() => {
+                    expect(player.queue.map(t => t.title))
+                        .toEqual(['D1', 'D2']);
+                });
+
+                // Играющий трек не тронут — доигрывает.
+                expect(player.currentTrack?.title).toBe('A');
+            });
+        });
+
+        it('уход в офлайн без скачанных: очередь оставляем как есть', async () => {
+            const tracks = await playList(['A', 'B']);
+
+            mocks.downloads.listDownloadedTracks.mockResolvedValue([]);
+
+            await whileOffline(async () => {
+                await new Promise(resolve => setTimeout(resolve, 30));
+
+                expect(player.queue).toEqual(tracks);
+            });
+        });
+
         it('скачанный трек играет без обращения к серверу', async () => {
             await whileOffline(async () => {
                 const tracks = [makeTrack('A'), makeTrack('B')];
@@ -828,9 +903,7 @@ describe('player store', () => {
     });
 
     describe('восстановление состояния после перезагрузки', () => {
-        it('сервер говорит «playing», но звук не пошёл — показываем паузу', async () => {
-            const track = makeTrack('Восстановленный');
-
+        function mockDeviceRestore(track: Track): void {
             mocks.getPlayerDevices.mockResolvedValue({
                 data: [
                     {
@@ -867,6 +940,12 @@ describe('player store', () => {
                 },
                 queue: [],
             });
+        }
+
+        it('сервер говорит «playing», но звук не пошёл — показываем паузу', async () => {
+            const track = makeTrack('Восстановленный');
+
+            mockDeviceRestore(track);
 
             await player.initializePlayerDevice();
 
@@ -874,6 +953,24 @@ describe('player store', () => {
             // честная пауза, а не «крутится без звука».
             expect(player.isPlaying).toBe(false);
             expect(player.currentTrack?.title).toBe('Восстановленный');
+        });
+
+        it('ссылка восстановленного трека запрашивается сразу', async () => {
+            mocks.downloads.getLocalAudioUrl.mockResolvedValue(null);
+            mocks.getTrackAudio.mockResolvedValue({url: 'blob:audio'});
+
+            const track = makeTrack('Восстановленный');
+
+            mockDeviceRestore(track);
+
+            await player.initializePlayerDevice();
+
+            // Кеш пуст после перезагрузки: ссылка текущего трека
+            // уходит в фон — первый запуск не ждёт запрос.
+            await vi.waitFor(() => {
+                expect(mocks.getTrackAudio)
+                    .toHaveBeenCalledWith(Number(track.id));
+            });
         });
     });
 

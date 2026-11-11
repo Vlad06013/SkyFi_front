@@ -19,7 +19,7 @@
 <script setup lang="ts">
 import { computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { IonApp, IonRouterOutlet } from '@ionic/vue';
+import { IonApp, IonRouterOutlet, toastController } from '@ionic/vue';
 import AudioPlayer from '@/components/player/AudioPlayer.vue';
 import AppTopBar from '@/components/AppTopBar.vue';
 import { useAuthStore } from '@/stores/auth';
@@ -31,6 +31,7 @@ import { useDownloadsStore } from '@/stores/downloads';
 const auth = useAuthStore();
 const appLayout = useAppLayout();
 const route = useRoute();
+const network = useNetworkStore();
 
 const showTopBar = computed(
     () =>
@@ -44,9 +45,59 @@ watch(showTopBar, (show) => {
   document.body.classList.toggle('app--top-bar', show);
 }, { immediate: true });
 
+// ============================================
+// ОФЛАЙН-УВЕДОМЛЕНИЕ
+//
+// Единый офлайн-сценарий — network store. Уход в офлайн
+// (или вход уже в офлайне) — уведомление сверху: режим виден
+// сразу, без охоты по интерфейсу.
+// ============================================
+
+let modeToastVisible = false;
+
+/** Один тост режима сети за раз (offline/online). */
+async function notifyNetworkMode(message: string): Promise<void> {
+    if (modeToastVisible) return;
+
+    modeToastVisible = true;
+
+    const toast = await toastController.create({
+        message,
+        duration: 4000,
+        position: 'top',
+        cssClass: 'player-toast',
+    });
+
+    void toast.onDidDismiss().then(() => {
+        modeToastVisible = false;
+    });
+
+    await toast.present();
+}
+
+watch(
+    () => network.isOnline,
+    (online) => {
+        // Офлайн и восстановление сети сообщаем одинаково:
+        // пользователь всегда знает, в каком режиме плеер.
+        void notifyNetworkMode(
+            online
+                ? 'Сеть восстановлена.'
+                : 'Нет сети — офлайн-режим. Играем скачанное.',
+        );
+    },
+);
+
 onMounted(() => {
   initHardwareBackButton();
   appLayout.start();
+
+  // Вошли уже в офлайне — уведомляем сразу.
+  if (!network.isOnline) {
+      void notifyNetworkMode(
+          'Нет сети — офлайн-режим. Играем скачанное.',
+      );
+  }
 
   // Офлайн-режим: затемнение несохранённых треков и пр.
   useNetworkStore().bind();

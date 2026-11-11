@@ -875,18 +875,30 @@ const usePlayerStore = defineStore('player', () => {
             }
         }
 
-        // Внешний трек без записи в базе: /tracks/{id}/audio по
-        // его id не сработает — ссылку просим у ресурса напрямую,
-        // без регистрации. Работает и для forceFresh-перезапроса
-        // протухшей ссылки.
-        if (track.source_type !== 'upload' && !track.file) {
+        // Внешний трек (волна/поиск): /tracks/{id}/audio по
+        // внешнему id не работает — ссылку просим у ресурса
+        // напрямую, без регистрации. Свежий file.path отработал
+        // выше; сюда падаем с протухшим или отсутствующим.
+        // Работает и для forceFresh-перезапроса протухшей ссылки.
+        if (track.source_type !== 'upload') {
             const stream = await getExternalTrackAudioUrl(track);
-
-            audioUrlCache.set(trackId, {
+            const entry = {
                 url: stream.url,
                 fetchedAt: Date.now(),
                 ttlSec: stream.path_ttl_sec ?? null,
-            });
+            };
+
+            audioUrlCache.set(trackId, entry);
+
+            // Дублируем под внешний id: при воспроизведении
+            // зарегистрированный трек приходит с DB id, а
+            // source_id у него прежний — ссылку найдём по нему.
+            if (
+                track.source_id !== null
+                && Number.isFinite(Number(track.source_id))
+            ) {
+                audioUrlCache.set(Number(track.source_id), entry);
+            }
 
             return stream.url;
         }
@@ -943,6 +955,58 @@ const usePlayerStore = defineStore('player', () => {
     }
 
     /**
+     * Запрос ссылки трека с дедупликацией: закешированные и
+     * летящие пропускаем. Успех — прогреваем файл следующего.
+     */
+    function preloadTrackUrl(track: Track): void {
+        const trackId = Number(track.id);
+
+        if (
+            !Number.isFinite(trackId)
+            || audioUrlCache.has(trackId)
+            || preloadInFlight.has(trackId)
+        ) {
+            return;
+        }
+
+        // Единая дорога: локальные файлы, кеш, file.path,
+        // внешний ресурс — решает resolveAudioUrl.
+        const request = resolveAudioUrl(track, false, true);
+
+        preloadInFlight.set(trackId, request);
+
+        void request
+            .then(() => {
+                // Ссылка следующего трека готова — греем его файл.
+                prewarmNextTrackFile();
+            })
+            .catch(() => {
+                // Не тащим битое в кеш: в кеш кладётся
+                // только успешный ответ.
+            })
+            .finally(() => {
+                preloadInFlight.delete(trackId);
+            });
+    }
+
+    /**
+     * Вооружение предзагрузки: ссылка текущего трека (после
+     * восстановления страницы её нет в кеше — первый запуск
+     * ждал бы запрос) + окно следующих по плану + прогрев
+     * файла ближайшего.
+     */
+    function armPreload(): void {
+        const current = currentSourceTrack.value;
+
+        if (current) {
+            preloadTrackUrl(current);
+        }
+
+        preloadUpcomingUrls();
+        prewarmNextTrackFile();
+    }
+
+    /**
      * Предзагрузка ссылок на ближайшие треки плана.
      *
      * План знает, что сыграет следующим, — запрашиваем ссылки
@@ -968,62 +1032,8 @@ const usePlayerStore = defineStore('player', () => {
 
             if (!track) continue;
 
-            const trackId = Number(track.id);
-
-            if (
-                !Number.isFinite(trackId)
-                || audioUrlCache.has(trackId)
-                || preloadInFlight.has(trackId)
-            ) {
-                continue;
-            }
-
-            const request =
-                track.source_type === 'upload'
-                    ? resolveAudioUrl(track, false, true)
-                    : resolveExternalAudioUrl(track);
-
-            preloadInFlight.set(trackId, request);
-
-            void request
-                .then(() => {
-                    // Ссылка следующего трека готова — греем его файл.
-                    prewarmNextTrackFile();
-                })
-                .catch(() => {
-                    // Не тащим битое в кеш: в кеш кладётся
-                    // только успешный ответ.
-                })
-                .finally(() => {
-                    preloadInFlight.delete(trackId);
-                });
+            preloadTrackUrl(track);
         }
-    }
-
-    /**
-     * Ссылка на поток внешнего трека из ресурса (без базы).
-     * Кладём в кеш под id и source_id: при воспроизведении трек
-     * может прийти уже зарегистрированным (DB id), а source_id
-     * у него прежний.
-     */
-    async function resolveExternalAudioUrl(track: Track): Promise<string> {
-        const stream = await getExternalTrackAudioUrl(track);
-        const entry = {
-            url: stream.url,
-            fetchedAt: Date.now(),
-            ttlSec: stream.path_ttl_sec ?? null,
-        };
-
-        audioUrlCache.set(Number(track.id), entry);
-
-        if (
-            track.source_id !== null
-            && Number.isFinite(Number(track.source_id))
-        ) {
-            audioUrlCache.set(Number(track.source_id), entry);
-        }
-
-        return stream.url;
     }
 
     /**
@@ -1153,10 +1163,9 @@ const usePlayerStore = defineStore('player', () => {
                 // Волна: следим за буфером, подгружаем порцию заранее.
                 void ensureWaveBuffer();
 
-                // Следующие треки плана: ссылки готовим заранее,
-                // файл ближайшего — прогреваем.
-                preloadUpcomingUrls();
-                prewarmNextTrackFile();
+                // Предзагрузку вооружаем: окно следующих,
+                // файл ближайшего — заранее.
+                armPreload();
 
                 return true;
             }
@@ -2414,6 +2423,23 @@ const usePlayerStore = defineStore('player', () => {
     }
 
     /**
+     * Офлайн-переход из любого контекста: очередь бесшовно
+     * меняем на скачанное. Играющий трек не трогаем — его
+     * ссылка уже получена, он доиграет. Следующие треки и
+     * свайпы идут по скачанным; порядок/shuffle — как стоят
+     * в состоянии плеера. Скачанного нет — очередь оставляем:
+     * офлайн-перебор сам докрутит до ближайшего скачанного.
+     */
+    async function enterOfflineQueue(): Promise<void> {
+        const downloaded =
+            await useDownloadsStore().listDownloadedTracks();
+
+        if (downloaded.length === 0) return;
+
+        applySourceQueue(downloaded, PlaySourceListsEnum.UPLOAD);
+    }
+
+    /**
      * Офлайн-поиск назад: ближайший скачанный трек в истории.
      * Нескачанные позади пропускаем — выбывают из истории.
      * -1 — скачанных позади нет, остаётся начало текущего трека.
@@ -3052,6 +3078,11 @@ const usePlayerStore = defineStore('player', () => {
     async function initializePlayerDevice(): Promise<void> {
         if (!auth.user) return;
 
+        // Единый офлайн-сценарий: без сети устройство не
+        // регистрируем и состояние не тянем — watch на isOnline
+        // перезапустит инициализацию, когда сеть вернётся.
+        if (!useNetworkStore().isOnline) return;
+
         if (deviceInitializationPromise) {
             return deviceInitializationPromise;
         }
@@ -3182,6 +3213,11 @@ const usePlayerStore = defineStore('player', () => {
             // от списка-источника — она в приоритете при переключении.
             serverQueue.value = queueResponse;
             setServerQueueCount(queueResponse.length);
+
+            // Восстановленный трек без ссылки в кеше: вооружаем
+            // предзагрузку сразу — его запрос и окно следующих
+            // уходят в фон, первый запуск не ждёт сеть.
+            armPreload();
 
             console.log(
                 '[Player] Очередь восстановлена с сервера:',
@@ -3866,19 +3902,24 @@ const usePlayerStore = defineStore('player', () => {
         },
     );
 
-    // Возврат онлайна после старта/сессии без сети: устройство
-    // не зарегистрировалось (init упал на запросах к мёртвому
-    // серверу), localDeviceId пуст — команды уходили с
-    // origin_device_id: null. Сервер снова доступен —
-    // догоняем регистрацию, heartbeat и состояние.
+    // Единый офлайн-сценарий:
+    // — уход в офлайн (откуда угодно): очередь бесшовно
+    //   переводим на скачанное; играющий трек не трогаем,
+    //   следующие и свайпы идут по скачанным;
+    // — возврат онлайна после старта/сессии без сети: устройство
+    //   не зарегистрировалось (init упал на запросах к мёртвому
+    //   серверу), localDeviceId пуст — команды уходили с
+    //   origin_device_id: null. Сервер снова доступен —
+    //   догоняем регистрацию, heartbeat и состояние.
     watch(
         () => useNetworkStore().isOnline,
         (isOnline) => {
-            if (
-                isOnline
-                && auth.user
-                && localDeviceId.value === null
-            ) {
+            if (!isOnline) {
+                void enterOfflineQueue();
+                return;
+            }
+
+            if (auth.user && localDeviceId.value === null) {
                 void initializePlayerDevice();
             }
         },

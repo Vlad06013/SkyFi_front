@@ -7,6 +7,33 @@ import {PlaySourceListsEnum} from '@/types/PlaySourceListsEnum'
 export type RepeatMode = 'off' | 'all' | 'one';
 
 /**
+ * Трек перед отправкой на бэкенд.
+ *
+ * Кеш скачанных подменяет meta.album.cover_path локальным
+ * файлом/objectURL/data-URI (для офлайн-показа обложек) —
+ * серверная валидация принимает только http(s)-URL и отбивает
+ * весь запрос. Чужую схему приводим к null. Заодно base64
+ * обложки не раздувают payload.
+ */
+export function sanitizeTrackForApi(track: Track): Track {
+    const cover = track.meta?.album?.cover_path;
+
+    if (typeof cover !== 'string' || /^https?:\/\//i.test(cover)) {
+        return track;
+    }
+
+    return {
+        ...track,
+        meta: {
+            ...track.meta,
+            album: track.meta.album
+                ? {...track.meta.album, cover_path: null}
+                : null,
+        },
+    };
+}
+
+/**
  * Выбрать трек и установить состояние воспроизведения.
  *
  * POST /player/play
@@ -24,7 +51,7 @@ export async function playRemoteTrack(
         await http.post<ApiResponse<PlayerStateResponse>>(
             '/player/play',
             {
-                track,
+                track: sanitizeTrackForApi(track),
                 playback_source: playbackSource,
                 ...meta,
             },
@@ -84,7 +111,7 @@ export async function getExternalTrackAudioUrl(
             title: track.title,
             source_type: track.source_type,
             source_id: track.source_id,
-            meta: track.meta,
+            meta: sanitizeTrackForApi(track).meta,
         },
         {timeout: 60000},
     )).data;

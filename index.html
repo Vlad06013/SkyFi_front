@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
   <head>
     <meta charset="utf-8" />
-    <title>Ionic App</title>
+    <title>SkyFi</title>
 
     <base href="/" />
 
@@ -18,14 +18,78 @@
 
     <!-- add to homescreen for ios -->
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="Ionic App" />
+    <meta name="apple-mobile-web-app-title" content="SkyFi" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+
+    <style>
+      /* Загрузочный экран: виден сразу, пока грузятся бандлы
+       * и первичная навигация. Vue заменяет его при монтировании. */
+      html,
+      body {
+        margin: 0;
+        background: #050507;
+      }
+
+      .app-splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        background: #050507;
+        color: #f5f3fa;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+
+      .app-splash-logo {
+        display: grid;
+        place-items: center;
+        width: 72px;
+        height: 72px;
+        border-radius: 20px;
+        background: #ffd633;
+        color: #16130a;
+        font-size: 36px;
+        font-weight: 800;
+        animation: app-splash-pulse 1.4s ease-in-out infinite;
+      }
+
+      .app-splash-text {
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+      }
+
+      @keyframes app-splash-pulse {
+        0%,
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+
+        50% {
+          transform: scale(0.94);
+          opacity: 0.75;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .app-splash-logo {
+          animation: none;
+        }
+      }
+    </style>
   </head>
 
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div class="app-splash" aria-hidden="true">
+        <span class="app-splash-logo">S</span>
+        <span class="app-splash-text">SkyFi</span>
+      </div>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
-
 </html>
-

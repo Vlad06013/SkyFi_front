@@ -133,7 +133,12 @@ export async function registerRequest(
 
 export async function getCurrentUserRequest() {
     return (
-        await http.get<ApiResponse<{ user: User }>>('/user')
+        // Быстрый фолбэк на кеш: старт приложения не должен
+        // ждать полный таймаут соединения, медленный сервер
+        // не должен блокировать вход.
+        await http.get<ApiResponse<{ user: User }>>('/user', {
+            timeout: 4000,
+        })
     ).data;
 }
 

@@ -84,7 +84,18 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
 
-  await auth.initialize();
+  // Вход решаем по кешу мгновенно: офлайн-старт не ждёт
+  // таймаут соединения. Есть токен и кеш пользователя —
+  // пускаем сразу, сеть ревалидируется в фоне (токен
+  // протухнет — следующая навигация уйдёт на /login).
+  // Кеша нет — инициализацию ждём, иначе не решить, куда.
+  if (!auth.initialized) {
+    if (auth.isAuthenticated) {
+      void auth.initialize();
+    } else {
+      await auth.initialize();
+    }
+  }
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return {

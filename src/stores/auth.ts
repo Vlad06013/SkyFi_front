@@ -11,6 +11,7 @@ import {
 
 import type { User } from '@/types/AuthType';
 import { invalidatePlaylistsCache } from '@/api/playlists';
+import { useNetworkStore } from '@/stores/network';
 
 export const useAuthStore = defineStore('auth', () => {
     const USER_CACHE_KEY = 'skyfi_user';
@@ -155,6 +156,13 @@ export const useAuthStore = defineStore('auth', () => {
         if (!token.value) {
             user.value = null;
             return false;
+        }
+
+        // Единый офлайн-сценарий (network store): запроса не
+        // будет совсем — остаёмся на кеше пользователя, вход
+        // мгновенный.
+        if (!useNetworkStore().isOnline) {
+            return user.value !== null;
         }
 
         try {
