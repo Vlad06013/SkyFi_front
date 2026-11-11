@@ -7,7 +7,10 @@ import {
 } from 'vue';
 
 import {searchTracks,} from '@/api/search';
-import {type Track,} from '@/types/TrackType';
+import {
+    type Track,
+    type TrackSourceType,
+} from '@/types/TrackType';
 import {PlaySourceListsEnum} from '@/types/PlaySourceListsEnum';
 const sourceList = PlaySourceListsEnum.SEARCH;
 
@@ -263,9 +266,7 @@ export function useSearch() {
 
     type SearchSource =
         | 'all'
-        | 'upload'
-        | 'yandex_music'
-        | 'internet_archive';
+        | TrackSourceType;
 
     // ==========================================
     // ВЫПОЛНЕНИЕ ПОИСКА

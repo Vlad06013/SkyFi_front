@@ -25,10 +25,20 @@ export interface TrackMeta {
     artists: TrackArtistMeta[];
 }
 
+/**
+ * Источник трека. Строгий список — зеркало бэкенд-enum,
+ * значения приходят из API в track.source_type,
+ * не переименовывать.
+ */
+export type TrackSourceType =
+    | 'upload'
+    | 'yandex_music'
+    | 'internet_archive';
+
 export interface Track {
     id: number | string;
     title: string;
-    source_type: string;
+    source_type: TrackSourceType;
     source_id: string | null;
     duration: number | null;
     /**

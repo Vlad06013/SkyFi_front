@@ -1,4 +1,4 @@
-import {beforeEach, describe, expect, it, vi} from 'vitest';
+import {afterEach, beforeEach, describe, expect, it, vi} from 'vitest';
 import {createPinia, setActivePinia} from 'pinia';
 
 import usePlayerStore from '@/stores/player';
@@ -113,7 +113,7 @@ function makeTrack(title: string): Track {
     return {
         id: trackSeq,
         title,
-        source_type: 'app',
+        source_type: 'upload',
         source_id: null,
         duration: 180_000,
         duration_ms: 180_000,
@@ -533,6 +533,148 @@ describe('player store', () => {
             player.progress = 1;
             await player.playPrevious();
             expect(player.currentTrack?.title).toBe('W1');
+        });
+    });
+
+    describe('предзагрузка ссылок', () => {
+        afterEach(() => {
+            // В остальных тестах getTrackAudio никто не
+            // настраивает: убираем свои реализации, чтобы не
+            // течь в них (clearAllMocks реализации не снимает).
+            mocks.getTrackAudio.mockReset();
+            mocks.downloads.getLocalAudioUrl.mockResolvedValue(
+                'blob:local-audio',
+            );
+        });
+
+        it('после восстановления сессии первый клик предзагружает сразу', async () => {
+            mocks.downloads.getLocalAudioUrl.mockResolvedValue(null);
+            mocks.getTrackAudio.mockResolvedValue({url: 'blob:audio'});
+
+            const restored = makeTrack('Восстановленный');
+
+            mocks.getPlayerDevices.mockResolvedValue({
+                data: [
+                    {
+                        id: 7,
+                        device_uuid: 'test-uuid',
+                        name: 'Tester',
+                        is_active: true,
+                        last_seen_at: new Date().toISOString(),
+                    },
+                ],
+            });
+
+            mocks.registerPlayerDevice.mockResolvedValue({
+                id: 7,
+                device_uuid: 'test-uuid',
+                name: 'Tester',
+                is_active: true,
+                last_seen_at: new Date().toISOString(),
+            });
+
+            localStorage.setItem('skyfi_device_uuid', 'test-uuid');
+
+            mocks.getPlayerState.mockResolvedValue({
+                state: {
+                    version: 1,
+                    is_playing: false,
+                    position_seconds: 0,
+                    active_device_id: 7,
+                    play_source: 'favorites',
+                    shuffle_enabled: false,
+                    repeat_mode: 'off',
+                    current_track: restored,
+                    queue: [],
+                },
+                queue: [],
+            });
+
+            await player.initializePlayerDevice();
+
+            // Страница избранного: восстановленный трек есть
+            // в списке — очередь сливается, а план был построен
+            // по пустой очереди при восстановлении и обязан
+            // перестроиться (иначе первый клик греет пустоту).
+            const a = makeTrack('A');
+            const c = makeTrack('C');
+            const d = makeTrack('D');
+
+            player.setQueue(
+                [a, restored, c, d],
+                PlaySourceListsEnum.FAVORITES,
+            );
+
+            await vi.waitFor(() => {
+                expect(mocks.getTrackAudio).toHaveBeenCalledTimes(2);
+            });
+
+            const requested = mocks.getTrackAudio.mock.calls
+                .map(call => Number(call[0]));
+
+            expect(requested).toEqual(
+                [c, d].map(track => Number(track.id)),
+            );
+
+            // Клик по восстановленному треку: его ссылка — третий
+            // запрос; предзагрузка уже в кеше, новых не нужно.
+            await player.playTrack(
+                restored,
+                PlaySourceListsEnum.FAVORITES,
+            );
+
+            expect(mocks.getTrackAudio).toHaveBeenCalledTimes(3);
+        });
+
+        it('после старта трека ссылки следующих по плану запрошены заранее', async () => {
+            mocks.downloads.getLocalAudioUrl.mockResolvedValue(null);
+            mocks.getTrackAudio.mockResolvedValue({url: 'blob:audio'});
+
+            const tracks = await playList(['A', 'B', 'C', 'D', 'E', 'F', 'G']);
+
+            // Открытие списка + первый запуск: окно A–F в кеше.
+            await vi.waitFor(() => {
+                expect(mocks.getTrackAudio).toHaveBeenCalledTimes(6);
+            });
+
+            const requested = mocks.getTrackAudio.mock.calls
+                .map(call => Number(call[0]));
+
+            expect(requested).toEqual(
+                [0, 1, 2, 3, 4, 5].map(index => Number(tracks[index].id)),
+            );
+
+            // Окно сдвигается: после переключения на B докешируется G.
+            await player.playNext();
+
+            await vi.waitFor(() => {
+                expect(mocks.getTrackAudio).toHaveBeenCalledTimes(7);
+            });
+
+            expect(Number(mocks.getTrackAudio.mock.calls[6][0]))
+                .toBe(Number(tracks[6].id));
+        });
+
+        it('в очередях с внешними треками (поиск, волна) предзагрузка молчит', async () => {
+            mocks.downloads.getLocalAudioUrl.mockResolvedValue(null);
+            mocks.getTrackAudio.mockResolvedValue({url: 'blob:audio'});
+
+            const tracks = ['A', 'B', 'C'].map(title => makeTrack(title));
+
+            // Контекст поиска: треки ещё не в базе, /audio по их
+            // id не сработает — предзагрузка не стартует вовсе.
+            player.setQueue(tracks, PlaySourceListsEnum.SEARCH);
+
+            await new Promise(resolve => setTimeout(resolve, 30));
+
+            expect(mocks.getTrackAudio).not.toHaveBeenCalled();
+
+            // Контекст библиотеки: те же треки предзагружаются.
+            player.setQueue(tracks, PlaySourceListsEnum.FAVORITES);
+
+            await vi.waitFor(() => {
+                expect(mocks.getTrackAudio).toHaveBeenCalledTimes(3);
+            });
         });
     });
 

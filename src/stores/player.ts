@@ -30,7 +30,10 @@ import {
     type WaveFeedbackType,
 } from '@/api/wave';
 
-import {type Track} from '@/types/TrackType';
+import {
+    type Track,
+    type TrackSourceType,
+} from '@/types/TrackType';
 import {useDownloadsStore} from '@/stores/downloads';
 import {useNetworkStore} from '@/stores/network';
 
@@ -77,7 +80,7 @@ const usePlayerStore = defineStore('player', () => {
         /** Название альбома из meta, если есть. */
         albumTitle?: string | null;
         source_id: string | null;
-        source_type: string;
+        source_type: TrackSourceType;
     };
 
     const auth = useAuthStore();
@@ -244,6 +247,15 @@ const usePlayerStore = defineStore('player', () => {
         number,
         { url: string; fetchedAt: number }
     >();
+
+    /** Треки, чьи ссылки сейчас запрашиваются предзагрузкой:
+     *  resolveAudioUrl дожидается чужой загрузки, не дублируя
+     *  запрос. */
+    const preloadInFlight = new Map<number, Promise<string>>();
+
+    /** Отдельный аудиоэлемент, прогревающий файл следующего
+     *  трека (см. prewarmNextTrackFile). */
+    let audioPrewarmer: HTMLAudioElement | null = null;
 
     let deviceInitializationPromise: Promise<void> | null = null;
     let isDeviceChangesSubscribed = false;
@@ -566,9 +578,15 @@ const usePlayerStore = defineStore('player', () => {
         // следующий/предыдущий работают по его очереди.
         exitWaveMode();
 
+        const previousQueue = queue.value;
+
         // Тот же список подрос (дозагрузка страницы): источник
-        // прежний и текущий трек в нём есть — историю и план
-        // не трогаем, новые треки вольются в план.
+        // прежний, текущий трек в списке есть и прежние позиции
+        // совпадают с новыми с начала — индексы истории и плана
+        // остаются валидными, новые треки вольются в конец плана.
+        // Перестановка, сжатие или мусорная старая очередь
+        // (восстановленная сессия строила план по пустой) —
+        // полный ребилд: индексы считать заново.
         const sameList =
             source !== null
             && source === playSource.value
@@ -578,7 +596,14 @@ const usePlayerStore = defineStore('player', () => {
                     String(track.id) === String(currentTrack.value?.id),
             );
 
-        const knownIds = new Set(queue.value.map(track => track.id));
+        const isExtension =
+            sameList
+            && previousQueue.length > 0
+            && tracks.length >= previousQueue.length
+            && previousQueue.every(
+                (track, index) =>
+                    String(tracks[index]?.id) === String(track.id),
+            );
 
         queue.value = [...tracks];
 
@@ -593,7 +618,10 @@ const usePlayerStore = defineStore('player', () => {
             playSource.value = source;
         }
 
-        if (sameList) {
+        if (isExtension) {
+            const knownIds = new Set(
+                previousQueue.map(track => track.id),
+            );
             const fresh: number[] = [];
 
             queue.value.forEach((track, index) => {
@@ -604,12 +632,18 @@ const usePlayerStore = defineStore('player', () => {
                 plan.value = [...plan.value, ...fresh];
             }
 
+            // Подгруженная страница: ссылки новых треков — в кеш.
+            preloadUpcomingUrls();
+
             return;
         }
 
-        // Новый список: история стёрта, план строится заново.
+        // Новый или изменившийся список: история стёрта,
+        // план строится заново.
         backStack.value = [];
         plan.value = buildPlan();
+
+        preloadUpcomingUrls();
     }
 
     /**
@@ -783,10 +817,15 @@ const usePlayerStore = defineStore('player', () => {
      *
      * forceFresh — пропустить кеш и file.path и запросить
      * ссылку заново (повторная попытка после ошибки воспроизведения).
+     *
+     * isPreload — вызов от предзагрузки: собственную заявку в
+     * preloadInFlight не проверяем, иначе продолжение этого же
+     * вызова найдёт само себя (цикл промисов).
      */
     async function resolveAudioUrl(
         track: Track,
         forceFresh = false,
+        isPreload = false,
     ): Promise<string> {
         // Скачанный трек играем локально: без сети и TTL.
         if (!forceFresh) {
@@ -829,6 +868,18 @@ const usePlayerStore = defineStore('player', () => {
             }
         }
 
+        // Предзагрузка уже запрашивает эту ссылку — дожидаемся
+        // её, а не дублируем запрос. Сама предзагрузка свою
+        // заявку не проверяет: иначе продолжение этого же
+        // вызова найдёт собственный промис (цикл).
+        if (!forceFresh && !isPreload) {
+            const inFlight = preloadInFlight.get(trackId);
+
+            if (inFlight) {
+                return inFlight;
+            }
+        }
+
         const audioFile = await getTrackAudio(trackId);
 
         if (!audioFile.url) {
@@ -841,6 +892,95 @@ const usePlayerStore = defineStore('player', () => {
         });
 
         return audioFile.url;
+    }
+
+    /**
+     * Предзагрузка ссылок на ближайшие треки плана.
+     *
+     * План знает, что сыграет следующим, — запрашиваем ссылки
+     * заранее и кладём в audioUrlCache: переключение не ждёт
+     * раундтрип /audio. В очередях с внешними треками (поиск,
+     * волна) ссылок ещё нет: /audio по внешнему id не работает,
+     * треки регистрируются через /play при воспроизведении.
+     * Списки библиотеки (избранное, загрузки, плейлисты) — все
+     * треки в базе, предзагружаем целиком. Протухшая к запуску
+     * ссылка не страшна: resolveAudioUrl перепроверяет свежесть.
+     */
+    function preloadUpcomingUrls(count = 5): void {
+        if (!useNetworkStore().isOnline) return;
+
+        if (
+            playSource.value === PlaySourceListsEnum.YANDEX_WAVE
+            || playSource.value === PlaySourceListsEnum.SEARCH
+        ) {
+            return;
+        }
+
+        for (const index of plan.value.slice(0, count)) {
+            const track = queue.value[index];
+
+            if (!track) continue;
+
+            const trackId = Number(track.id);
+
+            if (
+                !Number.isFinite(trackId)
+                || audioUrlCache.has(trackId)
+                || preloadInFlight.has(trackId)
+            ) {
+                continue;
+            }
+
+            const request = resolveAudioUrl(track, false, true);
+
+            preloadInFlight.set(trackId, request);
+
+            void request
+                .then(() => {
+                    // Ссылка следующего трека готова — греем его файл.
+                    prewarmNextTrackFile();
+                })
+                .catch(() => {
+                    // Не тащим битое в кеш: resolveAudioUrl
+                    // кладёт туда только успешный ответ.
+                })
+                .finally(() => {
+                    preloadInFlight.delete(trackId);
+                });
+        }
+    }
+
+    /**
+     * Прогрев файла ближайшего следующего трека: браузер начинает
+     * качать аудио заранее, и переключение не ждёт загрузки
+     * метаданных. Один прогреваемый трек — следующий по плану.
+     */
+    function prewarmNextTrackFile(): void {
+        const index = waveMode.value
+            ? currentTrackIndex.value + 1
+            : plan.value[0];
+
+        const track =
+            index === undefined ? null : queue.value[index] ?? null;
+
+        const cached = track
+            ? audioUrlCache.get(Number(track.id))
+            : undefined;
+
+        if (!cached) {
+            audioPrewarmer = null;
+            return;
+        }
+
+        if (audioPrewarmer && audioPrewarmer.src === cached.url) {
+            return;
+        }
+
+        const preloader = new Audio();
+
+        preloader.preload = 'auto';
+        preloader.src = cached.url;
+        audioPrewarmer = preloader;
     }
 
     /**
@@ -936,6 +1076,11 @@ const usePlayerStore = defineStore('player', () => {
             if (started) {
                 // Волна: следим за буфером, подгружаем порцию заранее.
                 void ensureWaveBuffer();
+
+                // Следующие треки плана: ссылки готовим заранее,
+                // файл ближайшего — прогреваем.
+                preloadUpcomingUrls();
+                prewarmNextTrackFile();
 
                 return true;
             }
@@ -1401,6 +1546,11 @@ const usePlayerStore = defineStore('player', () => {
         }
 
         plan.value = buildPlan();
+
+        // План сменился вручную — перевооружаем предзагрузку
+        // и прогрев: окно от нового трека, а не от старого.
+        preloadUpcomingUrls();
+        prewarmNextTrackFile();
     }
 
     /**
@@ -1896,6 +2046,7 @@ const usePlayerStore = defineStore('player', () => {
         // План перестраивается сразу: превью следующего честное.
         // История не трогается — «назад» ходит по реально игранному.
         plan.value = buildPlan();
+        preloadUpcomingUrls();
 
         reportOptions();
     }
@@ -2144,6 +2295,11 @@ const usePlayerStore = defineStore('player', () => {
             }
 
             backStack.value.pop();
+
+            // Голову плана сменили — перевооружаем предзагрузку
+            // и прогрев: следующий трек теперь другой.
+            preloadUpcomingUrls();
+            prewarmNextTrackFile();
 
             reportWave('skip', undefined, progress.value);
 
@@ -3117,9 +3273,18 @@ const usePlayerStore = defineStore('player', () => {
             currentTrackIndex.value = foundIndex;
         }
 
-        // Свежая сессия (перезагрузка, восстановление): план
-        // пуст — строим один раз. Непустой не трогаем: активное
-        // устройство знает порядок лучше серверного снимка.
+        // План применяем к пришедшей очереди: без позиций вне
+        // списка и без самого текущего. Пустой — строим заново
+        // (свежая сессия); непустой после чистки не трогаем:
+        // активное устройство знает порядок лучше серверного
+        // снимка.
+        plan.value = plan.value.filter(
+            index =>
+                index !== currentTrackIndex.value
+                && index >= 0
+                && index < queue.value.length,
+        );
+
         if (plan.value.length === 0 && !waveMode.value) {
             plan.value = buildPlan();
         }

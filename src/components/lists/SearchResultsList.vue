@@ -265,7 +265,7 @@ function getSourceTypeClass(sourceType: string): string {
     case 'yandex_music':
       return 'source-badge--yandex';
 
-    case 'uploads':
+    case 'upload':
       return 'source-badge--uploads';
 
     default:
