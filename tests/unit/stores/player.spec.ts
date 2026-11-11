@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
     resumeRemotePlayback: vi.fn(),
     seekRemotePlayback: vi.fn(),
     getTrackAudio: vi.fn(),
+    getExternalTrackAudioUrl: vi.fn(),
     getPlayerState: vi.fn(),
     getPlayerDevices: vi.fn(),
     registerPlayerDevice: vi.fn(),
@@ -51,6 +52,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/api/player', () => ({
     getTrackAudio: mocks.getTrackAudio,
+    getExternalTrackAudioUrl: mocks.getExternalTrackAudioUrl,
     getPlayerState: mocks.getPlayerState,
     playRemoteTrack: mocks.playRemoteTrack,
     pauseRemotePlayback: mocks.pauseRemotePlayback,
@@ -177,6 +179,9 @@ describe('player store', () => {
         mocks.pauseRemotePlayback.mockResolvedValue({state: {version: 1}});
         mocks.resumeRemotePlayback.mockResolvedValue({state: {version: 1}});
         mocks.seekRemotePlayback.mockResolvedValue({});
+        mocks.getExternalTrackAudioUrl.mockResolvedValue({
+            url: 'blob:external-audio',
+        });
         mocks.updatePlaybackOptions.mockResolvedValue({});
         mocks.updateQueueItemStatus.mockResolvedValue({});
         mocks.removeTrackFromQueue.mockResolvedValue({});
@@ -534,6 +539,24 @@ describe('player store', () => {
             await player.playPrevious();
             expect(player.currentTrack?.title).toBe('W1');
         });
+
+        it('предзагрузка: следующие треки порции греются из ресурса без регистрации', async () => {
+            await startTestWave();
+
+            // W1 играет (тест считает его скачанным), W2–W5
+            // предзагружаются из ресурса — без регистрации в базе.
+            await vi.waitFor(() => {
+                expect(mocks.getExternalTrackAudioUrl)
+                    .toHaveBeenCalledTimes(4);
+            });
+
+            // Следующий по свайпу: ссылка в кеше, новых запросов нет.
+            await player.playNext();
+
+            expect(mocks.getExternalTrackAudioUrl)
+                .toHaveBeenCalledTimes(4);
+            expect(player.currentTrack?.title).toBe('W2');
+        });
     });
 
     describe('предзагрузка ссылок', () => {
@@ -545,6 +568,52 @@ describe('player store', () => {
             mocks.downloads.getLocalAudioUrl.mockResolvedValue(
                 'blob:local-audio',
             );
+        });
+
+        it('протухшая по TTL предзагрузка запрашивается заново', async () => {
+            mocks.downloads.getLocalAudioUrl.mockResolvedValue(null);
+
+            mocks.playRemoteTrack.mockImplementation(
+                async (track: Track) => ({
+                    state: {version: 1, current_track: track},
+                }),
+            );
+
+            // 1 мс — ссылка протухает сразу после предзагрузки.
+            mocks.getExternalTrackAudioUrl.mockResolvedValue({
+                url: 'blob:external-audio',
+                path_ttl_sec: 0.001,
+            });
+
+            const tracks = ['A', 'B'].map((title) => {
+                const track = makeTrack(title);
+
+                track.source_type = 'yandex_music';
+                track.source_id = `ym-${title}`;
+
+                return track;
+            });
+
+            player.setQueue(tracks, PlaySourceListsEnum.SEARCH);
+
+            await vi.waitFor(() => {
+                expect(mocks.getExternalTrackAudioUrl)
+                    .toHaveBeenCalledTimes(2);
+            });
+
+            // Дольше TTL — играем: ссылка в кеше протухла,
+            // запрос уходит заново.
+            await new Promise(resolve => setTimeout(resolve, 20));
+
+            await player.playTrack(
+                tracks[0],
+                PlaySourceListsEnum.SEARCH,
+            );
+
+            await vi.waitFor(() => {
+                expect(mocks.getExternalTrackAudioUrl)
+                    .toHaveBeenCalledTimes(3);
+            });
         });
 
         it('после восстановления сессии первый клик предзагружает сразу', async () => {
@@ -655,26 +724,29 @@ describe('player store', () => {
                 .toBe(Number(tracks[6].id));
         });
 
-        it('в очередях с внешними треками (поиск, волна) предзагрузка молчит', async () => {
+        it('поиск: внешние треки предзагружаются напрямую из ресурса', async () => {
             mocks.downloads.getLocalAudioUrl.mockResolvedValue(null);
             mocks.getTrackAudio.mockResolvedValue({url: 'blob:audio'});
 
-            const tracks = ['A', 'B', 'C'].map(title => makeTrack(title));
+            const tracks = ['A', 'B', 'C'].map((title) => {
+                const track = makeTrack(title);
 
-            // Контекст поиска: треки ещё не в базе, /audio по их
-            // id не сработает — предзагрузка не стартует вовсе.
+                track.source_type = 'yandex_music';
+                track.source_id = `ym-${title}`;
+
+                return track;
+            });
+
+            // Контекст поиска: треки ещё не в базе — ссылки просим
+            // у ресурса, /audio по внешним id не дёргаем вообще.
             player.setQueue(tracks, PlaySourceListsEnum.SEARCH);
 
-            await new Promise(resolve => setTimeout(resolve, 30));
+            await vi.waitFor(() => {
+                expect(mocks.getExternalTrackAudioUrl)
+                    .toHaveBeenCalledTimes(3);
+            });
 
             expect(mocks.getTrackAudio).not.toHaveBeenCalled();
-
-            // Контекст библиотеки: те же треки предзагружаются.
-            player.setQueue(tracks, PlaySourceListsEnum.FAVORITES);
-
-            await vi.waitFor(() => {
-                expect(mocks.getTrackAudio).toHaveBeenCalledTimes(3);
-            });
         });
     });
 

@@ -68,6 +68,38 @@ export async function getTrackAudio(
     return result;
 }
 
+/**
+ * Ссылка на поток внешнего трека без регистрации в базе.
+ * Универсален для любого внешнего ресурса (волна, поиск).
+ * Трек шлём целиком — единый контракт с /tracks/resolve.
+ */
+export async function getExternalTrackAudioUrl(
+    track: Track,
+): Promise<AudioFile> {
+    // Яндекс может долго отдавать ссылку — даём минуту.
+    const response = (await http.post<ApiResponse<AudioFile>>(
+        '/tracks/external-audio',
+        {
+            id: track.id,
+            title: track.title,
+            source_type: track.source_type,
+            source_id: track.source_id,
+            meta: track.meta,
+        },
+        {timeout: 60000},
+    )).data;
+
+    const result = response.data;
+
+    if (!result?.url) {
+        throw new Error(
+            'API не вернул ссылку на аудиофайл',
+        );
+    }
+
+    return result;
+}
+
 
 export function downloadTrackAudio(
     trackId: number,

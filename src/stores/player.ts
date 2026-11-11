@@ -39,6 +39,7 @@ import {useNetworkStore} from '@/stores/network';
 
 import {
     getTrackAudio,
+    getExternalTrackAudioUrl,
     getPlayerState,
     playRemoteTrack,
     pauseRemotePlayback,
@@ -241,11 +242,14 @@ const usePlayerStore = defineStore('player', () => {
      */
     const backStack = ref<number[]>([]);
 
-    /** Кеш полученных через /tracks/{id}/audio ссылок (на время сессии).
-     *  fetchedAt — когда ссылка получена, для проверки по TTL источника. */
+    /** Кеш полученных ссылок на аудио (на время сессии).
+     *  fetchedAt — когда ссылка получена, ttlSec — сколько живёт
+     *  (едино со схемой TrackFile: путь + когда запрошен + TTL).
+     *  TTL может лечь позже внешнего запроса — при проверке
+     *  свежести берём его, с фолбэком на TTL файла трека. */
     const audioUrlCache = new Map<
         number,
-        { url: string; fetchedAt: number }
+        { url: string; fetchedAt: number; ttlSec: number | null }
     >();
 
     /** Треки, чьи ссылки сейчас запрашиваются предзагрузкой:
@@ -841,11 +845,13 @@ const usePlayerStore = defineStore('player', () => {
         const ttlSec = track.file?.path_ttl_sec ?? null;
 
         if (!forceFresh) {
-            const cached = audioUrlCache.get(trackId);
+            const cached = getCachedAudioUrl(track);
 
             if (
                 cached &&
-                isAudioUrlFresh(cached.fetchedAt, ttlSec)
+                // TTL записи в приоритете: внешние ссылки живут
+                // со своим TTL, фолбэк — TTL файла трека.
+                isAudioUrlFresh(cached.fetchedAt, cached.ttlSec ?? ttlSec)
             ) {
                 return cached.url;
             }
@@ -862,10 +868,27 @@ const usePlayerStore = defineStore('player', () => {
                     fetchedAt: file.path_fetch_at
                         ? parseServerDate(file.path_fetch_at)
                         : Date.now(),
+                    ttlSec,
                 });
 
                 return file.path;
             }
+        }
+
+        // Внешний трек без записи в базе: /tracks/{id}/audio по
+        // его id не сработает — ссылку просим у ресурса напрямую,
+        // без регистрации. Работает и для forceFresh-перезапроса
+        // протухшей ссылки.
+        if (track.source_type !== 'upload' && !track.file) {
+            const stream = await getExternalTrackAudioUrl(track);
+
+            audioUrlCache.set(trackId, {
+                url: stream.url,
+                fetchedAt: Date.now(),
+                ttlSec: stream.path_ttl_sec ?? null,
+            });
+
+            return stream.url;
         }
 
         // Предзагрузка уже запрашивает эту ссылку — дожидаемся
@@ -889,9 +912,34 @@ const usePlayerStore = defineStore('player', () => {
         audioUrlCache.set(trackId, {
             url: audioFile.url,
             fetchedAt: Date.now(),
+            ttlSec,
         });
 
         return audioFile.url;
+    }
+
+    /**
+     * Кешированная ссылка на трек: по id, а для внешних — и по
+     * source_id. Предзагрузка кладёт ссылку под внешний id, а
+     * при воспроизведении зарегистрированный трек приходит с DB
+     * id, но source_id у него прежний — находим по нему.
+     */
+    function getCachedAudioUrl(track: Track): {
+        url: string;
+        fetchedAt: number;
+        ttlSec: number | null;
+    } | undefined {
+        const byId = audioUrlCache.get(Number(track.id));
+
+        if (byId) return byId;
+
+        if (track.source_id === null) return undefined;
+
+        const externalKey = Number(track.source_id);
+
+        return Number.isFinite(externalKey)
+            ? audioUrlCache.get(externalKey)
+            : undefined;
     }
 
     /**
@@ -899,24 +947,23 @@ const usePlayerStore = defineStore('player', () => {
      *
      * План знает, что сыграет следующим, — запрашиваем ссылки
      * заранее и кладём в audioUrlCache: переключение не ждёт
-     * раундтрип /audio. В очередях с внешними треками (поиск,
-     * волна) ссылок ещё нет: /audio по внешнему id не работает,
-     * треки регистрируются через /play при воспроизведении.
-     * Списки библиотеки (избранное, загрузки, плейлисты) — все
-     * треки в базе, предзагружаем целиком. Протухшая к запуску
-     * ссылка не страшна: resolveAudioUrl перепроверяет свежесть.
+     * раундтрип. Аплоады и зарегистрированные треки — через базу
+     * (/audio или file.path). Внешние (волна, поиск) — у ресурса
+     * напрямую, без регистрации. Протухшая к запуску ссылка не
+     * страшна: resolveAudioUrl перепроверяет свежесть.
      */
     function preloadUpcomingUrls(count = 5): void {
         if (!useNetworkStore().isOnline) return;
 
-        if (
-            playSource.value === PlaySourceListsEnum.YANDEX_WAVE
-            || playSource.value === PlaySourceListsEnum.SEARCH
-        ) {
-            return;
-        }
+        // Волна не держит план — окно вычисляем от текущего.
+        const indices = waveMode.value
+            ? Array.from(
+                {length: count},
+                (_, offset) => currentTrackIndex.value + 1 + offset,
+            )
+            : plan.value.slice(0, count);
 
-        for (const index of plan.value.slice(0, count)) {
+        for (const index of indices) {
             const track = queue.value[index];
 
             if (!track) continue;
@@ -931,7 +978,10 @@ const usePlayerStore = defineStore('player', () => {
                 continue;
             }
 
-            const request = resolveAudioUrl(track, false, true);
+            const request =
+                track.source_type === 'upload'
+                    ? resolveAudioUrl(track, false, true)
+                    : resolveExternalAudioUrl(track);
 
             preloadInFlight.set(trackId, request);
 
@@ -941,13 +991,39 @@ const usePlayerStore = defineStore('player', () => {
                     prewarmNextTrackFile();
                 })
                 .catch(() => {
-                    // Не тащим битое в кеш: resolveAudioUrl
-                    // кладёт туда только успешный ответ.
+                    // Не тащим битое в кеш: в кеш кладётся
+                    // только успешный ответ.
                 })
                 .finally(() => {
                     preloadInFlight.delete(trackId);
                 });
         }
+    }
+
+    /**
+     * Ссылка на поток внешнего трека из ресурса (без базы).
+     * Кладём в кеш под id и source_id: при воспроизведении трек
+     * может прийти уже зарегистрированным (DB id), а source_id
+     * у него прежний.
+     */
+    async function resolveExternalAudioUrl(track: Track): Promise<string> {
+        const stream = await getExternalTrackAudioUrl(track);
+        const entry = {
+            url: stream.url,
+            fetchedAt: Date.now(),
+            ttlSec: stream.path_ttl_sec ?? null,
+        };
+
+        audioUrlCache.set(Number(track.id), entry);
+
+        if (
+            track.source_id !== null
+            && Number.isFinite(Number(track.source_id))
+        ) {
+            audioUrlCache.set(Number(track.source_id), entry);
+        }
+
+        return stream.url;
     }
 
     /**

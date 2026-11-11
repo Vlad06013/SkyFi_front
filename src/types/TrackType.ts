@@ -75,4 +75,13 @@ export interface AudioFile {
     filename?: string;
     size_bytes?: number | null;
     format?: string | null;
+    /**
+     * TTL ссылки в секундах (константа источника). Приходит
+     * с /tracks/{id}/audio и /tracks/external-audio — единая
+     * схема с TrackFile: ссылка + когда запрошена + сколько живёт.
+     */
+    path_ttl_sec?: number | null;
+    /** Когда ссылка была получена (метка бэка). Фронт ставит
+     *  свою метку в момент ответа — поле для единой схемы. */
+    path_fetch_at?: string | null;
 }
