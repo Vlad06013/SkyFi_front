@@ -3,106 +3,56 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>SkyFi — дизайн-концепты</title>
+<title>SkyFi — кит</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet" />
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    background: #0b0b0d;
-    color: #ececf1;
+    background: #000;
+    color: #fff;
     font-family: Inter, system-ui, sans-serif;
     min-height: 100vh;
     padding: 48px 24px 64px;
   }
-  .wrap { max-width: 1080px; margin: 0 auto; }
-  header { margin-bottom: 40px; }
+  .wrap { max-width: 560px; margin: 0 auto; }
   .logo {
-    font-family: Manrope, Inter, sans-serif;
+    font-family: "Plus Jakarta Sans", Inter, sans-serif;
     font-weight: 800;
     font-size: 28px;
     letter-spacing: -0.02em;
   }
-  .logo span { color: #8b7cff; }
-  .sub { color: #8e8b98; font-size: 14px; margin-top: 8px; max-width: 640px; line-height: 1.55; }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-    gap: 16px;
-  }
+  .logo span { color: #1ed760; }
+  .sub { color: #a7a7a7; font-size: 14px; margin: 10px 0 28px; line-height: 1.55; }
   a.card {
     display: block;
     text-decoration: none;
     color: inherit;
-    background: #141419;
-    border: 1px solid #232329;
+    background: #121212;
+    border: 1px solid #1ed760;
     border-radius: 18px;
     padding: 22px 20px 20px;
-    transition: transform .15s ease, border-color .15s ease;
   }
-  a.card:hover { transform: translateY(-3px); border-color: #3a3a44; }
-  .num { font-size: 12px; color: #7c7a86; letter-spacing: .12em; text-transform: uppercase; }
-  h2 { font-family: Manrope, Inter, sans-serif; font-size: 19px; font-weight: 800; margin: 10px 0 6px; }
-  p { font-size: 13px; color: #9c99a6; line-height: 1.5; min-height: 40px; }
+  .num { font-size: 12px; color: #a7a7a7; letter-spacing: .12em; text-transform: uppercase; }
+  h2 { font-family: "Plus Jakarta Sans", Inter, sans-serif; font-size: 19px; font-weight: 800; margin: 10px 0 6px; }
+  p { font-size: 13px; color: #a7a7a7; line-height: 1.5; }
   .dots { display: flex; gap: 6px; margin-top: 16px; }
   .dots i { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(255,255,255,.14); }
-  footer { margin-top: 40px; font-size: 12px; color: #6d6b76; line-height: 1.6; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <div class="logo">SkyFi <span>/ ui-kit</span></div>
-    <p class="sub">Четыре тёмные концепции цвета и типографики. Каждая страница — готовый набор
-    токенов, кнопок, иконок и компонентов: мини-плеер, списки треков, карточки, развёрнутый плеер
-    в мокапе телефона. Открывайте варианты, выбираем один — его переменные уедут в
-    <code>styles/tokens.css</code>. Шрифты в превью тянутся с Google Fonts, в APK будем бандлить локально.</p>
-  </header>
-
-  <div class="grid">
-    <a class="card" href="./variant-01-pulse-yellow.html">
-      <div class="num">Вариант 01</div>
-      <h2>Жёлтый пульс</h2>
-      <p>Энергия Яндекс Музыки: графит + сигнальный жёлтый, акцентные «квадратно-скруглённые» кнопки.</p>
-      <div class="dots">
-        <i style="background:#141413"></i><i style="background:#1d1d1b"></i><i style="background:#ffdb4d"></i><i style="background:#f4f3ee"></i><i style="background:#ff5d73"></i>
-      </div>
-    </a>
-
-    <a class="card" href="./variant-02-mint-green.html" style="border-color:#1ed760">
-      <div class="num">Выбран · 02</div>
-      <h2>Мятный грин</h2>
-      <p>Рабочий кит: токены, состояния, источник, сортировка, уведомления, phone / tv / car.</p>
-      <div class="dots">
-        <i style="background:#000000"></i><i style="background:#121212"></i><i style="background:#1ed760"></i><i style="background:#ffffff"></i><i style="background:#a7a7a7"></i>
-      </div>
-    </a>
-
-    <a class="card" href="./variant-03-deep-violet.html">
-      <div class="num">Вариант 03</div>
-      <h2>Глубокий индиго</h2>
-      <p>Ночное небо под бренд SkyFi: сине-фиолетовая глубина, лавандовый акцент, циан для видео.</p>
-      <div class="dots">
-        <i style="background:#0d0c13"></i><i style="background:#15141d"></i><i style="background:#8b7cff"></i><i style="background:#efedfb"></i><i style="background:#58d6ff"></i>
-      </div>
-    </a>
-
-    <a class="card" href="./variant-04-warm-amber.html">
-      <div class="num">Вариант 04</div>
-      <h2>Тёплый янтарь</h2>
-      <p>Уют для магнитолы и вечера: тёплый графит, янтарно-оранжевый свет, мягкие скругления.</p>
-      <div class="dots">
-        <i style="background:#171310"></i><i style="background:#201a15"></i><i style="background:#ffae45"></i><i style="background:#f6f0e8"></i><i style="background:#ff7a6b"></i>
-      </div>
-    </a>
-  </div>
-
-  <footer>
-    Иконки на страницах — черновик набора; в коде лягся пакет ionicons (outline для таб-бара,
-    filled для кнопок плеера) теми же начертаниями. Выбранный вариант — база для трёх
-    layout-профилей: phone / tv / car (контраст и размеры контролов профиль поднимет сам).
-  </footer>
+  <div class="logo">Свод <span>/ кит</span></div>
+  <p class="sub">Один выбранный кит. Макеты экранов — отдельные статичные страницы из этих же атомов, не приложение.</p>
+  <a class="card" href="./variant-02-mint-green.html">
+    <div class="num">Кит</div>
+    <h2>Мятный грин</h2>
+    <p>Токены, состояния, плеер, списки, друзья, шары, детали, phone / tv / car.</p>
+    <div class="dots">
+      <i style="background:#000000"></i><i style="background:#121212"></i><i style="background:#1ed760"></i><i style="background:#ffffff"></i><i style="background:#a7a7a7"></i>
+    </div>
+  </a>
 </div>
 </body>
 </html>
