@@ -305,10 +305,17 @@ export interface PlaybackDeviceDisconnectedPayload {
   command_id: string | null;
 }
 
+export interface FriendshipSide {
+  id: number;
+  name: string;
+  avatar: string | null;
+  current_snapshot: AnySnapshot | null;
+}
+
 export interface FriendshipPayload {
   id: number;
-  sender: { id: number; name: string; avatar: string | null };
-  receiver: { id: number; name: string; avatar: string | null };
+  sender: FriendshipSide;
+  receiver: FriendshipSide;
   status: string;
   created_at: string | null;
 }

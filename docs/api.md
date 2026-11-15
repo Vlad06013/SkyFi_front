@@ -282,6 +282,12 @@ status: pending|playing_now|played|skipped, snapshot|null}`.
 | `POST /{user}/queue` (30/мин) | snapshot → добавить другу в очередь (друг получает `friend.queue.item.added`) |
 | `POST /{user}/share` (30/мин) | snapshot → шара другу (`share.sent`) |
 
+`sender` / `receiver` каждой дружбы содержат `current_snapshot` —
+текущий снапшот плеера этого пользователя (null, если состояния
+плеера нет). Отдаётся всегда, независимо от is_playing: на странице
+друзей берём сторону, которая не я. То же поле приходит в
+websocket-ивентах `friendship.request.sent` / `friendship.request.accepted`.
+
 ## 13. Шары и ссылки
 
 | Метод/путь | Тело → Ответ |
