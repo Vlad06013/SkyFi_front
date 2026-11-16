@@ -14,7 +14,7 @@
   <header class="page-head">
     <a class="back" href="../index.html">← все макеты</a>
     <div class="sec-title">Друзья</div>
-    <p class="sec-note">Список со now-playing, заявки, поиск по email.</p>
+    <p class="sec-note">Список со now-playing, заявки галкой и крестиком, поиск по email. Колокольчик открывает панель.</p>
   </header>
   <div class="gallery">
     <figure>
@@ -25,7 +25,10 @@
       <div class="friend-row">
         <div class="avatar ini g1">Н</div>
         <div class="track-meta"><div class="track-title">Никита</div><div class="idle">хочет в друзья</div></div>
-        <button class="btn btn-primary sm">Принять</button>
+        <div class="n-actions">
+          <button class="icon-btn ghost ok" aria-label="принять"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 9.5 17 19 7.5"/></svg></button>
+          <button class="icon-btn ghost bad" aria-label="отклонить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 5l14 14M19 5 5 19"/></svg></button>
+        </div>
       </div>
       <div class="sec-label">Друзья</div>
       <a class="friend-row" href="friend.html" style="text-decoration:none;color:inherit">
@@ -58,7 +61,66 @@
       <div class="bar"><i></i></div>
     </div><div class="tabbar"><a class="tab" href="home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Главная</a><a class="tab" href="search.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>Поиск</a><a class="tab" href="library.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h13a1 1 0 0 1 1 1v16l-7.5-4-7.5 4V4a1 1 0 0 1 1-1z"/></svg>Моё</a><a class="tab on" href="friends.html"><i class="badge-dot"></i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M3.5 19c.7-3 2.9-4.5 5.5-4.5s4.8 1.5 5.5 4.5"/></svg>Друзья</a><a class="tab" href="settings.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.7M12 18.5v2.7M21.2 12h-2.7M5.5 12H2.8M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9M18.7 18.7l-1.9-1.9M7.2 7.2 5.3 5.3"/></svg>Настройки</a></div></div>
       </div>
-      <figcaption>Список + входящие. Тап по другу — его страница. Поиск снизу в поле.</figcaption>
+      <figcaption>Список + входящие. Заявка — галка и крестик справа.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone screen ">
+        <div class="n-panel n-pop">
+          <div class="n-head">Уведомления <span>непрочитанные</span></div>
+          <div class="n-row is-unread">
+            <div class="avatar ini g1">Н</div>
+            <div class="n-body">
+              <div class="n-title">Никита</div>
+              <div class="n-sub">хочет в друзья</div>
+            </div>
+            <div class="n-actions">
+              <button class="icon-btn ghost ok" aria-label="принять"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 9.5 17 19 7.5"/></svg></button>
+              <button class="icon-btn ghost bad" aria-label="отклонить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 5l14 14M19 5 5 19"/></svg></button>
+            </div>
+          </div>
+          <div class="n-row share is-unread">
+            <div class="thumb" style="background:var(--gradient-cover-1)"><span class="src" title="Яндекс"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="13.6" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9.6" cy="14.8" r="3.7"/><path d="M12.7 5.6h2.05v9.4H12.7z"/><path d="M14.75 5.6h6.3l-1.7 3.7h-6.3z"/></svg></span></div>
+            <div class="n-body">
+              <div class="n-title">Радиотишина</div>
+              <div class="n-sub">Илья поделился · трек · в плеер</div>
+            </div>
+          </div>
+          <div class="n-row share">
+            <div class="thumb" style="background:var(--gradient-cover-2)"><span class="src" title="SkyFi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 10.6a8.4 8.4 0 0 1 15.6 0"/><path d="M9 12.4v8.1l7.7-4.05z" fill="currentColor" stroke="none"/></svg></span></div>
+            <div class="n-body">
+              <div class="n-title">В дорогу</div>
+              <div class="n-sub">прочитано · плейлист · на карточку</div>
+            </div>
+          </div>
+        </div>
+        <div class="screen-body"><div class="appbar"><div class="logo">Друзья</div><button class="icon-btn ghost" aria-label="уведомления"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5a5.5 5.5 0 1 1 11 0c0 5.5 2.5 6.5 2.5 8H4c0-1.5 2.5-2.5 2.5-8z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><i class="badge-dot"></i></button></div>
+      <div class="field"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg><span class="ph">имя или email</span></div>
+      <div class="sec-label">Заявки <span>1</span></div>
+      <div class="friend-row">
+        <div class="avatar ini g1">Н</div>
+        <div class="track-meta"><div class="track-title">Никита</div><div class="idle">хочет в друзья</div></div>
+        <div class="n-actions">
+          <button class="icon-btn ghost ok" aria-label="принять"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 9.5 17 19 7.5"/></svg></button>
+          <button class="icon-btn ghost bad" aria-label="отклонить"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 5l14 14M19 5 5 19"/></svg></button>
+        </div>
+      </div>
+      <div class="sec-label">Друзья</div>
+      <a class="friend-row" href="friend.html" style="text-decoration:none;color:inherit">
+        <div class="avatar ini">А</div>
+        <div class="track-meta"><div class="track-title">Аня</div><div class="live">Радиотишина · Sum 41</div></div>
+        <span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>
+      </a>
+    </div>
+        <div class="screen-dock"><div class="mini-player">
+      <div class="thumb" style="background:var(--gradient-cover-1)"><span class="src" title="Яндекс"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="13.6" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9.6" cy="14.8" r="3.7"/><path d="M12.7 5.6h2.05v9.4H12.7z"/><path d="M14.75 5.6h6.3l-1.7 3.7h-6.3z"/></svg></span></div>
+      <div class="track-meta"><div class="track-title">Радиотишина</div><div class="track-artist">Sum 41</div></div>
+      <button class="icon-btn liked"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 20s-7-4.3-9-9c-1.2-2.8.6-6 3.8-6C9 5 12 8 12 8s3-3 5.2-3C20.4 5 22.2 8.2 21 11c-2 4.7-9 9-9 9z"/></svg></button>
+      <button class="fab small"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg></button>
+      <div class="bar"><i></i></div>
+    </div><div class="tabbar"><a class="tab" href="home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Главная</a><a class="tab" href="search.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>Поиск</a><a class="tab" href="library.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h13a1 1 0 0 1 1 1v16l-7.5-4-7.5 4V4a1 1 0 0 1 1-1z"/></svg>Моё</a><a class="tab on" href="friends.html"><i class="badge-dot"></i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M3.5 19c.7-3 2.9-4.5 5.5-4.5s4.8 1.5 5.5 4.5"/></svg>Друзья</a><a class="tab" href="settings.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.7M12 18.5v2.7M21.2 12h-2.7M5.5 12H2.8M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9M18.7 18.7l-1.9-1.9M7.2 7.2 5.3 5.3"/></svg>Настройки</a></div></div>
+      </div>
+      <figcaption>Колокольчик открывает панель: заявка и шары. Точка — непрочитанные.</figcaption>
     </figure><figure>
       <div class="phone screen ">
         <div class="screen-body"><div class="appbar"><div class="logo">Друзья</div><button class="icon-btn ghost" aria-label="уведомления"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5a5.5 5.5 0 1 1 11 0c0 5.5 2.5 6.5 2.5 8H4c0-1.5 2.5-2.5 2.5-8z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><i class="badge-dot"></i></button></div>
@@ -87,7 +149,7 @@
       <div class="bar"><i></i></div>
     </div><div class="tabbar"><a class="tab" href="home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Главная</a><a class="tab" href="search.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>Поиск</a><a class="tab" href="library.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h13a1 1 0 0 1 1 1v16l-7.5-4-7.5 4V4a1 1 0 0 1 1-1z"/></svg>Моё</a><a class="tab on" href="friends.html"><i class="badge-dot"></i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M3.5 19c.7-3 2.9-4.5 5.5-4.5s4.8 1.5 5.5 4.5"/></svg>Друзья</a><a class="tab" href="settings.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.7M12 18.5v2.7M21.2 12h-2.7M5.5 12H2.8M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9M18.7 18.7l-1.9-1.9M7.2 7.2 5.3 5.3"/></svg>Настройки</a></div></div>
       </div>
-      <figcaption>Поиск людей: добавить / друзья / отменить / принять.</figcaption>
+      <figcaption>Поиск: добавить / друзья / отменить. Входящая — галка и крестик.</figcaption>
     </figure>
   </div>
 </div>

@@ -14,7 +14,7 @@
   <header class="page-head">
     <a class="back" href="../index.html">← все макеты</a>
     <div class="sec-title">Вход</div>
-    <p class="sec-note">Почта или QR. «Войти по QR» показывает код с POST /qr-login — подтверждает другой залогиненный телефон. ТВ сразу на QR, без формы.</p>
+    <p class="sec-note">Почта или QR. Сброс: почта, код из письма, новый пароль. ТВ сразу на QR, без формы.</p>
   </header>
   <div class="gallery">
     <figure>
@@ -87,7 +87,57 @@
       <div class="auth-links">Уже есть? <a href="#">Войти</a></div>
     </div>
               </div>
-      <figcaption>Регистрация + хелпер ошибки. Reset — отдельный шаг с кодом из письма, тот же каркас.</figcaption>
+      <figcaption>Регистрация + хелпер ошибки.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone screen ">
+        <div class="screen-body">
+      <div class="auth-brand">
+        <div class="lockup">
+          <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 10.6a8.4 8.4 0 0 1 15.6 0"/><path d="M9 12.4v8.1l7.7-4.05z" fill="currentColor" stroke="none"/></svg>
+          <div class="word">Sky<b>Fi</b></div>
+        </div>
+        <div class="hero-sub">сброс пароля</div>
+      </div>
+      <form class="auth-form">
+        <label>Email</label>
+        <div class="field is-focus"><span>vlad@mail.ru</span></div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px">Отправить код</button>
+      </form>
+      <div class="auth-links"><a href="#">Назад ко входу</a></div>
+    </div>
+              </div>
+      <figcaption>POST /forgot-password {email}. Код уходит письмом.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone screen ">
+        <div class="screen-body">
+      <div class="auth-brand">
+        <div class="lockup">
+          <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 10.6a8.4 8.4 0 0 1 15.6 0"/><path d="M9 12.4v8.1l7.7-4.05z" fill="currentColor" stroke="none"/></svg>
+          <div class="word">Sky<b>Fi</b></div>
+        </div>
+        <div class="hero-sub">новый пароль</div>
+      </div>
+      <form class="auth-form">
+        <div class="ym-code is-input">
+          <div class="track-meta">
+            <div class="l">Код из письма</div>
+            <div class="n">481<span class="caret"></span></div>
+          </div>
+        </div>
+        <label>Новый пароль</label>
+        <div class="field"><span class="ph">минимум 8</span></div>
+        <label>Ещё раз</label>
+        <div class="field"><span class="ph">••••••••</span></div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px">Сменить пароль</button>
+      </form>
+      <div class="auth-links"><a href="#">Отправить код снова</a></div>
+    </div>
+              </div>
+      <figcaption>POST /reset-password {email, code, password, password_confirmation}.</figcaption>
     </figure>
   </div>
 </div>
