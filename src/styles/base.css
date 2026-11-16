@@ -1,0 +1,46 @@
+html,
+body,
+#app,
+ion-app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+:root {
+  --ion-background-color: #000000;
+  --ion-text-color: #ffffff;
+  --ion-font-family: var(--font-body);
+}
+
+ion-app,
+ion-content,
+ion-page {
+  --background: var(--color-bg);
+  --color: var(--color-text-primary);
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+}
+
+ion-app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: inherit;
+}

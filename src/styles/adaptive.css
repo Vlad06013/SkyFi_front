@@ -1,0 +1,143 @@
+/* Три раскладки: телефон ≤700, планшет 701–1050, десктоп ≥1051.
+   Токены — tokens.css. Здесь только привязка к оболочке и киту. */
+
+.sky-shell {
+  width: 100%;
+  max-width: var(--app-max);
+  height: 100%;
+  align-self: center;
+  margin-inline: auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  padding: var(--app-pad-top) var(--app-pad-x) var(--app-pad-bottom);
+  padding-top: max(var(--app-pad-top), env(safe-area-inset-top));
+  padding-bottom: max(var(--app-pad-bottom), env(safe-area-inset-bottom));
+}
+
+@media (min-width: 1121px) {
+  .sky-shell:not(.is-wave) {
+    border-left: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+  }
+}
+
+.sky-shell.is-wave {
+  max-width: none;
+  overflow: hidden;
+  padding: 0;
+}
+
+.sky-shell.is-wave .wave-page {
+  padding-top: max(var(--app-pad-top), env(safe-area-inset-top));
+  padding-inline: var(--app-pad-x);
+}
+
+.sky-shell.is-wave .sky-dock {
+  width: 100%;
+  max-width: var(--app-max);
+  margin-inline: auto;
+  padding-inline: var(--app-pad-x);
+  padding-bottom: max(var(--app-pad-bottom), env(safe-area-inset-bottom));
+  box-sizing: border-box;
+  position: relative;
+  z-index: 2;
+}
+
+.sky-shell.is-wave .wave-blobs {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+.sky-shell.is-wave .wave-page .appbar,
+.sky-shell.is-wave .wave-stage > :not(.wave-blobs) {
+  position: relative;
+  z-index: 1;
+}
+
+.sky-shell .n-pop {
+  left: 0;
+  right: 0;
+  top: 44px;
+  z-index: 20;
+}
+
+.sky-shell.is-wave .n-pop {
+  left: var(--app-pad-x);
+  right: var(--app-pad-x);
+  top: calc(max(var(--app-pad-top), env(safe-area-inset-top, 0px)) + 40px);
+}
+
+.thumb,
+.pl-row .cover,
+.pl-new,
+.mini-player .thumb {
+  width: var(--thumb-size);
+  height: var(--thumb-size);
+}
+
+.track-title { font-size: var(--title-size); }
+.track-artist,
+.friend-row .idle,
+.friend-row .live { font-size: var(--meta-size); }
+
+.hero-cover {
+  width: var(--hero-size);
+  height: var(--hero-size);
+}
+
+.hero-cover.round {
+  width: var(--hero-round);
+  height: var(--hero-round);
+}
+
+.hero-name { font-size: var(--hero-name-size); }
+
+.appbar .logo { font-size: var(--appbar-logo); }
+
+.tab { font-size: var(--tab-label); }
+.tab svg {
+  width: var(--tab-icon);
+  height: var(--tab-icon);
+}
+
+.wave-disc { --wave-cover: var(--wave-cover-size); }
+.wave-controls .fab {
+  width: var(--wave-fab);
+  height: var(--wave-fab);
+}
+
+.auth-form,
+.auth-links {
+  width: 100%;
+  max-width: var(--auth-max);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (min-width: 701px) {
+  .tabbar { padding: 10px 10px 12px; gap: 8px; }
+  .mini-player { padding: 12px 14px; gap: 14px; }
+  .track-row { padding: 8px 4px; gap: 10px; }
+  .pl-row { padding: 10px 4px; gap: 12px; }
+  .friend-row { padding: 10px 4px; }
+  .appbar { padding: 6px 2px 16px; }
+  .chip { padding: 8px 16px; font-size: 14px; }
+  .ym-card { padding: 18px; }
+  .now-card { padding: 12px; }
+  .now-card .thumb {
+    width: var(--thumb-size);
+    height: var(--thumb-size);
+  }
+}
+
+@media (min-width: 1051px) {
+  .tabbar { border-radius: 24px; padding: 12px 14px 14px; }
+  .ym-stats { grid-template-columns: repeat(4, 1fr); }
+  .auth-brand { padding-top: 48px; }
+  .wave-stage { padding: 16px 16px 8px; }
+  .hero-actions { margin: 18px 0 16px; gap: 14px; }
+  .wave-blob { width: 60%; filter: blur(72px); opacity: .22; }
+}

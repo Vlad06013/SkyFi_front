@@ -1,0 +1,97 @@
+/* Токены кита. */
+:root {
+    --color-bg:            #000000;
+    --color-surface:       #121212;
+    --color-surface-2:     #1a1a1a;
+    --color-surface-3:     #242424;
+    --color-border:        rgba(255, 255, 255, 0.06);
+    --color-text-primary:  #ffffff;
+    --color-text-secondary:#a7a7a7;
+    --color-text-faint:    #6a6a6a;
+    --color-accent:        #1ed760;
+    --color-accent-strong: #3ee87f;
+    --color-accent-pressed:#149447;
+    --color-accent-ink:    #062b14;
+    --color-like:          #1ed760;
+    --color-danger:        #f15e6c;
+    --color-warning:       #f0c14a;
+    --color-success:       #1ed760;
+    --gradient-cover-1: linear-gradient(135deg, #1ed760 0%, #0d7a4d 100%);
+    --gradient-cover-2: linear-gradient(135deg, #8a5cf6 0%, #40208f 100%);
+    --gradient-cover-3: linear-gradient(135deg, #f15e6c 0%, #7a1f3d 100%);
+    --font-display: 'Plus Jakarta Sans', 'Inter', sans-serif;
+    --font-body:    'Inter', system-ui, sans-serif;
+    --font-logo:    'Plus Jakarta Sans', sans-serif;
+    --radius-s: 8px;
+    --radius-m: 12px;
+    --radius-l: 16px;
+    --radius-pill: 999px;
+    --radius-button: 999px;
+    --shadow-fab: 0 8px 26px rgba(30, 215, 96, 0.3);
+    --wave-flame-gold:  #ffe566;
+    --wave-flame-mint:  #1ed760;
+    --wave-flame-ember: #ff9f1a;
+    color-scheme: dark;
+
+    --layout: phone;
+    --app-max: 100%;
+    --app-pad-x: 10px;
+    --app-pad-top: 12px;
+    --app-pad-bottom: 8px;
+    --thumb-size: 44px;
+    --hero-size: 188px;
+    --hero-round: 148px;
+    --wave-cover-size: 186px;
+    --title-size: 14px;
+    --meta-size: 12px;
+    --tab-label: 10px;
+    --tab-icon: 22px;
+    --appbar-logo: 20px;
+    --hero-name-size: 22px;
+    --wave-fab: 72px;
+    --auth-max: 100%;
+  }
+
+@media (min-width: 701px) and (max-width: 1050px) {
+  :root {
+    --layout: tablet;
+    --app-max: 100%;
+    --app-pad-x: 28px;
+    --app-pad-top: 18px;
+    --app-pad-bottom: 12px;
+    --thumb-size: 52px;
+    --hero-size: 220px;
+    --hero-round: 168px;
+    --wave-cover-size: 220px;
+    --title-size: 15px;
+    --meta-size: 13px;
+    --tab-label: 11px;
+    --tab-icon: 24px;
+    --appbar-logo: 22px;
+    --hero-name-size: 26px;
+    --wave-fab: 80px;
+    --auth-max: 440px;
+  }
+}
+
+@media (min-width: 1051px) {
+  :root {
+    --layout: desktop;
+    --app-max: 1120px;
+    --app-pad-x: 36px;
+    --app-pad-top: 20px;
+    --app-pad-bottom: 14px;
+    --thumb-size: 56px;
+    --hero-size: 240px;
+    --hero-round: 184px;
+    --wave-cover-size: 240px;
+    --title-size: 16px;
+    --meta-size: 13px;
+    --tab-label: 12px;
+    --tab-icon: 26px;
+    --appbar-logo: 24px;
+    --hero-name-size: 28px;
+    --wave-fab: 84px;
+    --auth-max: 440px;
+  }
+}

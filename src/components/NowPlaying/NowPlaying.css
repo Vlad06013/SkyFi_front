@@ -1,0 +1,247 @@
+.now-playing {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--color-bg);
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+  transition: transform .2s ease, opacity .2s ease;
+  user-select: none;
+}
+
+.now-playing.is-dragging {
+  transition: none;
+}
+
+.now-playing-inner {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 520px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: max(12px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+}
+
+.now-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+  min-height: 36px;
+}
+
+.now-stage {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  container-type: size;
+  display: grid;
+  place-items: center;
+  margin: 8px 0 16px;
+}
+
+.now-stage.is-list {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  overflow: hidden;
+  container-type: normal;
+}
+
+.now-stage.is-list .p-now,
+.now-stage.is-list .p-sheet,
+.now-stage.is-list .lyr {
+  width: 100%;
+}
+
+.now-stage.is-list .p-sheet {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: transform .2s ease;
+}
+
+.now-stage.is-list .p-sheet.is-dragging {
+  transition: none;
+}
+
+.now-playing .p-sheet-head {
+  flex-shrink: 0;
+  touch-action: none;
+  cursor: grab;
+}
+
+.now-playing .p-sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: none;
+  touch-action: pan-y;
+}
+
+.now-playing .p-sheet-body::-webkit-scrollbar {
+  width: 0;
+}
+
+.now-playing .p-sheet.is-dragging .p-sheet-body {
+  overflow: hidden;
+  pointer-events: none;
+  touch-action: none;
+}
+
+.now-playing .p-sheet-body.is-sorting {
+  overflow: hidden;
+  touch-action: none;
+}
+
+.now-playing .p-sheet-body .track-row {
+  transition: transform .15s ease;
+}
+
+.now-playing .p-sheet-body .track-row.is-drag {
+  transition: none;
+}
+
+.now-playing .grip {
+  touch-action: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.now-playing .grip:focus {
+  outline: none;
+}
+
+.now-stage.is-list .lyr {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: none;
+}
+
+.now-playing .cover-big {
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
+  border-radius: var(--radius-l);
+  border: 1px solid var(--color-border);
+}
+
+.now-footer {
+  flex-shrink: 0;
+}
+
+.seek {
+  margin-top: 8px;
+  padding: 12px 0;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.seek .progress {
+  max-width: none;
+  pointer-events: none;
+}
+
+.now-playing .p-actions .plain {
+  background: none;
+  border: 0;
+  padding: 6px;
+  color: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  transition: color .12s ease, transform .12s ease;
+}
+
+.now-playing .p-actions .plain:hover {
+  color: var(--color-text-primary);
+}
+
+.now-playing .p-actions .plain:active {
+  transform: scale(0.9);
+}
+
+.now-playing .p-actions .plain.liked {
+  color: var(--color-like);
+}
+
+.now-playing .p-actions .plain.is-on {
+  color: var(--color-accent);
+}
+
+.now-playing .p-actions .plain svg {
+  width: 20px;
+  height: 20px;
+}
+
+
+.now-playing.is-clip {
+  background: #000;
+}
+
+.now-playing .clip-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.now-playing .clip-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(0,0,0,.42) 0%, rgba(0,0,0,.08) 30%, rgba(0,0,0,.4) 58%, rgba(0,0,0,.88) 100%);
+}
+
+.now-playing.is-clip .now-top,
+.now-playing.is-clip .p-title {
+  color: #fff;
+}
+
+.now-playing.is-clip .p-artist {
+  color: rgba(255, 255, 255, .78);
+}
+
+.now-playing.is-clip .p-times {
+  color: rgba(255, 255, 255, .55);
+}
+
+.now-playing.is-clip .p-actions {
+  color: rgba(255, 255, 255, .82);
+}
+
+.now-playing .p-sheet .track-row:hover .grip,
+.now-playing .p-sheet .track-row.is-hover .grip,
+.now-playing .p-sheet .track-row:focus-visible .grip,
+.now-playing .p-sheet .track-row.is-focus .grip,
+.now-playing .p-sheet .track-row.is-drag .grip {
+  color: var(--color-text-primary);
+}
+
+.now-playing input {
+  user-select: text;
+}
+
+@media (min-width: 701px) {
+  .now-playing-inner {
+    padding: max(18px, env(safe-area-inset-top)) 28px max(20px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (min-width: 1051px) {
+  .now-playing-inner {
+    max-width: 560px;
+    padding-top: max(24px, env(safe-area-inset-top));
+  }
+}
