@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SkyFi · Моё</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../shared/kit.css" />
+<link rel="stylesheet" href="../shared/screens.css" />
+</head>
+<body class="screen-page">
+<div class="page">
+  <header class="page-head">
+    <a class="back" href="../index.html">← все макеты</a>
+    <div class="sec-title">Моё</div>
+    <p class="sec-note">Пилюли: треки, плейлисты, альбомы, артисты, загрузки (свои файлы на сервер + форма), скачано (офлайн: плейлисты / альбомы / треки). Стрелка — уже скачан. Прогресс нижнего бара заливает фон, как на волне.</p>
+  </header>
+  <div class="gallery">
+    <figure>
+      <div class="phone screen ">
+        <div class="screen-body"><div class="appbar"><div class="logo">Моё</div><button class="icon-btn ghost" aria-label="уведомления"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5a5.5 5.5 0 1 1 11 0c0 5.5 2.5 6.5 2.5 8H4c0-1.5 2.5-2.5 2.5-8z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><i class="badge-dot"></i></button></div>
+      <div class="chip-scroll">
+        <span class="chip active">Треки</span>
+        <span class="chip">Плейлисты</span>
+        <span class="chip">Альбомы</span>
+        <span class="chip">Артисты</span>
+        <span class="chip">Загрузки</span>
+        <span class="chip">Скачано</span>
+      </div>
+    <div class="track-row is-playing"><span class="grip" aria-hidden="true"><i></i><i></i><i></i></span>
+      <div class="thumb" style="background:var(--gradient-cover-1)"><span class="src" title="Яндекс"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="13.6" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9.6" cy="14.8" r="3.7"/><path d="M12.7 5.6h2.05v9.4H12.7z"/><path d="M14.75 5.6h6.3l-1.7 3.7h-6.3z"/></svg></span></div>
+      <div class="track-meta"><div class="track-title">Радиотишина</div><div class="track-artist">Sum 41</div></div>
+      <span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>
+      <svg class="dl-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="скачан"><path d="M12 4v9m0 0 3.5-3.5M12 13 8.5 9.5"/><path d="M5 17h14"/></svg>
+      <button class="icon-btn more" aria-label="ещё"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.55"/><circle cx="12" cy="12" r="1.55"/><circle cx="18.5" cy="12" r="1.55"/></svg></button></div>
+    <div class="track-row"><span class="grip" aria-hidden="true"><i></i><i></i><i></i></span>
+      <div class="thumb" style="background:var(--gradient-cover-2)"><span class="src" title="Файл"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V5"/><path d="M8.2 8.8 12 5l3.8 3.8"/><path d="M5 19h14"/></svg></span></div>
+      <div class="track-meta"><div class="track-title">Полковнику никто не пишет</div><div class="track-artist">Би-2</div></div>
+      <svg class="dl-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="скачан"><path d="M12 4v9m0 0 3.5-3.5M12 13 8.5 9.5"/><path d="M5 17h14"/></svg>
+      <button class="icon-btn more" aria-label="ещё"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.55"/><circle cx="12" cy="12" r="1.55"/><circle cx="18.5" cy="12" r="1.55"/></svg></button></div>
+    <div class="track-row"><span class="grip" aria-hidden="true"><i></i><i></i><i></i></span>
+      <div class="thumb" style="background:var(--gradient-cover-3)"><span class="src" title="VK"><svg viewBox="8 14 33 21" fill="currentColor"><path d="M25.54 34.58C14.6 34.58 8.36 27.08 8.1 14.6h5.48c.18 9.16 4.22 13.04 7.42 13.84V14.6h5.16v7.9c3.16-.34 6.48-3.94 7.6-7.9h5.16c-.86 4.88-4.46 8.48-7.02 9.96 2.56 1.2 6.66 4.34 8.22 10.02h-5.68c-1.22-3.8-4.26-6.74-8.28-7.14v7.14h-.62z"/></svg></span></div>
+      <div class="track-meta"><div class="track-title">Морская</div><div class="track-artist">Мумий Тролль</div></div>
+      <button class="icon-btn more" aria-label="ещё"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.55"/><circle cx="12" cy="12" r="1.55"/><circle cx="18.5" cy="12" r="1.55"/></svg></button></div>
+    <div class="track-row offline">
+      <span class="grip" aria-hidden="true"><i></i><i></i><i></i></span>
+      <div class="thumb" style="background:var(--gradient-cover-2)"><span class="src" title="Яндекс"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="13.6" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9.6" cy="14.8" r="3.7"/><path d="M12.7 5.6h2.05v9.4H12.7z"/><path d="M14.75 5.6h6.3l-1.7 3.7h-6.3z"/></svg></span></div>
+      <div class="track-meta"><div class="track-title">Fat Lip</div><div class="track-artist">нет в офлайне</div></div>
+      <button class="icon-btn more"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.55"/><circle cx="12" cy="12" r="1.55"/><circle cx="18.5" cy="12" r="1.55"/></svg></button>
+    </div></div>
+        <div class="screen-dock"><div class="mini-player">
+      <div class="thumb" style="background:var(--gradient-cover-1)"><span class="src" title="Яндекс"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="13.6" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9.6" cy="14.8" r="3.7"/><path d="M12.7 5.6h2.05v9.4H12.7z"/><path d="M14.75 5.6h6.3l-1.7 3.7h-6.3z"/></svg></span></div>
+      <div class="track-meta"><div class="track-title">Радиотишина</div><div class="track-artist">Sum 41</div></div>
+      <button class="icon-btn liked"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 20s-7-4.3-9-9c-1.2-2.8.6-6 3.8-6C9 5 12 8 12 8s3-3 5.2-3C20.4 5 22.2 8.2 21 11c-2 4.7-9 9-9 9z"/></svg></button>
+      <button class="fab small"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg></button>
+      <div class="bar"><i></i></div>
+    </div><div class="tabbar"><a class="tab" href="home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Главная</a><a class="tab" href="search.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>Поиск</a><a class="tab on" href="library.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h13a1 1 0 0 1 1 1v16l-7.5-4-7.5 4V4a1 1 0 0 1 1-1z"/></svg>Моё</a><a class="tab" href="friends.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M3.5 19c.7-3 2.9-4.5 5.5-4.5s4.8 1.5 5.5 4.5"/></svg>Друзья</a><a class="tab" href="settings.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.7M12 18.5v2.7M21.2 12h-2.7M5.5 12H2.8M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9M18.7 18.7l-1.9-1.9M7.2 7.2 5.3 5.3"/></svg>Настройки</a></div></div>
+      </div>
+      <figcaption>Треки: хендл всегда. Стрелка — скачан. Без стрелки и приглушён — нет в офлайне.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone screen ">
+        <div class="screen-body"><div class="appbar"><div class="logo">Моё</div><button class="icon-btn ghost" aria-label="уведомления"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5a5.5 5.5 0 1 1 11 0c0 5.5 2.5 6.5 2.5 8H4c0-1.5 2.5-2.5 2.5-8z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><i class="badge-dot"></i></button></div>
+      <div class="chip-scroll">
+        <span class="chip">Треки</span>
+        <span class="chip active">Плейлисты</span>
+        <span class="chip">Альбомы</span>
+        <span class="chip">Артисты</span>
+        <span class="chip">Загрузки</span>
+        <span class="chip">Скачано</span>
+      </div>
+      <div class="pl-row">
+        <div class="pl-new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+        <div class="track-meta"><div class="track-title">Новый плейлист</div><div class="track-artist">имя и видимость</div></div>
+      </div>
+      <div class="pl-row">
+        <div class="cover" style="background:var(--gradient-cover-2)"><span class="src" title="SkyFi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 10.6a8.4 8.4 0 0 1 15.6 0"/><path d="M9 12.4v8.1l7.7-4.05z" fill="currentColor" stroke="none"/></svg></span></div>
+        <div class="track-meta"><div class="track-title">В дорогу</div><div class="track-artist">18 · друзья · свой</div></div>
+        <svg class="dl-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="скачан"><path d="M12 4v9m0 0 3.5-3.5M12 13 8.5 9.5"/><path d="M5 17h14"/></svg>
+        <button class="icon-btn more" aria-label="ещё"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.55"/><circle cx="12" cy="12" r="1.55"/><circle cx="18.5" cy="12" r="1.55"/></svg></button>
+      </div>
+      <div class="pl-row">
+        <div class="cover" style="background:var(--gradient-cover-3)"><span class="src" title="Яндекс"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="13.6" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9.6" cy="14.8" r="3.7"/><path d="M12.7 5.6h2.05v9.4H12.7z"/><path d="M14.75 5.6h6.3l-1.7 3.7h-6.3z"/></svg></span></div>
+        <div class="track-meta"><div class="track-title">Панк на ночь</div><div class="track-artist">36 · Яндекс</div></div>
+        <button class="icon-btn more" aria-label="ещё"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.55"/><circle cx="12" cy="12" r="1.55"/><circle cx="18.5" cy="12" r="1.55"/></svg></button>
+      </div>
+    </div>
+        <div class="screen-dock"><div class="mini-player">
+      <div class="thumb" style="background:var(--gradient-cover-1)"><span class="src" title="Яндекс"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="13.6" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9.6" cy="14.8" r="3.7"/><path d="M12.7 5.6h2.05v9.4H12.7z"/><path d="M14.75 5.6h6.3l-1.7 3.7h-6.3z"/></svg></span></div>
+      <div class="track-meta"><div class="track-title">Радиотишина</div><div class="track-artist">Sum 41</div></div>
+      <button class="icon-btn liked"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 20s-7-4.3-9-9c-1.2-2.8.6-6 3.8-6C9 5 12 8 12 8s3-3 5.2-3C20.4 5 22.2 8.2 21 11c-2 4.7-9 9-9 9z"/></svg></button>
+      <button class="fab small"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg></button>
+      <div class="bar"><i></i></div>
+    </div><div class="tabbar"><a class="tab" href="home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Главная</a><a class="tab" href="search.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>Поиск</a><a class="tab on" href="library.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h13a1 1 0 0 1 1 1v16l-7.5-4-7.5 4V4a1 1 0 0 1 1-1z"/></svg>Моё</a><a class="tab" href="friends.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M3.5 19c.7-3 2.9-4.5 5.5-4.5s4.8 1.5 5.5 4.5"/></svg>Друзья</a><a class="tab" href="settings.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.7M12 18.5v2.7M21.2 12h-2.7M5.5 12H2.8M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9M18.7 18.7l-1.9-1.9M7.2 7.2 5.3 5.3"/></svg>Настройки</a></div></div>
+      </div>
+      <figcaption>Плейлист тоже может быть скачан — та же зелёная стрелка.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone screen ">
+        <div class="screen-body"><div class="appbar"><div class="logo">Моё</div><button class="icon-btn ghost" aria-label="уведомления"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5a5.5 5.5 0 1 1 11 0c0 5.5 2.5 6.5 2.5 8H4c0-1.5 2.5-2.5 2.5-8z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><i class="badge-dot"></i></button></div>
+      <div class="chip-scroll">
+        <span class="chip">Треки</span>
+        <span class="chip active">Плейлисты</span>
+        <span class="chip">Альбомы</span>
+        <span class="chip">Артисты</span>
+        <span class="chip">Загрузки</span>
+        <span class="chip">Скачано</span>
+      </div>
+      <div class="pl-row">
+        <div class="pl-new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></div>
+        <div class="track-meta"><div class="track-title">Новый плейлист</div><div class="track-artist">имя и видимость</div></div>
+      </div>
+      <div class="pl-row">
+        <div class="cover" style="background:var(--gradient-cover-2)"><span class="src" title="SkyFi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 10.6a8.4 8.4 0 0 1 15.6 0"/><path d="M9 12.4v8.1l7.7-4.05z" fill="currentColor" stroke="none"/></svg></span></div>
+        <div class="track-meta"><div class="track-title">В дорогу</div><div class="track-artist">18 · друзья · свой</div></div>
+        <button class="icon-btn more" aria-label="ещё"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.55"/><circle cx="12" cy="12" r="1.55"/><circle cx="18.5" cy="12" r="1.55"/></svg></button>
+      </div>
+    </div>
+        <div class="screen-dock">
+      <div class="sheet">
+        <div class="handle"></div>
+        <div class="sheet-title">Новый плейлист</div>
+        <form class="up-form">
+          <label>Название</label>
+          <div class="field is-focus"><span>В дорогу</span></div>
+          <label>Видимость</label>
+          <div class="select">
+            <div class="select-box"><span class="val">Только друзья</span><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9.5 12 15.5 18 9.5"/></svg></div>
+          </div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px">Создать</button>
+        </form>
+      </div>
+    <div class="tabbar"><a class="tab" href="home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Главная</a><a class="tab" href="search.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>Поиск</a><a class="tab on" href="library.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h13a1 1 0 0 1 1 1v16l-7.5-4-7.5 4V4a1 1 0 0 1 1-1z"/></svg>Моё</a><a class="tab" href="friends.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M3.5 19c.7-3 2.9-4.5 5.5-4.5s4.8 1.5 5.5 4.5"/></svg>Друзья</a><a class="tab" href="settings.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.7M12 18.5v2.7M21.2 12h-2.7M5.5 12H2.8M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9M18.7 18.7l-1.9-1.9M7.2 7.2 5.3 5.3"/></svg>Настройки</a></div></div>
+      </div>
+      <figcaption>POST /playlists {name, visibility}. Все / друзья / только я. Обложка — потом, PUT /cover.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone screen ">
+        <div class="screen-body"><div class="appbar"><div class="logo">Моё</div><button class="icon-btn ghost" aria-label="уведомления"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5a5.5 5.5 0 1 1 11 0c0 5.5 2.5 6.5 2.5 8H4c0-1.5 2.5-2.5 2.5-8z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><i class="badge-dot"></i></button></div>
+      <div class="chip-scroll is-end">
+        <span class="chip">Треки</span>
+        <span class="chip">Плейлисты</span>
+        <span class="chip">Альбомы</span>
+        <span class="chip">Артисты</span>
+        <span class="chip active">Загрузки</span>
+        <span class="chip">Скачано</span>
+      </div>
+      <div class="sec-label">Свои файлы</div>
+      <div class="pl-row">
+        <div class="pl-new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V5"/><path d="M8.2 8.8 12 5l3.8 3.8"/><path d="M5 19h14"/></svg></div>
+        <div class="track-meta"><div class="track-title">Загрузить трек</div><div class="track-artist">mp3, flac, wav, m4a</div></div>
+      </div>
+      <div class="track-row">
+        <div class="thumb" style="background:var(--gradient-cover-3)"><span class="src" title="Файл"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V5"/><path d="M8.2 8.8 12 5l3.8 3.8"/><path d="M5 19h14"/></svg></span></div>
+        <div class="track-meta"><div class="track-title">Морская</div><div class="track-artist">mp3 · 8.2 МБ</div></div>
+        <button class="icon-btn more" aria-label="ещё"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.55"/><circle cx="12" cy="12" r="1.55"/><circle cx="18.5" cy="12" r="1.55"/></svg></button>
+      </div>
+      <div class="track-row">
+        <div class="thumb" style="background:var(--gradient-cover-2)"><span class="src" title="Файл"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V5"/><path d="M8.2 8.8 12 5l3.8 3.8"/><path d="M5 19h14"/></svg></span></div>
+        <div class="track-meta"><div class="track-title">Демо</div><div class="track-artist">flac · 24 МБ</div></div>
+        <svg class="dl-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="скачан"><path d="M12 4v9m0 0 3.5-3.5M12 13 8.5 9.5"/><path d="M5 17h14"/></svg>
+        <button class="icon-btn more" aria-label="ещё"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.55"/><circle cx="12" cy="12" r="1.55"/><circle cx="18.5" cy="12" r="1.55"/></svg></button>
+      </div>
+    </div>
+        <div class="screen-dock"><div class="mini-player">
+      <div class="thumb" style="background:var(--gradient-cover-1)"><span class="src" title="Яндекс"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="13.6" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9.6" cy="14.8" r="3.7"/><path d="M12.7 5.6h2.05v9.4H12.7z"/><path d="M14.75 5.6h6.3l-1.7 3.7h-6.3z"/></svg></span></div>
+      <div class="track-meta"><div class="track-title">Радиотишина</div><div class="track-artist">Sum 41</div></div>
+      <button class="icon-btn liked"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 20s-7-4.3-9-9c-1.2-2.8.6-6 3.8-6C9 5 12 8 12 8s3-3 5.2-3C20.4 5 22.2 8.2 21 11c-2 4.7-9 9-9 9z"/></svg></button>
+      <button class="fab small"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg></button>
+      <div class="bar"><i></i></div>
+    </div><div class="tabbar"><a class="tab" href="home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Главная</a><a class="tab" href="search.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>Поиск</a><a class="tab on" href="library.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h13a1 1 0 0 1 1 1v16l-7.5-4-7.5 4V4a1 1 0 0 1 1-1z"/></svg>Моё</a><a class="tab" href="friends.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M3.5 19c.7-3 2.9-4.5 5.5-4.5s4.8 1.5 5.5 4.5"/></svg>Друзья</a><a class="tab" href="settings.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.7M12 18.5v2.7M21.2 12h-2.7M5.5 12H2.8M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9M18.7 18.7l-1.9-1.9M7.2 7.2 5.3 5.3"/></svg>Настройки</a></div></div>
+      </div>
+      <figcaption>Загрузки — только то, что вы сами залили на сервер. Строка сверху открывает форму.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone screen ">
+        <div class="screen-body"><div class="appbar"><div class="logo">Моё</div><button class="icon-btn ghost" aria-label="уведомления"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5a5.5 5.5 0 1 1 11 0c0 5.5 2.5 6.5 2.5 8H4c0-1.5 2.5-2.5 2.5-8z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><i class="badge-dot"></i></button></div>
+      <div class="chip-scroll is-end">
+        <span class="chip">Треки</span>
+        <span class="chip">Плейлисты</span>
+        <span class="chip">Альбомы</span>
+        <span class="chip">Артисты</span>
+        <span class="chip active">Загрузки</span>
+        <span class="chip">Скачано</span>
+      </div>
+      <div class="sec-label">Свои файлы</div>
+      <div class="track-row">
+        <div class="thumb" style="background:var(--gradient-cover-3)"><span class="src" title="Файл"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V5"/><path d="M8.2 8.8 12 5l3.8 3.8"/><path d="M5 19h14"/></svg></span></div>
+        <div class="track-meta"><div class="track-title">Морская</div><div class="track-artist">mp3 · 8.2 МБ</div></div>
+        <button class="icon-btn more" aria-label="ещё"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.55"/><circle cx="12" cy="12" r="1.55"/><circle cx="18.5" cy="12" r="1.55"/></svg></button>
+      </div>
+      <div class="track-row">
+        <div class="thumb" style="background:var(--gradient-cover-2)"><span class="src" title="Файл"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V5"/><path d="M8.2 8.8 12 5l3.8 3.8"/><path d="M5 19h14"/></svg></span></div>
+        <div class="track-meta"><div class="track-title">Демо</div><div class="track-artist">flac · 24 МБ</div></div>
+        <svg class="dl-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="скачан"><path d="M12 4v9m0 0 3.5-3.5M12 13 8.5 9.5"/><path d="M5 17h14"/></svg>
+        <button class="icon-btn more" aria-label="ещё"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.55"/><circle cx="12" cy="12" r="1.55"/><circle cx="18.5" cy="12" r="1.55"/></svg></button>
+      </div>
+    </div>
+        <div class="screen-dock">
+      <div class="sheet">
+        <div class="handle"></div>
+        <div class="sheet-title">Загрузить трек</div>
+        <form class="up-form">
+          <div class="drop is-on">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V5"/><path d="M8.2 8.8 12 5l3.8 3.8"/><path d="M5 19h14"/></svg>
+            <div class="name">demo.flac</div>
+            <div class="meta">24 МБ · другой файл</div>
+          </div>
+          <label>Название</label>
+          <div class="field"><span>Демо</span></div>
+          <label>Исполнители</label>
+          <div class="field"><span>Sum 41</span></div>
+          <div class="field-row">
+            <div class="field"><span class="ph">ещё имя</span></div>
+            <button class="icon-btn" aria-label="ещё исполнитель"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+          </div>
+          <label>Альбом</label>
+          <div class="field"><span class="ph">необязательно</span></div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px">Загрузить</button>
+        </form>
+      </div>
+    <div class="tabbar"><a class="tab" href="home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Главная</a><a class="tab" href="search.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>Поиск</a><a class="tab on" href="library.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h13a1 1 0 0 1 1 1v16l-7.5-4-7.5 4V4a1 1 0 0 1 1-1z"/></svg>Моё</a><a class="tab" href="friends.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M3.5 19c.7-3 2.9-4.5 5.5-4.5s4.8 1.5 5.5 4.5"/></svg>Друзья</a><a class="tab" href="settings.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.7M12 18.5v2.7M21.2 12h-2.7M5.5 12H2.8M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9M18.7 18.7l-1.9-1.9M7.2 7.2 5.3 5.3"/></svg>Настройки</a></div></div>
+      </div>
+      <figcaption>Файл, название, несколько исполнителей (плюс — ещё один), альбом. artist_names[] и album_title.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone screen ">
+        <div class="screen-body"><div class="appbar"><div class="logo">Моё</div><button class="icon-btn ghost" aria-label="уведомления"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5a5.5 5.5 0 1 1 11 0c0 5.5 2.5 6.5 2.5 8H4c0-1.5 2.5-2.5 2.5-8z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><i class="badge-dot"></i></button></div>
+      <div class="chip-scroll is-end">
+        <span class="chip">Треки</span>
+        <span class="chip">Плейлисты</span>
+        <span class="chip">Альбомы</span>
+        <span class="chip">Артисты</span>
+        <span class="chip">Загрузки</span>
+        <span class="chip active">Скачано</span>
+      </div>
+      <div class="sec-label">Плейлисты</div>
+      <div class="pl-row">
+        <div class="cover" style="background:var(--gradient-cover-2)"><span class="src" title="SkyFi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 10.6a8.4 8.4 0 0 1 15.6 0"/><path d="M9 12.4v8.1l7.7-4.05z" fill="currentColor" stroke="none"/></svg></span></div>
+        <div class="track-meta"><div class="track-title">В дорогу</div><div class="track-artist">18 треков</div></div>
+        <svg class="dl-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="скачан"><path d="M12 4v9m0 0 3.5-3.5M12 13 8.5 9.5"/><path d="M5 17h14"/></svg>
+        <button class="icon-btn more" aria-label="ещё"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.55"/><circle cx="12" cy="12" r="1.55"/><circle cx="18.5" cy="12" r="1.55"/></svg></button>
+      </div>
+      <div class="sec-label">Альбомы</div>
+      <div class="pl-row">
+        <div class="cover" style="background:var(--gradient-cover-1)"><span class="src" title="Яндекс"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="13.6" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9.6" cy="14.8" r="3.7"/><path d="M12.7 5.6h2.05v9.4H12.7z"/><path d="M14.75 5.6h6.3l-1.7 3.7h-6.3z"/></svg></span></div>
+        <div class="track-meta"><div class="track-title">Heaven :x: Hell</div><div class="track-artist">Sum 41 · 2024</div></div>
+        <svg class="dl-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="скачан"><path d="M12 4v9m0 0 3.5-3.5M12 13 8.5 9.5"/><path d="M5 17h14"/></svg>
+        <button class="icon-btn more" aria-label="ещё"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.55"/><circle cx="12" cy="12" r="1.55"/><circle cx="18.5" cy="12" r="1.55"/></svg></button>
+      </div>
+      <div class="sec-label">Треки</div>
+      <div class="track-row">
+        <div class="thumb" style="background:var(--gradient-cover-1)"><span class="src" title="Яндекс"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="13.6" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9.6" cy="14.8" r="3.7"/><path d="M12.7 5.6h2.05v9.4H12.7z"/><path d="M14.75 5.6h6.3l-1.7 3.7h-6.3z"/></svg></span></div>
+        <div class="track-meta"><div class="track-title">Радиотишина</div><div class="track-artist">Sum 41</div></div>
+        <svg class="dl-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-label="скачан"><path d="M12 4v9m0 0 3.5-3.5M12 13 8.5 9.5"/><path d="M5 17h14"/></svg>
+        <button class="icon-btn more" aria-label="ещё"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.55"/><circle cx="12" cy="12" r="1.55"/><circle cx="18.5" cy="12" r="1.55"/></svg></button>
+      </div>
+      <div class="track-row">
+        <div class="thumb" style="background:var(--gradient-cover-2)"><span class="src" title="Файл"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V5"/><path d="M8.2 8.8 12 5l3.8 3.8"/><path d="M5 19h14"/></svg></span></div>
+        <div class="track-meta"><div class="track-title">Полковнику никто не пишет</div><div class="track-artist">Би-2</div></div>
+        <span class="dl-ind" aria-hidden="true">
+          <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="8" opacity=".25"/><path d="M12 4a8 8 0 0 1 8 8" stroke-linecap="round"/></svg>
+          <svg class="dl-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12m0 0 4-4M12 16l-4-4"/></svg>
+        </span>
+        <button class="icon-btn more" aria-label="ещё"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.55"/><circle cx="12" cy="12" r="1.55"/><circle cx="18.5" cy="12" r="1.55"/></svg></button>
+      </div>
+    </div>
+        <div class="screen-dock"><div class="mini-player">
+      <div class="thumb" style="background:var(--gradient-cover-1)"><span class="src" title="Яндекс"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="13.6" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9.6" cy="14.8" r="3.7"/><path d="M12.7 5.6h2.05v9.4H12.7z"/><path d="M14.75 5.6h6.3l-1.7 3.7h-6.3z"/></svg></span></div>
+      <div class="track-meta"><div class="track-title">Радиотишина</div><div class="track-artist">Sum 41</div></div>
+      <button class="icon-btn liked"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 20s-7-4.3-9-9c-1.2-2.8.6-6 3.8-6C9 5 12 8 12 8s3-3 5.2-3C20.4 5 22.2 8.2 21 11c-2 4.7-9 9-9 9z"/></svg></button>
+      <button class="fab small"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg></button>
+      <div class="bar"><i></i></div>
+    </div><div class="tabbar"><a class="tab" href="home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Главная</a><a class="tab" href="search.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>Поиск</a><a class="tab on" href="library.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h13a1 1 0 0 1 1 1v16l-7.5-4-7.5 4V4a1 1 0 0 1 1-1z"/></svg>Моё</a><a class="tab" href="friends.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M3.5 19c.7-3 2.9-4.5 5.5-4.5s4.8 1.5 5.5 4.5"/></svg>Друзья</a><a class="tab" href="settings.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.7M12 18.5v2.7M21.2 12h-2.7M5.5 12H2.8M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9M18.7 18.7l-1.9-1.9M7.2 7.2 5.3 5.3"/></svg>Настройки</a></div></div>
+      </div>
+      <figcaption>Скачано: офлайн целиком. Разбито на плейлисты, альбомы и треки.</figcaption>
+    </figure>
+  </div>
+</div>
+</body>
+</html>

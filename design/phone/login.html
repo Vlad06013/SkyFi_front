@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SkyFi · Вход</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../shared/kit.css" />
+<link rel="stylesheet" href="../shared/screens.css" />
+</head>
+<body class="screen-page">
+<div class="page">
+  <header class="page-head">
+    <a class="back" href="../index.html">← все макеты</a>
+    <div class="sec-title">Вход</div>
+    <p class="sec-note">Почта или QR. «Войти по QR» показывает код с POST /qr-login — подтверждает другой залогиненный телефон. ТВ сразу на QR, без формы.</p>
+  </header>
+  <div class="gallery">
+    <figure>
+      <div class="phone screen ">
+        <div class="screen-body">
+      <div class="auth-brand">
+        <div class="lockup">
+          <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 10.6a8.4 8.4 0 0 1 15.6 0"/><path d="M9 12.4v8.1l7.7-4.05z" fill="currentColor" stroke="none"/></svg>
+          <div class="word">Sky<b>Fi</b></div>
+        </div>
+        <div class="hero-sub">с возвращением</div>
+      </div>
+      <form class="auth-form">
+        <label>Email</label>
+        <div class="field"><span>vlad@mail.ru</span></div>
+        <label>Пароль</label>
+        <div class="field"><span class="ph">••••••••</span></div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px">Войти</button>
+        <button class="btn btn-ghost" style="width:100%;justify-content:center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h4v4h-7z"/></svg>
+          Войти по QR
+        </button>
+      </form>
+      <div class="auth-links">Нет аккаунта? <a href="#">Создать</a><br><a href="#" style="color:var(--color-text-secondary)">забыл пароль</a></div>
+    </div>
+              </div>
+      <figcaption>Почта или QR. Ошибки поля — как в ките, не красные.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone screen ">
+        <div class="screen-body">
+      <div class="auth-brand">
+        <div class="lockup">
+          <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 10.6a8.4 8.4 0 0 1 15.6 0"/><path d="M9 12.4v8.1l7.7-4.05z" fill="currentColor" stroke="none"/></svg>
+          <div class="word">Sky<b>Fi</b></div>
+        </div>
+        <div class="hero-sub">войти по QR</div>
+      </div>
+      <div class="qr-box"><div class="qr-fake"></div></div>
+      <div class="empty" style="padding-top:8px">
+        <div class="es">На другом устройстве откройте SkyFi и наведите камеру. После подтверждения этот экран залогинится сам.</div>
+      </div>
+      <div class="auth-links"><a href="#">Войти по email</a></div>
+    </div>
+              </div>
+      <figcaption>Этот экран показывает код. Подтверждает телефон, который уже в аккаунте.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone screen ">
+        <div class="screen-body">
+      <div class="auth-brand">
+        <div class="lockup">
+          <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 10.6a8.4 8.4 0 0 1 15.6 0"/><path d="M9 12.4v8.1l7.7-4.05z" fill="currentColor" stroke="none"/></svg>
+          <div class="word">Sky<b>Fi</b></div>
+        </div>
+        <div class="hero-sub">новый аккаунт</div>
+      </div>
+      <form class="auth-form">
+        <label>Имя</label>
+        <div class="field"><span class="ph">как к вам обращаться</span></div>
+        <label>Email</label>
+        <div class="field is-error"><span>vlad@</span></div>
+        <div class="field-msg">не похоже на почту</div>
+        <label>Пароль</label>
+        <div class="field"><span class="ph">минимум 8</span></div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px">Создать</button>
+      </form>
+      <div class="auth-links">Уже есть? <a href="#">Войти</a></div>
+    </div>
+              </div>
+      <figcaption>Регистрация + хелпер ошибки. Reset — отдельный шаг с кодом из письма, тот же каркас.</figcaption>
+    </figure>
+  </div>
+</div>
+</body>
+</html>

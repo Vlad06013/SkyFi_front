@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>SkyFi — кит</title>
+<title>SkyFi · макеты</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet" />
 <style>
@@ -14,45 +14,85 @@
     color: #fff;
     font-family: Inter, system-ui, sans-serif;
     min-height: 100vh;
-    padding: 48px 24px 64px;
+    padding: 48px 24px 72px;
   }
-  .wrap { max-width: 560px; margin: 0 auto; }
-  .logo {
+  .wrap { max-width: 880px; margin: 0 auto; }
+  .lockup { display: flex; align-items: center; gap: 10px; }
+  .lockup .mark { width: 28px; height: 28px; color: #1ed760; }
+  .lockup .word { font-family: "Plus Jakarta Sans", Inter, sans-serif; font-weight: 800; font-size: 28px; letter-spacing: -0.03em; }
+  .lockup .word b { color: #1ed760; font-weight: 800; }
+  .lockup .tag { color: #1ed760; font-family: "Plus Jakarta Sans", Inter, sans-serif; font-weight: 800; font-size: 16px; letter-spacing: -0.02em; }
+  .sub { color: #a7a7a7; font-size: 14px; margin: 10px 0 36px; line-height: 1.55; max-width: 640px; }
+  h2 {
     font-family: "Plus Jakarta Sans", Inter, sans-serif;
-    font-weight: 800;
-    font-size: 28px;
-    letter-spacing: -0.02em;
+    font-size: 13px; font-weight: 700; letter-spacing: .12em;
+    text-transform: uppercase; color: #6a6a6a; margin: 0 0 12px;
   }
-  .logo span { color: #1ed760; }
-  .sub { color: #a7a7a7; font-size: 14px; margin: 10px 0 28px; line-height: 1.55; }
+  .group { margin-bottom: 32px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
   a.card {
-    display: block;
-    text-decoration: none;
-    color: inherit;
-    background: #121212;
-    border: 1px solid #1ed760;
-    border-radius: 18px;
-    padding: 22px 20px 20px;
+    display: block; text-decoration: none; color: inherit;
+    background: #121212; border: 1px solid rgba(255,255,255,.06);
+    border-radius: 14px; padding: 16px 16px 14px;
   }
-  .num { font-size: 12px; color: #a7a7a7; letter-spacing: .12em; text-transform: uppercase; }
-  h2 { font-family: "Plus Jakarta Sans", Inter, sans-serif; font-size: 19px; font-weight: 800; margin: 10px 0 6px; }
-  p { font-size: 13px; color: #a7a7a7; line-height: 1.5; }
-  .dots { display: flex; gap: 6px; margin-top: 16px; }
-  .dots i { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(255,255,255,.14); }
+  a.card:hover { border-color: #1ed760; }
+  a.card.kit { border-color: #1ed760; }
+  .num { font-size: 11px; color: #6a6a6a; letter-spacing: .1em; text-transform: uppercase; }
+  a.card h3 { font-size: 16px; font-weight: 700; margin: 6px 0 4px; }
+  a.card p { font-size: 12px; color: #a7a7a7; line-height: 1.4; }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="logo">Свод <span>/ кит</span></div>
-  <p class="sub">Один выбранный кит. Макеты экранов — отдельные статичные страницы из этих же атомов, не приложение.</p>
-  <a class="card" href="./variant-02-mint-green.html">
-    <div class="num">Кит</div>
-    <h2>Мятный грин</h2>
-    <p>Токены, состояния, плеер, списки, друзья, шары, детали, phone / tv / car.</p>
-    <div class="dots">
-      <i style="background:#000000"></i><i style="background:#121212"></i><i style="background:#1ed760"></i><i style="background:#ffffff"></i><i style="background:#a7a7a7"></i>
+  <div class="lockup">
+    <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 10.6a8.4 8.4 0 0 1 15.6 0"/><path d="M9 12.4v8.1l7.7-4.05z" fill="currentColor" stroke="none"/></svg>
+    <div class="word">Sky<b>Fi</b></div>
+    <span class="tag">/ design</span>
+  </div>
+  <p class="sub">Кит — атомы. Макеты — статичные экраны из них. Не приложение: смотрим и правим здесь, в Vue переносим решения.</p>
+
+  <div class="group">
+    <h2>Кит</h2>
+    <div class="grid">
+      <a class="card kit" href="./kit/">
+        <div class="num">токены · состояния</div>
+        <h3>Мятный грин</h3>
+        <p>Плеер, списки, друзья, шары, детали, phone / tv / car.</p>
+      </a>
     </div>
-  </a>
+  </div>
+
+  <div class="group">
+    <h2>Телефон</h2>
+    <div class="grid">
+      <a class="card" href="./phone/home.html"><div class="num">главная</div><h3>Волна</h3><p>Плеер на экране, аура, без бара снизу.</p></a>
+      <a class="card" href="./phone/search.html"><div class="num">поиск</div><h3>Поиск</h3><p>Пилюля «Лучшее» первая. Прокрутка наполняет остальные.</p></a>
+      <a class="card" href="./phone/library.html"><div class="num">моё</div><h3>Моё</h3><p>Треки, загрузки свои, скачано офлайн.</p></a>
+      <a class="card" href="./phone/artist.html"><div class="num">детали</div><h3>Артист</h3><p>Круг, фильтр треки / альбомы.</p></a>
+      <a class="card" href="./phone/album.html"><div class="num">детали</div><h3>Альбом</h3><p>Имя под обложкой, год, список треков.</p></a>
+      <a class="card" href="./phone/playlist.html"><div class="num">детали</div><h3>Плейлист</h3><p>Имя под обложкой. Свой и внешний.</p></a>
+      <a class="card" href="./phone/friends.html"><div class="num">друзья</div><h3>Друзья</h3><p>Список, заявки, поиск.</p></a>
+      <a class="card" href="./phone/friend.html"><div class="num">друзья</div><h3>Страница друга</h3><p>Now-playing, очередь с хендлом, избранное.</p></a>
+      <a class="card" href="./phone/settings.html"><div class="num">ещё</div><h3>Настройки</h3><p>Яндекс, громкость, обновить или скачать.</p></a>
+      <a class="card" href="./phone/login.html"><div class="num">вход</div><h3>Логин</h3><p>Почта, QR, регистрация.</p></a>
+      <a class="card" href="./phone/qr.html"><div class="num">вход</div><h3>QR с телефона</h3><p>Подтвердить код ТВ.</p></a>
+    </div>
+  </div>
+
+  <div class="group">
+    <h2>ТВ</h2>
+    <div class="grid">
+      <a class="card" href="./tv/home.html"><div class="num">10 футов</div><h3>Главная</h3><p>Рейл, крупный плеер, фокус пульта.</p></a>
+      <a class="card" href="./tv/qr.html"><div class="num">вход</div><h3>QR на ТВ</h3><p>Без формы логина.</p></a>
+    </div>
+  </div>
+
+  <div class="group">
+    <h2>Магнитола</h2>
+    <div class="grid">
+      <a class="card" href="./car/player.html"><div class="num">за рулём</div><h3>Плеер</h3><p>Крупные кнопки, очередь, без соцсети.</p></a>
+    </div>
+  </div>
 </div>
 </body>
 </html>

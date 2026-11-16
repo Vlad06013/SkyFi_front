@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SkyFi · Главная · волна</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../shared/kit.css" />
+<link rel="stylesheet" href="../shared/screens.css" />
+</head>
+<body class="screen-page">
+<div class="page">
+  <header class="page-head">
+    <a class="back" href="../index.html">← все макеты</a>
+    <div class="sec-title">Главная · волна</div>
+    <p class="sec-note">Главная и есть плеер: без мини-бара снизу. Обложка с крутящейся аурой, на экране prev / play / next. Аура тлеет в паузе, горит когда играет.</p>
+  </header>
+  <div class="gallery">
+    <figure>
+      <div class="phone screen is-wave">
+        <div class="screen-body">
+          <div class="appbar">
+            <button class="icon-btn ghost" aria-label="уведомления">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5a5.5 5.5 0 1 1 11 0c0 5.5 2.5 6.5 2.5 8H4c0-1.5 2.5-2.5 2.5-8z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+              <i class="badge-dot"></i>
+            </button>
+          </div>
+          <div class="wave-stage">
+            <div class="wave-blobs" aria-hidden="true">
+              <span class="wave-blob wave-blob-a"></span>
+              <span class="wave-blob wave-blob-b"></span>
+              <span class="wave-blob wave-blob-c"></span>
+            </div>
+            <div class="wave-disc">
+              <div class="wave-flame wave-flame-on" aria-hidden="true">
+                <span class="wave-flame-ring"></span>
+                <span class="wave-flame-tongue wave-flame-tongue-1"></span>
+                <span class="wave-flame-tongue wave-flame-tongue-2"></span>
+                <span class="wave-flame-tongue wave-flame-tongue-3"></span>
+              </div>
+              <div class="cover" style="background:var(--gradient-cover-1)">
+                <span class="src" title="Яндекс"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="13.6" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9.6" cy="14.8" r="3.7"/><path d="M12.7 5.6h2.05v9.4H12.7z"/><path d="M14.75 5.6h6.3l-1.7 3.7h-6.3z"/></svg></span>
+              </div>
+            </div>
+            <div class="wave-pill">
+              <span class="wave-pill-fill" style="width:38%"></span>
+              <span class="wave-pill-text">Sum 41 — Радиотишина</span>
+              <button class="icon-btn liked" aria-label="в избранном"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 20s-7-4.3-9-9c-1.2-2.8.6-6 3.8-6C9 5 12 8 12 8s3-3 5.2-3C20.4 5 22.2 8.2 21 11c-2 4.7-9 9-9 9z"/></svg></button>
+            </div>
+            <div class="wave-controls">
+              <button class="plain" aria-label="назад"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 6.5 10 12l8 5.5zM6 6.5h2.5v11H6z"/></svg></button>
+              <button class="fab" aria-label="пауза"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg></button>
+              <button class="plain" aria-label="вперёд"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6.5l8 5.5-8 5.5zM15.5 6.5H18v11h-2.5z"/></svg></button>
+            </div>
+          </div>
+        </div>
+        <div class="screen-dock">
+          <div class="tabbar"><a class="tab on" href="home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Главная</a><a class="tab" href="search.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>Поиск</a><a class="tab" href="library.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h13a1 1 0 0 1 1 1v16l-7.5-4-7.5 4V4a1 1 0 0 1 1-1z"/></svg>Моё</a><a class="tab" href="friends.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M3.5 19c.7-3 2.9-4.5 5.5-4.5s4.8 1.5 5.5 4.5"/></svg>Друзья</a><a class="tab" href="settings.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.7M12 18.5v2.7M21.2 12h-2.7M5.5 12H2.8M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9M18.7 18.7l-1.9-1.9M7.2 7.2 5.3 5.3"/></svg>Настройки</a></div>
+        </div>
+      </div>
+      <figcaption>Онлайн, Яндекс есть. Аура крутится, play / prev / next на экране. Мини-плеера нет — это и есть главная.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone screen is-wave">
+        <div class="screen-body">
+          <div class="appbar">
+            <button class="icon-btn ghost" aria-label="уведомления">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5a5.5 5.5 0 1 1 11 0c0 5.5 2.5 6.5 2.5 8H4c0-1.5 2.5-2.5 2.5-8z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+              <i class="badge-dot"></i>
+            </button>
+          </div>
+          <div class="wave-stage">
+            <div class="wave-blobs" aria-hidden="true">
+              <span class="wave-blob wave-blob-a"></span>
+              <span class="wave-blob wave-blob-b"></span>
+              <span class="wave-blob wave-blob-c"></span>
+            </div>
+            <button class="wave-return" type="button">В волну</button>
+            <div class="wave-disc">
+              <div class="wave-flame wave-flame-on" aria-hidden="true">
+                <span class="wave-flame-ring"></span>
+                <span class="wave-flame-tongue wave-flame-tongue-1"></span>
+                <span class="wave-flame-tongue wave-flame-tongue-2"></span>
+                <span class="wave-flame-tongue wave-flame-tongue-3"></span>
+              </div>
+              <div class="cover" style="background:var(--gradient-cover-2)">
+                <span class="src" title="Файл"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V5"/><path d="M8.2 8.8 12 5l3.8 3.8"/><path d="M5 19h14"/></svg></span>
+              </div>
+            </div>
+            <div class="wave-pill">
+              <span class="wave-pill-fill" style="width:22%"></span>
+              <span class="wave-pill-text">Би-2 — Полковнику никто не пишет</span>
+              <button class="icon-btn" aria-label="в избранное"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20s-7-4.3-9-9c-1.2-2.8.6-6 3.8-6C9 5 12 8 12 8s3-3 5.2-3C20.4 5 22.2 8.2 21 11c-2 4.7-9 9-9 9z"/></svg></button>
+            </div>
+            <div class="wave-controls">
+              <button class="plain" aria-label="назад"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 6.5 10 12l8 5.5zM6 6.5h2.5v11H6z"/></svg></button>
+              <button class="fab" aria-label="пауза"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg></button>
+              <button class="plain" aria-label="вперёд"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6.5l8 5.5-8 5.5zM15.5 6.5H18v11h-2.5z"/></svg></button>
+            </div>
+          </div>
+        </div>
+        <div class="screen-dock">
+          <div class="tabbar"><a class="tab on" href="home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Главная</a><a class="tab" href="search.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>Поиск</a><a class="tab" href="library.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h13a1 1 0 0 1 1 1v16l-7.5-4-7.5 4V4a1 1 0 0 1 1-1z"/></svg>Моё</a><a class="tab" href="friends.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M3.5 19c.7-3 2.9-4.5 5.5-4.5s4.8 1.5 5.5 4.5"/></svg>Друзья</a><a class="tab" href="settings.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.7M12 18.5v2.7M21.2 12h-2.7M5.5 12H2.8M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9M18.7 18.7l-1.9-1.9M7.2 7.2 5.3 5.3"/></svg>Настройки</a></div>
+        </div>
+      </div>
+      <figcaption>Играет не волна (избранное, файл). Тот же экран-плеер, тег «В волну» гасит чужой источник.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone screen is-wave">
+        <div class="screen-body">
+          <div class="appbar">
+            <button class="icon-btn ghost" aria-label="уведомления">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 9.5a5.5 5.5 0 1 1 11 0c0 5.5 2.5 6.5 2.5 8H4c0-1.5 2.5-2.5 2.5-8z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg>
+              <i class="badge-dot"></i>
+            </button>
+          </div>
+          <div class="wave-stage">
+            <div class="wave-blobs" aria-hidden="true">
+              <span class="wave-blob wave-blob-a"></span>
+              <span class="wave-blob wave-blob-c"></span>
+            </div>
+            <div class="wave-disc is-idle">
+              <div class="wave-flame" aria-hidden="true">
+                <span class="wave-flame-ring"></span>
+                <span class="wave-flame-tongue wave-flame-tongue-1"></span>
+                <span class="wave-flame-tongue wave-flame-tongue-2"></span>
+                <span class="wave-flame-tongue wave-flame-tongue-3"></span>
+              </div>
+              <div class="cover wave-cover-empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 10.6a8.4 8.4 0 0 1 15.6 0"/><path d="M9 12.4v8.1l7.7-4.05z" fill="currentColor" stroke="none"/></svg>
+              </div>
+            </div>
+            <div class="cta-card">
+              <div class="track-title">Подключите Яндекс Музыку</div>
+              <p>Волна и импорт лайков живут на аккаунте Яндекса. Поиск и свои файлы уже работают.</p>
+              <button class="btn btn-primary" style="width:100%;justify-content:center">Подключить</button>
+            </div>
+          </div>
+        </div>
+        <div class="screen-dock">
+          <div class="tabbar"><a class="tab on" href="home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Главная</a><a class="tab" href="search.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>Поиск</a><a class="tab" href="library.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h13a1 1 0 0 1 1 1v16l-7.5-4-7.5 4V4a1 1 0 0 1 1-1z"/></svg>Моё</a><a class="tab" href="friends.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M3.5 19c.7-3 2.9-4.5 5.5-4.5s4.8 1.5 5.5 4.5"/></svg>Друзья</a><a class="tab" href="settings.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.7M12 18.5v2.7M21.2 12h-2.7M5.5 12H2.8M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9M18.7 18.7l-1.9-1.9M7.2 7.2 5.3 5.3"/></svg>Настройки</a></div>
+        </div>
+      </div>
+      <figcaption>Яндекс не подключён: тот же экран, аура тлеет, CTA device-auth. Мини-плеера нет.</figcaption>
+    </figure>
+
+    <figure>
+      <div class="phone screen is-wave">
+        <div class="screen-body">
+          <div class="wave-stage">
+            <div class="wave-blobs" aria-hidden="true">
+              <span class="wave-blob wave-blob-b"></span>
+              <span class="wave-blob wave-blob-c"></span>
+            </div>
+            <div class="wave-disc">
+              <div class="wave-flame wave-flame-on" aria-hidden="true">
+                <span class="wave-flame-ring"></span>
+                <span class="wave-flame-tongue wave-flame-tongue-1"></span>
+                <span class="wave-flame-tongue wave-flame-tongue-2"></span>
+                <span class="wave-flame-tongue wave-flame-tongue-3"></span>
+              </div>
+              <div class="cover" style="background:var(--gradient-cover-3)">
+                <span class="src" title="Файл"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15.5V5"/><path d="M8.2 8.8 12 5l3.8 3.8"/><path d="M5 19h14"/></svg></span>
+              </div>
+            </div>
+            <div class="wave-pill">
+              <span class="wave-pill-fill" style="width:54%"></span>
+              <span class="wave-pill-text">Мумий Тролль — Морская</span>
+              <button class="icon-btn liked" aria-label="в избранном"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 20s-7-4.3-9-9c-1.2-2.8.6-6 3.8-6C9 5 12 8 12 8s3-3 5.2-3C20.4 5 22.2 8.2 21 11c-2 4.7-9 9-9 9z"/></svg></button>
+            </div>
+            <div class="wave-controls">
+              <button class="plain" aria-label="назад"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 6.5 10 12l8 5.5zM6 6.5h2.5v11H6z"/></svg></button>
+              <button class="fab" aria-label="пауза"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg></button>
+              <button class="plain" aria-label="вперёд"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6.5l8 5.5-8 5.5zM15.5 6.5H18v11h-2.5z"/></svg></button>
+            </div>
+            <div class="status-row wave-note"><span class="status"><i class="dot warn"></i>нет сети · из скачанного</span></div>
+          </div>
+        </div>
+        <div class="screen-dock">
+          <div class="tabbar"><a class="tab on" href="home.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Главная</a><a class="tab" href="search.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>Поиск</a><a class="tab" href="library.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h13a1 1 0 0 1 1 1v16l-7.5-4-7.5 4V4a1 1 0 0 1 1-1z"/></svg>Моё</a><a class="tab" href="friends.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M3.5 19c.7-3 2.9-4.5 5.5-4.5s4.8 1.5 5.5 4.5"/></svg>Друзья</a><a class="tab" href="settings.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.7M12 18.5v2.7M21.2 12h-2.7M5.5 12H2.8M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9M18.7 18.7l-1.9-1.9M7.2 7.2 5.3 5.3"/></svg>Настройки</a></div>
+        </div>
+      </div>
+      <figcaption>Офлайн: тот же плеер, радио из скачанного. Колокольчика нет.</figcaption>
+    </figure>
+  </div>
+</div>
+</body>
+</html>
