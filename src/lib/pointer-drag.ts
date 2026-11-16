@@ -1,3 +1,9 @@
+export function ratioFromClientX(clientX: number, el: HTMLElement) {
+  const rect = el.getBoundingClientRect();
+  if (!rect.width) return 0;
+  return Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+}
+
 export function trackPointer(
   event: PointerEvent,
   handlers: {

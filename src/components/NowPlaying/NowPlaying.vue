@@ -92,20 +92,12 @@
         {{ artist }}<template v-if="album && layer !== 'lyrics'"> · {{ album }}</template>
       </div>
 
-      <div
+      <SeekBar
         class="seek"
-        role="slider"
-        :aria-valuemin="0"
-        :aria-valuemax="Math.round(durationSeconds)"
-        :aria-valuenow="Math.round(state.position_seconds)"
-        aria-label="позиция"
-        @pointerdown="onSeekPointerDown"
-      >
-        <div class="progress">
-          <div class="fill" :style="{ width: progress + '%' }" />
-          <div class="knob" :style="{ left: progress + '%' }" />
-        </div>
-      </div>
+        :model-value="progress"
+        label="позиция"
+        @update:model-value="seekRatio($event / 100)"
+      />
       <div class="p-times">
         <span>{{ formatTime(state.position_seconds) }}</span>
         <span>{{ formatTime(durationSeconds) }}</span>
@@ -219,6 +211,7 @@
 import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
+import SeekBar from '@/components/SeekBar/SeekBar.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import TrackRow from '@/components/TrackRow/TrackRow.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
@@ -352,27 +345,10 @@ function openNowMenu(event: MouseEvent) {
   openMenu(event, 'now', entityFromSnapshot(current.value, artist.value));
 }
 
-function ratioFromEvent(event: PointerEvent, el: HTMLElement) {
-  const rect = el.getBoundingClientRect();
-  if (!rect.width) return 0;
-  return Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
-}
-
 function isNoDragTarget(target: EventTarget | null) {
   return target instanceof Element && Boolean(
-    target.closest('button, a, input, .ctx, .seek, .p-sheet-head, .p-sheet-body, .sheet-mask, .sky-toast'),
+    target.closest('button, a, input, .ctx, .seek, .seek-bar, .p-sheet-head, .p-sheet-body, .sheet-mask, .sky-toast'),
   );
-}
-
-function onSeekPointerDown(event: PointerEvent) {
-  if (event.pointerType === 'mouse' && event.button !== 0) return;
-  event.stopPropagation();
-  const el = event.currentTarget as HTMLElement;
-  seekRatio(ratioFromEvent(event, el));
-  trackPointer(event, {
-    move: (next) => seekRatio(ratioFromEvent(next, el)),
-    up: () => undefined,
-  });
 }
 
 function onPlayerDragStart(event: PointerEvent) {

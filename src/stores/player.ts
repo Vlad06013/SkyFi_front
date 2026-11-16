@@ -13,6 +13,7 @@ export const usePlayerStore = defineStore('player', () => {
   const expanded = ref(false);
   const clipMode = ref(false);
   const localDeviceId = ref(1);
+  const volume = ref(72);
   const queue = ref<TrackSnapshot[]>(
     favoriteTracks.filter((track) => track.source_id !== state.value.current_snapshot?.source_id),
   );
@@ -159,12 +160,17 @@ export const usePlayerStore = defineStore('player', () => {
     expanded.value = false;
   }
 
+  function setVolume(percent: number) {
+    volume.value = Math.round(Math.min(100, Math.max(0, percent)));
+  }
+
   return {
     state,
     liked,
     expanded,
     clipMode,
     localDeviceId,
+    volume,
     queue,
     current,
     title,
@@ -186,6 +192,7 @@ export const usePlayerStore = defineStore('player', () => {
     activateDevice,
     openExpanded,
     closeExpanded,
+    setVolume,
   };
 });
 
