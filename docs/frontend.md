@@ -37,18 +37,23 @@
 ```
 PlayerControls/
 ├── PlayerControls.vue   — только <template>
-├── PlayerControls.ts    — <script setup>: состояние, методы
+├── PlayerControls.ts    — defineComponent: setup, состояние, методы
 └── PlayerControls.css   — стили (scoped)
 ```
 
 - `X.vue` — вёрстка одним файлом. Подключает скрипт и стили
-  соседними файлами: `<script setup src="./X.ts"></script>`
+  соседними файлами: `<script src="./X.ts" lang="ts"></script>`
   и `<style scoped src="./X.css"></style>`. Из шаблона
-  напрямую доступно всё, что объявлено в ts-файле (refs,
-  computed, обработчики) — импорты живут в ts.
-- `X.ts` — вся логика: refs/computed/handlers, вызовы
-  composables (`usePlayer()`, `useApi()`). Никаких шаблонов
-  в строках, никакого HTML из скрипта.
+  доступно всё, что `setup()` вернул в `return`, плюс пропсы
+  и зарегистрированные в `components:` компоненты. (Вариант
+  `<script setup src>` не используем: vue-tsc не подхватывает
+  внешний setup-файл для типизации шаблона.)
+- `X.ts` — вся логика: `export default defineComponent({...})`
+  с опциями `name` (многословное), `components`, `props`,
+  `emits` и `setup()`. В `setup()` объявляем refs/computed/
+  handlers; в конце явный `return {...}` всего, что
+  использует шаблон. Никаких шаблонов в строках, никакого
+  HTML из скрипта.
 - `X.css` — только стили этого компонента (scoped). Тема,
   токены и глобальные стили — в отдельном `styles/` (тоже
   расколотом на файлы: tokens.css, base.css, ...).

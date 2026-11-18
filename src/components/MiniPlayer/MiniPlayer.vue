@@ -30,15 +30,4 @@
   </button>
 </template>
 
-<script setup lang="ts">
-import { computed } from 'vue';
-import { storeToRefs } from 'pinia';
-import { usePlayerStore } from '@/stores/player';
-import { coverVar } from '@/lib/cover';
-import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
-
-const player = usePlayerStore();
-const { current, title, artist, liked } = storeToRefs(player);
-const playing = computed(() => player.state.is_playing);
-const { togglePlay, toggleLike, openExpanded } = player;
-</script>
+<script src="./MiniPlayer.ts" lang="ts"></script>

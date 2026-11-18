@@ -9,9 +9,4 @@
   </Teleport>
 </template>
 
-<script setup lang="ts">
-import { storeToRefs } from 'pinia';
-import { useToastStore } from '@/stores/toast';
-
-const { toast } = storeToRefs(useToastStore());
-</script>
+<script src="./AppToast.ts" lang="ts"></script>

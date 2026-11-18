@@ -35,17 +35,4 @@
   </div>
 </template>
 
-<script setup lang="ts">
-import AppBar from '@/components/AppBar/AppBar.vue';
-import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
-import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
-import TrackRow from '@/components/TrackRow/TrackRow.vue';
-import { useMediaMenu } from '@/composables/useMediaMenu';
-import { coverVar, artistsLine } from '@/lib/cover';
-import { albumHeaven, favoriteTracks } from '@/mocks/catalog';
-import { usePlayerStore } from '@/stores/player';
-
-const player = usePlayerStore();
-const album = albumHeaven;
-const { open, variant, top, right, sheet, entity, openSnapshotMenu, closeMenu, run } = useMediaMenu();
-</script>
+<script src="./Album.ts" lang="ts"></script>

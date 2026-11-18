@@ -1,0 +1,10 @@
+.seek-bar {
+  padding: 12px 0;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.progress {
+  max-width: none;
+  pointer-events: none;
+}

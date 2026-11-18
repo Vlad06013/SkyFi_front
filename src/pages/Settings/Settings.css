@@ -1,7 +1,3 @@
-.sheet-mask {
-  position: absolute;
-}
-
 .logout-wrap {
   display: flex;
   justify-content: center;
@@ -24,8 +20,4 @@
 
 .logout-pill:active {
   transform: scale(0.97);
-}
-
-.set-row[role='button'] {
-  cursor: pointer;
 }

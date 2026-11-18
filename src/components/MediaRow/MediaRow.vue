@@ -22,24 +22,4 @@
   </div>
 </template>
 
-<script setup lang="ts">
-import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
-import { coverVar } from '@/lib/cover';
-import type { SnapshotSource } from '@/types';
-
-withDefaults(defineProps<{
-  title: string;
-  subtitle: string;
-  source: SnapshotSource;
-  round?: boolean;
-  menuable?: boolean;
-}>(), {
-  round: false,
-  menuable: true,
-});
-
-const emit = defineEmits<{
-  open: [];
-  menu: [event: MouseEvent];
-}>();
-</script>
+<script src="./MediaRow.ts" lang="ts"></script>

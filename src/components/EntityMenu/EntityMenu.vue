@@ -128,19 +128,4 @@
   </ContextMenu>
 </template>
 
-<script setup lang="ts">
-import ContextMenu from '@/components/ContextMenu/ContextMenu.vue';
-import type { MenuAction, MenuVariant } from '@/lib/media-menu';
-
-defineProps<{
-  open: boolean;
-  top: number;
-  right: number;
-  variant: MenuVariant;
-}>();
-
-const emit = defineEmits<{
-  close: [];
-  action: [action: MenuAction];
-}>();
-</script>
+<script src="./EntityMenu.ts" lang="ts"></script>

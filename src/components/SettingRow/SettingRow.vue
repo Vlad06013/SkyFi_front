@@ -16,17 +16,4 @@
   </div>
 </template>
 
-<script setup lang="ts">
-withDefaults(defineProps<{
-  title: string;
-  idle?: string;
-  on?: boolean;
-  clickable?: boolean;
-}>(), {
-  idle: '',
-  on: false,
-  clickable: false,
-});
-
-const emit = defineEmits<{ open: [] }>();
-</script>
+<script src="./SettingRow.ts" lang="ts"></script>

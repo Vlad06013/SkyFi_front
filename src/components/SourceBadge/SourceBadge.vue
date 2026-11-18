@@ -21,11 +21,4 @@
   </span>
 </template>
 
-<script setup lang="ts">
-import { computed } from 'vue';
-import type { SnapshotSource } from '@/types';
-import { sourceTitle } from '@/lib/cover';
-
-const props = defineProps<{ source: SnapshotSource }>();
-const label = computed(() => sourceTitle(props.source));
-</script>
+<script src="./SourceBadge.ts" lang="ts"></script>

@@ -55,21 +55,6 @@
   </div>
 </template>
 
-<script setup lang="ts">
-import { computed } from 'vue';
-import { storeToRefs } from 'pinia';
-import { usePlayerStore } from '@/stores/player';
-import { useNotificationsStore } from '@/stores/notifications';
-import { coverVar } from '@/lib/cover';
-import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
-
-const player = usePlayerStore();
-const { current, title, artist, liked } = storeToRefs(player);
-const playing = computed(() => player.state.is_playing);
-const { togglePlay, toggleLike, openExpanded, skipNext, skipPrevious } = player;
-const notifications = useNotificationsStore();
-const { hasUnread } = storeToRefs(notifications);
-const { toggle: toggleBell } = notifications;
-</script>
+<script src="./Home.ts" lang="ts"></script>
 
 <style scoped src="./Home.css"></style>

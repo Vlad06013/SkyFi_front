@@ -17,23 +17,4 @@
   </div>
 </template>
 
-<script setup lang="ts">
-import { storeToRefs } from 'pinia';
-import { useRouter } from 'vue-router';
-import { useNotificationsStore } from '@/stores/notifications';
-
-defineProps<{
-  title?: string;
-  back?: boolean;
-  badge?: boolean;
-}>();
-
-const notifications = useNotificationsStore();
-const { hasUnread } = storeToRefs(notifications);
-const { toggle } = notifications;
-const router = useRouter();
-
-function goBack() {
-  router.back();
-}
-</script>
+<script src="./AppBar.ts" lang="ts"></script>
