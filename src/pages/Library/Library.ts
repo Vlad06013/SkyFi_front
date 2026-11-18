@@ -6,17 +6,17 @@ import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
 import MediaRow from '@/components/MediaRow/MediaRow.vue';
 import TrackRow from '@/components/TrackRow/TrackRow.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
-import { moveItem, sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
-import { artistsLine } from '@/lib/cover';
+import { sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
+import { plural } from '@/lib/plural';import { artistsLine } from '@/lib/cover';
 import {
   favoriteAlbums,
   favoriteArtists,
   favoritePlaylists,
-  favoriteTracks,
   trackFatLip,
   trackRadio,
 } from '@/mocks/catalog';
 import { usePlayerStore } from '@/stores/player';
+import { useFavoritesStore } from '@/stores/favorites';
 import { useToastStore } from '@/stores/toast';
 import type { TrackSnapshot } from '@/types';
 import type { MenuEntity } from '@/lib/media-menu';
@@ -40,8 +40,9 @@ export default defineComponent({
     const router = useRouter();
     const player = usePlayerStore();
     const { current } = storeToRefs(player);
+    const favorites = useFavoritesStore();
+    const { tracks } = storeToRefs(favorites);
     const toast = useToastStore();
-    const tracks = ref([...favoriteTracks]);
     const playlists = ref([...favoritePlaylists]);
     const sortDrag = ref<ListSortState | null>(null);
 
@@ -54,14 +55,14 @@ export default defineComponent({
       },
     });
 
-    const counts: Record<LibTab, string> = {
-      tracks: '128 треков',
-      playlists: '6 плейлистов',
-      albums: '24 альбома',
-      artists: '18 артистов',
+    const counts = computed<Record<LibTab, string>>(() => ({
+      tracks: `${tracks.value.length} ${plural(tracks.value.length, ['трек', 'трека', 'треков'])}`,
+      playlists: `${playlists.value.length} ${plural(playlists.value.length, ['плейлист', 'плейлиста', 'плейлистов'])}`,
+      albums: `${favoriteAlbums.length} ${plural(favoriteAlbums.length, ['альбом', 'альбома', 'альбомов'])}`,
+      artists: `${favoriteArtists.length} ${plural(favoriteArtists.length, ['артист', 'артиста', 'артистов'])}`,
       uploads: '',
       downloaded: '',
-    };
+    }));
 
     const showDownloadAll = computed(
       () => tab.value === 'tracks' || tab.value === 'playlists' || tab.value === 'albums' || tab.value === 'artists',
@@ -84,7 +85,7 @@ export default defineComponent({
       if (item.snapshot?.type === 'playlist') openPlaylist(item.sourceId);
       else if (item.snapshot?.type === 'album') openAlbum(item.sourceId);
       else if (item.snapshot?.type === 'artist') openArtist(item.sourceId);
-      player.playSnapshot(tracks.value[0] ?? favoriteTracks[0]);
+      player.playSnapshot(tracks.value[0]);
     }
 
     function onSort(event: PointerEvent, index: number) {
@@ -97,7 +98,7 @@ export default defineComponent({
         },
         onEnd: (from, to) => {
           sortDrag.value = null;
-          tracks.value = moveItem(tracks.value, from, to);
+          favorites.reorder(from, to);
         },
       });
     }

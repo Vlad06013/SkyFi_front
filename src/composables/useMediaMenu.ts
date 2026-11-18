@@ -2,6 +2,7 @@ import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { entityFromSnapshot, menuAnchor, type MediaSheet, type MenuAction, type MenuEntity, type MenuVariant } from '@/lib/media-menu';
 import { usePlayerStore } from '@/stores/player';
+import { useFavoritesStore } from '@/stores/favorites';
 import { useToastStore } from '@/stores/toast';
 import type { AnySnapshot, TrackSnapshot } from '@/types';
 
@@ -10,9 +11,11 @@ export function useMediaMenu(hooks: {
   onEdit?: (entity: MenuEntity) => void;
   onDelete?: (entity: MenuEntity) => void;
   onLyrics?: () => void;
+  onLike?: (entity: MenuEntity) => void;
 } = {}) {
   const player = usePlayerStore();
   const { current, queue } = storeToRefs(player);
+  const favorites = useFavoritesStore();
   const toast = useToastStore();
   const menu = ref<{
     variant: MenuVariant;
@@ -69,6 +72,15 @@ export function useMediaMenu(hooks: {
       return;
     }
     if (action === 'like') {
+      if (hooks.onLike) {
+        hooks.onLike(target);
+        return;
+      }
+      if (target.snapshot?.type === 'track') {
+        const added = favorites.toggle(target.snapshot);
+        toast.show(target.title, added ? 'добавлено в избранное' : 'убрано из избранного');
+        return;
+      }
       toast.show(target.title, 'уже в избранном');
       return;
     }

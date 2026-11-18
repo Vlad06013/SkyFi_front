@@ -16,11 +16,11 @@
         </svg>
         В очередь другу
       </button>
-      <button type="button" @click="emit('action', 'like')">
+      <button type="button" :class="{ liked: isLiked }" @click="emit('action', 'like')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 20s-7-4.3-9-9c-1.2-2.8.6-6 3.8-6C9 5 12 8 12 8s3-3 5.2-3C20.4 5 22.2 8.2 21 11c-2 4.7-9 9-9 9z" />
         </svg>
-        В избранное
+        {{ isLiked ? 'Убрать из избранного' : 'В избранное' }}
       </button>
       <button type="button" @click="emit('action', 'playlist')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">

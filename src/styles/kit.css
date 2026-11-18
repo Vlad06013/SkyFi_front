@@ -578,6 +578,7 @@
 .ctx button:hover { background: var(--color-surface-3); }
 .ctx button svg { width: 18px; height: 18px; color: var(--color-text-secondary); flex-shrink: 0; }
 .ctx .bad { color: var(--color-text-secondary); }
+.ctx button.liked svg { color: var(--color-like); }
 
 .n-panel {
   background: #1c1c1c;

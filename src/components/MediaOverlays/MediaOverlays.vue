@@ -4,6 +4,7 @@
     :top="top"
     :right="right"
     :variant="variant"
+    :entity="entity"
     @close="emit('close')"
     @action="emit('action', $event)"
   />

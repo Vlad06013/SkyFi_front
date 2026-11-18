@@ -9,6 +9,7 @@ import { mockFriends } from '@/mocks/friends';
 import { favoriteTracks } from '@/mocks/catalog';
 import { coverVar, artistsLine } from '@/lib/cover';
 import { usePlayerStore } from '@/stores/player';
+import { useToastStore } from '@/stores/toast';
 
 export default defineComponent({
   name: 'FriendPage',
@@ -16,7 +17,10 @@ export default defineComponent({
   setup() {
     const route = useRoute();
     const player = usePlayerStore();
-    const { open, variant, top, right, sheet, entity, openSnapshotMenu, closeMenu, run } = useMediaMenu();
+    const toast = useToastStore();
+    const { open, variant, top, right, sheet, entity, openSnapshotMenu, closeMenu, run } = useMediaMenu({
+      onLike: () => toast.show(friend.value.name, 'это избранное друга'),
+    });
     const friend = computed(
       () => mockFriends.find((f) => String(f.id) === String(route.params.id)) ?? mockFriends[0],
     );
