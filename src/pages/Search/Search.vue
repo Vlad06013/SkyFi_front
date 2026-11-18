@@ -67,11 +67,12 @@
         />
       </template>
 
-      <MediaRow
+      <VideoRow
         v-else-if="section === 'videos'"
         :title="mockVideo.title"
         :subtitle="`${artistsLine(mockVideo.artists)} · клип`"
         :source="mockVideo.source_type"
+        :cover="mockVideo.cover_url ?? ''"
         :menuable="false"
         @open="player.playSnapshot(mockVideo)"
       />

@@ -5,6 +5,7 @@ import type {
   TrackSnapshot,
   VideoSnapshot,
 } from '@/types';
+import clipFrameUrl from '../../design/shared/clip-frame.jpg';
 
 export const trackRadio: TrackSnapshot = {
   type: 'track',
@@ -99,7 +100,18 @@ export const mockVideo: VideoSnapshot = {
   title: 'Радиотишина',
   artists: [{ name: 'Sum 41' }],
   duration_ms: 10000,
-  cover_url: '/design/shared/clip-frame.jpg',
+  cover_url: clipFrameUrl,
+  watch_url: 'https://test-videos.co.uk/',
+};
+
+export const mockVideoJellyfish: VideoSnapshot = {
+  type: 'video',
+  source_type: 'mock',
+  source_id: 'mock-jellyfish',
+  title: 'Морская',
+  artists: [{ name: 'Мумий Тролль' }],
+  duration_ms: 30000,
+  cover_url: clipFrameUrl,
   watch_url: 'https://test-videos.co.uk/',
 };
 
@@ -113,3 +125,4 @@ export const favoriteTracks: TrackSnapshot[] = [
 export const favoriteAlbums: AlbumSnapshot[] = [albumHeaven];
 export const favoriteArtists: ArtistSnapshot[] = [artistSum41];
 export const favoritePlaylists: PlaylistSnapshot[] = [playlistRoad, playlistPunk];
+export const favoriteVideos: VideoSnapshot[] = [mockVideo, mockVideoJellyfish];

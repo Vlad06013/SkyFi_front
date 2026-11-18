@@ -16,20 +16,27 @@
 
     <div v-if="showDownloadAll" class="dl-all-bar">
       <span class="dl-count">{{ counts[tab] }}</span>
-      <button v-if="tab === 'playlists'" class="dl-all is-run" type="button" aria-label="скачивается 42%">
-        <svg class="ring spin" viewBox="0 0 36 36" aria-hidden="true">
-          <circle class="track" cx="18" cy="18" r="15" />
-          <circle class="arc" cx="18" cy="18" r="15" transform="rotate(-90 18 18)" />
-        </svg>
-        <span class="pct">42%</span>
-      </button>
-      <span v-else-if="tab === 'albums'" class="dl-all is-done">Скачано</span>
-      <button v-else class="dl-all" type="button" aria-label="скачать все">
-        <svg class="ring" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15" /></svg>
-        <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M12 5v12m0 0 4.6-4.6M12 17l-4.6-4.6" />
-        </svg>
-      </button>
+      <div v-if="tab !== 'videos'" class="dl-bar-side">
+        <button v-if="tab === 'playlists'" class="icon-btn ghost" type="button" aria-label="новый плейлист" @click="openCreate">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
+        <button v-if="tab === 'playlists'" class="dl-all is-run" type="button" aria-label="скачивается 42%">
+          <svg class="ring spin" viewBox="0 0 36 36" aria-hidden="true">
+            <circle class="track" cx="18" cy="18" r="15" />
+            <circle class="arc" cx="18" cy="18" r="15" transform="rotate(-90 18 18)" />
+          </svg>
+          <span class="pct">42%</span>
+        </button>
+        <span v-else-if="tab === 'albums'" class="dl-all is-done">Скачано</span>
+        <button v-else class="dl-all" type="button" aria-label="скачать все">
+          <svg class="ring" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15" /></svg>
+          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 5v12m0 0 4.6-4.6M12 17l-4.6-4.6" />
+          </svg>
+        </button>
+      </div>
     </div>
 
     <div v-if="tab === 'tracks'" class="list-sort" :class="{ 'is-sorting': Boolean(sortDrag) }">
@@ -66,17 +73,6 @@
     </div>
 
     <template v-else-if="tab === 'playlists'">
-      <div class="pl-row">
-        <div class="pl-new">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-        </div>
-        <div class="track-meta">
-          <div class="track-title">Новый плейлист</div>
-          <div class="track-artist">имя и видимость</div>
-        </div>
-      </div>
       <MediaRow
         v-for="pl in playlists"
         :key="pl.source_id"
@@ -84,13 +80,13 @@
         :subtitle="`${pl.item_count} · ${pl.owner_name}`"
         :source="pl.source_type"
         @open="openPlaylist(pl.source_id)"
-        @menu="openSnapshotMenu($event, pl, pl.source_type === 'skyfi' ? 'own-playlist' : 'collection', pl.owner_name ?? undefined)"
+        @menu="openSnapshotMenu($event, pl, 'collection', pl.owner_name ?? undefined)"
       />
     </template>
 
     <template v-else-if="tab === 'albums'">
       <MediaRow
-        v-for="album in favoriteAlbums"
+        v-for="album in albums"
         :key="album.source_id"
         :title="album.title"
         :subtitle="`${artistsLine(album.artists)} · ${album.year}`"
@@ -102,7 +98,7 @@
 
     <template v-else-if="tab === 'artists'">
       <MediaRow
-        v-for="artist in favoriteArtists"
+        v-for="artist in artists"
         :key="artist.source_id"
         :title="artist.title"
         subtitle="Исполнитель"
@@ -110,6 +106,19 @@
         round
         @open="openArtist(artist.source_id)"
         @menu="openSnapshotMenu($event, artist, 'collection')"
+      />
+    </template>
+
+    <template v-else-if="tab === 'videos'">
+      <VideoRow
+        v-for="video in videos"
+        :key="video.source_id"
+        :title="video.title"
+        :subtitle="`${artistsLine(video.artists)} · клип`"
+        :source="video.source_type"
+        :cover="video.cover_url ?? ''"
+        @open="player.playSnapshot(video)"
+        @menu="openSnapshotMenu($event, video, 'video')"
       />
     </template>
 
@@ -129,6 +138,60 @@
       @action="run"
       @update:sheet="sheet = $event"
     />
+
+    <div v-if="createOpen" class="sheet-mask" @click.self="createOpen = false">
+      <div class="sheet">
+        <div class="handle" />
+        <div class="sheet-title">Новый плейлист</div>
+        <form class="up-form" @submit.prevent="createPlaylist">
+          <label>Название</label>
+          <div class="field" :class="{ 'is-focus': nameFocus }">
+            <input
+              v-model="draftName"
+              placeholder="Например: В дорогу"
+              @focus="nameFocus = true"
+              @blur="nameFocus = false"
+            >
+          </div>
+          <label>Видимость</label>
+          <div class="select" :class="{ 'is-open': visibilityOpen }">
+            <button type="button" class="select-box" @click="visibilityOpen = !visibilityOpen">
+              <span class="val">{{ visibilityLabel }}</span>
+              <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m6 9.5 6 6 6-6" />
+              </svg>
+            </button>
+            <div v-if="visibilityOpen" class="select-menu">
+              <button
+                v-for="option in visibilityOptions"
+                :key="option.value"
+                type="button"
+                class="select-opt"
+                :class="{ 'is-on': visibility === option.value }"
+                @click="pickVisibility(option.value)"
+              >
+                <span>{{ option.label }}<span class="osub">{{ option.hint }}</span></span>
+                <svg
+                  v-if="visibility === option.value"
+                  class="tick"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M5 12.5 9.5 17 19 7.5" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center;margin-top:4px">
+            Создать
+          </button>
+        </form>
+      </div>
+    </div>
   </div>
 </template>
 

@@ -4,6 +4,7 @@ import AppBar from '@/components/AppBar/AppBar.vue';
 import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
 import MediaRow from '@/components/MediaRow/MediaRow.vue';
 import TrackRow from '@/components/TrackRow/TrackRow.vue';
+import VideoRow from '@/components/VideoRow/VideoRow.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import { artistsLine } from '@/lib/cover';
 import { artistSum41, favoriteTracks, mockVideo } from '@/mocks/catalog';
@@ -11,7 +12,7 @@ import { usePlayerStore } from '@/stores/player';
 
 export default defineComponent({
   name: 'SearchPage',
-  components: { AppBar, MediaOverlays, MediaRow, TrackRow },
+  components: { AppBar, MediaOverlays, MediaRow, TrackRow, VideoRow },
   setup() {
     const query = ref('');
     const history = ['sum 41', 'би-2'];

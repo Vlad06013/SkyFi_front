@@ -6,8 +6,9 @@ import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import TrackRow from '@/components/TrackRow/TrackRow.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import { coverVar, artistsLine } from '@/lib/cover';
-import { favoritePlaylists, favoriteTracks, playlistRoad } from '@/mocks/catalog';
+import { playlistRoad } from '@/mocks/catalog';
 import { usePlayerStore } from '@/stores/player';
+import { useFavoritesStore } from '@/stores/favorites';
 
 export default defineComponent({
   name: 'PlaylistPage',
@@ -15,10 +16,11 @@ export default defineComponent({
   setup() {
     const route = useRoute();
     const player = usePlayerStore();
+    const favorites = useFavoritesStore();
     const { open, variant, top, right, sheet, entity, openSnapshotMenu, closeMenu, run } = useMediaMenu();
 
     const playlist = computed(
-      () => favoritePlaylists.find((p) => p.source_id === route.params.id) ?? playlistRoad,
+      () => favorites.playlists.find((p) => p.source_id === route.params.id) ?? playlistRoad,
     );
 
     const own = computed(() => playlist.value.source_type === 'skyfi');
@@ -26,7 +28,7 @@ export default defineComponent({
     return {
       playlist,
       own,
-      favoriteTracks,
+      favoriteTracks: favorites.tracks,
       player,
       coverVar,
       artistsLine,

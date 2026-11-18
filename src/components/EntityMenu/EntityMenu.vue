@@ -91,7 +91,54 @@
       </button>
     </template>
 
-    <template v-else-if="variant === 'own-playlist'">
+    <template v-else-if="variant === 'video'">
+      <button type="button" :class="{ liked: isLiked }" @click="emit('action', 'like')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 20s-7-4.3-9-9c-1.2-2.8.6-6 3.8-6C9 5 12 8 12 8s3-3 5.2-3C20.4 5 22.2 8.2 21 11c-2 4.7-9 9-9 9z" />
+        </svg>
+        {{ isLiked ? 'Убрать из избранного' : 'В избранное' }}
+      </button>
+      <button type="button" @click="emit('action', 'playlist')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 6h12M3 12h8" />
+          <path d="M18 10.5v11M12.5 16h11" stroke-width="2.4" />
+        </svg>
+        В плейлист
+      </button>
+      <button type="button" @click="emit('action', 'share')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 9.5H6.5A2.5 2.5 0 0 0 4 12v7.5A2.5 2.5 0 0 0 6.5 22h11a2.5 2.5 0 0 0 2.5-2.5V12a2.5 2.5 0 0 0-2.5-2.5H16" />
+          <path d="M12 15.5V3m0 0 3.6 3.6M12 3 8.4 6.6" />
+        </svg>
+        Поделиться
+      </button>
+    </template>
+
+    <template v-else>
+      <button type="button" @click="emit('action', 'listen')">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z" /></svg>
+        Слушать
+      </button>
+      <button type="button" :class="{ liked: isLiked }" @click="emit('action', 'like')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 20s-7-4.3-9-9c-1.2-2.8.6-6 3.8-6C9 5 12 8 12 8s3-3 5.2-3C20.4 5 22.2 8.2 21 11c-2 4.7-9 9-9 9z" />
+        </svg>
+        {{ isLiked ? 'Убрать из избранного' : 'В избранное' }}
+      </button>
+      <button type="button" @click="emit('action', 'download')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 4v9m0 0 3.5-3.5M12 13 8.5 9.5" />
+          <path d="M5 17h14" />
+        </svg>
+        Скачать
+      </button>
+      <button type="button" @click="emit('action', 'share')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 9.5H6.5A2.5 2.5 0 0 0 4 12v7.5A2.5 2.5 0 0 0 6.5 22h11a2.5 2.5 0 0 0 2.5-2.5V12a2.5 2.5 0 0 0-2.5-2.5H16" />
+          <path d="M12 15.5V3m0 0 3.6 3.6M12 3 8.4 6.6" />
+        </svg>
+        Поделиться
+      </button>
       <button type="button" @click="emit('action', 'edit')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 7h16M9 7V5.8A1.8 1.8 0 0 1 10.8 4h2.4A1.8 1.8 0 0 1 15 5.8V7M7 7l.8 13h8.4L17 7" />
@@ -102,27 +149,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
           <path d="M5 5l14 14M19 5 5 19" />
         </svg>
-        Удалить плейлист
-      </button>
-    </template>
-
-    <template v-else>
-      <button type="button" @click="emit('action', 'listen')">
-        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z" /></svg>
-        Слушать
-      </button>
-      <button type="button" @click="emit('action', 'like')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 20s-7-4.3-9-9c-1.2-2.8.6-6 3.8-6C9 5 12 8 12 8s3-3 5.2-3C20.4 5 22.2 8.2 21 11c-2 4.7-9 9-9 9z" />
-        </svg>
-        В избранное
-      </button>
-      <button type="button" @click="emit('action', 'share')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M8 9.5H6.5A2.5 2.5 0 0 0 4 12v7.5A2.5 2.5 0 0 0 6.5 22h11a2.5 2.5 0 0 0 2.5-2.5V12a2.5 2.5 0 0 0-2.5-2.5H16" />
-          <path d="M12 15.5V3m0 0 3.6 3.6M12 3 8.4 6.6" />
-        </svg>
-        Поделиться
+        Удалить
       </button>
     </template>
   </ContextMenu>

@@ -1,7 +1,7 @@
 import type { AnySnapshot, SnapshotSource } from '@/types';
 import { artistsLine } from '@/lib/cover';
 
-export type MenuVariant = 'track' | 'now' | 'own-playlist' | 'collection';
+export type MenuVariant = 'track' | 'now' | 'collection' | 'video';
 
 export type MediaSheet = 'friend-queue' | 'friend-share' | 'playlist' | 'share' | 'devices' | null;
 
@@ -29,8 +29,8 @@ export type MenuEntity = {
 const menuHeight: Record<MenuVariant, number> = {
   track: 292,
   now: 292,
-  'own-playlist': 112,
-  collection: 156,
+  collection: 292,
+  video: 156,
 };
 
 export function entityFromSnapshot(snapshot: AnySnapshot, artist = artistsLine(snapshot.artists)): MenuEntity {

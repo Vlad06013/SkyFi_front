@@ -76,7 +76,7 @@ export function useMediaMenu(hooks: {
         hooks.onLike(target);
         return;
       }
-      if (target.snapshot?.type === 'track') {
+      if (target.snapshot && (target.snapshot.type === 'track' || target.snapshot.type === 'video')) {
         const added = favorites.toggle(target.snapshot);
         toast.show(target.title, added ? 'добавлено в избранное' : 'убрано из избранного');
         return;
@@ -105,16 +105,20 @@ export function useMediaMenu(hooks: {
       return;
     }
     if (action === 'listen') {
-      if (target.snapshot?.type === 'track') player.playSnapshot(target.snapshot);
+      if (target.snapshot && (target.snapshot.type === 'track' || target.snapshot.type === 'video')) {
+        player.playSnapshot(target.snapshot);
+      }
       hooks.onListen?.(target);
       return;
     }
     if (action === 'edit') {
-      hooks.onEdit?.(target);
+      if (hooks.onEdit) hooks.onEdit(target);
+      else toast.show(target.title, 'редактирование — скоро');
       return;
     }
     if (action === 'delete') {
-      hooks.onDelete?.(target);
+      if (hooks.onDelete) hooks.onDelete(target);
+      else toast.show(target.title, 'удаление — скоро');
       return;
     }
     if (action === 'lyrics') {
