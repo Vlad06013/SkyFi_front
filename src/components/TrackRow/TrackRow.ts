@@ -13,6 +13,7 @@ export default defineComponent({
     source: { type: String as PropType<SnapshotSource>, required: true },
     playing: { type: Boolean, default: false },
     offline: { type: Boolean, default: false },
+    liked: { type: Boolean, default: false },
     sortable: { type: Boolean, default: false },
     menuable: { type: Boolean, default: true },
     dragging: { type: Boolean, default: false },

@@ -11,6 +11,7 @@ export default defineComponent({
     subtitle: { type: String, required: true },
     source: { type: String as PropType<SnapshotSource>, required: true },
     round: { type: Boolean, default: false },
+    liked: { type: Boolean, default: false },
     menuable: { type: Boolean, default: true },
   },
   emits: ['open', 'menu'],

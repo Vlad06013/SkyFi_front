@@ -5,6 +5,7 @@ type YmState = 'connected' | 'idle' | 'starting' | 'awaiting' | 'importing' | 'd
 
 const ymCode = '111111';
 const codeDelayMs = 1200;
+const confirmDelayMs = 8000;
 const importStepPct = 4;
 const importTickMs = 150;
 const importTotal = 1248;
@@ -14,9 +15,9 @@ export default defineComponent({
   setup() {
     const toast = useToastStore();
     const ymState = ref<YmState>('connected');
-    const codeDraft = ref('');
     const importPct = ref(0);
     let codeTimer: ReturnType<typeof setTimeout> | null = null;
+    let confirmTimer: ReturnType<typeof setTimeout> | null = null;
     let importTimer: ReturnType<typeof setInterval> | null = null;
 
     const isLinked = computed(() =>
@@ -39,6 +40,10 @@ export default defineComponent({
         clearTimeout(codeTimer);
         codeTimer = null;
       }
+      if (confirmTimer) {
+        clearTimeout(confirmTimer);
+        confirmTimer = null;
+      }
       if (importTimer) {
         clearInterval(importTimer);
         importTimer = null;
@@ -54,19 +59,13 @@ export default defineComponent({
     function requestCode() {
       clearTimers();
       ymState.value = 'starting';
-      codeDraft.value = '';
       codeTimer = setTimeout(() => {
         ymState.value = 'awaiting';
+        confirmTimer = setTimeout(() => {
+          ymState.value = 'connected';
+          toast.show('Яндекс Музыка', 'подключена');
+        }, confirmDelayMs);
       }, codeDelayMs);
-    }
-
-    function confirmCode() {
-      if (codeDraft.value.trim() !== ymCode) {
-        toast.show('Код не совпал', `введите ${ymCode}`);
-        return;
-      }
-      ymState.value = 'connected';
-      toast.show('Яндекс Музыка', 'подключена');
     }
 
     function startImport() {
@@ -97,14 +96,12 @@ export default defineComponent({
     return {
       ymState,
       ymCode,
-      codeDraft,
       importPct,
       importCount,
       isLinked,
       statusLine,
       disconnect,
       requestCode,
-      confirmCode,
       startImport,
       cancelImport,
       copied,

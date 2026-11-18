@@ -3,8 +3,9 @@ import { storeToRefs } from 'pinia';
 import { entityFromSnapshot, menuAnchor, type MediaSheet, type MenuAction, type MenuEntity, type MenuVariant } from '@/lib/media-menu';
 import { usePlayerStore } from '@/stores/player';
 import { useFavoritesStore } from '@/stores/favorites';
+import { useDownloadsStore } from '@/stores/downloads';
 import { useToastStore } from '@/stores/toast';
-import type { AnySnapshot, TrackSnapshot } from '@/types';
+import type { AnySnapshot } from '@/types';
 
 export function useMediaMenu(hooks: {
   onListen?: (entity: MenuEntity) => void;
@@ -16,6 +17,7 @@ export function useMediaMenu(hooks: {
   const player = usePlayerStore();
   const { current, queue } = storeToRefs(player);
   const favorites = useFavoritesStore();
+  const downloads = useDownloadsStore();
   const toast = useToastStore();
   const menu = ref<{
     variant: MenuVariant;
@@ -42,32 +44,41 @@ export function useMediaMenu(hooks: {
   }
 
   function openSnapshotMenu(event: MouseEvent, snapshot: AnySnapshot, nextVariant: MenuVariant, artist?: string) {
-    openMenu(event, nextVariant, entityFromSnapshot(snapshot, artist));
+    const next = entityFromSnapshot(snapshot, artist);
+    if (
+      menu.value &&
+      menu.value.entity.sourceId === next.sourceId &&
+      menu.value.variant === nextVariant
+    ) {
+      menu.value = null;
+      return;
+    }
+    openMenu(event, nextVariant, next);
   }
 
   function closeMenu() {
     menu.value = null;
   }
 
-  function enqueue(track: TrackSnapshot) {
+  function enqueue(snapshot: AnySnapshot) {
     const playingId = current.value && 'source_id' in current.value ? current.value.source_id : null;
-    if (track.source_id === playingId) {
-      toast.show(track.title, 'уже играет');
+    if (snapshot.source_id === playingId) {
+      toast.show(snapshot.title, 'уже играет');
       return;
     }
-    if (queue.value.some((item) => item.source_id === track.source_id)) {
-      toast.show(track.title, 'уже в очереди');
+    if (queue.value.some((item) => item.source_id === snapshot.source_id)) {
+      toast.show(snapshot.title, 'уже в очереди');
       return;
     }
-    queue.value = [...queue.value, track];
-    toast.show(`${track.title} — ${entity.value.artist}`, 'добавлено в очередь');
+    queue.value = [...queue.value, snapshot];
+    toast.show(`${snapshot.title} — ${entity.value.artist}`, 'добавлено в очередь');
   }
 
   function run(action: MenuAction) {
     const target = menu.value?.entity ?? entity.value;
     menu.value = null;
     entity.value = target;
-    if (action === 'queue' && target.snapshot?.type === 'track') {
+    if (action === 'queue' && target.snapshot) {
       enqueue(target.snapshot);
       return;
     }
@@ -85,6 +96,7 @@ export function useMediaMenu(hooks: {
       return;
     }
     if (action === 'download') {
+      if (target.snapshot) downloads.add(target.snapshot);
       toast.show(`${target.title} — ${target.artist}`, 'скачано');
       return;
     }

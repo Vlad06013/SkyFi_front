@@ -17,7 +17,13 @@ export default defineComponent({
   setup(props, { emit }) {
     const favorites = useFavoritesStore();
     const isLiked = computed(() => favorites.has(props.entity.snapshot));
+    const isTrackLike = computed(() =>
+      ['track', 'playlist-track', 'friend-track', 'playlist-video'].includes(props.variant),
+    );
+    const isInPlaylist = computed(() =>
+      props.variant === 'playlist-track' || props.variant === 'playlist-video',
+    );
 
-    return { emit, isLiked };
+    return { emit, isLiked, isTrackLike, isInPlaylist };
   },
 });

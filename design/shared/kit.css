@@ -216,6 +216,10 @@
     color: var(--color-text-primary); margin-bottom: 8px;
   }
   .logo-stage svg { width: 64px; height: 64px; }
+  .tab-preview { display: flex; align-items: flex-start; gap: 16px; margin-top: 10px; }
+  .tab-preview .tp { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; color: var(--color-text-faint); }
+  .tab-preview .tp svg { width: 22px; height: 22px; }
+  .tab-preview .tp.on { color: var(--color-accent); font-weight: 600; }
   .logo-sizes { display: flex; align-items: center; gap: 18px; margin-top: 12px; color: var(--color-text-primary); }
   .logo-sizes i { display: flex; color: var(--color-text-faint); font-size: 10px; font-style: normal; width: 28px; }
   .app-icon {
@@ -610,6 +614,8 @@
   .icon-cell .dl-all { margin: 0 auto; }
   .icon-cell .dl-all .ring { width: 36px; height: 36px; }
   .icon-cell .dl-all .arrow { width: 22px; height: 22px; }
+  .dl-all-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .dl-all-cap { font-size: 10px; line-height: 1; color: var(--color-text-faint); }
 
   .tabbar {
     display: flex; justify-content: space-between; gap: 4px;
@@ -676,8 +682,8 @@
     display: flex; align-items: center; justify-content: center;
   }
   .src svg { width: 12px; height: 12px; display: block; }
-  .cover .src { left: 8px; bottom: 8px; width: 22px; height: 22px; padding: 4px; }
-  .cover .src svg { width: 14px; height: 14px; }
+  .cover .src { left: 4px; bottom: 4px; width: 18px; height: 18px; padding: 3px; }
+  .cover .src svg { width: 12px; height: 12px; }
   .cover-big .src { left: 10px; bottom: 10px; width: 26px; height: 26px; padding: 5px; }
   .cover-big .src svg { width: 16px; height: 16px; }
 
@@ -1124,7 +1130,6 @@
     color: var(--color-text-primary);
     font-size: 13px;
     font-weight: 700;
-    text-align: center;
     text-overflow: ellipsis;
     white-space: nowrap;
   }

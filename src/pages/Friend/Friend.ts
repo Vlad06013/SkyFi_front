@@ -9,6 +9,7 @@ import { mockFriends, friendQueue } from '@/mocks/friends';
 import { favoriteTracks } from '@/mocks/catalog';
 import { coverVar, artistsLine } from '@/lib/cover';
 import { useFriendsStore } from '@/stores/friends';
+import { useFavoritesStore } from '@/stores/favorites';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
 
@@ -21,6 +22,7 @@ export default defineComponent({
     const player = usePlayerStore();
     const toast = useToastStore();
     const friendsStore = useFriendsStore();
+    const favorites = useFavoritesStore();
     const { open, variant, top, right, sheet, entity, openSnapshotMenu, closeMenu, run } = useMediaMenu();
 
     const friend = computed(
@@ -49,6 +51,7 @@ export default defineComponent({
       watching,
       favoriteTracks,
       friendQueue,
+      favorites,
       player,
       coverVar,
       artistsLine,

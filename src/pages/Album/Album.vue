@@ -18,6 +18,7 @@
       :title="track.title"
       :artist="artistsLine(track.artists)"
       :source="track.source_type"
+      :liked="favorites.has(track)"
       @play="player.playSnapshot(track)"
       @menu="openSnapshotMenu($event, track, 'track')"
     />

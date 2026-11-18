@@ -1,13 +1,13 @@
 <template>
   <div>
     <AppBar title="Настройки" />
-    <div v-if="user" class="friend-row" role="button" tabindex="0" style="padding:12px 2px 16px" @click="openName">
-      <div class="pic-plus round sm">
+    <div v-if="user" class="friend-row" style="padding:12px 2px 16px">
+      <div class="pic-plus round sm" role="button" tabindex="0" aria-label="загрузить фото" @click="pickAvatar" @keydown.enter.prevent="pickAvatar">
         <div class="avatar ini">
           <img v-if="user.avatar" :src="user.avatar" alt="">
           <template v-else>{{ user.name.slice(0, 1) }}</template>
         </div>
-        <span class="plus" role="button" aria-label="загрузить фото" @click.stop="pickAvatar">
+        <span class="plus" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
             <path d="M12 5v14M5 12h14" />
           </svg>

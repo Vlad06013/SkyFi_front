@@ -1,17 +1,30 @@
 <template>
   <button
     v-if="current"
+    ref="rootEl"
     class="mini-player"
     type="button"
-    :style="dragStyle"
     @pointerdown="onDragStart"
   >
-    <div class="thumb" :style="{ background: coverVar(current.source_type) }">
-      <SourceBadge :source="current.source_type" />
-    </div>
-    <div class="track-meta">
-      <div class="track-title">{{ title }}</div>
-      <div class="track-artist">{{ artist }}</div>
+    <div class="mp-slider" :style="sliderStyle">
+      <div v-for="(pane, index) in panes" :key="index" class="mp-pane">
+        <div class="thumb" :style="{ background: coverVar(pane.snapshot.source_type) }">
+          <template v-if="pane.snapshot.type === 'video'">
+            <img v-if="pane.snapshot.cover_url" class="mp-cover" :src="pane.snapshot.cover_url" alt="">
+            <span class="vid-badge" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="6" width="18" height="12" rx="2" />
+                <path d="M10.2 9.6v4.8l4.2-2.4z" fill="currentColor" stroke="none" />
+              </svg>
+            </span>
+          </template>
+          <SourceBadge v-else :source="pane.snapshot.source_type" />
+        </div>
+        <div class="track-meta">
+          <div class="track-title">{{ pane.title }}</div>
+          <div class="track-artist">{{ pane.artist }}</div>
+        </div>
+      </div>
     </div>
     <span
       class="icon-btn"
@@ -37,3 +50,5 @@
 </template>
 
 <script src="./MiniPlayer.ts" lang="ts"></script>
+
+<style scoped src="./MiniPlayer.css"></style>

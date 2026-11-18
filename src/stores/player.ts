@@ -2,7 +2,7 @@ import { acceptHMRUpdate, defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { favoriteTracks } from '@/mocks/catalog';
 import { mockPlayerState } from '@/mocks/player';
-import type { AnySnapshot, RepeatMode, TrackSnapshot } from '@/types';
+import type { AnySnapshot, RepeatMode } from '@/types';
 
 const repeatCycle: RepeatMode[] = ['off', 'all', 'one'];
 const skipRestartAfter = 3;
@@ -15,7 +15,7 @@ export const usePlayerStore = defineStore('player', () => {
   const clipQualities = [360, 720, 1080];
   const localDeviceId = ref(1);
   const volume = ref(72);
-  const queue = ref<TrackSnapshot[]>(
+  const queue = ref<AnySnapshot[]>(
     favoriteTracks.filter((track) => track.source_id !== state.value.current_snapshot?.source_id),
   );
 
@@ -44,6 +44,18 @@ export const usePlayerStore = defineStore('player', () => {
   const title = computed(() => current.value?.title ?? '');
   const artist = computed(() =>
     current.value?.artists.map((a) => a.name).join(', ') ?? '',
+  );
+  function cycleInContext(delta: number) {
+    const sourceId = snapshotId(current.value);
+    const index = favoriteTracks.findIndex((track) => track.source_id === sourceId);
+    const from = index < 0 ? 0 : index;
+    return favoriteTracks[(from + delta + favoriteTracks.length) % favoriteTracks.length];
+  }
+  const previewNext = computed<AnySnapshot | null>(
+    () => queue.value[0] ?? (favoriteTracks.length ? cycleInContext(1) : null),
+  );
+  const previewPrevious = computed<AnySnapshot | null>(
+    () => (favoriteTracks.length ? cycleInContext(-1) : null),
   );
   const album = computed(() => {
     const snap = current.value;
@@ -177,6 +189,8 @@ export const usePlayerStore = defineStore('player', () => {
     current,
     title,
     artist,
+    previewNext,
+    previewPrevious,
     album,
     durationSeconds,
     progress,

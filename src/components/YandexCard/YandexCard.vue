@@ -36,6 +36,7 @@
     </div>
 
     <template v-else-if="ymState === 'awaiting'">
+      <p class="caption">Скопируйте код, перейдите по ссылке и введите его на странице Яндекса — подключение подтвердится само.</p>
       <div class="ym-code">
         <div class="track-meta">
           <div class="l">Код</div>
@@ -60,10 +61,6 @@
           </svg>
         </button>
       </div>
-      <div class="field" style="margin-top:10px">
-        <input v-model="codeDraft" placeholder="введите код 111111" inputmode="numeric" @keyup.enter="confirmCode">
-      </div>
-      <button class="btn btn-primary wide" type="button" @click="confirmCode">Подтвердить</button>
       <button class="btn btn-ghost wide" type="button" @click="requestCode">Перезапросить код</button>
     </template>
 
@@ -80,7 +77,7 @@
     <template v-else-if="ymState === 'importing'">
       <div class="ym-progress">
         <div class="ym-progress-head">
-          <span>Треки</span>
+          <span>Импортируем</span>
           <span class="ym-progress-pct">{{ importPct }}%</span>
         </div>
         <div class="ym-bar"><i :style="{ width: `${importPct}%` }" /></div>

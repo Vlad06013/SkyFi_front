@@ -39,6 +39,7 @@ export default defineComponent({
       chips,
       favoriteTracks,
       albums,
+      favorites,
       player,
       coverVar,
       artistsLine,

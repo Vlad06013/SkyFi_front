@@ -10,17 +10,17 @@ import UploadForm from '@/components/UploadForm/UploadForm.vue';
 import VideoRow from '@/components/VideoRow/VideoRow.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import type { PlaylistDraft } from '@/components/PlaylistForm/PlaylistForm';
+import type { UploadDraft } from '@/components/UploadForm/UploadForm';
 import { sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
 import { plural } from '@/lib/plural';
 import { artistsLine } from '@/lib/cover';
 import {
-  downloadedTracks,
   trackFatLip,
-  trackRadio,
   uploadedTracks,
 } from '@/mocks/catalog';
 import { usePlayerStore } from '@/stores/player';
 import { useFavoritesStore } from '@/stores/favorites';
+import { useDownloadsStore } from '@/stores/downloads';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
 import { useLibraryTab, type LibraryTab } from '@/composables/useLibraryTab';
@@ -52,9 +52,11 @@ export default defineComponent({
     const sortDrag = ref<ListSortState | null>(null);
 
     const createOpen = ref(false);
+    const uploadOpen = ref(false);
     const editing = ref<PlaylistSnapshot | null>(null);
     const uploads = ref<TrackSnapshot[]>([...uploadedTracks]);
-    const downloaded = downloadedTracks;
+    const downloads = useDownloadsStore();
+    const downloaded = downloads.items;
 
     const { open, variant, top, right, sheet, entity, openSnapshotMenu, closeMenu, run } = useMediaMenu({
       onListen: (item) => listenCollection(item),
@@ -105,7 +107,15 @@ export default defineComponent({
     }
 
     function isDownloaded(track: TrackSnapshot) {
-      return track.source_id === trackRadio.source_id || track.source_type === 'upload';
+      return downloads.isDownloaded(track);
+    }
+
+    const dlAllStatus = computed(() => downloads.status(tab.value));
+    const dlAllPct = computed(() => downloads.pct(tab.value));
+    const dlAllArc = computed(() => Math.round((dlAllPct.value / 100) * 94));
+
+    function downloadAllTab() {
+      downloads.downloadAll(tab.value, tab.value === 'tracks' ? tracks.value : []);
     }
 
     function listenCollection(item: MenuEntity) {
@@ -152,7 +162,6 @@ export default defineComponent({
       favorites.add(playlist);
       createOpen.value = false;
       toast.show(draft.name, 'плейлист создан');
-      router.push(`/playlist/${playlist.source_id}`);
     }
 
     function savePlaylist(draft: PlaylistDraft) {
@@ -163,7 +172,7 @@ export default defineComponent({
       editing.value = null;
     }
 
-    function onUpload(draft: { title: string; artists: string; album: string }) {
+    function onUpload(draft: UploadDraft) {
       const track: TrackSnapshot = {
         type: 'track',
         source_type: 'upload',
@@ -178,7 +187,13 @@ export default defineComponent({
         stream_url: null,
       };
       uploads.value = [track, ...uploads.value];
-      toast.show(track.title, 'загружено');
+      uploadOpen.value = false;
+      const visibilityHint: Record<Visibility, string> = {
+        public: 'видят все',
+        friends: 'видят друзья',
+        private: 'только вы',
+      };
+      toast.show(track.title, `загружено · ${visibilityHint[draft.visibility]}`);
     }
 
     function openAlbum(id: string) {
@@ -199,12 +214,17 @@ export default defineComponent({
       playlists,
       sortDrag,
       player,
+      favorites,
       counts,
       showDownloadAll,
       artistsLine,
       isPlaying,
       isOffline,
       isDownloaded,
+      dlAllStatus,
+      dlAllPct,
+      dlAllArc,
+      downloadAllTab,
       onSort,
       sortRowStyle,
       openPlaylist,
@@ -220,6 +240,7 @@ export default defineComponent({
       closeMenu,
       run,
       createOpen,
+      uploadOpen,
       editing,
       uploads,
       downloaded,

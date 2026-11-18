@@ -1,6 +1,6 @@
 <template>
   <ContextMenu :open="open" :top="top" :right="right" @close="emit('close')">
-    <template v-if="variant === 'track' || variant === 'playlist-track' || variant === 'friend-track'">
+    <template v-if="isTrackLike">
       <button type="button" @click="emit('action', 'queue')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 6h11M3 12h11M3 18h6.5" />
@@ -16,24 +16,20 @@
         </svg>
         В очередь другу
       </button>
-      <template v-if="variant !== 'friend-track'">
-        <button type="button" :class="{ liked: isLiked }" @click="emit('action', 'like')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 20s-7-4.3-9-9c-1.2-2.8.6-6 3.8-6C9 5 12 8 12 8s3-3 5.2-3C20.4 5 22.2 8.2 21 11c-2 4.7-9 9-9 9z" />
-          </svg>
-          {{ isLiked ? 'Убрать из избранного' : 'В избранное' }}
-        </button>
-      </template>
-      <template v-if="variant !== 'playlist-track'">
-        <button type="button" @click="emit('action', 'playlist')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 6h12M3 12h8" />
-            <path d="M18 10.5v11M12.5 16h11" stroke-width="2.4" />
-          </svg>
-          В плейлист
-        </button>
-      </template>
-      <button type="button" @click="emit('action', 'download')">
+      <button type="button" :class="{ liked: isLiked }" @click="emit('action', 'like')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 20s-7-4.3-9-9c-1.2-2.8.6-6 3.8-6C9 5 12 8 12 8s3-3 5.2-3C20.4 5 22.2 8.2 21 11c-2 4.7-9 9-9 9z" />
+        </svg>
+        {{ isLiked ? 'Убрать из избранного' : 'В избранное' }}
+      </button>
+      <button v-if="variant === 'track'" type="button" @click="emit('action', 'playlist')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 6h12M3 12h8" />
+          <path d="M18 10.5v11M12.5 16h11" stroke-width="2.4" />
+        </svg>
+        В плейлист
+      </button>
+      <button v-if="variant !== 'playlist-video'" type="button" @click="emit('action', 'download')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 4v9m0 0 3.5-3.5M12 13 8.5 9.5" />
           <path d="M5 17h14" />
@@ -46,6 +42,12 @@
           <path d="M12 15.5V3m0 0 3.6 3.6M12 3 8.4 6.6" />
         </svg>
         Поделиться
+      </button>
+      <button v-if="isInPlaylist" class="bad" type="button" @click="emit('action', 'delete')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 5l14 14M19 5 5 19" />
+        </svg>
+        Удалить из плейлиста
       </button>
     </template>
 
@@ -96,6 +98,13 @@
     </template>
 
     <template v-else-if="variant === 'video'">
+      <button type="button" @click="emit('action', 'queue')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 6h11M3 12h11M3 18h6.5" />
+          <path d="M13.6 7 22 12l-8.4 5z" fill="currentColor" stroke="none" />
+        </svg>
+        В очередь
+      </button>
       <button type="button" :class="{ liked: isLiked }" @click="emit('action', 'like')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 20s-7-4.3-9-9c-1.2-2.8.6-6 3.8-6C9 5 12 8 12 8s3-3 5.2-3C20.4 5 22.2 8.2 21 11c-2 4.7-9 9-9 9z" />

@@ -30,6 +30,7 @@
         :title="track.title"
         :artist="artistsLine(track.artists)"
         :source="track.source_type"
+        :liked="favorites.has(track)"
         @play="player.playSnapshot(track)"
         @menu="openSnapshotMenu($event, track, 'track')"
       />
@@ -41,6 +42,7 @@
         :title="album.title"
         :subtitle="`${album.year} · ${album.track_count} треков`"
         :source="album.source_type"
+        :liked="favorites.has(album)"
         @open="openAlbum(album.source_id)"
         @menu="openSnapshotMenu($event, album, 'collection')"
       />

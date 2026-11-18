@@ -5,6 +5,9 @@
       <div class="avatar ini lg" :class="friend.tone">{{ friend.initial }}</div>
       <div class="f-name">{{ friend.name }}</div>
       <div class="f-mail">{{ friend.email }}</div>
+      <div style="margin-top:10px">
+        <button class="btn btn-danger sm" type="button" @click="removeFriend">Удалить из друзей</button>
+      </div>
     </div>
     <div v-if="friend.current_snapshot && watching" class="now-card is-vid">
       <div class="preview">
@@ -57,6 +60,7 @@
       :title="track.title"
       :artist="artistsLine(track.artists)"
       :source="track.source_type"
+      :liked="favorites.has(track)"
       @play="player.playSnapshot(track)"
       @menu="openSnapshotMenu($event, track, 'friend-track')"
     />
@@ -67,12 +71,10 @@
       :title="track.title"
       :artist="artistsLine(track.artists)"
       :source="track.source_type"
+      :liked="favorites.has(track)"
       @play="player.playSnapshot(track)"
       @menu="openSnapshotMenu($event, track, 'friend-track')"
     />
-    <div class="logout-wrap">
-      <button class="btn btn-danger" type="button" @click="removeFriend">Удалить из друзей</button>
-    </div>
     <MediaOverlays
       :open="open"
       :top="top"

@@ -1,17 +1,17 @@
 import { computed, defineComponent, ref, type PropType } from 'vue';
 import type { Visibility } from '@/types';
 
+export const visibilityOptions: { value: Visibility; label: string; hint: string }[] = [
+  { value: 'private', label: 'Только я', hint: 'видите только вы' },
+  { value: 'friends', label: 'Друзья', hint: 'видят ваши друзья' },
+  { value: 'public', label: 'Все', hint: 'видят все пользователи' },
+];
+
 export interface PlaylistDraft {
   name: string;
   visibility: Visibility;
   cover: string | null;
 }
-
-const visibilityOptions: { value: Visibility; label: string; hint: string }[] = [
-  { value: 'private', label: 'Только я', hint: 'видите только вы' },
-  { value: 'friends', label: 'Друзья', hint: 'видят ваши друзья' },
-  { value: 'public', label: 'Все', hint: 'плейлист в открытом доступе' },
-];
 
 export default defineComponent({
   name: 'PlaylistForm',

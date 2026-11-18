@@ -12,7 +12,7 @@
       <template v-else> · {{ playlist.owner_name }}</template>
     </div>
     <div class="hero-actions">
-      <button class="fab small" type="button" aria-label="играть" @click="player.playSnapshot(content[0])">
+      <button class="fab small" type="button" aria-label="играть" @click="content[0] && player.playSnapshot(content[0])">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z" /></svg>
       </button>
       <button class="icon-btn liked" type="button" aria-label="в избранном">
@@ -29,17 +29,22 @@
         :source="item.source_type"
         :cover="item.cover_url ?? ''"
         @open="player.playSnapshot(item)"
-        @menu="openSnapshotMenu($event, item, 'video')"
+        @menu="openSnapshotMenu($event, item, 'playlist-video')"
       />
       <TrackRow
         v-else
         :title="item.title"
         :artist="artistsLine(item.artists)"
         :source="item.source_type"
+        :liked="favorites.has(item)"
         @play="player.playSnapshot(item)"
         @menu="openSnapshotMenu($event, item, 'playlist-track')"
       />
     </template>
+    <div v-if="!content.length" class="empty">
+      <div class="et">Пусто</div>
+      <div class="es">Добавляйте треки через меню «⋯ → В плейлист»</div>
+    </div>
     <MediaOverlays
       :open="open"
       :top="top"

@@ -36,6 +36,39 @@
         @blur="albumFocus = false"
       >
     </div>
+    <label>Видимость</label>
+    <div class="select" :class="{ 'is-open': visibilityOpen }">
+      <button type="button" class="select-box" @click="visibilityOpen = !visibilityOpen">
+        <span class="val">{{ visibilityLabel }}</span>
+        <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m6 9.5 6 6 6-6" />
+        </svg>
+      </button>
+      <div v-if="visibilityOpen" class="select-menu">
+        <button
+          v-for="option in visibilityOptions"
+          :key="option.value"
+          type="button"
+          class="select-opt"
+          :class="{ 'is-on': visibility === option.value }"
+          @click="pickVisibility(option.value)"
+        >
+          <span>{{ option.label }}<span class="osub">{{ option.hint }}</span></span>
+          <svg
+            v-if="visibility === option.value"
+            class="tick"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M5 12.5 9.5 17 19 7.5" />
+          </svg>
+        </button>
+      </div>
+    </div>
     <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center">
       Загрузить
     </button>

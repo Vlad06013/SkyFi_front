@@ -14,6 +14,17 @@
       </button>
     </div>
 
+    <div v-if="tab === 'uploads'" class="dl-all-bar">
+      <span class="dl-count" />
+      <div class="dl-bar-side">
+        <button class="icon-btn ghost" type="button" aria-label="загрузить трек" @click="uploadOpen = true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
     <div v-if="showDownloadAll" class="dl-all-bar">
       <span class="dl-count">{{ counts[tab] }}</span>
       <div v-if="tab !== 'videos'" class="dl-bar-side">
@@ -22,20 +33,32 @@
             <path d="M12 5v14M5 12h14" />
           </svg>
         </button>
-        <button v-if="tab === 'playlists'" class="dl-all is-run" type="button" aria-label="скачивается 42%">
-          <svg class="ring spin" viewBox="0 0 36 36" aria-hidden="true">
-            <circle class="track" cx="18" cy="18" r="15" />
-            <circle class="arc" cx="18" cy="18" r="15" transform="rotate(-90 18 18)" />
-          </svg>
-          <span class="pct">42%</span>
-        </button>
-        <span v-else-if="tab === 'albums'" class="dl-all is-done">Скачано</span>
-        <button v-else class="dl-all" type="button" aria-label="скачать все">
-          <svg class="ring" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15" /></svg>
-          <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M12 5v12m0 0 4.6-4.6M12 17l-4.6-4.6" />
-          </svg>
-        </button>
+        <div class="dl-all-wrap">
+          <span v-if="dlAllStatus === 'done'" class="dl-all is-done">Скачано</span>
+          <button
+            v-else
+            class="dl-all"
+            :class="{ 'is-run': dlAllStatus === 'run' }"
+            type="button"
+            :aria-label="dlAllStatus === 'run' ? `скачивается ${dlAllPct}%` : 'скачать все'"
+            @click="downloadAllTab"
+          >
+            <template v-if="dlAllStatus === 'run'">
+              <svg class="ring spin" viewBox="0 0 36 36" aria-hidden="true">
+                <circle class="track" cx="18" cy="18" r="15" />
+                <circle class="arc" cx="18" cy="18" r="15" transform="rotate(-90 18 18)" :style="{ strokeDasharray: `${dlAllArc} 94` }" />
+              </svg>
+              <span class="pct">{{ dlAllPct }}%</span>
+            </template>
+            <template v-else>
+              <svg class="ring" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15" /></svg>
+              <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 5v12m0 0 4.6-4.6M12 17l-4.6-4.6" />
+              </svg>
+            </template>
+          </button>
+          <span v-if="dlAllStatus !== 'done'" class="dl-all-cap">Скачать</span>
+        </div>
       </div>
     </div>
 
@@ -48,6 +71,7 @@
         :source="track.source_type"
         :playing="isPlaying(track)"
         :offline="isOffline(track)"
+        :liked="favorites.has(track)"
         sortable
         :dragging="sortDrag?.from === index"
         :drag-style="sortRowStyle(index, sortDrag)"
@@ -123,7 +147,6 @@
     </template>
 
     <template v-else-if="tab === 'uploads'">
-      <UploadForm @upload="onUpload" />
       <TrackRow
         v-for="track in uploads"
         :key="track.source_id"
@@ -183,6 +206,14 @@
         <div class="handle" />
         <div class="sheet-title">Новый плейлист</div>
         <PlaylistForm submit-label="Создать" @submit="createPlaylist" />
+      </div>
+    </div>
+
+    <div v-if="uploadOpen" class="sheet-mask" @click.self="uploadOpen = false">
+      <div class="sheet">
+        <div class="handle" />
+        <div class="sheet-title">Загрузить трек</div>
+        <UploadForm @upload="onUpload" />
       </div>
     </div>
 
