@@ -1,5 +1,6 @@
 import type {
   AlbumSnapshot,
+  AnySnapshot,
   ArtistSnapshot,
   PlaylistSnapshot,
   TrackSnapshot,
@@ -118,6 +119,30 @@ export const mockVideoJellyfish: VideoSnapshot = {
 export const favoriteTracks: TrackSnapshot[] = [
   trackRadio,
   trackColonel,
+  trackSea,
+  trackFatLip,
+];
+
+export const trackOwnDemo: TrackSnapshot = {
+  type: 'track',
+  source_type: 'upload',
+  source_id: 'up-2',
+  title: 'Демо на диване',
+  duration_ms: 187000,
+  artists: [{ name: 'Я' }],
+  album: null,
+  stream_url: '/local/demo.mp3',
+};
+
+export const uploadedTracks: TrackSnapshot[] = [trackColonel, trackOwnDemo];
+
+export const downloadedTracks: TrackSnapshot[] = [trackRadio, trackColonel, trackFatLip];
+
+/** Контент «В дорогу»: треки + один клип, чтобы проверить смешанный список. */
+export const playlistRoadContent: AnySnapshot[] = [
+  trackRadio,
+  trackColonel,
+  mockVideo,
   trackSea,
   trackFatLip,
 ];

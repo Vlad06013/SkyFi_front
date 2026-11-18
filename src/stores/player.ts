@@ -9,9 +9,10 @@ const skipRestartAfter = 3;
 
 export const usePlayerStore = defineStore('player', () => {
   const state = ref(mockPlayerState.state);
-  const liked = ref(true);
   const expanded = ref(false);
   const clipMode = ref(false);
+  const clipQuality = ref(720);
+  const clipQualities = [360, 720, 1080];
   const localDeviceId = ref(1);
   const volume = ref(72);
   const queue = ref<TrackSnapshot[]>(
@@ -64,10 +65,6 @@ export const usePlayerStore = defineStore('player', () => {
 
   function togglePlay() {
     state.value = { ...state.value, is_playing: !state.value.is_playing };
-  }
-
-  function toggleLike() {
-    liked.value = !liked.value;
   }
 
   function toggleShuffle() {
@@ -141,6 +138,10 @@ export const usePlayerStore = defineStore('player', () => {
     clipMode.value = !clipMode.value;
   }
 
+  function setClipQuality(quality: number) {
+    clipQuality.value = quality;
+  }
+
   function activateDevice(id: number) {
     state.value = {
       ...state.value,
@@ -166,9 +167,10 @@ export const usePlayerStore = defineStore('player', () => {
 
   return {
     state,
-    liked,
     expanded,
     clipMode,
+    clipQuality,
+    clipQualities,
     localDeviceId,
     volume,
     queue,
@@ -179,7 +181,6 @@ export const usePlayerStore = defineStore('player', () => {
     durationSeconds,
     progress,
     togglePlay,
-    toggleLike,
     toggleShuffle,
     toggleRepeat,
     playSnapshot,
@@ -189,6 +190,7 @@ export const usePlayerStore = defineStore('player', () => {
     seek,
     seekRatio,
     toggleClips,
+    setClipQuality,
     activateDevice,
     openExpanded,
     closeExpanded,

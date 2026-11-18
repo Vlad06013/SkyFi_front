@@ -31,9 +31,9 @@
           </button>
         </div>
       </div>
-      <div class="sec-label">Друзья</div>
+      <div class="sec-label">Друзья <span>{{ listening.length }}</span></div>
       <button
-        v-for="friend in mockFriends"
+        v-for="friend in listening"
         :key="friend.id"
         class="friend-row"
         type="button"
@@ -43,21 +43,46 @@
         <div class="track-meta">
           <div class="track-title">{{ friend.name }}</div>
           <div v-if="friend.live" class="live">{{ friend.live }}</div>
-          <div v-else class="idle">{{ friend.idle }}</div>
         </div>
-        <span v-if="friend.live && !friend.watching" class="eq" aria-hidden="true"><i /><i /><i /></span>
+        <div
+          v-if="friend.watching && friend.current_snapshot?.type === 'video'"
+          class="now-prev"
+          aria-hidden="true"
+        >
+          <img :src="friend.current_snapshot.cover_url ?? ''" alt="">
+          <span class="vid-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="6" width="18" height="12" rx="2" />
+              <path d="M10.2 9.6v4.8l4.2-2.4z" fill="currentColor" stroke="none" />
+            </svg>
+          </span>
+        </div>
       </button>
+      <div v-if="outgoing" class="friend-row">
+        <div class="avatar ini" :class="outgoing.tone">{{ outgoing.initial }}</div>
+        <div class="track-meta">
+          <div class="track-title">{{ outgoing.name }}</div>
+          <div class="idle">заявка отправлена</div>
+        </div>
+        <button class="btn btn-ghost sm" type="button" @click="cancelOutgoing">Отменить</button>
+      </div>
     </template>
 
     <template v-else>
-      <div v-for="friend in filtered()" :key="friend.id" class="friend-row">
+      <button
+        v-for="friend in filtered"
+        :key="friend.id"
+        class="friend-row"
+        type="button"
+        @click="openFriend(friend.id)"
+      >
         <div class="avatar ini" :class="friend.tone">{{ friend.initial }}</div>
         <div class="track-meta">
           <div class="track-title">{{ friend.name }}</div>
           <div class="idle">{{ friend.email }}</div>
         </div>
         <span class="muted-pill">Друзья</span>
-      </div>
+      </button>
     </template>
   </div>
 </template>

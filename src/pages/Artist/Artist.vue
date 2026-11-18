@@ -11,15 +11,40 @@
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z" /></svg>
       </button>
     </div>
-    <TrackRow
-      v-for="track in favoriteTracks"
-      :key="track.source_id"
-      :title="track.title"
-      :artist="artistsLine(track.artists)"
-      :source="track.source_type"
-      @play="player.playSnapshot(track)"
-      @menu="openSnapshotMenu($event, track, 'track')"
-    />
+    <div class="chips is-center">
+      <button
+        v-for="chip in chips"
+        :key="chip.id"
+        class="chip"
+        :class="{ active: tab === chip.id }"
+        type="button"
+        @click="tab = chip.id"
+      >
+        {{ chip.label }}
+      </button>
+    </div>
+    <template v-if="tab === 'tracks'">
+      <TrackRow
+        v-for="track in favoriteTracks"
+        :key="track.source_id"
+        :title="track.title"
+        :artist="artistsLine(track.artists)"
+        :source="track.source_type"
+        @play="player.playSnapshot(track)"
+        @menu="openSnapshotMenu($event, track, 'track')"
+      />
+    </template>
+    <template v-else>
+      <MediaRow
+        v-for="album in albums"
+        :key="album.source_id"
+        :title="album.title"
+        :subtitle="`${album.year} · ${album.track_count} треков`"
+        :source="album.source_type"
+        @open="openAlbum(album.source_id)"
+        @menu="openSnapshotMenu($event, album, 'collection')"
+      />
+    </template>
     <MediaOverlays
       :open="open"
       :top="top"

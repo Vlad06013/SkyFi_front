@@ -12,7 +12,7 @@
       <template v-else> · {{ playlist.owner_name }}</template>
     </div>
     <div class="hero-actions">
-      <button class="fab small" type="button" aria-label="играть" @click="player.playSnapshot(favoriteTracks[0])">
+      <button class="fab small" type="button" aria-label="играть" @click="player.playSnapshot(content[0])">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z" /></svg>
       </button>
       <button class="icon-btn liked" type="button" aria-label="в избранном">
@@ -21,15 +21,25 @@
         </svg>
       </button>
     </div>
-    <TrackRow
-      v-for="track in favoriteTracks"
-      :key="track.source_id"
-      :title="track.title"
-      :artist="artistsLine(track.artists)"
-      :source="track.source_type"
-      @play="player.playSnapshot(track)"
-      @menu="openSnapshotMenu($event, track, 'track')"
-    />
+    <template v-for="item in content" :key="item.source_id">
+      <VideoRow
+        v-if="item.type === 'video'"
+        :title="item.title"
+        :subtitle="`${artistsLine(item.artists)} · клип`"
+        :source="item.source_type"
+        :cover="item.cover_url ?? ''"
+        @open="player.playSnapshot(item)"
+        @menu="openSnapshotMenu($event, item, 'video')"
+      />
+      <TrackRow
+        v-else
+        :title="item.title"
+        :artist="artistsLine(item.artists)"
+        :source="item.source_type"
+        @play="player.playSnapshot(item)"
+        @menu="openSnapshotMenu($event, item, 'playlist-track')"
+      />
+    </template>
     <MediaOverlays
       :open="open"
       :top="top"

@@ -1,5 +1,5 @@
-import { trackRadio } from './catalog';
-import type { AnySnapshot } from '@/types';
+import { mockVideo, trackColonel, trackFatLip, trackRadio, trackSea } from './catalog';
+import type { AnySnapshot, TrackSnapshot } from '@/types';
 
 export interface FriendMock {
   id: number;
@@ -8,7 +8,6 @@ export interface FriendMock {
   initial: string;
   tone: '' | 'g1' | 'g3';
   live: string | null;
-  idle: string | null;
   watching: boolean;
   current_snapshot: AnySnapshot | null;
 }
@@ -20,6 +19,14 @@ export const incomingRequest = {
   tone: 'g1' as const,
 };
 
+export const outgoingRequest = {
+  id: 5,
+  name: 'Катя',
+  email: 'katya@mail.ru',
+  initial: 'К',
+  tone: 'g3' as const,
+};
+
 export const mockFriends: FriendMock[] = [
   {
     id: 2,
@@ -28,7 +35,6 @@ export const mockFriends: FriendMock[] = [
     initial: 'А',
     tone: '',
     live: 'Радиотишина · Sum 41',
-    idle: null,
     watching: false,
     current_snapshot: trackRadio,
   },
@@ -38,10 +44,9 @@ export const mockFriends: FriendMock[] = [
     email: 'ilya@mail.ru',
     initial: 'И',
     tone: 'g1',
-    live: null,
-    idle: 'на паузе · Полковнику никто не пишет',
+    live: 'Морская · Мумий Тролль',
     watching: false,
-    current_snapshot: null,
+    current_snapshot: trackSea,
   },
   {
     id: 4,
@@ -49,20 +54,10 @@ export const mockFriends: FriendMock[] = [
     email: 'max@mail.ru',
     initial: 'М',
     tone: 'g1',
-    live: 'Радиотишина',
-    idle: null,
+    live: 'Радиотишина · клип',
     watching: true,
-    current_snapshot: trackRadio,
-  },
-  {
-    id: 5,
-    name: 'Катя',
-    email: 'katya@mail.ru',
-    initial: 'К',
-    tone: 'g3',
-    live: null,
-    idle: 'ничего не слушает',
-    watching: false,
-    current_snapshot: null,
+    current_snapshot: mockVideo,
   },
 ];
+
+export const friendQueue: TrackSnapshot[] = [trackFatLip, trackColonel, trackSea];

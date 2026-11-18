@@ -4,15 +4,16 @@ import AppBar from '@/components/AppBar/AppBar.vue';
 import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import TrackRow from '@/components/TrackRow/TrackRow.vue';
+import VideoRow from '@/components/VideoRow/VideoRow.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import { coverVar, artistsLine } from '@/lib/cover';
-import { playlistRoad } from '@/mocks/catalog';
+import { playlistRoad, playlistRoadContent } from '@/mocks/catalog';
 import { usePlayerStore } from '@/stores/player';
 import { useFavoritesStore } from '@/stores/favorites';
 
 export default defineComponent({
   name: 'PlaylistPage',
-  components: { AppBar, MediaOverlays, SourceBadge, TrackRow },
+  components: { AppBar, MediaOverlays, SourceBadge, TrackRow, VideoRow },
   setup() {
     const route = useRoute();
     const player = usePlayerStore();
@@ -28,7 +29,7 @@ export default defineComponent({
     return {
       playlist,
       own,
-      favoriteTracks: favorites.tracks,
+      content: playlistRoadContent,
       player,
       coverVar,
       artistsLine,

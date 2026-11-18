@@ -6,7 +6,38 @@
       <div class="f-name">{{ friend.name }}</div>
       <div class="f-mail">{{ friend.email }}</div>
     </div>
-    <div v-if="friend.current_snapshot" class="now-card">
+    <div v-if="friend.current_snapshot && watching" class="now-card is-vid">
+      <div class="preview">
+        <img
+          v-if="friend.current_snapshot.type === 'video'"
+          :src="friend.current_snapshot.cover_url ?? ''"
+          alt="кадр клипа"
+        >
+        <span class="vid-badge" aria-label="клип">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="6" width="18" height="12" rx="2" />
+            <path d="M10.2 9.6v4.8l4.2-2.4z" fill="currentColor" stroke="none" />
+          </svg>
+        </span>
+      </div>
+      <div class="meta">
+        <div class="track-meta">
+          <div class="track-title">{{ friend.current_snapshot.title }}</div>
+          <div class="track-artist">{{ artistsLine(friend.current_snapshot.artists) }}</div>
+          <div class="live">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="6" width="18" height="12" rx="2" />
+              <path d="M10.2 9.6v4.8l4.2-2.4z" fill="currentColor" stroke="none" />
+            </svg>
+            смотрит сейчас
+          </div>
+        </div>
+        <button class="fab small" type="button" aria-label="смотреть у себя" @click="playNow">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z" /></svg>
+        </button>
+      </div>
+    </div>
+    <div v-else-if="friend.current_snapshot" class="now-card">
       <div class="thumb" :style="{ background: coverVar(friend.current_snapshot.source_type) }">
         <SourceBadge :source="friend.current_snapshot.source_type" />
       </div>
@@ -19,6 +50,16 @@
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z" /></svg>
       </button>
     </div>
+    <div class="sec-label">Очередь</div>
+    <TrackRow
+      v-for="track in friendQueue"
+      :key="track.source_id"
+      :title="track.title"
+      :artist="artistsLine(track.artists)"
+      :source="track.source_type"
+      @play="player.playSnapshot(track)"
+      @menu="openSnapshotMenu($event, track, 'friend-track')"
+    />
     <div class="sec-label">Избранное</div>
     <TrackRow
       v-for="track in favoriteTracks"
@@ -27,8 +68,11 @@
       :artist="artistsLine(track.artists)"
       :source="track.source_type"
       @play="player.playSnapshot(track)"
-      @menu="openSnapshotMenu($event, track, 'track')"
+      @menu="openSnapshotMenu($event, track, 'friend-track')"
     />
+    <div class="logout-wrap">
+      <button class="btn btn-danger" type="button" @click="removeFriend">Удалить из друзей</button>
+    </div>
     <MediaOverlays
       :open="open"
       :top="top"

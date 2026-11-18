@@ -71,5 +71,12 @@ export const useFavoritesStore = defineStore('favorites', () => {
     section.value = next;
   }
 
-  return { tracks, videos, albums, artists, playlists, has, add, remove, toggle, reorder };
+  function update(snapshot: AnySnapshot, patch: { title?: string; cover_url?: string | null }) {
+    const section = sections[snapshot.type];
+    section.value = section.value.map((item) =>
+      sameIdentity(item, snapshot) ? { ...item, ...patch } : item,
+    );
+  }
+
+  return { tracks, videos, albums, artists, playlists, has, add, remove, toggle, reorder, update };
 });

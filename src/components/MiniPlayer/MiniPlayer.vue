@@ -1,5 +1,11 @@
 <template>
-  <button v-if="current" class="mini-player" type="button" @click="openExpanded">
+  <button
+    v-if="current"
+    class="mini-player"
+    type="button"
+    :style="dragStyle"
+    @pointerdown="onDragStart"
+  >
     <div class="thumb" :style="{ background: coverVar(current.source_type) }">
       <SourceBadge :source="current.source_type" />
     </div>

@@ -1,51 +1,33 @@
 <template>
   <div>
     <AppBar title="Настройки" />
-    <button v-if="user" class="friend-row" type="button" style="padding:12px 2px 16px" @click="openName">
+    <div v-if="user" class="friend-row" role="button" tabindex="0" style="padding:12px 2px 16px" @click="openName">
       <div class="pic-plus round sm">
-        <div class="avatar ini">{{ user.name.slice(0, 1) }}</div>
-        <span class="plus" aria-label="загрузить фото">
+        <div class="avatar ini">
+          <img v-if="user.avatar" :src="user.avatar" alt="">
+          <template v-else>{{ user.name.slice(0, 1) }}</template>
+        </div>
+        <span class="plus" role="button" aria-label="загрузить фото" @click.stop="pickAvatar">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
             <path d="M12 5v14M5 12h14" />
           </svg>
         </span>
       </div>
+      <input ref="avatarInput" type="file" accept="image/*" hidden @change="onAvatarPicked">
       <div class="track-meta">
         <div class="track-title" style="font-size:16px">{{ user.name }}</div>
         <div class="idle">{{ user.email }}</div>
       </div>
-      <span class="go" aria-hidden="true">
+      <button class="icon-btn ghost" type="button" aria-label="изменить имя" @click.stop="openName">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 6.5 15 12l-6 5.5" />
+          <path d="M12 20h9" />
+          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z" />
         </svg>
-      </span>
-    </button>
+      </button>
+    </div>
 
     <div class="sec-label">Сервисы</div>
-    <div class="ym-card">
-      <div class="ym-head">
-        <div class="ico on">
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <circle cx="11" cy="13.6" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8" />
-            <circle cx="9.6" cy="14.8" r="3.7" />
-            <path d="M12.7 5.6h2.05v9.4H12.7z" />
-            <path d="M14.75 5.6h6.3l-1.7 3.7h-6.3z" />
-          </svg>
-        </div>
-        <div class="track-meta">
-          <div class="track-title">Яндекс Музыка</div>
-          <div class="track-artist">подключён</div>
-        </div>
-        <button class="btn btn-ghost sm" type="button">Отключить</button>
-      </div>
-      <div class="ym-stats">
-        <div class="ym-stat"><div class="n">1 248</div><div class="l">треков</div></div>
-        <div class="ym-stat"><div class="n">86</div><div class="l">альбомов</div></div>
-        <div class="ym-stat"><div class="n">12</div><div class="l">плейлистов</div></div>
-        <div class="ym-stat"><div class="n">41</div><div class="l">исполнителей</div></div>
-      </div>
-      <button class="btn btn-primary wide" type="button">Импортировать</button>
-    </div>
+    <YandexCard />
 
     <div class="sec-label">Звук</div>
     <div class="vol-row">
@@ -114,7 +96,7 @@
     </SettingRow>
 
     <div class="logout-wrap">
-      <button class="logout-pill" type="button" @click="logout">Выйти</button>
+      <button class="btn btn-danger" type="button" @click="logout">Выйти</button>
     </div>
 
     <div v-if="sheet" class="sheet-mask" @click.self="sheet = null">

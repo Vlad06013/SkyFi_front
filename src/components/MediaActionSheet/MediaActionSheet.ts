@@ -5,7 +5,7 @@ import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { coverVar } from '@/lib/cover';
 import { trackPointer } from '@/lib/pointer-drag';
 import { favoritePlaylists } from '@/mocks/catalog';
-import { mockFriends } from '@/mocks/friends';
+import { useFriendsStore } from '@/stores/friends';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
 import type { MediaSheet, MenuEntity } from '@/lib/media-menu';
@@ -23,6 +23,7 @@ export default defineComponent({
     const player = usePlayerStore();
     const { state, localDeviceId } = storeToRefs(player);
     const toast = useToastStore();
+    const friendsStore = useFriendsStore();
     const friendQuery = ref('');
     const friendFocus = ref(false);
     const dragging = ref(false);
@@ -39,10 +40,18 @@ export default defineComponent({
 
     const visibleFriends = computed(() => {
       const q = friendQuery.value.trim().toLowerCase();
-      if (!q) return mockFriends;
-      return mockFriends.filter(
+      if (!q) return friendsStore.friends;
+      return friendsStore.friends.filter(
         (friend) => friend.name.toLowerCase().includes(q) || friend.email.toLowerCase().includes(q),
       );
+    });
+
+    const coverImage = computed(() => {
+      const snapshot = props.entity.snapshot;
+      if (!snapshot) return '';
+      if (snapshot.type === 'video') return snapshot.cover_url ?? '';
+      if (snapshot.type === 'track') return snapshot.album?.cover_url ?? '';
+      return '';
     });
 
     const dragStyle = computed(() => {
@@ -82,6 +91,23 @@ export default defineComponent({
 
     function openInAppShare() {
       emit('update:sheet', 'friend-share');
+    }
+
+    async function shareExternally() {
+      const url = `https://skyfi.app/t/${props.entity.sourceId}`;
+      if (typeof navigator.share === 'function') {
+        try {
+          await navigator.share({
+            title: props.entity.title,
+            text: `${props.entity.title} — ${props.entity.artist}`,
+            url,
+          });
+        } catch {
+          /* пользователь закрыл системный диалог */
+        }
+        return;
+      }
+      toast.show('Поделиться', 'не поддерживается здесь · ссылка в буфере');
     }
 
     function deviceCaption(device: PlayerDevice) {
@@ -127,6 +153,7 @@ export default defineComponent({
       friendFocus,
       visibleFriends,
       favoritePlaylists,
+      coverImage,
       dragging,
       dragStyle,
       close,
@@ -134,6 +161,7 @@ export default defineComponent({
       pickShare,
       pickPlaylist,
       openInAppShare,
+      shareExternally,
       deviceCaption,
       pickDevice,
       onDragStart,

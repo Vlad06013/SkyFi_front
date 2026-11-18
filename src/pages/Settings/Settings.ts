@@ -4,13 +4,14 @@ import { storeToRefs } from 'pinia';
 import AppBar from '@/components/AppBar/AppBar.vue';
 import SeekBar from '@/components/SeekBar/SeekBar.vue';
 import SettingRow from '@/components/SettingRow/SettingRow.vue';
+import YandexCard from '@/components/YandexCard/YandexCard.vue';
 import { useAuthStore } from '@/stores/auth';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
 
 export default defineComponent({
   name: 'SettingsPage',
-  components: { AppBar, SeekBar, SettingRow },
+  components: { AppBar, SeekBar, SettingRow, YandexCard },
   setup() {
     const router = useRouter();
     const auth = useAuthStore();
@@ -19,6 +20,7 @@ export default defineComponent({
     const toast = useToastStore();
     const sheet = ref<'name' | 'download' | null>(null);
     const draft = ref(user.value?.name ?? '');
+    const avatarInput = ref<HTMLInputElement | null>(null);
     const appLatest = ref(false);
     const downloadedGb = ref(1.2);
     const builds = [
@@ -30,6 +32,17 @@ export default defineComponent({
     function openName() {
       draft.value = user.value?.name ?? '';
       sheet.value = 'name';
+    }
+
+    function pickAvatar() {
+      avatarInput.value?.click();
+    }
+
+    function onAvatarPicked() {
+      const file = avatarInput.value?.files?.[0];
+      if (!file) return;
+      auth.setAvatar(URL.createObjectURL(file));
+      toast.show('Фото', 'обновлено');
     }
 
     function saveName() {
@@ -63,10 +76,13 @@ export default defineComponent({
       volume,
       sheet,
       draft,
+      avatarInput,
       appLatest,
       downloadedGb,
       builds,
       openName,
+      pickAvatar,
+      onAvatarPicked,
       saveName,
       updateApp,
       downloadBuild,

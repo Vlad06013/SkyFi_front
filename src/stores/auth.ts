@@ -20,5 +20,10 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = { ...user.value, name };
   }
 
-  return { user, isAuthed, logout, login, rename };
+  function setAvatar(avatar: string | null) {
+    if (!user.value) return;
+    user.value = { ...user.value, avatar };
+  }
+
+  return { user, isAuthed, logout, login, rename, setAvatar };
 });

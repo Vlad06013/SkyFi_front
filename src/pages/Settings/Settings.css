@@ -3,21 +3,3 @@
   justify-content: center;
   padding: 28px 0 12px;
 }
-
-.logout-pill {
-  border: 0;
-  cursor: pointer;
-  padding: 11px 32px;
-  border-radius: var(--radius-pill);
-  background: var(--color-accent);
-  color: var(--color-danger);
-  font: 600 14px/1.2 var(--font-body);
-}
-
-.logout-pill:hover {
-  background: var(--color-accent-strong);
-}
-
-.logout-pill:active {
-  transform: scale(0.97);
-}

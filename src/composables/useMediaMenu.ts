@@ -76,7 +76,7 @@ export function useMediaMenu(hooks: {
         hooks.onLike(target);
         return;
       }
-      if (target.snapshot && (target.snapshot.type === 'track' || target.snapshot.type === 'video')) {
+      if (target.snapshot) {
         const added = favorites.toggle(target.snapshot);
         toast.show(target.title, added ? 'добавлено в избранное' : 'убрано из избранного');
         return;

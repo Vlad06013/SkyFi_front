@@ -8,8 +8,8 @@ export default defineComponent({
   name: 'NotificationPanel',
   setup() {
     const notifications = useNotificationsStore();
-    const { open, request } = storeToRefs(notifications);
-    const { accept, decline, close } = notifications;
+    const { open, request, shares, unreadCount, hasUnread } = storeToRefs(notifications);
+    const { accept, decline, markRead, markAllRead, close } = notifications;
     const { expanded } = storeToRefs(usePlayerStore());
     const route = useRoute();
 
@@ -33,6 +33,6 @@ export default defineComponent({
       if (value) close();
     });
 
-    return { open, request, accept, decline };
+    return { open, request, shares, unreadCount, hasUnread, accept, decline, markRead, markAllRead };
   },
 });

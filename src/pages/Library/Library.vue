@@ -122,9 +122,48 @@
       />
     </template>
 
+    <template v-else-if="tab === 'uploads'">
+      <UploadForm @upload="onUpload" />
+      <TrackRow
+        v-for="track in uploads"
+        :key="track.source_id"
+        :title="track.title"
+        :artist="artistsLine(track.artists)"
+        :source="track.source_type"
+        @play="player.playSnapshot(track)"
+        @menu="openSnapshotMenu($event, track, 'track')"
+      />
+    </template>
+
+    <template v-else-if="tab === 'downloaded'">
+      <TrackRow
+        v-for="track in downloaded"
+        :key="track.source_id"
+        :title="track.title"
+        :artist="artistsLine(track.artists)"
+        :source="track.source_type"
+        @play="player.playSnapshot(track)"
+        @menu="openSnapshotMenu($event, track, 'track')"
+      >
+        <svg
+          class="dl-mark"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-label="скачан"
+        >
+          <path d="M12 4v9m0 0 3.5-3.5M12 13 8.5 9.5" />
+          <path d="M5 17h14" />
+        </svg>
+      </TrackRow>
+    </template>
+
     <div v-else class="empty" style="padding-top:28px">
-      <div class="et">{{ tab === 'uploads' ? 'Свои файлы' : 'Скачано' }}</div>
-      <div class="es">{{ tab === 'uploads' ? 'Загрузки появятся здесь' : 'Офлайн целиком — плейлисты, альбомы, треки' }}</div>
+      <div class="et">Пусто</div>
+      <div class="es">Здесь пока ничего нет</div>
     </div>
 
     <MediaOverlays
@@ -143,53 +182,20 @@
       <div class="sheet">
         <div class="handle" />
         <div class="sheet-title">Новый плейлист</div>
-        <form class="up-form" @submit.prevent="createPlaylist">
-          <label>Название</label>
-          <div class="field" :class="{ 'is-focus': nameFocus }">
-            <input
-              v-model="draftName"
-              placeholder="Например: В дорогу"
-              @focus="nameFocus = true"
-              @blur="nameFocus = false"
-            >
-          </div>
-          <label>Видимость</label>
-          <div class="select" :class="{ 'is-open': visibilityOpen }">
-            <button type="button" class="select-box" @click="visibilityOpen = !visibilityOpen">
-              <span class="val">{{ visibilityLabel }}</span>
-              <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="m6 9.5 6 6 6-6" />
-              </svg>
-            </button>
-            <div v-if="visibilityOpen" class="select-menu">
-              <button
-                v-for="option in visibilityOptions"
-                :key="option.value"
-                type="button"
-                class="select-opt"
-                :class="{ 'is-on': visibility === option.value }"
-                @click="pickVisibility(option.value)"
-              >
-                <span>{{ option.label }}<span class="osub">{{ option.hint }}</span></span>
-                <svg
-                  v-if="visibility === option.value"
-                  class="tick"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2.2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path d="M5 12.5 9.5 17 19 7.5" />
-                </svg>
-              </button>
-            </div>
-          </div>
-          <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center;margin-top:4px">
-            Создать
-          </button>
-        </form>
+        <PlaylistForm submit-label="Создать" @submit="createPlaylist" />
+      </div>
+    </div>
+
+    <div v-if="editing" class="sheet-mask" @click.self="editing = null">
+      <div class="sheet">
+        <div class="handle" />
+        <div class="sheet-title">Изменить плейлист</div>
+        <PlaylistForm
+          submit-label="Сохранить"
+          :initial-name="editing.title"
+          :initial-cover="editing.cover_url"
+          @submit="savePlaylist"
+        />
       </div>
     </div>
   </div>

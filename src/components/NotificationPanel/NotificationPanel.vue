@@ -1,6 +1,12 @@
 <template>
   <div v-if="open" class="n-panel n-pop">
-    <div class="n-head">Уведомления <span>непрочитанные</span></div>
+    <div class="n-head">
+      Уведомления
+      <div style="display:flex;align-items:center;gap:12px">
+        <span>{{ unreadCount }} непрочитанных</span>
+        <button v-if="hasUnread" class="n-readall" type="button" @click="markAllRead">прочитать все</button>
+      </div>
+    </div>
     <div v-if="request" class="n-row is-unread">
       <div class="avatar ini" :class="request.tone">{{ request.initial }}</div>
       <div class="n-body">
@@ -16,11 +22,20 @@
         </button>
       </div>
     </div>
-    <div class="n-row share is-unread">
+    <div
+      v-for="share in shares"
+      :key="share.id"
+      class="n-row share"
+      :class="{ 'is-unread': share.unread }"
+      role="button"
+      tabindex="0"
+      @click="markRead(share.id)"
+      @keydown.enter="markRead(share.id)"
+    >
       <div class="thumb" style="background:var(--gradient-cover-1)" />
       <div class="n-body">
-        <div class="n-title">Радиотишина</div>
-        <div class="n-sub">Илья поделился · трек · в плеер</div>
+        <div class="n-title">{{ share.title }}</div>
+        <div class="n-sub">{{ share.sub }}</div>
       </div>
     </div>
   </div>

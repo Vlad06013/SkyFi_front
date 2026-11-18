@@ -9,6 +9,7 @@
 
         <div v-if="sheet !== 'devices'" class="now-card" style="margin-bottom:8px">
           <div class="thumb" :style="{ background: coverVar(entity.source) }">
+            <img v-if="coverImage" :src="coverImage" alt="">
             <SourceBadge :source="entity.source" />
           </div>
           <div class="track-meta">
@@ -90,7 +91,7 @@
             Ссылка уже в буфере
           </div>
           <button class="friend-row" type="button" style="padding:8px 4px" @click="openInAppShare">
-            <div class="avatar ini">
+            <div class="avatar ini" style="background:linear-gradient(135deg,#3ee87f,#0a3d24)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M4.2 10.6a8.4 8.4 0 0 1 15.6 0" />
                 <path d="M9 12.4v8.1l7.7-4.05z" fill="currentColor" stroke="none" />
@@ -98,7 +99,18 @@
             </div>
             <div class="track-meta">
               <div class="track-title">Другу в SkyFi</div>
-              <div class="idle">поиск по email</div>
+            </div>
+          </button>
+          <button class="friend-row" type="button" style="padding:8px 4px" @click="shareExternally">
+            <div class="avatar ini" style="background:var(--color-surface-3)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 9.5H6.5A2.5 2.5 0 0 0 4 12v7.5A2.5 2.5 0 0 0 6.5 22h11a2.5 2.5 0 0 0 2.5-2.5V12a2.5 2.5 0 0 0-2.5-2.5H16" />
+                <path d="M12 15.5V3m0 0 3.6 3.6M12 3 8.4 6.6" />
+              </svg>
+            </div>
+            <div class="track-meta">
+              <div class="track-title">Через приложение</div>
+              <div class="idle">выбор, куда отправить</div>
             </div>
           </button>
         </template>

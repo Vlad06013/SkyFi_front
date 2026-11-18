@@ -1,8 +1,9 @@
 <template>
   <div
     v-if="expanded && current"
+    ref="rootEl"
     class="now-playing"
-    :class="{ 'is-dragging': playerDragging, 'is-clip': clipMode }"
+    :class="{ 'is-dragging': playerDragging, 'is-clip': clipMode, 'is-clip-idle': clipIdle }"
     :style="playerDragStyle"
     @pointerdown="onPlayerDragStart"
   >
@@ -16,8 +17,71 @@
             <path d="M6 9.5 12 15.5 18 9.5" />
           </svg>
         </button>
-        <span v-if="clipMode" class="q-chip">720</span>
+        <div v-if="clipMode" class="clip-top-side">
+          <button class="q-chip" type="button" aria-label="качество клипа" @click.stop="qualityOpen = !qualityOpen">
+            {{ clipQuality }}
+          </button>
+          <button
+            class="icon-btn ghost"
+            type="button"
+            :aria-label="isFullscreen ? 'свернуть экран' : 'во весь экран'"
+            @click.stop="toggleFullscreen"
+          >
+            <svg
+              v-if="!isFullscreen"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15" />
+            </svg>
+            <svg
+              v-else
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M9 4v3.5A1.5 1.5 0 0 1 7.5 9H4M20 9h-3.5A1.5 1.5 0 0 1 15 7.5V4M15 20v-3.5a1.5 1.5 0 0 1 1.5-1.5H20M4 15h3.5a1.5 1.5 0 0 1 1.5 1.5V20" />
+            </svg>
+          </button>
+        </div>
         <span v-else />
+      </div>
+
+      <div v-if="qualityOpen" class="clip-quality-mask" @pointerdown.stop="qualityOpen = false" />
+      <div v-if="qualityOpen" class="select-menu clip-quality">
+        <button
+          v-for="quality in clipQualities"
+          :key="quality"
+          type="button"
+          class="select-opt"
+          :class="{ 'is-on': quality === clipQuality }"
+          @click="pickQuality(quality)"
+        >
+          <span>{{ quality }}<span class="osub">{{ quality === clipQuality ? 'активно' : 'выбрать' }}</span></span>
+          <svg
+            v-if="quality === clipQuality"
+            class="tick"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M5 12.5 9.5 17 19 7.5" />
+          </svg>
+        </button>
       </div>
 
       <div

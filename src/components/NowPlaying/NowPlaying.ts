@@ -1,10 +1,11 @@
-import { computed, defineComponent, ref } from 'vue';
+import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
 import SeekBar from '@/components/SeekBar/SeekBar.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import TrackRow from '@/components/TrackRow/TrackRow.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
+import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { coverVar, artistsLine } from '@/lib/cover';
 import { moveItem, sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
 import { entityFromSnapshot } from '@/lib/media-menu';
@@ -28,12 +29,13 @@ export default defineComponent({
       album,
       progress,
       durationSeconds,
-      liked,
       state,
       clipMode,
+      clipQuality,
       queue,
     } = storeToRefs(player);
     const playing = computed(() => player.state.is_playing);
+    const { liked, toggleLike } = useSnapshotLike(() => player.current);
     const repeatLabel = computed(() => {
       if (state.value.repeat_mode === 'one') return 'повтор одного';
       if (state.value.repeat_mode === 'all') return 'повтор всех';
@@ -42,7 +44,6 @@ export default defineComponent({
     const {
       closeExpanded,
       togglePlay,
-      toggleLike,
       toggleShuffle,
       toggleRepeat,
       skipNext,
@@ -50,6 +51,7 @@ export default defineComponent({
       playSnapshot,
       seekRatio,
       toggleClips,
+      setClipQuality,
     } = player;
 
     const layer = ref<Layer>('now');
@@ -59,6 +61,57 @@ export default defineComponent({
     const queueDragY = ref(0);
     const swipeThreshold = 88;
     const sortDrag = ref<ListSortState | null>(null);
+    const rootEl = ref<HTMLElement | null>(null);
+    const qualityOpen = ref(false);
+    const clipIdle = ref(false);
+    const isFullscreen = ref(false);
+    const clipIdleDelay = 5000;
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const clipQualities = player.clipQualities;
+
+    function wake() {
+      clipIdle.value = false;
+      if (idleTimer) {
+        clearTimeout(idleTimer);
+        idleTimer = null;
+      }
+      if (clipMode.value && expanded.value && !qualityOpen.value) {
+        idleTimer = setTimeout(() => {
+          clipIdle.value = true;
+        }, clipIdleDelay);
+      }
+    }
+
+    function pickQuality(quality: number) {
+      setClipQuality(quality);
+      qualityOpen.value = false;
+    }
+
+    function onFullscreenChange() {
+      isFullscreen.value = document.fullscreenElement === rootEl.value;
+    }
+
+    function toggleFullscreen() {
+      if (!rootEl.value) return;
+      if (document.fullscreenElement) {
+        void document.exitFullscreen();
+        return;
+      }
+      void rootEl.value.requestFullscreen();
+    }
+
+    watch([clipMode, expanded, qualityOpen], wake);
+
+    onMounted(() => {
+      wake();
+      document.addEventListener('fullscreenchange', onFullscreenChange);
+    });
+
+    onBeforeUnmount(() => {
+      if (idleTimer) clearTimeout(idleTimer);
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+    });
 
     const { open, variant, top, right, sheet, entity, openMenu, closeMenu, run } = useMediaMenu({
       onLyrics() {
@@ -141,11 +194,12 @@ export default defineComponent({
 
     function isNoDragTarget(target: EventTarget | null) {
       return target instanceof Element && Boolean(
-        target.closest('button, a, input, .ctx, .seek, .seek-bar, .p-sheet-head, .p-sheet-body, .sheet-mask, .sky-toast'),
+        target.closest('button, a, input, .ctx, .seek, .seek-bar, .p-sheet-head, .p-sheet-body, .sheet-mask, .sky-toast, .clip-quality, .clip-quality-mask'),
       );
     }
 
     function onPlayerDragStart(event: PointerEvent) {
+      wake();
       if (sheet.value) return;
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       if (isNoDragTarget(event.target)) return;
@@ -220,6 +274,11 @@ export default defineComponent({
       liked,
       state,
       clipMode,
+      clipQuality,
+      clipQualities,
+      qualityOpen,
+      clipIdle,
+      isFullscreen,
       queue,
       playing,
       repeatLabel,
@@ -229,6 +288,7 @@ export default defineComponent({
       playerDragY,
       queueDragY,
       sortDrag,
+      rootEl,
       playerDragStyle,
       queueSheetStyle,
       topLabel,
@@ -246,6 +306,8 @@ export default defineComponent({
       playSnapshot,
       seekRatio,
       toggleClips,
+      pickQuality,
+      toggleFullscreen,
       onTop,
       openQueue,
       onClips,
