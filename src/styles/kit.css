@@ -289,7 +289,8 @@
 }
 .field svg { width: 16px; height: 16px; color: var(--color-text-faint); flex-shrink: 0; }
 .field .ph { color: var(--color-text-faint); }
-.field.is-focus { box-shadow: inset 0 0 0 2px var(--color-accent); }
+/* У поля своя внутренняя рамка фокуса — общий outline .is-focus гасим, иначе двойное кольцо. */
+.field.is-focus { box-shadow: inset 0 0 0 2px var(--color-accent); outline: none; }
 .field.is-focus svg { color: var(--color-accent); }
 .field.is-error { box-shadow: inset 0 0 0 1px rgba(255,255,255,.28); }
 .field.is-disabled { opacity: .38; }
@@ -521,6 +522,7 @@
 .select-box .chev { width: 18px; height: 18px; color: var(--color-text-secondary); flex-shrink: 0; }
 .select.is-hover .select-box { background: var(--color-surface-3); }
 .select.is-pressed .select-box { background: var(--color-surface-3); transform: scale(0.98); }
+.select.is-focus { outline: none; }
 .select.is-focus .select-box,
 .select.is-open .select-box { box-shadow: inset 0 0 0 2px var(--color-accent); }
 .select.is-open .chev { color: var(--color-accent); transform: rotate(180deg); }
@@ -547,7 +549,7 @@
 .select-opt.is-on { color: var(--color-accent); font-weight: 600; }
 .select-opt:focus { outline: none; }
 .select-opt:focus-visible,
-.select-opt.is-focus { box-shadow: inset 0 0 0 2px var(--color-accent); }
+.select-opt.is-focus { box-shadow: inset 0 0 0 2px var(--color-accent); outline: none; }
 .select-opt.is-off { color: var(--color-text-faint); }
 .select-opt.is-off .osub { color: var(--color-text-faint); }
 .select-opt.is-disabled { opacity: .38; color: var(--color-text-faint); cursor: default; }
