@@ -87,7 +87,9 @@ Sanctum Bearer-токен: `Authorization: Bearer <token>`.
 
 Общий конверт (все типы): `type`, `source_type`, `source_id`,
 `title`, `artists: [{name, source_id?}]` (исполнители/авторы,
-может быть `[]`).
+может быть `[]`). Проверено curl'ом: у artist-снапшотов поле
+`artists` не приходит (ни в поиске, ни в избранном) — фронт от
+него не зависит, подзаголовок строки артиста — фиксированный.
 
 - **track**: + `duration_ms|null`, `cover_url|null` (обложка трека из
   источника; у Яндекса заполняется импортом), `album {title?, year?,

@@ -18,6 +18,7 @@ export function sourceTitle(source: SnapshotSource): string {
   return 'SkyFi';
 }
 
-export function artistsLine(artists: { name: string }[]): string {
-  return artists.map((a) => a.name).join(', ');
+export function artistsLine(artists: { name: string }[] | null | undefined): string {
+  // Бэк не шлёт artists у artist-снапшотов (проверено curl'ом, api.md §9).
+  return (artists ?? []).map((a) => a.name).join(', ');
 }
