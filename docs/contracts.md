@@ -123,7 +123,8 @@ export interface AuthUser {
   id: number;
   name: string;
   email: string;
-  avatar: string | null;
+  /** Проверено curl'ом: бэк отдаёт avatar_url (не avatar). */
+  avatar_url: string | null;
 }
 
 export interface AuthPayload {
@@ -174,6 +175,35 @@ export interface PlayerStatePayload {
 export interface HealthPayload {
   status: 'ok';
   server_time: string;
+}
+```
+
+## QR-вход (api.md §3, формы проверены curl'ом)
+
+```ts
+/** data ответа POST /qr-login. */
+export interface QrStartPayload {
+  code: string;
+  /** Абсолютный срок жизни кода, ISO 8601 UTC (~15 мин). */
+  expires_at: string;
+  /** Готовый QR в SVG — фронт рендерит как есть, не генерирует. */
+  qr_svg: string;
+}
+
+export type QrStatusValue = 'pending' | 'confirmed';
+
+/** data ответа GET /qr-login/{code} (поллинг ТВ). */
+export interface QrStatusPayload {
+  status: QrStatusValue;
+  /** Заполнены только при confirmed. */
+  token: string | null;
+  /** При confirmed — полная модель; фронту нужны id/name/email/avatar_url. */
+  user: (AuthUser & Record<string, unknown>) | null;
+}
+
+/** data ответа POST /qr-login/confirm. */
+export interface QrConfirmPayload {
+  status: 'confirmed';
 }
 ```
 

@@ -52,7 +52,9 @@ Sanctum Bearer-токен: `Authorization: Bearer <token>`.
 
 ### 1.4. Health (без авторизации)
 
-`GET /health` → `{ status: "ok", server_time }`. Служит
+`GET /health` (под базовым префиксом, фактически
+`/api/v1/skyfy/health` — уточнено curl'ом, голый `/health`
+отдаёт 404) → `{ status: "ok", server_time }`. Служит
 офлайн-детекту: неуспешный запрос = бэк недоступен (сеть есть —
 иначе fetch не ушёл бы; токен не при чём, auth тут нет).
 
@@ -119,11 +121,23 @@ playlist|artist`.
 | `PUT /profile/avatar` | multipart `avatar` (image) |
 | `DELETE /profile/avatar` | → дефолтный аватар |
 
-**QR-вход** (для ТВ/магнитолы): `POST /qr-login` → код + срок;
-экран ТВ показывает QR со ссылкой; авторизованный телефон
-сканирует → `POST /qr-login/confirm` (auth) `{code}`; ТВ поллит
-`GET /qr-login/{code}` до статуса «подтверждён» → получает
-`token` и логинится.
+Форма `user` в register/login/`GET /user` (проверено curl'ом):
+`{id, name, email, avatar_url}`. QR-поллинг при confirmed
+отдаёт полную модель (лишние поля `email_verified_at`,
+`avatar`, `created_at`, `updated_at`) — фронту нужны те же
+`id/name/email/avatar_url`.
+
+**QR-вход** (для ТВ/магнитолы), формы проверены curl'ом:
+- `POST /qr-login` → `data: {code, expires_at, qr_svg}` —
+  код, абсолютный срок (ISO 8601 UTC, ~15 мин) и готовый
+  QR в SVG. Фронт рендерит `qr_svg` как есть, сам QR
+  не генерирует.
+- ТВ поллит `GET /qr-login/{code}` → `data: {status,
+  token, user}`: `pending` — `token`/`user` null;
+  `confirmed` — полные `token` + `user`, ими и логинимся;
+  нет кода — 404 «QR-код не найден.».
+- Телефон (auth): `POST /qr-login/confirm` `{code}` → 200
+  `{status: "confirmed"}`; без токена — 401 «Не авторизован.».
 
 **Яндекс Музыка (аккаунт)**: `POST /yandex-music/auth/device/start`
 (12/мин) → параметры устройственного входа Яндекса (пользователь

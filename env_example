@@ -1,5 +1,5 @@
 #VITE_API_URL=http://127.0.0.1:8080/api/v1/skyfy/
-VITE_API_URL=http://194.58.100.188:8080/api/v1/skyfy/
+VITE_API_URL=http://192.168.8.33:8080/api/v1/skyfy/
 VITE_REVERB_APP_KEY=vpu88awigtkvxluumpff
 #VITE_REVERB_HOST=localhost
 VITE_REVERB_HOST=194.58.100.188
