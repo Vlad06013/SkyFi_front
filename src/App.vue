@@ -2,6 +2,7 @@
   <ion-app>
     <router-view />
     <app-splash v-if="app.phase !== 'ready'" />
+    <app-toast />
   </ion-app>
 </template>
 

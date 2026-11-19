@@ -9,7 +9,6 @@
     </div>
     <NotificationPanel />
     <NowPlaying />
-    <AppToast />
   </div>
 </template>
 

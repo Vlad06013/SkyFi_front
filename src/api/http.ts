@@ -2,6 +2,7 @@ import axios from 'axios';
 import type { AxiosInstance, AxiosRequestConfig } from 'axios';
 import type { ApiResponse } from '@/types';
 import { getSession } from '@/lib/session';
+import { localizeServerMessage } from '@/lib/error-messages';
 
 export type ApiErrorKind = 'auth' | 'validation' | 'not-found' | 'rate-limit' | 'server' | 'network';
 
@@ -47,11 +48,20 @@ function toApiError(error: unknown): ApiError {
 
   const status = error.response?.status ?? null;
   const errors = (error.response?.data as Partial<ApiResponse<unknown>> | undefined)?.errors;
-  const message = typeof errors === 'string' && errors.length > 0 ? errors : null;
+  const rawMessage = typeof errors === 'string' && errors.length > 0 ? errors : null;
+  const message = rawMessage ? localizeServerMessage(rawMessage) : null;
 
   if (status === 401) return new ApiError(401, 'auth', message ?? 'Не авторизован.');
   if (status === 422) {
-    const fields = typeof errors === 'object' && errors !== null ? (errors as Record<string, string[]>) : undefined;
+    const rawFields = typeof errors === 'object' && errors !== null ? (errors as Record<string, string[]>) : undefined;
+    const fields = rawFields
+      ? Object.fromEntries(
+          Object.entries(rawFields).map(([key, list]) => [
+            key,
+            list.map((item) => localizeServerMessage(item)),
+          ]),
+        )
+      : undefined;
     return new ApiError(422, 'validation', message ?? 'Проверьте поля формы.', fields);
   }
   if (status === 429) return new ApiError(429, 'rate-limit', message ?? 'Слишком часто. Подождите немного.');

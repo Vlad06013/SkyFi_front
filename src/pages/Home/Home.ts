@@ -5,10 +5,11 @@ import { useNotificationsStore } from '@/stores/notifications';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { coverVar } from '@/lib/cover';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
+import OfflineBanner from '@/components/OfflineBanner/OfflineBanner.vue';
 
 export default defineComponent({
   name: 'HomePage',
-  components: { SourceBadge },
+  components: { SourceBadge, OfflineBanner },
   setup() {
     const player = usePlayerStore();
     const { current, title, artist } = storeToRefs(player);

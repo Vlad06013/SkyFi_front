@@ -6,13 +6,14 @@ import AppSheet from '@/components/AppSheet/AppSheet.vue';
 import SeekBar from '@/components/SeekBar/SeekBar.vue';
 import SettingRow from '@/components/SettingRow/SettingRow.vue';
 import YandexCard from '@/components/YandexCard/YandexCard.vue';
+import QrScannerSheet from '@/components/QrScannerSheet/QrScannerSheet.vue';
 import { useAuthStore } from '@/stores/auth';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
 
 export default defineComponent({
   name: 'SettingsPage',
-  components: { AppBar, AppSheet, SeekBar, SettingRow, YandexCard },
+  components: { AppBar, AppSheet, SeekBar, SettingRow, YandexCard, QrScannerSheet },
   setup() {
     const router = useRouter();
     const auth = useAuthStore();
@@ -20,6 +21,7 @@ export default defineComponent({
     const { volume } = storeToRefs(usePlayerStore());
     const toast = useToastStore();
     const sheet = ref<'name' | 'download' | null>(null);
+    const scanOpen = ref(false);
     const draft = ref(user.value?.name ?? '');
     const avatarInput = ref<HTMLInputElement | null>(null);
     const avatarBusy = ref(false);
@@ -87,10 +89,16 @@ export default defineComponent({
       await router.replace('/login');
     }
 
+    function onScanned(code: string) {
+      scanOpen.value = false;
+      void router.push({ path: '/qr-confirm', query: { code } });
+    }
+
     return {
       user,
       volume,
       sheet,
+      scanOpen,
       draft,
       avatarInput,
       avatarBusy,
@@ -105,6 +113,7 @@ export default defineComponent({
       downloadBuild,
       clearDownloads,
       logout,
+      onScanned,
     };
   },
 });

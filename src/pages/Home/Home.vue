@@ -1,5 +1,6 @@
 <template>
   <div class="wave-page">
+    <OfflineBanner />
     <div class="appbar">
       <button class="icon-btn ghost n-bell" type="button" aria-label="уведомления" @click.stop="toggleBell">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">

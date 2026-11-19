@@ -46,6 +46,21 @@
     </div>
 
     <div class="sec-label">Приложение</div>
+    <SettingRow title="Сканировать QR" idle="вход на ТВ или магнитолу" clickable @open="scanOpen = true">
+      <template #icon>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+          <path d="M14 14h3v3h4v4h-7z" />
+        </svg>
+      </template>
+      <span class="go" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 6.5 15 12l-6 5.5" />
+        </svg>
+      </span>
+    </SettingRow>
     <SettingRow
       v-if="appLatest"
       title="Приложение"
@@ -145,6 +160,8 @@
         </SettingRow>
       </template>
     </AppSheet>
+
+    <QrScannerSheet :open="scanOpen" @close="scanOpen = false" @scanned="onScanned" />
   </div>
 </template>
 

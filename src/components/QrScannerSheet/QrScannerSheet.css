@@ -1,0 +1,28 @@
+.qr-scan {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.qr-reader {
+  overflow: hidden;
+  border-radius: var(--radius-m);
+  background: var(--color-surface-2);
+}
+
+.qr-reader :deep(video) {
+  display: block;
+  width: 100%;
+}
+
+.qr-scan-hint,
+.qr-scan-err {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.qr-scan-err {
+  color: var(--color-danger);
+}

@@ -117,6 +117,17 @@
 
 .field input::placeholder { color: var(--color-text-faint); }
 
+/* Chrome/Android вебвью красят автофилл своим фоном поверх страницы —
+   перебиваем цветом поля (inset-тень рисуется поверх их подсветки). */
+.field input:-webkit-autofill,
+.field input:-webkit-autofill:hover,
+.field input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px var(--color-surface-2) inset;
+  -webkit-text-fill-color: var(--color-text-primary);
+  caret-color: var(--color-text-primary);
+  transition: background-color 999999s ease-in-out 0s;
+}
+
 .friend-row {
   text-decoration: none;
   color: inherit;

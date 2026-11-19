@@ -8,5 +8,8 @@
 
     <WebView
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:importantForAutofill="noExcludeDescendants" />
+    <!-- Автофилл Android рисует свою подсветку поверх инпутов WebView
+         (серый прямоугольник, CSS его не перебивает) — отключаем. -->
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

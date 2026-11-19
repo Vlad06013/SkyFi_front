@@ -1,13 +1,17 @@
 import { defineComponent } from 'vue';
 import { IonApp } from '@ionic/vue';
 import AppSplash from '@/components/AppSplash/AppSplash.vue';
+import AppToast from '@/components/AppToast/AppToast.vue';
 import { useAppStore } from '@/stores/app';
+import { useOnlineRestoreToast } from '@/composables/useOnlineRestoreToast';
 
 export default defineComponent({
   name: 'App',
-  components: { IonApp, AppSplash },
+  components: { IonApp, AppSplash, AppToast },
   setup() {
     const app = useAppStore();
+    // Тост «Соединение восстановлено» при переходе офлайн → онлайн.
+    useOnlineRestoreToast();
     return { app };
   },
 });
