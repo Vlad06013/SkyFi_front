@@ -33,32 +33,25 @@
             <path d="M12 5v14M5 12h14" />
           </svg>
         </button>
-        <div class="dl-all-wrap">
-          <span v-if="dlAllStatus === 'done'" class="dl-all is-done">Скачано</span>
-          <button
-            v-else
-            class="dl-all"
-            :class="{ 'is-run': dlAllStatus === 'run' }"
-            type="button"
-            :aria-label="dlAllStatus === 'run' ? `скачивается ${dlAllPct}%` : 'скачать все'"
-            @click="downloadAllTab"
-          >
-            <template v-if="dlAllStatus === 'run'">
-              <svg class="ring spin" viewBox="0 0 36 36" aria-hidden="true">
-                <circle class="track" cx="18" cy="18" r="15" />
-                <circle class="arc" cx="18" cy="18" r="15" transform="rotate(-90 18 18)" :style="{ strokeDasharray: `${dlAllArc} 94` }" />
-              </svg>
-              <span class="pct">{{ dlAllPct }}%</span>
-            </template>
-            <template v-else>
-              <svg class="ring" viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15" /></svg>
-              <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M12 5v12m0 0 4.6-4.6M12 17l-4.6-4.6" />
-              </svg>
-            </template>
-          </button>
-          <span v-if="dlAllStatus !== 'done'" class="dl-all-cap">Скачать</span>
-        </div>
+        <span v-if="dlAllStatus === 'done'" class="dl-all is-done">Скачано</span>
+        <button
+          v-else-if="dlAllStatus === 'run'"
+          class="dl-all is-run"
+          type="button"
+          :aria-label="`скачивается ${dlAllPct}%`"
+        >
+          <svg class="ring spin" viewBox="0 0 36 36" aria-hidden="true">
+            <circle class="track" cx="18" cy="18" r="15" />
+            <circle class="arc" cx="18" cy="18" r="15" transform="rotate(-90 18 18)" :style="{ strokeDasharray: `${dlAllArc} 94` }" />
+          </svg>
+          <span class="pct">{{ dlAllPct }}%</span>
+        </button>
+        <button v-else class="icon-btn ghost" type="button" aria-label="скачать все" @click="downloadAllTab">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 4v9m0 0 3.5-3.5M12 13 8.5 9.5" />
+            <path d="M5 17h14" />
+          </svg>
+        </button>
       </div>
     </div>
 

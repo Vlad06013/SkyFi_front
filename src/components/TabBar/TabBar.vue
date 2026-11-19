@@ -16,7 +16,8 @@
         <path d="M16.5 16.5 21 21" />
       </svg>
       <svg v-else-if="item.id === 'library'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M5 3h13a1 1 0 0 1 1 1v16l-7.5-4-7.5 4V4a1 1 0 0 1 1-1z" />
+        <circle cx="12" cy="12" r="8.4" />
+        <path d="M12 15.4s-3.4-2-4.4-4.3c-.6-1.4.3-2.9 1.8-2.9 1 0 2.6 1 2.6 1s1.6-1 2.6-1c1.5 0 2.4 1.5 1.8 2.9-1 2.3-4.4 4.3-4.4 4.3z" fill="currentColor" stroke="none" />
       </svg>
       <svg v-else-if="item.id === 'friends'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
         <circle cx="9" cy="8" r="3.5" />

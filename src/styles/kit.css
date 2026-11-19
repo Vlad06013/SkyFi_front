@@ -796,8 +796,6 @@
 .pl-row .cover.round { border-radius: 50%; }
 .pl-row .tick { width: 16px; height: 16px; color: var(--color-accent); flex-shrink: 0; }
 .dl-bar-side { display: flex; align-items: center; gap: 8px; }
-.dl-all-wrap { display: flex; flex-direction: column; align-items: center; gap: 3px; }
-.dl-all-cap { font-size: 10px; line-height: 1; color: var(--color-text-faint); }
 
 .hero-cover {
   width: 188px; height: 188px; margin: 4px auto 0;
