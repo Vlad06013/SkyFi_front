@@ -106,8 +106,14 @@ export function useMediaMenu(hooks: {
         return;
       }
       if (target.snapshot) {
-        const added = favorites.toggle(target.snapshot);
-        toast.show(target.title, added ? 'добавлено в избранное' : 'убрано из избранного');
+        void favorites
+          .toggle(target.snapshot)
+          .then((added) => {
+            toast.show(target.title, added ? 'добавлено в избранное' : 'убрано из избранного');
+          })
+          .catch((error: unknown) => {
+            toast.show(error instanceof Error ? error.message : 'Не удалось обновить избранное', '', true);
+          });
         return;
       }
       toast.show(target.title, 'уже в избранном');

@@ -19,6 +19,8 @@ interface SnapshotBase {
 export interface TrackSnapshot extends SnapshotBase {
   type: 'track';
   duration_ms: number | null;
+  /** Обложка трека из источника; null — пока бэк её не привёз. */
+  cover_url: string | null;
   album: {
     title?: string;
     year?: string;

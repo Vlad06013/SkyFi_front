@@ -103,8 +103,10 @@ export interface SearchPagePayload {
   videos: SearchSection<WithFavorite<import('./snapshots').VideoSnapshot>>;
 }
 
+/** data ответа GET /favorites без фильтра: вкладки по типам. Ключ videos всегда на месте (у Яндекса пусто). */
 export interface FavoritesPayload {
   tracks: TrackSnapshot[];
+  videos: import('./snapshots').VideoSnapshot[];
   albums: import('./snapshots').AlbumSnapshot[];
   artists: import('./snapshots').ArtistSnapshot[];
   playlists: import('./snapshots').PlaylistSnapshot[];

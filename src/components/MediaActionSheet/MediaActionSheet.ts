@@ -3,7 +3,7 @@ import { storeToRefs } from 'pinia';
 import AppSheet from '@/components/AppSheet/AppSheet.vue';
 import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
-import { coverVar } from '@/lib/cover';
+import { coverVar, trackCover } from '@/lib/cover';
 import { favoritePlaylists } from '@/mocks/catalog';
 import { useFriendsStore } from '@/stores/friends';
 import { usePlayerStore } from '@/stores/player';
@@ -48,7 +48,7 @@ export default defineComponent({
       const snapshot = props.entity.snapshot;
       if (!snapshot) return '';
       if (snapshot.type === 'video') return snapshot.cover_url ?? '';
-      if (snapshot.type === 'track') return snapshot.album?.cover_url ?? '';
+      if (snapshot.type === 'track') return trackCover(snapshot);
       return '';
     });
 

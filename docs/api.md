@@ -89,7 +89,8 @@ Sanctum Bearer-токен: `Authorization: Bearer <token>`.
 `title`, `artists: [{name, source_id?}]` (исполнители/авторы,
 может быть `[]`).
 
-- **track**: + `duration_ms|null`, `album {title?, year?,
+- **track**: + `duration_ms|null`, `cover_url|null` (обложка трека из
+  источника; у Яндекса заполняется импортом), `album {title?, year?,
   cover_url?, source_id?}|null`, `lyrics|null` (на проводе не
   приходит — отдельный роут), `stream_url|null` (постоянная
   ссылка, только у источников со стабильными URL; у Яндекса
@@ -268,11 +269,11 @@ status: pending|playing_now|played|skipped, snapshot|null}`.
 
 | Метод/путь | Тело → Ответ |
 |---|---|
-| `GET /?type=` | без type — все вкладки `{tracks: [...], albums: [...], artists: [...], playlists: [...]}` (снапшоты, отсортированы); с type — одна секция |
-| `POST /` | snapshot → запись; повтор — no-op |
-| `DELETE /` | snapshot → удалить |
+| `GET /?type=` | без type — все вкладки `{tracks: [...], videos: [...], albums: [...], artists: [...], playlists: [...]}` (снапшоты, отсортированы; `videos` всегда на месте, у Яндекса пусто); с type — одна секция |
+| `POST /` | snapshot → `{message, is_favorite: true}`; запись; повтор — no-op |
+| `DELETE /` | snapshot в теле → удалить; сообщение |
 | `POST /check` | snapshot → `{is_favorite}` |
-| `PATCH /sort` | `{type, items: [{source_type, source_id, sort}]}` — новый порядок вкладки |
+| `PATCH /sort` | `{type, items: [{source_type, source_id, sort}]}` — новый порядок вкладки (`sort` = индекс в списке) |
 
 ## 11. Плейлисты (`/playlists`)
 

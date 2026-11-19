@@ -23,7 +23,10 @@
                 </svg>
               </span>
             </template>
-            <SourceBadge v-else :source="pane.snapshot.source_type" />
+            <template v-else>
+              <img v-if="pane.snapshot.type === 'track'" :src="trackCover(pane.snapshot)" alt="">
+              <SourceBadge :source="pane.snapshot.source_type" />
+            </template>
           </div>
           <div class="track-meta">
             <div class="track-title">{{ pane.title }}</div>

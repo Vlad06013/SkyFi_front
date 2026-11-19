@@ -74,6 +74,7 @@
             :title="playlist.title"
             :subtitle="`${playlist.item_count} треков`"
             :source="playlist.source_type"
+            :cover="playlist.cover_url ?? ''"
             :menuable="false"
             @open="pickPlaylist(playlist.title)"
           />

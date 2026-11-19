@@ -3,7 +3,7 @@ import { storeToRefs } from 'pinia';
 import { usePlayerStore } from '@/stores/player';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
-import { coverVar } from '@/lib/cover';
+import { coverVar, trackCover } from '@/lib/cover';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import OfflineBanner from '@/components/OfflineBanner/OfflineBanner.vue';
 
@@ -35,6 +35,7 @@ export default defineComponent({
       hasUnread,
       toggleBell,
       coverVar,
+      trackCover,
     };
   },
 });

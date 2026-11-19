@@ -3,7 +3,7 @@ import { storeToRefs } from 'pinia';
 import { usePlayerStore } from '@/stores/player';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { trackPointer } from '@/lib/pointer-drag';
-import { artistsLine, coverVar } from '@/lib/cover';
+import { artistsLine, coverVar, trackCover } from '@/lib/cover';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import type { AnySnapshot } from '@/types';
 
@@ -159,6 +159,7 @@ export default defineComponent({
       panes,
       trackEl,
       coverVar,
+      trackCover,
       onDragStart,
       onScroll,
       onLike,

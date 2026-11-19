@@ -27,9 +27,11 @@
       </span>
     </div>
     <div v-else-if="kind === 'media'" class="cover" :class="{ round }" :style="{ background: coverVar(source) }">
+      <img v-if="cover" :src="cover" alt="">
       <SourceBadge :source="source" />
     </div>
     <div v-else class="thumb" :style="{ background: coverVar(source) }">
+      <img v-if="cover" :src="cover" alt="">
       <SourceBadge :source="source" />
     </div>
 

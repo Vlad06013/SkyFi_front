@@ -24,6 +24,7 @@
           <span class="wave-flame-tongue wave-flame-tongue-3" />
         </div>
         <div class="cover" :style="{ background: current ? coverVar(current.source_type) : 'var(--gradient-cover-1)' }">
+          <img v-if="current?.type === 'track'" :src="trackCover(current)" alt="">
           <SourceBadge v-if="current" :source="current.source_type" />
         </div>
       </div>

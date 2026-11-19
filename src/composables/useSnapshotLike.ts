@@ -12,8 +12,14 @@ export function useSnapshotLike(source: () => AnySnapshot | null | undefined) {
   function toggleLike() {
     const snapshot = source();
     if (!snapshot) return;
-    const added = favorites.toggle(snapshot);
-    toast.show(snapshot.title, added ? 'добавлено в избранное' : 'убрано из избранного');
+    void favorites
+      .toggle(snapshot)
+      .then((added) => {
+        toast.show(snapshot.title, added ? 'добавлено в избранное' : 'убрано из избранного');
+      })
+      .catch((error: unknown) => {
+        toast.show(error instanceof Error ? error.message : 'Не удалось обновить избранное', '', true);
+      });
   }
 
   return { liked, toggleLike };

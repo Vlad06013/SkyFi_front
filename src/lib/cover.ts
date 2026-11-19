@@ -1,9 +1,14 @@
-import type { SnapshotSource } from '@/types';
+import type { SnapshotSource, TrackSnapshot } from '@/types';
 
 export function coverVar(source: SnapshotSource): string {
   if (source === 'yandex_music' || source === 'mock') return 'var(--gradient-cover-1)';
   if (source === 'vk') return 'var(--gradient-cover-3)';
   return 'var(--gradient-cover-2)';
+}
+
+/** Обложка трека: своё поле, фолбэк — обложка альбома. */
+export function trackCover(track: TrackSnapshot): string {
+  return track.cover_url ?? track.album?.cover_url ?? '';
 }
 
 export function sourceTitle(source: SnapshotSource): string {

@@ -47,6 +47,7 @@
         :title="bestArtist.title"
         subtitle="Исполнитель"
         :source="bestArtist.source_type"
+        :cover="bestArtist.cover_url ?? ''"
         round
         :liked="bestArtist.is_favorite"
         @open="openArtist"
@@ -60,6 +61,7 @@
           :title="track.title"
           :subtitle="artistsLine(track.artists)"
           :source="track.source_type"
+          :cover="trackCover(track)"
           :liked="track.is_favorite"
           :downloaded="downloads.isDownloaded(track)"
           :playing="isPlaying(track)"

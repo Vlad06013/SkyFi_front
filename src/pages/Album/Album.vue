@@ -2,6 +2,7 @@
   <div>
     <AppBar back />
     <div class="hero-cover" :style="{ background: coverVar(album.source_type) }">
+      <img v-if="album.cover_url" :src="album.cover_url" alt="">
       <SourceBadge :source="album.source_type" />
     </div>
     <div class="hero-name">{{ album.title }}</div>
@@ -18,6 +19,7 @@
       :title="track.title"
       :subtitle="artistsLine(track.artists)"
       :source="track.source_type"
+      :cover="trackCover(track)"
       :liked="favorites.has(track)"
       @open="player.playSnapshot(track)"
       @menu="openSnapshotMenu($event, track, 'my-album-track')"

@@ -562,8 +562,8 @@
 .select-opt.is-disabled { opacity: .38; color: var(--color-text-faint); cursor: default; }
 .select-opt.is-disabled .osub { color: var(--color-text-faint); }
 
-.thumb, .cover, .cover-big { position: relative; overflow: hidden; }
-.thumb img, .cover img, .cover-big img {
+.thumb, .cover, .cover-big, .hero-cover { position: relative; overflow: hidden; }
+.thumb img, .cover img, .cover-big img, .hero-cover img {
   position: absolute; inset: 0;
   width: 100%; height: 100%;
   object-fit: cover; display: block;

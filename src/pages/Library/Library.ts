@@ -12,9 +12,8 @@ import type { PlaylistDraft } from '@/components/PlaylistForm/PlaylistForm';
 import type { UploadDraft } from '@/components/UploadForm/UploadForm';
 import { sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
 import { plural } from '@/lib/plural';
-import { artistsLine } from '@/lib/cover';
+import { artistsLine, trackCover } from '@/lib/cover';
 import {
-  trackFatLip,
   uploadedTracks,
 } from '@/mocks/catalog';
 import { usePlayerStore } from '@/stores/player';
@@ -78,13 +77,21 @@ export default defineComponent({
           toast.show(item.title, 'загрузка удалена');
           return;
         }
-        if (item.snapshot) favorites.remove(item.snapshot);
-        toast.show(
-          item.title,
-          item.snapshot?.type === 'playlist' && item.snapshot.source_type === 'skyfi'
-            ? 'плейлист удалён'
-            : 'убрано из избранного',
-        );
+        if (item.snapshot) {
+          void favorites
+            .remove(item.snapshot)
+            .then(() => {
+              toast.show(
+                item.title,
+                item.snapshot?.type === 'playlist' && item.snapshot.source_type === 'skyfi'
+                  ? 'плейлист удалён'
+                  : 'убрано из избранного',
+              );
+            })
+            .catch((error: unknown) => {
+              toast.show(error instanceof Error ? error.message : 'Не удалось удалить', '', true);
+            });
+        }
       },
     });
 
@@ -115,10 +122,6 @@ export default defineComponent({
     function isPlayingVideo(video: VideoSnapshot) {
       const snap = current.value;
       return snap?.type === 'video' && snap.source_id === video.source_id;
-    }
-
-    function isOffline(track: TrackSnapshot) {
-      return track.source_id === trackFatLip.source_id;
     }
 
     function isDownloaded(track: TrackSnapshot) {
@@ -174,7 +177,9 @@ export default defineComponent({
         cover_url: draft.cover,
         item_count: 0,
       };
-      favorites.add(playlist);
+      favorites.add(playlist).catch((error: unknown) => {
+        toast.show(error instanceof Error ? error.message : 'Не удалось сохранить плейлист', '', true);
+      });
       createOpen.value = false;
       toast.show(draft.name, 'плейлист создан');
     }
@@ -194,6 +199,7 @@ export default defineComponent({
         source_id: `up-${Date.now()}`,
         title: draft.title,
         duration_ms: null,
+        cover_url: null,
         artists: draft.artists
           .split(',')
           .map((name) => ({ name: name.trim() }))
@@ -264,9 +270,9 @@ export default defineComponent({
       counts,
       showDownloadAll,
       artistsLine,
+      trackCover,
       isPlaying,
       isPlayingVideo,
-      isOffline,
       isDownloaded,
       dlAllStatus,
       dlAllPct,

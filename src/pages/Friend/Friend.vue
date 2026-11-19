@@ -44,6 +44,7 @@
       </template>
       <template v-else-if="friend.current_snapshot">
         <div class="thumb" :style="{ background: coverVar(friend.current_snapshot.source_type) }">
+          <img v-if="friend.current_snapshot.type === 'track'" :src="trackCover(friend.current_snapshot)" alt="">
           <SourceBadge :source="friend.current_snapshot.source_type" />
         </div>
         <div class="track-meta">
@@ -71,6 +72,7 @@
           :title="track.title"
           :subtitle="artistsLine(track.artists)"
           :source="track.source_type"
+          :cover="trackCover(track)"
           :liked="favorites.has(track)"
           :playing="isPlaying(track)"
           sortable
@@ -104,6 +106,7 @@
         :title="track.title"
         :subtitle="artistsLine(track.artists)"
         :source="track.source_type"
+        :cover="trackCover(track)"
         :liked="favorites.has(track)"
         :playing="isPlaying(track)"
         @open="player.playSnapshot(track)"
@@ -118,6 +121,7 @@
         :title="pl.title"
         :subtitle="`${pl.item_count} · ${pl.owner_name}`"
         :source="pl.source_type"
+        :cover="pl.cover_url ?? ''"
         :liked="favorites.has(pl)"
         @open="player.playSnapshot(favoriteTracks[0])"
         @menu="openSnapshotMenu($event, pl, 'my-playlists', pl.owner_name ?? undefined)"
@@ -131,6 +135,7 @@
         :title="artist.title"
         subtitle="Исполнитель"
         :source="artist.source_type"
+        :cover="artist.cover_url ?? ''"
         round
         :liked="favorites.has(artist)"
         @open="openArtist(artist.source_id)"
@@ -145,6 +150,7 @@
         :title="album.title"
         :subtitle="`${artistsLine(album.artists)} · ${album.year}`"
         :source="album.source_type"
+        :cover="album.cover_url ?? ''"
         :liked="favorites.has(album)"
         @open="openAlbum(album.source_id)"
         @menu="openSnapshotMenu($event, album, 'my-albums')"

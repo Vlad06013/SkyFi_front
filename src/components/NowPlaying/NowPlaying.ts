@@ -6,7 +6,7 @@ import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
-import { coverVar, artistsLine } from '@/lib/cover';
+import { coverVar, artistsLine, trackCover } from '@/lib/cover';
 import { moveItem, sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
 import { entityFromSnapshot } from '@/lib/media-menu';
 import { trackPointer } from '@/lib/pointer-drag';
@@ -296,6 +296,7 @@ export default defineComponent({
       clipFrame,
       coverVar,
       artistsLine,
+      trackCover,
       sortRowStyle,
       formatTime,
       togglePlay,

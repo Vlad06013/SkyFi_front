@@ -27,6 +27,8 @@ interface SnapshotBase {
 export interface TrackSnapshot extends SnapshotBase {
   type: 'track';
   duration_ms: number | null;
+  /** Обложка трека из источника; null — пока бэк её не привёз. */
+  cover_url: string | null;
   album: {
     title?: string;
     year?: string;
@@ -335,9 +337,10 @@ export interface SearchPagePayload {
 ## Избранное, плейлисты, волна
 
 ```ts
-/** data ответа GET /favorites без фильтра: вкладки по типам. */
+/** data ответа GET /favorites без фильтра: вкладки по типам. Ключ videos всегда на месте (у Яндекса пусто). */
 export interface FavoritesPayload {
   tracks: TrackSnapshot[];
+  videos: VideoSnapshot[];
   albums: AlbumSnapshot[];
   artists: ArtistSnapshot[];
   playlists: PlaylistSnapshot[];
@@ -441,6 +444,7 @@ export const mockTrack: TrackSnapshot = {
   source_id: '111',
   title: 'Radio Silence',
   duration_ms: 203310,
+  cover_url: null,
   artists: [{ name: 'Sum 41', source_id: '5950' }],
   album: { title: 'Heaven :x: Hell', year: '2024', cover_url: 'https://example.com/c.webp' },
   stream_url: null,

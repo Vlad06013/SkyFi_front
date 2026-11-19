@@ -5,7 +5,7 @@ import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
 import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
-import { coverVar, artistsLine } from '@/lib/cover';
+import { coverVar, artistsLine, trackCover } from '@/lib/cover';
 import { playlistRoad, playlistRoadContent } from '@/mocks/catalog';
 import { usePlayerStore } from '@/stores/player';
 import { useFavoritesStore } from '@/stores/favorites';
@@ -56,6 +56,7 @@ export default defineComponent({
       player,
       coverVar,
       artistsLine,
+      trackCover,
       openSnapshotMenu,
       open,
       items,

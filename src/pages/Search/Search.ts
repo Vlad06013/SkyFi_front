@@ -5,8 +5,8 @@ import AppBar from '@/components/AppBar/AppBar.vue';
 import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
 import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
-import { artistsLine } from '@/lib/cover';
-import { artistSum41, favoriteTracks, mockVideo } from '@/mocks/catalog';
+import { artistsLine, trackCover } from '@/lib/cover';
+import { artistShinedown, favoriteTracks, mockVideo } from '@/mocks/catalog';
 import { usePlayerStore } from '@/stores/player';
 import { useFavoritesStore } from '@/stores/favorites';
 import { useDownloadsStore } from '@/stores/downloads';
@@ -31,7 +31,7 @@ export default defineComponent({
 
     // Мок поиска: результаты приходят с is_favorite по контракту
     // (api.md §9, WithFavorite), на моках флаг считаем из стора.
-    const bestArtist = computed(() => ({ ...artistSum41, is_favorite: favorites.has(artistSum41) }));
+    const bestArtist = computed(() => ({ ...artistShinedown, is_favorite: favorites.has(artistShinedown) }));
     const trackResults = computed(() =>
       favoriteTracks.map((track) => ({ ...track, is_favorite: favorites.has(track) })),
     );
@@ -47,7 +47,7 @@ export default defineComponent({
     }
 
     function openArtist() {
-      router.push(`/artist/${artistSum41.source_id}`);
+      router.push(`/artist/${artistShinedown.source_id}`);
       player.playSnapshot(favoriteTracks[0]);
     }
 
@@ -63,6 +63,7 @@ export default defineComponent({
       trackResults,
       videoResult,
       artistsLine,
+      trackCover,
       isPlaying,
       useHistory,
       openArtist,

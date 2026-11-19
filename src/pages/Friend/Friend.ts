@@ -8,7 +8,7 @@ import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import { mockFriends, friendQueue } from '@/mocks/friends';
 import { favoriteTracks } from '@/mocks/catalog';
-import { coverVar, artistsLine } from '@/lib/cover';
+import { coverVar, artistsLine, trackCover } from '@/lib/cover';
 import { moveItem, sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
 import { useFriendsStore } from '@/stores/friends';
 import { useFavoritesStore } from '@/stores/favorites';
@@ -113,6 +113,7 @@ export default defineComponent({
       favChips,
       coverVar,
       artistsLine,
+      trackCover,
       toggleQueue,
       isPlaying,
       playNow,

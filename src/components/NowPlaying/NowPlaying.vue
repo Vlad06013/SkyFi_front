@@ -91,6 +91,7 @@
         <template v-if="layer === 'queue'">
           <div class="p-now">
             <div class="thumb" :style="{ background: coverVar(current.source_type) }">
+              <img v-if="current.type === 'track'" :src="trackCover(current)" alt="">
               <SourceBadge :source="current.source_type" />
             </div>
             <div class="track-meta">
@@ -123,6 +124,7 @@
                 :title="track.title"
                 :subtitle="artistsLine(track.artists)"
                 :source="track.source_type"
+                :cover="track.type === 'track' ? trackCover(track) : ''"
                 sortable
                 :menuable="false"
                 :dragging="sortDrag?.from === index"
@@ -146,6 +148,7 @@
           class="cover-big"
           :style="{ background: coverVar(current.source_type) }"
         >
+          <img v-if="current.type === 'track'" :src="trackCover(current)" alt="">
           <SourceBadge :source="current.source_type" />
         </div>
       </div>
