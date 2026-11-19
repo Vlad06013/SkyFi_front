@@ -191,6 +191,7 @@ export const usePlayerStore = defineStore('player', () => {
     artist,
     previewNext,
     previewPrevious,
+    skipRestartAfter,
     album,
     durationSeconds,
     progress,

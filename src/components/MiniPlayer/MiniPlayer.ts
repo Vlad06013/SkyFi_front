@@ -1,4 +1,4 @@
-import { computed, defineComponent, onBeforeUnmount, ref } from 'vue';
+import { computed, defineComponent, onBeforeUnmount, onMounted, ref } from 'vue';
 import { storeToRefs } from 'pinia';
 import { usePlayerStore } from '@/stores/player';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
@@ -7,9 +7,10 @@ import { artistsLine, coverVar } from '@/lib/cover';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import type { AnySnapshot } from '@/types';
 
+const paneGap = 20;
 const tapSlop = 8;
 const swipeThreshold = 64;
-const commitMs = 180;
+const settleDebounceMs = 90;
 
 export default defineComponent({
   name: 'MiniPlayer',
@@ -18,15 +19,15 @@ export default defineComponent({
     const player = usePlayerStore();
     const { current, previewNext, previewPrevious } = storeToRefs(player);
     const playing = computed(() => player.state.is_playing);
-    const { togglePlay, openExpanded } = player;
+    const { togglePlay, openExpanded, skipRestartAfter } = player;
     const { liked, toggleLike } = useSnapshotLike(() => player.current);
 
-    const rootEl = ref<HTMLElement | null>(null);
-    const dragX = ref(0);
+    const trackEl = ref<HTMLElement | null>(null);
     const dragging = ref(false);
-    const noJump = ref(false);
-    const commitDir = ref(0);
-    let skipTimer: ReturnType<typeof setTimeout> | null = null;
+    let startClientX = 0;
+    let startScroll = 0;
+    let lastDx = 0;
+    let settleTimer: ReturnType<typeof setTimeout> | null = null;
 
     const panes = computed(() => {
       const now = current.value;
@@ -43,57 +44,94 @@ export default defineComponent({
       ];
     });
 
-    const sliderStyle = computed(() => ({
-      transform: `translateX(calc(-100% / 3 + ${dragX.value}px))`,
-      transition: dragging.value || noJump.value
-        ? 'none'
-        : commitDir.value
-          ? `transform ${commitMs}ms ease`
-          : 'transform .2s ease',
-    }));
+    function slotOffset(index: number) {
+      const el = trackEl.value;
+      if (!el) return 0;
+      return index * (el.clientWidth + paneGap);
+    }
 
-    function instantReset() {
-      noJump.value = true;
-      dragX.value = 0;
-      commitDir.value = 0;
-      requestAnimationFrame(() => {
-        noJump.value = false;
-      });
+    function centerInstant() {
+      const el = trackEl.value;
+      if (!el) return;
+      el.scrollLeft = slotOffset(1);
+    }
+
+    function scrollToSlot(index: number) {
+      trackEl.value?.scrollTo({ left: slotOffset(index), behavior: 'smooth' });
+    }
+
+    function commitNext() {
+      if (!previewNext.value) {
+        scrollToSlot(1);
+        return;
+      }
+      player.skipNext();
+      centerInstant();
+    }
+
+    function commitPrev() {
+      const restartOnly = player.state.position_seconds > skipRestartAfter;
+      if (!previewPrevious.value) {
+        scrollToSlot(1);
+        return;
+      }
+      player.skipPrevious();
+      if (restartOnly) {
+        scrollToSlot(1);
+        return;
+      }
+      centerInstant();
+    }
+
+    function onSettled() {
+      if (dragging.value) return;
+      const el = trackEl.value;
+      if (!el) return;
+      const step = el.clientWidth + paneGap;
+      if (!step) return;
+      const index = Math.round(el.scrollLeft / step);
+      if (index >= 2) commitNext();
+      else if (index <= 0) commitPrev();
+    }
+
+    function onScroll() {
+      if (settleTimer) clearTimeout(settleTimer);
+      settleTimer = setTimeout(onSettled, settleDebounceMs);
     }
 
     function onDragStart(event: PointerEvent) {
-      if (commitDir.value) return;
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       if (event.target instanceof Element && event.target.closest('.icon-btn, .fab')) return;
-      const startX = event.clientX;
+      const el = trackEl.value;
+      if (!el) return;
+      startClientX = event.clientX;
+      startScroll = el.scrollLeft;
+      lastDx = 0;
       dragging.value = true;
       trackPointer(event, {
         move: (next) => {
-          dragX.value = next.clientX - startX;
+          lastDx = next.clientX - startClientX;
+          el.scrollLeft = startScroll - lastDx;
         },
         up: () => {
-          const dx = dragX.value;
-          const width = rootEl.value?.offsetWidth ?? 0;
           dragging.value = false;
-          if (Math.abs(dx) < tapSlop) {
-            dragX.value = 0;
+          if (Math.abs(lastDx) < tapSlop) {
             openExpanded();
             return;
           }
-          if (Math.abs(dx) >= swipeThreshold && width) {
-            const dir = dx < 0 ? 1 : -1;
-            commitDir.value = dir;
-            dragX.value = -dir * width;
-            skipTimer = setTimeout(() => {
-              if (dir > 0) player.skipNext();
-              else player.skipPrevious();
-              instantReset();
-            }, commitMs);
-            return;
-          }
-          dragX.value = 0;
+          if (lastDx <= -swipeThreshold) scrollToSlot(2);
+          else if (lastDx >= swipeThreshold) scrollToSlot(0);
+          else scrollToSlot(1);
+        },
+        cancel: () => {
+          dragging.value = false;
+          scrollToSlot(1);
         },
       });
+    }
+
+    function onResize() {
+      if (!dragging.value) centerInstant();
     }
 
     function onLike(index: number) {
@@ -104,8 +142,14 @@ export default defineComponent({
       if (index === 1) togglePlay();
     }
 
+    onMounted(() => {
+      requestAnimationFrame(centerInstant);
+      window.addEventListener('resize', onResize);
+    });
+
     onBeforeUnmount(() => {
-      if (skipTimer) clearTimeout(skipTimer);
+      if (settleTimer) clearTimeout(settleTimer);
+      window.removeEventListener('resize', onResize);
     });
 
     return {
@@ -113,10 +157,10 @@ export default defineComponent({
       liked,
       playing,
       panes,
-      rootEl,
-      sliderStyle,
+      trackEl,
       coverVar,
       onDragStart,
+      onScroll,
       onLike,
       onTogglePlay,
     };

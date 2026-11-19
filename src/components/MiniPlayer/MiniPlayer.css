@@ -3,13 +3,22 @@
   overflow: hidden;
 }
 
-.mp-strip {
+.mp-track {
   display: flex;
-  width: 300%;
+  gap: 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mp-track::-webkit-scrollbar {
+  display: none;
 }
 
 .mp-pane {
-  flex: 0 0 calc(100% / 3);
+  flex: 0 0 100%;
 }
 
 .mp-cover {

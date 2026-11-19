@@ -9,6 +9,7 @@ export function trackPointer(
   handlers: {
     move: (event: PointerEvent) => void;
     up: (event: PointerEvent) => void;
+    cancel?: () => void;
   },
 ) {
   const pointerId = event.pointerId;
@@ -36,6 +37,13 @@ export function trackPointer(
     handlers.up(next);
   };
 
+  const cancel = (next: PointerEvent) => {
+    if (next.pointerId !== pointerId) return;
+    cleanup();
+    if (handlers.cancel) handlers.cancel();
+    else handlers.up(next);
+  };
+
   const onTouchMove = (touchEvent: TouchEvent) => {
     if (touchEvent.cancelable) touchEvent.preventDefault();
   };
@@ -43,7 +51,7 @@ export function trackPointer(
   function cleanup() {
     window.removeEventListener('pointermove', move, true);
     window.removeEventListener('pointerup', up, true);
-    window.removeEventListener('pointercancel', up, true);
+    window.removeEventListener('pointercancel', cancel, true);
     document.removeEventListener('touchmove', onTouchMove, true);
     if (target?.hasPointerCapture(pointerId)) {
       try {
@@ -56,6 +64,6 @@ export function trackPointer(
 
   window.addEventListener('pointermove', move, { capture: true, passive: false });
   window.addEventListener('pointerup', up, { capture: true });
-  window.addEventListener('pointercancel', up, { capture: true });
+  window.addEventListener('pointercancel', cancel, { capture: true });
   document.addEventListener('touchmove', onTouchMove, { capture: true, passive: false });
 }
