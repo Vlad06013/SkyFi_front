@@ -5,6 +5,8 @@ import type { Pinia } from 'pinia';
 import * as authApi from '@/api/auth';
 import { useAuthStore } from '@/stores/auth';
 import Settings from '@/pages/Settings/Settings.vue';
+import QrScannerSheet from '@/components/QrScannerSheet/QrScannerSheet.vue';
+import SettingRow from '@/components/SettingRow/SettingRow.vue';
 
 const routerMocks = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -106,5 +108,28 @@ describe('pages/Settings', () => {
     expect(logoutMock).toHaveBeenCalledTimes(1);
     expect(useAuthStore().isAuthed).toBe(false);
     expect(routerMocks.replace).toHaveBeenCalledWith('/login');
+  });
+
+  it('кнопка «Сканировать QR» открывает шит сканера', async () => {
+    const wrapper = mount(Settings, {
+      global: {
+        plugins: [pinia],
+        stubs: {
+          AppBar: true,
+          AppSheet: { template: '<div><slot /></div>' },
+          SeekBar: true,
+          YandexCard: true,
+          QrScannerSheet: { props: ['open'], template: '<div class="qr-scanner-stub" />' },
+        },
+      },
+    });
+
+    expect(wrapper.text()).toContain('Сканировать QR');
+    const qrRow = wrapper
+      .findAllComponents(SettingRow)
+      .find((row) => row.props('title') === 'Сканировать QR');
+    expect(qrRow).toBeDefined();
+    await qrRow!.trigger('click');
+    expect(wrapper.findComponent(QrScannerSheet).props('open')).toBe(true);
   });
 });
