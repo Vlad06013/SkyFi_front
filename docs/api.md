@@ -343,10 +343,28 @@ artist_names: [..]}` → upload; `GET /` — список; `PATCH /{id}`
 
 ## 16. Импорт из Яндекса (`/import/yandex-music`)
 
-`GET /summary` — что будет импортировано; `POST /` (12/мин) —
-старт (job); `GET /` — прогресс `{status: pending|running|
-completed|failed, counters}`; `DELETE /` — отмена. Лайки Яндекса
-приезжают в избранное с `import_source: "yandex"`.
+Формы по коду бэка (контроллер `YandexMusicImportController`).
+Без подключённого Яндекса summary/start — 422 «Яндекс Музыка
+не подключена.».
+
+- `GET /summary` → `data: {<type>: {total, existing}}` по ключам
+  `tracks`/`videos`/`albums`/`playlists`/`artists`: `total` —
+  сколько лайкнуто в Яндексе, `existing` — сколько уже перенесено
+  в SkyFi (маркер `import_source: "yandex"`). Видео Яндекс не
+  лайкает: `total` у `videos` всегда 0.
+- `POST /` (12/мин) → прогресс созданной задачи (старая запись
+  пользователя удаляется). Джоба уходит в очередь.
+- `GET /` → прогресс активной (или последней) задачи, `data:
+  null` — импорт ни разу не запускался. Форма: `{job_id, status,
+  total, processed, imported, skipped, failed, progress (0–100,
+  completed = 100), message, started_at, finished_at}`.
+  `status`: `queued` | `running` | `completed` | `failed` |
+  `cancelled`.
+- `DELETE /` → отмена: активной/висящей ставит `cancelled`
+  (джоба завершит текущую страницу и выйдет), отвечает прогрессом;
+  записи нет — `data: null`.
+
+Лайки Яндекса приезжают в избранное с `import_source: "yandex"`.
 
 ## 17. Сокеты
 

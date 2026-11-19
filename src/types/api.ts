@@ -185,3 +185,39 @@ export interface YandexDisconnectPayload {
   connected: boolean;
   message: string;
 }
+
+/* Импорт «Мне нравится» из Яндекс Музыки (api.md §16, формы по коду бэка). */
+
+export interface YandexImportSection {
+  /** Сколько лайкнуто в Яндексе. */
+  total: number;
+  /** Сколько уже перенесено в SkyFi (маркер import_source: "yandex"). */
+  existing: number;
+}
+
+/** data ответа GET /import/yandex-music/summary. Видео Яндекс не лайкает: total всегда 0. */
+export interface YandexImportSummaryPayload {
+  tracks: YandexImportSection;
+  videos: YandexImportSection;
+  albums: YandexImportSection;
+  playlists: YandexImportSection;
+  artists: YandexImportSection;
+}
+
+export type YandexImportStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+/** data ответов POST/GET/DELETE /import/yandex-music; null — задачи ещё не было. */
+export interface YandexImportProgressPayload {
+  job_id: string;
+  status: YandexImportStatus;
+  total: number;
+  processed: number;
+  imported: number;
+  skipped: number;
+  failed: number;
+  /** Процент 0–100. */
+  progress: number;
+  message: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+}

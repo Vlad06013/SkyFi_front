@@ -10,7 +10,8 @@ export default defineComponent({
     const toast = useToastStore();
     const online = useOnlineStore();
     const yandex = useYandexStore();
-    const { connected, awaiting, expired, userCode, verificationUrl, busy } = storeToRefs(yandex);
+    const { connected, awaiting, expired, userCode, verificationUrl, busy, summary, progress, importActive } =
+      storeToRefs(yandex);
 
     /** Первый refresh не удался (офлайн/троттлинг) — показать «повторить». */
     const loadFailed = ref(false);
@@ -23,6 +24,24 @@ export default defineComponent({
       if (connected.value) return 'подключён';
       if (loadFailed.value) return 'не удалось загрузить';
       return 'не подключён';
+    });
+
+    const importPct = computed(() => progress.value?.progress ?? 0);
+
+    /** Числа как в макете: 1 248 через неразрывный пробел. */
+    function fmt(n: number): string {
+      return n.toLocaleString('ru-RU');
+    }
+
+    /** Счётчик секции: «5/515» — длинный вариант «5 из 515» не влезает в .ym-stat .n. */
+    function fmtPair(section: { total: number; existing: number }): string {
+      return `${fmt(section.existing)}/${fmt(section.total)}`;
+    }
+    const importDoneLine = computed(() => {
+      if (progress.value?.status !== 'completed') return '';
+      const parts = [`добавлено ${progress.value.imported}`, `пропущено ${progress.value.skipped}`];
+      if (progress.value.failed > 0) parts.push(`ошибок ${progress.value.failed}`);
+      return parts.join(' · ');
     });
 
     async function refresh() {
@@ -57,6 +76,22 @@ export default defineComponent({
       }
     }
 
+    function startImport() {
+      if (busy.value || importActive.value || guardOffline()) return;
+      void yandex.startImport().catch((error: unknown) => {
+        toast.show(error instanceof Error ? error.message : 'Не удалось запустить импорт', '', true);
+      });
+    }
+
+    async function cancelImport() {
+      if (busy.value) return;
+      try {
+        await yandex.cancelImport();
+      } catch (error) {
+        toast.show(error instanceof Error ? error.message : 'Не удалось отменить импорт', '', true);
+      }
+    }
+
     async function copy(text: string | null, what: string) {
       if (!text) return;
       try {
@@ -72,8 +107,21 @@ export default defineComponent({
       if (now === true && was === false) toast.show('Яндекс Музыка', 'подключена');
     });
 
+    // Финал джобы виден только если его ждали прямо на экране (не stale-запись прошлого входа).
+    watch(
+      () => progress.value?.status,
+      (now, was) => {
+        if (now === 'completed' && (was === 'queued' || was === 'running')) {
+          toast.show('Импорт завершён', importDoneLine.value);
+        }
+      },
+    );
+
     onMounted(refresh);
-    onBeforeUnmount(() => yandex.stopPolling());
+    onBeforeUnmount(() => {
+      yandex.stopPolling();
+      yandex.stopImportPolling();
+    });
 
     return {
       connected,
@@ -82,12 +130,21 @@ export default defineComponent({
       userCode,
       verificationUrl,
       busy,
+      summary,
+      progress,
+      importActive,
+      importPct,
+      importDoneLine,
+      fmt,
+      fmtPair,
       loadFailed,
       isLinked,
       statusLine,
       refresh,
       connect,
       disconnect,
+      startImport,
+      cancelImport,
       copy,
     };
   },

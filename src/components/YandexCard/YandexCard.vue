@@ -72,7 +72,29 @@
     </template>
 
     <template v-else-if="connected">
-      <p class="caption">Волна и импорт лайков работают на этом аккаунте.</p>
+      <div v-if="summary" class="ym-stats">
+        <div class="ym-stat"><div class="n">{{ fmtPair(summary.tracks) }}</div><div class="l">треков</div></div>
+        <div class="ym-stat"><div class="n">{{ fmtPair(summary.albums) }}</div><div class="l">альбомов</div></div>
+        <div class="ym-stat"><div class="n">{{ fmtPair(summary.playlists) }}</div><div class="l">плейлистов</div></div>
+        <div class="ym-stat"><div class="n">{{ fmtPair(summary.artists) }}</div><div class="l">исполнителей</div></div>
+      </div>
+
+      <div v-if="importActive" class="ym-progress">
+        <div class="ym-progress-head">
+          <span>Импортируем</span>
+          <span class="ym-progress-pct">{{ importPct }}%</span>
+        </div>
+        <div class="ym-bar"><i :style="{ width: `${importPct}%` }" /></div>
+        <div class="hint">{{ progress?.processed ?? 0 }} из {{ progress?.total ?? 0 }}</div>
+      </div>
+      <p v-else-if="progress?.status === 'failed'" class="caption">{{ progress?.message ?? 'Импорт не удался. Попробуйте ещё раз.' }}</p>
+      <p v-else-if="progress?.status === 'cancelled'" class="caption">{{ progress?.message ?? 'Импорт отменён' }}</p>
+      <p v-else-if="importDoneLine" class="caption">Импорт завершён · {{ importDoneLine }}</p>
+
+      <button v-if="importActive" class="btn btn-ghost wide" type="button" :disabled="busy" @click="cancelImport">Отменить</button>
+      <button v-else class="btn btn-primary wide" type="button" :disabled="busy" @click="startImport">
+        {{ progress?.status === 'completed' ? 'Импортировать снова' : 'Импортировать' }}
+      </button>
     </template>
 
     <template v-else>

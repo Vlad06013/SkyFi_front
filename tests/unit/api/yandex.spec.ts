@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { http } from '@/api/http';
-import { disconnectYandex, fetchYandexDeviceStatus, startYandexDeviceAuth } from '@/api/yandex';
+import {
+  cancelYandexImport,
+  disconnectYandex,
+  fetchYandexDeviceStatus,
+  fetchYandexImportProgress,
+  fetchYandexImportSummary,
+  startYandexDeviceAuth,
+  startYandexImport,
+} from '@/api/yandex';
 
 vi.mock('@/api/http', () => ({
   http: {
@@ -38,5 +46,37 @@ describe('api/yandex', () => {
     deleteMock.mockResolvedValue({ connected: false, message: 'Яндекс Музыка отключена.' });
     await disconnectYandex();
     expect(deleteMock).toHaveBeenCalledWith('yandex-music/auth');
+  });
+
+  it('summary: GET import/yandex-music/summary', async () => {
+    const payload = {
+      tracks: { total: 10, existing: 2 },
+      videos: { total: 0, existing: 0 },
+      albums: { total: 3, existing: 0 },
+      playlists: { total: 1, existing: 1 },
+      artists: { total: 5, existing: 0 },
+    };
+    getMock.mockResolvedValue(payload);
+    await expect(fetchYandexImportSummary()).resolves.toEqual(payload);
+    expect(getMock).toHaveBeenCalledWith('import/yandex-music/summary');
+  });
+
+  it('startImport: POST import/yandex-music', async () => {
+    const payload = { job_id: 'j1', status: 'queued', total: 0, processed: 0, imported: 0, skipped: 0, failed: 0, progress: 0, message: null, started_at: null, finished_at: null };
+    postMock.mockResolvedValue(payload);
+    await expect(startYandexImport()).resolves.toEqual(payload);
+    expect(postMock).toHaveBeenCalledWith('import/yandex-music');
+  });
+
+  it('progress: GET import/yandex-music', async () => {
+    getMock.mockResolvedValue(null);
+    await fetchYandexImportProgress();
+    expect(getMock).toHaveBeenCalledWith('import/yandex-music');
+  });
+
+  it('cancel: DELETE import/yandex-music', async () => {
+    deleteMock.mockResolvedValue({ job_id: 'j1', status: 'cancelled', total: 10, processed: 4, imported: 4, skipped: 0, failed: 0, progress: 40, message: 'Импорт отменён', started_at: 't', finished_at: 't' });
+    await cancelYandexImport();
+    expect(deleteMock).toHaveBeenCalledWith('import/yandex-music');
   });
 });

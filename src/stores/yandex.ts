@@ -1,16 +1,25 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import {
+  cancelYandexImport,
   disconnectYandex,
   fetchYandexDeviceStatus,
+  fetchYandexImportProgress,
+  fetchYandexImportSummary,
   startYandexDeviceAuth,
+  startYandexImport,
 } from '@/api/yandex';
-import type { YandexDeviceStatusPayload } from '@/types';
+import type { YandexDeviceStatusPayload, YandexImportProgressPayload, YandexImportSummaryPayload } from '@/types';
 
 /** Троттлинг статуса 30/мин — 3 с даёт ~20/мин с запасом. */
 const POLL_INTERVAL_MS = 3_000;
 
 const LIVE_STATUSES = ['not_started', 'pending', 'connected'];
+const ACTIVE_JOB_STATUSES = ['queued', 'running'];
+
+function isActiveJob(payload: YandexImportProgressPayload | null): boolean {
+  return payload !== null && ACTIVE_JOB_STATUSES.includes(payload.status);
+}
 
 export const useYandexStore = defineStore('yandex', () => {
   /** null — первого refresh ещё не было. */
@@ -24,7 +33,15 @@ export const useYandexStore = defineStore('yandex', () => {
   /** start/disconnect в полёте. */
   const busy = ref(false);
 
+  /** Сводка лайкнутого (total) и перенесённого (existing). null — не грузили/нет подключения. */
+  const summary = ref<YandexImportSummaryPayload | null>(null);
+  /** Активная (или последняя) задача импорта; null — импорт ни разу не запускался. */
+  const progress = ref<YandexImportProgressPayload | null>(null);
+
+  const importActive = computed(() => isActiveJob(progress.value));
+
   let timer: ReturnType<typeof setInterval> | null = null;
+  let importTimer: ReturnType<typeof setInterval> | null = null;
 
   function stopPolling() {
     if (timer) {
@@ -36,6 +53,18 @@ export const useYandexStore = defineStore('yandex', () => {
   function startPolling() {
     stopPolling();
     timer = setInterval(() => void poll(), POLL_INTERVAL_MS);
+  }
+
+  function stopImportPolling() {
+    if (importTimer) {
+      clearInterval(importTimer);
+      importTimer = null;
+    }
+  }
+
+  function startImportPolling() {
+    stopImportPolling();
+    importTimer = setInterval(() => void pollImport(), POLL_INTERVAL_MS);
   }
 
   function applyStatus(payload: YandexDeviceStatusPayload) {
@@ -55,13 +84,18 @@ export const useYandexStore = defineStore('yandex', () => {
       expired.value = false;
       userCode.value = null;
       verificationUrl.value = null;
+      if (payload.connected) {
+        void syncImportState();
+      } else {
+        clearImportState();
+      }
       return;
     }
     // Любое другое (expired/failed/consumed/...) — сессию бэк уже удалил.
     expired.value = true;
   }
 
-  /** Тихий поллинг: офлайн/429 глушим — следующий тик или онлайн-стор всё решат. */
+  /** Тихий поллинг авторизации: офлайн/429 глушим — следующий тик или онлайн-стор всё решат. */
   async function poll() {
     try {
       applyStatus(await fetchYandexDeviceStatus());
@@ -73,6 +107,56 @@ export const useYandexStore = defineStore('yandex', () => {
   /** Загрузить текущее состояние. Ошибку пробрасываем — карточка решает сама. */
   async function refresh() {
     applyStatus(await fetchYandexDeviceStatus());
+  }
+
+  /** Свежая сводка + прогресс. Тихая: бьёт по Яндексу, на экране не критично. */
+  async function syncImportState() {
+    try {
+      summary.value = await fetchYandexImportSummary();
+    } catch {
+      summary.value = null;
+    }
+    await loadProgress();
+  }
+
+  async function loadProgress() {
+    try {
+      applyProgress(await fetchYandexImportProgress());
+    } catch {
+      // Офлайн/троттлинг — оставляем прошлое значение.
+    }
+  }
+
+  function applyProgress(payload: YandexImportProgressPayload | null) {
+    progress.value = payload;
+    if (isActiveJob(payload)) {
+      startImportPolling();
+    } else {
+      stopImportPolling();
+    }
+  }
+
+  function clearImportState() {
+    summary.value = null;
+    progress.value = null;
+    stopImportPolling();
+  }
+
+  /** Поллинг джобы: активные статусы глушим тихо, финал обновляет сводку. */
+  async function pollImport() {
+    try {
+      const payload = await fetchYandexImportProgress();
+      applyProgress(payload);
+      if (payload?.status === 'completed') {
+        try {
+          summary.value = await fetchYandexImportSummary();
+        } catch {
+          summary.value = null;
+        }
+      }
+    } catch {
+      // Намеренно пусто.
+    }
   }
 
   async function connect() {
@@ -106,6 +190,27 @@ export const useYandexStore = defineStore('yandex', () => {
     expired.value = false;
     userCode.value = null;
     verificationUrl.value = null;
+    clearImportState();
+  }
+
+  async function startImport() {
+    if (busy.value || importActive.value) return;
+    busy.value = true;
+    try {
+      applyProgress(await startYandexImport());
+    } finally {
+      busy.value = false;
+    }
+  }
+
+  async function cancelImport() {
+    if (busy.value) return;
+    busy.value = true;
+    try {
+      applyProgress(await cancelYandexImport());
+    } finally {
+      busy.value = false;
+    }
   }
 
   return {
@@ -115,9 +220,15 @@ export const useYandexStore = defineStore('yandex', () => {
     userCode,
     verificationUrl,
     busy,
+    summary,
+    progress,
+    importActive,
     refresh,
     connect,
     disconnect,
     stopPolling,
+    stopImportPolling,
+    startImport,
+    cancelImport,
   };
 });
