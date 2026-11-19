@@ -12,21 +12,21 @@
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z" /></svg>
       </button>
     </div>
-    <TrackRow
+    <SnapshotRow
       v-for="track in favoriteTracks"
       :key="track.source_id"
       :title="track.title"
-      :artist="artistsLine(track.artists)"
+      :subtitle="artistsLine(track.artists)"
       :source="track.source_type"
       :liked="favorites.has(track)"
-      @play="player.playSnapshot(track)"
-      @menu="openSnapshotMenu($event, track, 'track')"
+      @open="player.playSnapshot(track)"
+      @menu="openSnapshotMenu($event, track, 'my-album-track')"
     />
     <MediaOverlays
       :open="open"
       :top="top"
       :right="right"
-      :variant="variant"
+      :items="items"
       :sheet="sheet"
       :entity="entity"
       @close="closeMenu"

@@ -715,7 +715,8 @@
   }
   .ctx button:hover { background: var(--color-surface-3); }
   .ctx button svg { width: 18px; height: 18px; color: var(--color-text-secondary); flex-shrink: 0; }
-  .ctx .bad { color: var(--color-text-secondary); }
+  .ctx button.danger,
+  .ctx button.danger svg { color: var(--color-danger); }
 
   .btn.sm { padding: 7px 14px; font-size: 12px; }
   .icon-btn.ghost { background: transparent; border: 0; width: 36px; height: 36px; position: relative; }

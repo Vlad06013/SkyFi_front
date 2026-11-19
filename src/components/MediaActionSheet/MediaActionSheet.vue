@@ -67,9 +67,10 @@
         </template>
 
         <template v-else-if="sheet === 'playlist'">
-          <MediaRow
+          <SnapshotRow
             v-for="playlist in favoritePlaylists"
             :key="playlist.source_id"
+            kind="media"
             :title="playlist.title"
             :subtitle="`${playlist.item_count} треков`"
             :source="playlist.source_type"

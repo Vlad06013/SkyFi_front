@@ -2,9 +2,8 @@ import { computed, defineComponent, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import AppBar from '@/components/AppBar/AppBar.vue';
 import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
-import MediaRow from '@/components/MediaRow/MediaRow.vue';
+import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
-import TrackRow from '@/components/TrackRow/TrackRow.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import { coverVar, artistsLine } from '@/lib/cover';
 import { artistSum41, favoriteTracks } from '@/mocks/catalog';
@@ -15,7 +14,7 @@ type ArtistTab = 'tracks' | 'albums';
 
 export default defineComponent({
   name: 'ArtistPage',
-  components: { AppBar, MediaOverlays, MediaRow, SourceBadge, TrackRow },
+  components: { AppBar, MediaOverlays, SnapshotRow, SourceBadge },
   setup() {
     const router = useRouter();
     const player = usePlayerStore();
@@ -27,7 +26,7 @@ export default defineComponent({
       { id: 'tracks', label: 'Треки' },
       { id: 'albums', label: 'Альбомы' },
     ];
-    const { open, variant, top, right, sheet, entity, openSnapshotMenu, closeMenu, run } = useMediaMenu();
+    const { open, items, top, right, sheet, entity, openSnapshotMenu, closeMenu, run } = useMediaMenu();
 
     function openAlbum(id: string) {
       router.push(`/album/${id}`);
@@ -46,7 +45,7 @@ export default defineComponent({
       openAlbum,
       openSnapshotMenu,
       open,
-      variant,
+      items,
       top,
       right,
       sheet,

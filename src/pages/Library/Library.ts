@@ -4,11 +4,9 @@ import { storeToRefs } from 'pinia';
 import AppBar from '@/components/AppBar/AppBar.vue';
 import AppSheet from '@/components/AppSheet/AppSheet.vue';
 import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
-import MediaRow from '@/components/MediaRow/MediaRow.vue';
+import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import PlaylistForm from '@/components/PlaylistForm/PlaylistForm.vue';
-import TrackRow from '@/components/TrackRow/TrackRow.vue';
 import UploadForm from '@/components/UploadForm/UploadForm.vue';
-import VideoRow from '@/components/VideoRow/VideoRow.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import type { PlaylistDraft } from '@/components/PlaylistForm/PlaylistForm';
 import type { UploadDraft } from '@/components/UploadForm/UploadForm';
@@ -25,12 +23,12 @@ import { useDownloadsStore } from '@/stores/downloads';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
 import { useLibraryTab, type LibraryTab } from '@/composables/useLibraryTab';
-import type { PlaylistSnapshot, TrackSnapshot, Visibility } from '@/types';
+import type { PlaylistSnapshot, TrackSnapshot, VideoSnapshot, Visibility } from '@/types';
 import type { MenuEntity } from '@/lib/media-menu';
 
 export default defineComponent({
   name: 'LibraryPage',
-  components: { AppBar, AppSheet, MediaOverlays, MediaRow, PlaylistForm, TrackRow, UploadForm, VideoRow },
+  components: { AppBar, AppSheet, MediaOverlays, PlaylistForm, SnapshotRow, UploadForm },
   setup() {
     const chips: { id: LibraryTab; label: string }[] = [
       { id: 'tracks', label: 'Треки' },
@@ -55,20 +53,31 @@ export default defineComponent({
     const createOpen = ref(false);
     const uploadOpen = ref(false);
     const editing = ref<PlaylistSnapshot | null>(null);
+    const editingUpload = ref<TrackSnapshot | null>(null);
     const uploads = ref<TrackSnapshot[]>([...uploadedTracks]);
     const downloads = useDownloadsStore();
     const downloaded = downloads.items;
 
-    const { open, variant, top, right, sheet, entity, openSnapshotMenu, closeMenu, run } = useMediaMenu({
+    const { open, items, top, right, sheet, entity, openSnapshotMenu, closeMenu, run } = useMediaMenu({
       onListen: (item) => listenCollection(item),
       onEdit: (item) => {
         if (item.snapshot?.type === 'playlist' && item.snapshot.source_type === 'skyfi') {
           editing.value = item.snapshot;
           return;
         }
+        if (item.snapshot?.type === 'track' && item.snapshot.source_type === 'upload') {
+          editingUpload.value = item.snapshot;
+          uploadOpen.value = true;
+          return;
+        }
         toast.show(item.title, 'изменение — скоро');
       },
       onDelete: (item) => {
+        if (item.snapshot?.type === 'track' && item.snapshot.source_type === 'upload') {
+          uploads.value = uploads.value.filter((track) => track.source_id !== item.sourceId);
+          toast.show(item.title, 'загрузка удалена');
+          return;
+        }
         if (item.snapshot) favorites.remove(item.snapshot);
         toast.show(
           item.title,
@@ -101,6 +110,11 @@ export default defineComponent({
     function isPlaying(track: TrackSnapshot) {
       const snap = current.value;
       return snap?.type === 'track' && snap.source_id === track.source_id;
+    }
+
+    function isPlayingVideo(video: VideoSnapshot) {
+      const snap = current.value;
+      return snap?.type === 'video' && snap.source_id === video.source_id;
     }
 
     function isOffline(track: TrackSnapshot) {
@@ -186,6 +200,7 @@ export default defineComponent({
           .filter((artist) => artist.name),
         album: draft.album.trim() ? { title: draft.album.trim() } : null,
         stream_url: null,
+        visibility: draft.visibility,
       };
       uploads.value = [track, ...uploads.value];
       uploadOpen.value = false;
@@ -196,6 +211,36 @@ export default defineComponent({
       };
       toast.show(track.title, `загружено · ${visibilityHint[draft.visibility]}`);
     }
+
+    function saveUpload(draft: UploadDraft) {
+      const current = editingUpload.value;
+      if (!current) return;
+      const album = draft.album.trim();
+      uploads.value = uploads.value.map((track) =>
+        track.source_id === current.source_id
+          ? {
+              ...track,
+              title: draft.title,
+              artists: draft.artists
+                .split(',')
+                .map((name) => ({ name: name.trim() }))
+                .filter((artist) => artist.name),
+              album: album ? { title: album } : null,
+              visibility: draft.visibility,
+            }
+          : track,
+      );
+      editingUpload.value = null;
+      uploadOpen.value = false;
+      toast.show(draft.title, 'загрузка сохранена');
+    }
+
+    function openUpload() {
+      editingUpload.value = null;
+      uploadOpen.value = true;
+    }
+
+    const uploadTitle = computed(() => (editingUpload.value ? 'Изменить трек' : 'Загрузить трек'));
 
     function openAlbum(id: string) {
       router.push(`/album/${id}`);
@@ -220,6 +265,7 @@ export default defineComponent({
       showDownloadAll,
       artistsLine,
       isPlaying,
+      isPlayingVideo,
       isOffline,
       isDownloaded,
       dlAllStatus,
@@ -233,7 +279,7 @@ export default defineComponent({
       openArtist,
       openSnapshotMenu,
       open,
-      variant,
+      items,
       top,
       right,
       sheet,
@@ -243,9 +289,13 @@ export default defineComponent({
       createOpen,
       uploadOpen,
       editing,
+      editingUpload,
       uploads,
       downloaded,
       onUpload,
+      saveUpload,
+      openUpload,
+      uploadTitle,
       openCreate,
       createPlaylist,
       savePlaylist,

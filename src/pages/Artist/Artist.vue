@@ -24,34 +24,35 @@
       </button>
     </div>
     <template v-if="tab === 'tracks'">
-      <TrackRow
+      <SnapshotRow
         v-for="track in favoriteTracks"
         :key="track.source_id"
         :title="track.title"
-        :artist="artistsLine(track.artists)"
+        :subtitle="artistsLine(track.artists)"
         :source="track.source_type"
         :liked="favorites.has(track)"
-        @play="player.playSnapshot(track)"
-        @menu="openSnapshotMenu($event, track, 'track')"
+        @open="player.playSnapshot(track)"
+        @menu="openSnapshotMenu($event, track, 'my-album-track')"
       />
     </template>
     <template v-else>
-      <MediaRow
+      <SnapshotRow
         v-for="album in albums"
         :key="album.source_id"
+        kind="media"
         :title="album.title"
         :subtitle="`${album.year} · ${album.track_count} треков`"
         :source="album.source_type"
         :liked="favorites.has(album)"
         @open="openAlbum(album.source_id)"
-        @menu="openSnapshotMenu($event, album, 'collection')"
+        @menu="openSnapshotMenu($event, album, 'my-albums')"
       />
     </template>
     <MediaOverlays
       :open="open"
       :top="top"
       :right="right"
-      :variant="variant"
+      :items="items"
       :sheet="sheet"
       :entity="entity"
       @close="closeMenu"

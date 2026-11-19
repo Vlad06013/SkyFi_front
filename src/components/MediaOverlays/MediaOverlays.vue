@@ -3,8 +3,7 @@
     :open="open"
     :top="top"
     :right="right"
-    :variant="variant"
-    :entity="entity"
+    :items="items"
     @close="emit('close')"
     @action="emit('action', $event)"
   />

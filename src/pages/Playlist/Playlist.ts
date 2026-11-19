@@ -2,9 +2,8 @@ import { computed, defineComponent, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import AppBar from '@/components/AppBar/AppBar.vue';
 import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
+import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
-import TrackRow from '@/components/TrackRow/TrackRow.vue';
-import VideoRow from '@/components/VideoRow/VideoRow.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import { coverVar, artistsLine } from '@/lib/cover';
 import { playlistRoad, playlistRoadContent } from '@/mocks/catalog';
@@ -15,14 +14,14 @@ import type { AnySnapshot } from '@/types';
 
 export default defineComponent({
   name: 'PlaylistPage',
-  components: { AppBar, MediaOverlays, SourceBadge, TrackRow, VideoRow },
+  components: { AppBar, MediaOverlays, SnapshotRow, SourceBadge },
   setup() {
     const route = useRoute();
     const player = usePlayerStore();
     const favorites = useFavoritesStore();
     const toast = useToastStore();
-    const { open, variant, top, right, sheet, entity, openSnapshotMenu, closeMenu, run } = useMediaMenu({
-      onDelete: (item) => {
+    const { open, items, top, right, sheet, entity, openSnapshotMenu, closeMenu, run } = useMediaMenu({
+      onDeletePlaylist: (item) => {
         if (item.snapshot) removeFromPlaylist(item.snapshot);
       },
     });
@@ -59,7 +58,7 @@ export default defineComponent({
       artistsLine,
       openSnapshotMenu,
       open,
-      variant,
+      items,
       top,
       right,
       sheet,

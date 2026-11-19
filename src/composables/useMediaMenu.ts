@@ -1,6 +1,15 @@
 import { computed, ref } from 'vue';
 import { storeToRefs } from 'pinia';
-import { entityFromSnapshot, menuAnchor, type MediaSheet, type MenuAction, type MenuEntity, type MenuVariant } from '@/lib/media-menu';
+import {
+  buildMenuItems,
+  entityFromSnapshot,
+  menuAnchor,
+  type MediaSheet,
+  type MenuAction,
+  type MenuContext,
+  type MenuEntity,
+  type MenuItem,
+} from '@/lib/media-menu';
 import { usePlayerStore } from '@/stores/player';
 import { useFavoritesStore } from '@/stores/favorites';
 import { useDownloadsStore } from '@/stores/downloads';
@@ -11,6 +20,7 @@ export function useMediaMenu(hooks: {
   onListen?: (entity: MenuEntity) => void;
   onEdit?: (entity: MenuEntity) => void;
   onDelete?: (entity: MenuEntity) => void;
+  onDeletePlaylist?: (entity: MenuEntity) => void;
   onLyrics?: () => void;
   onLike?: (entity: MenuEntity) => void;
 } = {}) {
@@ -20,7 +30,7 @@ export function useMediaMenu(hooks: {
   const downloads = useDownloadsStore();
   const toast = useToastStore();
   const menu = ref<{
-    variant: MenuVariant;
+    context: MenuContext;
     entity: MenuEntity;
     top: number;
     right: number;
@@ -34,26 +44,34 @@ export function useMediaMenu(hooks: {
   });
 
   const open = computed(() => Boolean(menu.value));
-  const variant = computed(() => menu.value?.variant ?? 'track');
   const top = computed(() => menu.value?.top ?? 0);
   const right = computed(() => menu.value?.right ?? 12);
 
-  function openMenu(event: MouseEvent, nextVariant: MenuVariant, next: MenuEntity) {
-    entity.value = next;
-    menu.value = { variant: nextVariant, entity: next, ...menuAnchor(event, nextVariant) };
+  function resolveItems(context: MenuContext, target: MenuEntity): MenuItem[] {
+    return buildMenuItems(context, target, {
+      liked: favorites.has(target.snapshot),
+      downloaded: target.snapshot ? downloads.isDownloaded(target.snapshot) : false,
+    });
   }
 
-  function openSnapshotMenu(event: MouseEvent, snapshot: AnySnapshot, nextVariant: MenuVariant, artist?: string) {
+  const items = computed(() => (menu.value ? resolveItems(menu.value.context, menu.value.entity) : []));
+
+  function openMenu(event: MouseEvent, context: MenuContext, next: MenuEntity) {
+    entity.value = next;
+    menu.value = { context, entity: next, ...menuAnchor(event, resolveItems(context, next)) };
+  }
+
+  function openSnapshotMenu(event: MouseEvent, snapshot: AnySnapshot, context: MenuContext, artist?: string) {
     const next = entityFromSnapshot(snapshot, artist);
     if (
       menu.value &&
       menu.value.entity.sourceId === next.sourceId &&
-      menu.value.variant === nextVariant
+      menu.value.context === context
     ) {
       menu.value = null;
       return;
     }
-    openMenu(event, nextVariant, next);
+    openMenu(event, context, next);
   }
 
   function closeMenu() {
@@ -96,8 +114,17 @@ export function useMediaMenu(hooks: {
       return;
     }
     if (action === 'download') {
-      if (target.snapshot) downloads.add(target.snapshot);
-      toast.show(`${target.title} — ${target.artist}`, 'скачано');
+      if (!target.snapshot) return;
+      if (downloads.isDownloaded(target.snapshot)) {
+        downloads.remove(target.snapshot);
+        toast.show(target.title, 'удалено из скачанного');
+        return;
+      }
+      if (downloads.add(target.snapshot)) {
+        toast.show(`${target.title} — ${target.artist}`, 'скачано');
+      } else {
+        toast.show(target.title, 'скачивание пока только для треков');
+      }
       return;
     }
     if (action === 'friend-queue') {
@@ -125,7 +152,12 @@ export function useMediaMenu(hooks: {
     }
     if (action === 'edit') {
       if (hooks.onEdit) hooks.onEdit(target);
-      else toast.show(target.title, 'редактирование — скоро');
+      else toast.show(target.title, 'изменение — скоро');
+      return;
+    }
+    if (action === 'delete-playlist') {
+      if (hooks.onDeletePlaylist) hooks.onDeletePlaylist(target);
+      else toast.show(target.title, 'удаление — скоро');
       return;
     }
     if (action === 'delete') {
@@ -140,7 +172,7 @@ export function useMediaMenu(hooks: {
 
   return {
     open,
-    variant,
+    items,
     top,
     right,
     sheet,

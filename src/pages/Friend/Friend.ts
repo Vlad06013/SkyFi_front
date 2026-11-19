@@ -2,8 +2,8 @@ import { computed, defineComponent, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AppBar from '@/components/AppBar/AppBar.vue';
 import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
+import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
-import TrackRow from '@/components/TrackRow/TrackRow.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import { mockFriends, friendQueue } from '@/mocks/friends';
 import { favoriteTracks } from '@/mocks/catalog';
@@ -22,7 +22,7 @@ const tapSlop = 8;
 
 export default defineComponent({
   name: 'FriendPage',
-  components: { AppBar, MediaOverlays, SourceBadge, TrackRow },
+  components: { AppBar, MediaOverlays, SnapshotRow, SourceBadge },
   setup() {
     const route = useRoute();
     const router = useRouter();
@@ -30,7 +30,7 @@ export default defineComponent({
     const toast = useToastStore();
     const friendsStore = useFriendsStore();
     const favorites = useFavoritesStore();
-    const { open, variant, top, right, sheet, entity, openSnapshotMenu, closeMenu, run } = useMediaMenu();
+    const { open, items, top, right, sheet, entity, openSnapshotMenu, closeMenu, run } = useMediaMenu();
 
     const queue = ref<TrackSnapshot[]>([...friendQueue]);
     const queueOpen = ref(false);
@@ -127,7 +127,7 @@ export default defineComponent({
       onQueueHeadDrag,
       openSnapshotMenu,
       open,
-      variant,
+      items,
       top,
       right,
       sheet,

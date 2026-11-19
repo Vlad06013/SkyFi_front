@@ -17,7 +17,7 @@
     <div v-if="tab === 'uploads'" class="dl-all-bar">
       <span class="dl-count" />
       <div class="dl-bar-side">
-        <button class="icon-btn ghost" type="button" aria-label="загрузить трек" @click="uploadOpen = true">
+        <button class="icon-btn ghost" type="button" aria-label="загрузить трек" @click="openUpload">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
             <path d="M12 5v14M5 12h14" />
           </svg>
@@ -63,125 +63,105 @@
     </div>
 
     <div v-if="tab === 'tracks'" class="list-sort" :class="{ 'is-sorting': Boolean(sortDrag) }">
-      <TrackRow
+      <SnapshotRow
         v-for="(track, index) in tracks"
         :key="track.source_id"
         :title="track.title"
-        :artist="isOffline(track) ? 'нет в офлайне' : artistsLine(track.artists)"
+        :subtitle="isOffline(track) ? 'нет в офлайне' : artistsLine(track.artists)"
         :source="track.source_type"
         :playing="isPlaying(track)"
         :offline="isOffline(track)"
         :liked="favorites.has(track)"
+        :downloaded="isDownloaded(track)"
         sortable
         :dragging="sortDrag?.from === index"
         :drag-style="sortRowStyle(index, sortDrag)"
-        @play="player.playSnapshot(track)"
-        @menu="openSnapshotMenu($event, track, 'track')"
+        @open="player.playSnapshot(track)"
+        @menu="openSnapshotMenu($event, track, 'my-tracks')"
         @sort="onSort($event, index)"
-      >
-        <svg
-          v-if="isDownloaded(track)"
-          class="dl-mark"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-label="скачан"
-        >
-          <path d="M12 4v9m0 0 3.5-3.5M12 13 8.5 9.5" />
-          <path d="M5 17h14" />
-        </svg>
-      </TrackRow>
+      />
     </div>
 
     <template v-else-if="tab === 'playlists'">
-      <MediaRow
+      <SnapshotRow
         v-for="pl in playlists"
         :key="pl.source_id"
+        kind="media"
         :title="pl.title"
         :subtitle="`${pl.item_count} · ${pl.owner_name}`"
         :source="pl.source_type"
         @open="openPlaylist(pl.source_id)"
-        @menu="openSnapshotMenu($event, pl, 'collection', pl.owner_name ?? undefined)"
+        @menu="openSnapshotMenu($event, pl, 'my-playlists', pl.owner_name ?? undefined)"
       />
     </template>
 
     <template v-else-if="tab === 'albums'">
-      <MediaRow
+      <SnapshotRow
         v-for="album in albums"
         :key="album.source_id"
+        kind="media"
         :title="album.title"
         :subtitle="`${artistsLine(album.artists)} · ${album.year}`"
         :source="album.source_type"
         @open="openAlbum(album.source_id)"
-        @menu="openSnapshotMenu($event, album, 'collection')"
+        @menu="openSnapshotMenu($event, album, 'my-albums')"
       />
     </template>
 
     <template v-else-if="tab === 'artists'">
-      <MediaRow
+      <SnapshotRow
         v-for="artist in artists"
         :key="artist.source_id"
+        kind="media"
         :title="artist.title"
         subtitle="Исполнитель"
         :source="artist.source_type"
         round
         @open="openArtist(artist.source_id)"
-        @menu="openSnapshotMenu($event, artist, 'collection')"
+        @menu="openSnapshotMenu($event, artist, 'my-artists')"
       />
     </template>
 
     <template v-else-if="tab === 'videos'">
-      <VideoRow
+      <SnapshotRow
         v-for="video in videos"
         :key="video.source_id"
+        kind="video"
         :title="video.title"
         :subtitle="`${artistsLine(video.artists)} · клип`"
         :source="video.source_type"
         :cover="video.cover_url ?? ''"
+        :playing="isPlayingVideo(video)"
         @open="player.playSnapshot(video)"
-        @menu="openSnapshotMenu($event, video, 'video')"
+        @menu="openSnapshotMenu($event, video, 'my-videos')"
       />
     </template>
 
     <template v-else-if="tab === 'uploads'">
-      <TrackRow
+      <SnapshotRow
         v-for="track in uploads"
         :key="track.source_id"
         :title="track.title"
-        :artist="artistsLine(track.artists)"
+        :subtitle="artistsLine(track.artists)"
         :source="track.source_type"
-        @play="player.playSnapshot(track)"
-        @menu="openSnapshotMenu($event, track, 'track')"
+        :playing="isPlaying(track)"
+        @open="player.playSnapshot(track)"
+        @menu="openSnapshotMenu($event, track, 'my-uploads')"
       />
     </template>
 
     <template v-else-if="tab === 'downloaded'">
-      <TrackRow
+      <SnapshotRow
         v-for="track in downloaded"
         :key="track.source_id"
         :title="track.title"
-        :artist="artistsLine(track.artists)"
+        :subtitle="artistsLine(track.artists)"
         :source="track.source_type"
-        @play="player.playSnapshot(track)"
-        @menu="openSnapshotMenu($event, track, 'track')"
-      >
-        <svg
-          class="dl-mark"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-label="скачан"
-        >
-          <path d="M12 4v9m0 0 3.5-3.5M12 13 8.5 9.5" />
-          <path d="M5 17h14" />
-        </svg>
-      </TrackRow>
+        :playing="isPlaying(track)"
+        :downloaded="true"
+        @open="player.playSnapshot(track)"
+        @menu="openSnapshotMenu($event, track, 'my-downloaded')"
+      />
     </template>
 
     <div v-else class="empty" style="padding-top:28px">
@@ -193,7 +173,7 @@
       :open="open"
       :top="top"
       :right="right"
-      :variant="variant"
+      :items="items"
       :sheet="sheet"
       :entity="entity"
       @close="closeMenu"
@@ -205,8 +185,16 @@
       <PlaylistForm submit-label="Создать" @submit="createPlaylist" />
     </AppSheet>
 
-    <AppSheet :open="uploadOpen" title="Загрузить трек" @close="uploadOpen = false">
-      <UploadForm @upload="onUpload" />
+    <AppSheet :open="uploadOpen" :title="uploadTitle" @close="uploadOpen = false">
+      <UploadForm
+        :key="editingUpload?.source_id ?? 'new'"
+        :initial-title="editingUpload?.title ?? ''"
+        :initial-artists="editingUpload ? artistsLine(editingUpload.artists) : ''"
+        :initial-album="editingUpload?.album?.title ?? ''"
+        :initial-visibility="editingUpload?.visibility ?? 'public'"
+        :submit-label="editingUpload ? 'Сохранить' : 'Загрузить'"
+        @upload="editingUpload ? saveUpload($event) : onUpload($event)"
+      />
     </AppSheet>
 
     <AppSheet :open="Boolean(editing)" title="Изменить плейлист" @close="editing = null">

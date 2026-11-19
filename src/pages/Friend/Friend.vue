@@ -64,39 +64,39 @@
         <div class="sh-title">Очередь · {{ queueCountLabel }}</div>
       </div>
       <div v-if="queueOpen" class="p-sheet-body list-sort" :class="{ 'is-sorting': Boolean(sortDrag) }">
-        <TrackRow
+        <SnapshotRow
           v-for="(track, index) in queue"
           :key="track.source_id"
           :title="track.title"
-          :artist="artistsLine(track.artists)"
+          :subtitle="artistsLine(track.artists)"
           :source="track.source_type"
           :liked="favorites.has(track)"
           sortable
           :dragging="sortDrag?.from === index"
           :drag-style="sortRowStyle(index, sortDrag)"
-          @play="player.playSnapshot(track)"
-          @menu="openSnapshotMenu($event, track, 'friend-track')"
+          @open="player.playSnapshot(track)"
+          @menu="openSnapshotMenu($event, track, 'friend-queue-track')"
           @sort="onSort($event, index)"
         />
       </div>
     </div>
 
     <div class="sec-label">Избранное</div>
-    <TrackRow
+    <SnapshotRow
       v-for="track in favoriteTracks"
       :key="track.source_id"
       :title="track.title"
-      :artist="artistsLine(track.artists)"
+      :subtitle="artistsLine(track.artists)"
       :source="track.source_type"
       :liked="favorites.has(track)"
-      @play="player.playSnapshot(track)"
-      @menu="openSnapshotMenu($event, track, 'friend-track')"
+      @open="player.playSnapshot(track)"
+      @menu="openSnapshotMenu($event, track, 'my-tracks')"
     />
     <MediaOverlays
       :open="open"
       :top="top"
       :right="right"
-      :variant="variant"
+      :items="items"
       :sheet="sheet"
       :entity="entity"
       @close="closeMenu"

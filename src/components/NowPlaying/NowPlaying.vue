@@ -117,17 +117,17 @@
               <div class="sh-title">Очередь</div>
             </div>
             <div class="p-sheet-body list-sort" :class="{ 'is-sorting': Boolean(sortDrag) }">
-              <TrackRow
+              <SnapshotRow
                 v-for="(track, index) in queue"
                 :key="track.source_id"
                 :title="track.title"
-                :artist="artistsLine(track.artists)"
+                :subtitle="artistsLine(track.artists)"
                 :source="track.source_type"
                 sortable
                 :menuable="false"
                 :dragging="sortDrag?.from === index"
                 :drag-style="sortRowStyle(index, sortDrag)"
-                @play="playSnapshot(track)"
+                @open="playSnapshot(track)"
                 @sort="onSortStart($event, index)"
               />
             </div>
@@ -261,7 +261,7 @@
       :open="open"
       :top="top"
       :right="right"
-      :variant="variant"
+      :items="items"
       :sheet="sheet"
       :entity="entity"
       @close="closeMenu"

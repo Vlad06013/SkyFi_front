@@ -23,8 +23,13 @@ export const useDownloadsStore = defineStore('downloads', () => {
   }
 
   function add(snapshot: AnySnapshot) {
-    if (snapshot.type !== 'track' || isDownloaded(snapshot)) return;
+    if (snapshot.type !== 'track' || isDownloaded(snapshot)) return false;
     items.value = [{ ...snapshot, type: 'track' }, ...items.value];
+    return true;
+  }
+
+  function remove(snapshot: AnySnapshot) {
+    items.value = items.value.filter((item) => keyOf(item) !== keyOf(snapshot));
   }
 
   function status(tab: string): DownloadAllStatus {
@@ -51,5 +56,5 @@ export const useDownloadsStore = defineStore('downloads', () => {
     timers.set(tab, timer);
   }
 
-  return { items, isDownloaded, add, status, pct, downloadAll };
+  return { items, isDownloaded, add, remove, status, pct, downloadAll };
 });

@@ -151,6 +151,8 @@
 .vid-row .more { background: transparent; border: 0; width: 24px; height: 24px; flex-shrink: 0; }
 .vid-row .icon-btn svg { width: 16px; height: 16px; }
 .vid-row .icon-btn:hover { color: var(--color-text-primary); }
+.vid-row.is-playing { background: var(--color-surface-2); box-shadow: inset 3px 0 0 var(--color-accent); }
+.vid-row.is-playing .track-title { color: var(--color-accent); font-weight: 600; }
 
 .cards-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .media-card .cover { aspect-ratio: 1; border-radius: var(--radius-s); border: 1px solid var(--color-border); margin-bottom: 10px; position: relative; overflow: hidden; }
@@ -612,8 +614,9 @@
 }
 .ctx button:hover { background: var(--color-surface-3); }
 .ctx button svg { width: 18px; height: 18px; color: var(--color-text-secondary); flex-shrink: 0; }
-.ctx .bad { color: var(--color-text-secondary); }
 .ctx button.liked svg { color: var(--color-like); }
+.ctx button.danger,
+.ctx button.danger svg { color: var(--color-danger); }
 
 .n-panel {
   background: #1c1c1c;

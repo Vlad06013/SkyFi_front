@@ -1,7 +1,7 @@
 import { computed, defineComponent, ref, watch, type PropType } from 'vue';
 import { storeToRefs } from 'pinia';
 import AppSheet from '@/components/AppSheet/AppSheet.vue';
-import MediaRow from '@/components/MediaRow/MediaRow.vue';
+import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { coverVar } from '@/lib/cover';
 import { favoritePlaylists } from '@/mocks/catalog';
@@ -13,7 +13,7 @@ import type { PlayerDevice } from '@/types';
 
 export default defineComponent({
   name: 'MediaActionSheet',
-  components: { AppSheet, MediaRow, SourceBadge },
+  components: { AppSheet, SnapshotRow, SourceBadge },
   props: {
     sheet: { type: String as PropType<MediaSheet>, default: null },
     entity: { type: Object as PropType<MenuEntity>, required: true },

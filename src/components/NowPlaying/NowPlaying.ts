@@ -2,8 +2,8 @@ import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } fro
 import { storeToRefs } from 'pinia';
 import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
 import SeekBar from '@/components/SeekBar/SeekBar.vue';
+import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
-import TrackRow from '@/components/TrackRow/TrackRow.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { coverVar, artistsLine } from '@/lib/cover';
@@ -18,7 +18,7 @@ type Layer = 'now' | 'queue' | 'lyrics';
 
 export default defineComponent({
   name: 'NowPlaying',
-  components: { MediaOverlays, SeekBar, SourceBadge, TrackRow },
+  components: { MediaOverlays, SeekBar, SnapshotRow, SourceBadge },
   setup() {
     const player = usePlayerStore();
     const {
@@ -113,7 +113,7 @@ export default defineComponent({
       document.removeEventListener('fullscreenchange', onFullscreenChange);
     });
 
-    const { open, variant, top, right, sheet, entity, openMenu, closeMenu, run } = useMediaMenu({
+    const { open, items, top, right, sheet, entity, openMenu, closeMenu, run } = useMediaMenu({
       onLyrics() {
         closeMenu();
         sheet.value = null;
@@ -189,7 +189,8 @@ export default defineComponent({
         closeMenu();
         return;
       }
-      openMenu(event, 'now', entityFromSnapshot(current.value, artist.value));
+      const context = current.value.type === 'video' ? 'now-video' : 'now-track';
+      openMenu(event, context, entityFromSnapshot(current.value, artist.value));
     }
 
     function isNoDragTarget(target: EventTarget | null) {
@@ -316,7 +317,7 @@ export default defineComponent({
       onSortStart,
       onQueueDragStart,
       open,
-      variant,
+      items,
       top,
       right,
       sheet,

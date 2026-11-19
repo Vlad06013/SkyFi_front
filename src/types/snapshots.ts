@@ -1,3 +1,5 @@
+import type { Visibility } from './api';
+
 export type SnapshotType = 'track' | 'video' | 'album' | 'playlist' | 'artist';
 export type SnapshotSource = 'yandex_music' | 'upload' | 'vk' | 'skyfi' | 'mock';
 
@@ -25,6 +27,7 @@ export interface TrackSnapshot extends SnapshotBase {
   } | null;
   stream_url: string | null;
   sort?: number | null;
+  visibility?: Visibility;
 }
 
 export interface VideoSnapshot extends SnapshotBase {

@@ -1,4 +1,4 @@
-import { computed, defineComponent, ref } from 'vue';
+import { computed, defineComponent, ref, type PropType } from 'vue';
 import { useToastStore } from '@/stores/toast';
 import { visibilityOptions } from '@/components/PlaylistForm/PlaylistForm';
 import type { Visibility } from '@/types';
@@ -12,13 +12,20 @@ export interface UploadDraft {
 
 export default defineComponent({
   name: 'UploadForm',
+  props: {
+    initialTitle: { type: String, default: '' },
+    initialArtists: { type: String, default: '' },
+    initialAlbum: { type: String, default: '' },
+    initialVisibility: { type: String as PropType<Visibility>, default: 'public' },
+    submitLabel: { type: String, default: 'Загрузить' },
+  },
   emits: ['upload'],
   setup(props, { emit }) {
     const toast = useToastStore();
-    const title = ref('');
-    const artists = ref('');
-    const album = ref('');
-    const visibility = ref<Visibility>('public');
+    const title = ref(props.initialTitle);
+    const artists = ref(props.initialArtists);
+    const album = ref(props.initialAlbum);
+    const visibility = ref<Visibility>(props.initialVisibility);
     const visibilityOpen = ref(false);
     const titleFocus = ref(false);
     const artistFocus = ref(false);

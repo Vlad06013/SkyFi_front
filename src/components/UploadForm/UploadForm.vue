@@ -70,7 +70,7 @@
       </div>
     </div>
     <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center">
-      Загрузить
+      {{ submitLabel }}
     </button>
   </form>
 </template>

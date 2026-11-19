@@ -22,23 +22,25 @@
       </button>
     </div>
     <template v-for="item in content" :key="item.source_id">
-      <VideoRow
+      <SnapshotRow
         v-if="item.type === 'video'"
+        kind="video"
         :title="item.title"
         :subtitle="`${artistsLine(item.artists)} · клип`"
         :source="item.source_type"
         :cover="item.cover_url ?? ''"
+        :liked="favorites.has(item)"
         @open="player.playSnapshot(item)"
-        @menu="openSnapshotMenu($event, item, 'playlist-video')"
+        @menu="openSnapshotMenu($event, item, 'my-playlist-video')"
       />
-      <TrackRow
+      <SnapshotRow
         v-else
         :title="item.title"
-        :artist="artistsLine(item.artists)"
+        :subtitle="artistsLine(item.artists)"
         :source="item.source_type"
         :liked="favorites.has(item)"
-        @play="player.playSnapshot(item)"
-        @menu="openSnapshotMenu($event, item, 'playlist-track')"
+        @open="player.playSnapshot(item)"
+        @menu="openSnapshotMenu($event, item, 'my-playlist-track')"
       />
     </template>
     <div v-if="!content.length" class="empty">
@@ -49,7 +51,7 @@
       :open="open"
       :top="top"
       :right="right"
-      :variant="variant"
+      :items="items"
       :sheet="sheet"
       :entity="entity"
       @close="closeMenu"

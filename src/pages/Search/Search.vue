@@ -41,40 +41,44 @@
         <button class="chip" :class="{ active: section === 'videos' }" type="button" @click="section = 'videos'">Видео</button>
       </div>
 
-      <MediaRow
+      <SnapshotRow
         v-if="section === 'best'"
-        :title="artistSum41.title"
+        kind="media"
+        :title="bestArtist.title"
         subtitle="Исполнитель"
-        :source="artistSum41.source_type"
+        :source="bestArtist.source_type"
         round
+        :liked="bestArtist.is_favorite"
         @open="openArtist"
-        @menu="openSnapshotMenu($event, artistSum41, 'collection')"
-      >
-        <svg class="like-mark" viewBox="0 0 24 24" fill="currentColor" aria-label="в избранном">
-          <path d="M12 20s-7-4.3-9-9c-1.2-2.8.6-6 3.8-6C9 5 12 8 12 8s3-3 5.2-3C20.4 5 22.2 8.2 21 11c-2 4.7-9 9-9 9z" />
-        </svg>
-      </MediaRow>
+        @menu="openSnapshotMenu($event, bestArtist, 'my-artists')"
+      />
 
       <template v-else-if="section === 'tracks'">
-        <TrackRow
-          v-for="track in favoriteTracks"
+        <SnapshotRow
+          v-for="track in trackResults"
           :key="track.source_id"
           :title="track.title"
-          :artist="artistsLine(track.artists)"
+          :subtitle="artistsLine(track.artists)"
           :source="track.source_type"
-          @play="player.playSnapshot(track)"
-          @menu="openSnapshotMenu($event, track, 'track')"
+          :liked="track.is_favorite"
+          :downloaded="downloads.isDownloaded(track)"
+          :playing="isPlaying(track)"
+          @open="player.playSnapshot(track)"
+          @menu="openSnapshotMenu($event, track, 'my-tracks')"
         />
       </template>
 
-      <VideoRow
+      <SnapshotRow
         v-else-if="section === 'videos'"
-        :title="mockVideo.title"
-        :subtitle="`${artistsLine(mockVideo.artists)} · клип`"
-        :source="mockVideo.source_type"
-        :cover="mockVideo.cover_url ?? ''"
-        :menuable="false"
-        @open="player.playSnapshot(mockVideo)"
+        kind="video"
+        :title="videoResult.title"
+        :subtitle="`${artistsLine(videoResult.artists)} · клип`"
+        :source="videoResult.source_type"
+        :cover="videoResult.cover_url ?? ''"
+        :liked="videoResult.is_favorite"
+        :playing="isPlaying(videoResult)"
+        @open="player.playSnapshot(videoResult)"
+        @menu="openSnapshotMenu($event, videoResult, 'my-videos')"
       />
 
       <div v-else class="empty" style="padding-top:20px">
@@ -87,7 +91,7 @@
       :open="open"
       :top="top"
       :right="right"
-      :variant="variant"
+      :items="items"
       :sheet="sheet"
       :entity="entity"
       @close="closeMenu"
