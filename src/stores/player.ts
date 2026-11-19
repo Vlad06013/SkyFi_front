@@ -1,5 +1,5 @@
 import { acceptHMRUpdate, defineStore } from 'pinia';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { favoriteTracks } from '@/mocks/catalog';
 import { mockPlayerState } from '@/mocks/player';
 import type { AnySnapshot, RepeatMode } from '@/types';
@@ -165,7 +165,14 @@ export const usePlayerStore = defineStore('player', () => {
     };
   }
 
+  function syncClipMode() {
+    if (current.value?.type === 'video') clipMode.value = true;
+  }
+
+  watch(() => current.value?.type, syncClipMode);
+
   function openExpanded() {
+    syncClipMode();
     if (current.value) expanded.value = true;
   }
 
