@@ -44,7 +44,7 @@ export default defineComponent({
     });
 
     const sliderStyle = computed(() => ({
-      transform: `translateX(calc(-100% + ${dragX.value}px))`,
+      transform: `translateX(calc(-100% / 3 + ${dragX.value}px))`,
       transition: dragging.value || noJump.value
         ? 'none'
         : commitDir.value
@@ -96,6 +96,14 @@ export default defineComponent({
       });
     }
 
+    function onLike(index: number) {
+      if (index === 1) toggleLike();
+    }
+
+    function onTogglePlay(index: number) {
+      if (index === 1) togglePlay();
+    }
+
     onBeforeUnmount(() => {
       if (skipTimer) clearTimeout(skipTimer);
     });
@@ -107,10 +115,10 @@ export default defineComponent({
       panes,
       rootEl,
       sliderStyle,
-      togglePlay,
-      toggleLike,
       coverVar,
       onDragStart,
+      onLike,
+      onTogglePlay,
     };
   },
 });

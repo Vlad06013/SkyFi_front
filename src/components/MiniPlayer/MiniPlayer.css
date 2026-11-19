@@ -1,16 +1,15 @@
-.mp-slider {
+.mp-viewport {
+  width: 100%;
+  overflow: hidden;
+}
+
+.mp-strip {
   display: flex;
-  flex: 1;
-  min-width: 0;
+  width: 300%;
 }
 
 .mp-pane {
-  flex: 0 0 100%;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  padding-right: 12px;
+  flex: 0 0 calc(100% / 3);
 }
 
 .mp-cover {

@@ -1,9 +1,9 @@
 import { computed, defineComponent, ref, watch, type PropType } from 'vue';
 import { storeToRefs } from 'pinia';
+import AppSheet from '@/components/AppSheet/AppSheet.vue';
 import MediaRow from '@/components/MediaRow/MediaRow.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { coverVar } from '@/lib/cover';
-import { trackPointer } from '@/lib/pointer-drag';
 import { favoritePlaylists } from '@/mocks/catalog';
 import { useFriendsStore } from '@/stores/friends';
 import { usePlayerStore } from '@/stores/player';
@@ -13,7 +13,7 @@ import type { PlayerDevice } from '@/types';
 
 export default defineComponent({
   name: 'MediaActionSheet',
-  components: { MediaRow, SourceBadge },
+  components: { AppSheet, MediaRow, SourceBadge },
   props: {
     sheet: { type: String as PropType<MediaSheet>, default: null },
     entity: { type: Object as PropType<MenuEntity>, required: true },
@@ -26,8 +26,6 @@ export default defineComponent({
     const friendsStore = useFriendsStore();
     const friendQuery = ref('');
     const friendFocus = ref(false);
-    const dragging = ref(false);
-    const dragY = ref(0);
 
     const title = computed(() => {
       if (props.sheet === 'friend-queue') return 'В очередь другу';
@@ -52,11 +50,6 @@ export default defineComponent({
       if (snapshot.type === 'video') return snapshot.cover_url ?? '';
       if (snapshot.type === 'track') return snapshot.album?.cover_url ?? '';
       return '';
-    });
-
-    const dragStyle = computed(() => {
-      if (!dragY.value) return undefined;
-      return { transform: `translateY(${dragY.value}px)` };
     });
 
     watch(
@@ -123,29 +116,6 @@ export default defineComponent({
       close();
     }
 
-    function onDragStart(event: PointerEvent) {
-      if (event.pointerType === 'mouse' && event.button !== 0) return;
-      event.stopPropagation();
-      const startY = event.clientY;
-      dragging.value = true;
-      dragY.value = 0;
-      trackPointer(event, {
-        move: (next) => {
-          dragY.value = Math.max(0, next.clientY - startY);
-        },
-        up: () => {
-          const shouldClose = dragY.value > 88;
-          dragging.value = false;
-          if (shouldClose) {
-            dragY.value = 0;
-            close();
-            return;
-          }
-          dragY.value = 0;
-        },
-      });
-    }
-
     return {
       state,
       title,
@@ -154,8 +124,6 @@ export default defineComponent({
       visibleFriends,
       favoritePlaylists,
       coverImage,
-      dragging,
-      dragStyle,
       close,
       pickQueue,
       pickShare,
@@ -164,7 +132,6 @@ export default defineComponent({
       shareExternally,
       deviceCaption,
       pickDevice,
-      onDragStart,
       coverVar,
     };
   },

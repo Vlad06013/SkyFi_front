@@ -99,56 +99,52 @@
       <button class="btn btn-danger" type="button" @click="logout">Выйти</button>
     </div>
 
-    <div v-if="sheet" class="sheet-mask" @click.self="sheet = null">
-      <div class="sheet">
-        <div class="handle" />
-        <div class="sheet-title">{{ sheet === 'name' ? 'Имя' : 'Скачать SkyFi' }}</div>
-        <form v-if="sheet === 'name'" class="up-form" @submit.prevent="saveName">
-          <label>Как к вам обращаться</label>
-          <div class="field is-focus">
-            <input v-model="draft">
-          </div>
-          <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center;margin-top:4px">
-            Сохранить
-          </button>
-        </form>
-        <template v-else>
-          <SettingRow
-            v-for="build in builds"
-            :key="build.id"
-            :title="build.title"
-            :idle="build.idle"
-            clickable
-            @open="downloadBuild(build.title)"
-          >
-            <template #icon>
-              <svg v-if="build.id === 'apk'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="7" y="3" width="10" height="18" rx="2" />
-                <path d="M11 18h2" />
-              </svg>
-              <svg v-else-if="build.id === 'linux'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="5" width="18" height="14" rx="2" />
-                <path d="m7 10 3 2-3 2" />
-                <path d="M13 14h4" />
-              </svg>
-              <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <rect x="4" y="4" width="7" height="7" rx="1" />
-                <rect x="13" y="4" width="7" height="7" rx="1" />
-                <rect x="4" y="13" width="7" height="7" rx="1" />
-                <rect x="13" y="13" width="7" height="7" rx="1" />
-              </svg>
-            </template>
-            <span class="go" aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 4v11" />
-                <path d="M8 11.5 12 16l4-4.5" />
-                <path d="M5 19h14" />
-              </svg>
-            </span>
-          </SettingRow>
-        </template>
-      </div>
-    </div>
+    <AppSheet :open="Boolean(sheet)" :title="sheet === 'name' ? 'Имя' : 'Скачать SkyFi'" @close="sheet = null">
+      <form v-if="sheet === 'name'" class="up-form" @submit.prevent="saveName">
+        <label>Как к вам обращаться</label>
+        <div class="field is-focus">
+          <input v-model="draft">
+        </div>
+        <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center;margin-top:4px">
+          Сохранить
+        </button>
+      </form>
+      <template v-else>
+        <SettingRow
+          v-for="build in builds"
+          :key="build.id"
+          :title="build.title"
+          :idle="build.idle"
+          clickable
+          @open="downloadBuild(build.title)"
+        >
+          <template #icon>
+            <svg v-if="build.id === 'apk'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="7" y="3" width="10" height="18" rx="2" />
+              <path d="M11 18h2" />
+            </svg>
+            <svg v-else-if="build.id === 'linux'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="5" width="18" height="14" rx="2" />
+              <path d="m7 10 3 2-3 2" />
+              <path d="M13 14h4" />
+            </svg>
+            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <rect x="4" y="4" width="7" height="7" rx="1" />
+              <rect x="13" y="4" width="7" height="7" rx="1" />
+              <rect x="4" y="13" width="7" height="7" rx="1" />
+              <rect x="13" y="13" width="7" height="7" rx="1" />
+            </svg>
+          </template>
+          <span class="go" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 4v11" />
+              <path d="M8 11.5 12 16l4-4.5" />
+              <path d="M5 19h14" />
+            </svg>
+          </span>
+        </SettingRow>
+      </template>
+    </AppSheet>
   </div>
 </template>
 

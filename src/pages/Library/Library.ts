@@ -2,6 +2,7 @@ import { computed, defineComponent, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import AppBar from '@/components/AppBar/AppBar.vue';
+import AppSheet from '@/components/AppSheet/AppSheet.vue';
 import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
 import MediaRow from '@/components/MediaRow/MediaRow.vue';
 import PlaylistForm from '@/components/PlaylistForm/PlaylistForm.vue';
@@ -29,7 +30,7 @@ import type { MenuEntity } from '@/lib/media-menu';
 
 export default defineComponent({
   name: 'LibraryPage',
-  components: { AppBar, MediaOverlays, MediaRow, PlaylistForm, TrackRow, UploadForm, VideoRow },
+  components: { AppBar, AppSheet, MediaOverlays, MediaRow, PlaylistForm, TrackRow, UploadForm, VideoRow },
   setup() {
     const chips: { id: LibraryTab; label: string }[] = [
       { id: 'tracks', label: 'Треки' },

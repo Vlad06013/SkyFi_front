@@ -169,16 +169,3 @@
   transform: translateX(-50%);
 }
 
-.sheet-mask {
-  position: absolute;
-  inset: 0;
-  z-index: 40;
-  background: rgba(0, 0, 0, 0.55);
-  display: flex;
-  align-items: flex-end;
-  padding: 8px;
-}
-
-.sheet-mask .sheet {
-  width: 100%;
-}

@@ -53,17 +53,34 @@
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z" /></svg>
       </button>
     </div>
-    <div class="sec-label">Очередь</div>
-    <TrackRow
-      v-for="track in friendQueue"
-      :key="track.source_id"
-      :title="track.title"
-      :artist="artistsLine(track.artists)"
-      :source="track.source_type"
-      :liked="favorites.has(track)"
-      @play="player.playSnapshot(track)"
-      @menu="openSnapshotMenu($event, track, 'friend-track')"
-    />
+
+    <div
+      class="p-sheet queue-sheet"
+      :class="{ 'is-open': queueOpen, 'is-dragging': queueDragging }"
+      :style="queueSheetStyle"
+    >
+      <div class="p-sheet-head" @pointerdown="onQueueHeadDrag">
+        <div class="handle" />
+        <div class="sh-title">Очередь · {{ queueCountLabel }}</div>
+      </div>
+      <div v-if="queueOpen" class="p-sheet-body list-sort" :class="{ 'is-sorting': Boolean(sortDrag) }">
+        <TrackRow
+          v-for="(track, index) in queue"
+          :key="track.source_id"
+          :title="track.title"
+          :artist="artistsLine(track.artists)"
+          :source="track.source_type"
+          :liked="favorites.has(track)"
+          sortable
+          :dragging="sortDrag?.from === index"
+          :drag-style="sortRowStyle(index, sortDrag)"
+          @play="player.playSnapshot(track)"
+          @menu="openSnapshotMenu($event, track, 'friend-track')"
+          @sort="onSort($event, index)"
+        />
+      </div>
+    </div>
+
     <div class="sec-label">Избранное</div>
     <TrackRow
       v-for="track in favoriteTracks"
@@ -90,3 +107,5 @@
 </template>
 
 <script src="./Friend.ts" lang="ts"></script>
+
+<style scoped src="./Friend.css"></style>

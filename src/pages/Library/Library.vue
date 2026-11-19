@@ -201,34 +201,23 @@
       @update:sheet="sheet = $event"
     />
 
-    <div v-if="createOpen" class="sheet-mask" @click.self="createOpen = false">
-      <div class="sheet">
-        <div class="handle" />
-        <div class="sheet-title">Новый плейлист</div>
-        <PlaylistForm submit-label="Создать" @submit="createPlaylist" />
-      </div>
-    </div>
+    <AppSheet :open="createOpen" title="Новый плейлист" @close="createOpen = false">
+      <PlaylistForm submit-label="Создать" @submit="createPlaylist" />
+    </AppSheet>
 
-    <div v-if="uploadOpen" class="sheet-mask" @click.self="uploadOpen = false">
-      <div class="sheet">
-        <div class="handle" />
-        <div class="sheet-title">Загрузить трек</div>
-        <UploadForm @upload="onUpload" />
-      </div>
-    </div>
+    <AppSheet :open="uploadOpen" title="Загрузить трек" @close="uploadOpen = false">
+      <UploadForm @upload="onUpload" />
+    </AppSheet>
 
-    <div v-if="editing" class="sheet-mask" @click.self="editing = null">
-      <div class="sheet">
-        <div class="handle" />
-        <div class="sheet-title">Изменить плейлист</div>
-        <PlaylistForm
-          submit-label="Сохранить"
-          :initial-name="editing.title"
-          :initial-cover="editing.cover_url"
-          @submit="savePlaylist"
-        />
-      </div>
-    </div>
+    <AppSheet :open="Boolean(editing)" title="Изменить плейлист" @close="editing = null">
+      <PlaylistForm
+        v-if="editing"
+        submit-label="Сохранить"
+        :initial-name="editing.title"
+        :initial-cover="editing.cover_url"
+        @submit="savePlaylist"
+      />
+    </AppSheet>
   </div>
 </template>
 

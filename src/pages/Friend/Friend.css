@@ -1,0 +1,23 @@
+.queue-sheet {
+  margin-top: 4px;
+  transition: transform .2s ease;
+}
+
+.queue-sheet.is-dragging {
+  transition: none;
+}
+
+.queue-sheet .p-sheet-head {
+  touch-action: none;
+  cursor: grab;
+}
+
+.queue-sheet .p-sheet-body {
+  max-height: 320px;
+  overflow: auto;
+  overscroll-behavior: none;
+}
+
+.queue-sheet .p-sheet-body::-webkit-scrollbar {
+  width: 0;
+}

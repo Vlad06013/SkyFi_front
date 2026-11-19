@@ -1,22 +1,15 @@
 <template>
-  <Teleport to="body">
-    <div v-if="sheet" class="sheet-mask media-sheet-mask" @click.self="close" @pointerdown.stop>
-      <div class="sheet" :class="{ 'is-dragging': dragging }" :style="dragStyle">
-        <div class="sheet-head" @pointerdown="onDragStart">
-          <div class="handle" />
-          <div class="sheet-title">{{ title }}</div>
-        </div>
-
-        <div v-if="sheet !== 'devices'" class="now-card" style="margin-bottom:8px">
-          <div class="thumb" :style="{ background: coverVar(entity.source) }">
-            <img v-if="coverImage" :src="coverImage" alt="">
-            <SourceBadge :source="entity.source" />
-          </div>
-          <div class="track-meta">
-            <div class="track-title">{{ entity.title }}</div>
-            <div class="track-artist">{{ entity.artist }}</div>
-          </div>
-        </div>
+  <AppSheet :open="Boolean(sheet)" :title="title" @close="close">
+    <div v-if="sheet !== 'devices'" class="now-card" style="margin-bottom:8px">
+      <div class="thumb" :style="{ background: coverVar(entity.source) }">
+        <img v-if="coverImage" :src="coverImage" alt="">
+        <SourceBadge :source="entity.source" />
+      </div>
+      <div class="track-meta">
+        <div class="track-title">{{ entity.title }}</div>
+        <div class="track-artist">{{ entity.artist }}</div>
+      </div>
+    </div>
 
         <template v-if="sheet === 'friend-queue' || sheet === 'friend-share'">
           <div class="field" :class="{ 'is-focus': friendFocus }" style="margin-bottom:10px">
@@ -144,9 +137,7 @@
             </button>
           </div>
         </template>
-      </div>
-    </div>
-  </Teleport>
+  </AppSheet>
 </template>
 
 <script src="./MediaActionSheet.ts" lang="ts"></script>

@@ -1,13 +1,12 @@
 <template>
-  <button
-    v-if="current"
-    ref="rootEl"
-    class="mini-player"
-    type="button"
-    @pointerdown="onDragStart"
-  >
-    <div class="mp-slider" :style="sliderStyle">
-      <div v-for="(pane, index) in panes" :key="index" class="mp-pane">
+  <div v-if="current" ref="rootEl" class="mp-viewport">
+    <div class="mp-strip" :style="sliderStyle" @pointerdown="onDragStart">
+      <div
+        v-for="(pane, index) in panes"
+        :key="index"
+        class="mini-player mp-pane"
+        :aria-hidden="index !== 1"
+      >
         <div class="thumb" :style="{ background: coverVar(pane.snapshot.source_type) }">
           <template v-if="pane.snapshot.type === 'video'">
             <img v-if="pane.snapshot.cover_url" class="mp-cover" :src="pane.snapshot.cover_url" alt="">
@@ -24,29 +23,29 @@
           <div class="track-title">{{ pane.title }}</div>
           <div class="track-artist">{{ pane.artist }}</div>
         </div>
+        <span
+          class="icon-btn"
+          :class="{ liked: index === 1 && liked }"
+          role="button"
+          aria-label="лайк"
+          @click.stop="onLike(index)"
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 20s-7-4.3-9-9c-1.2-2.8.6-6 3.8-6C9 5 12 8 12 8s3-3 5.2-3C20.4 5 22.2 8.2 21 11c-2 4.7-9 9-9 9z" />
+          </svg>
+        </span>
+        <span class="fab small" role="button" :aria-label="playing && index === 1 ? 'пауза' : 'играть'" @click.stop="onTogglePlay(index)">
+          <svg v-if="playing && index === 1" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" />
+          </svg>
+          <svg v-else viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5.5v13l11-6.5z" />
+          </svg>
+        </span>
+        <div class="bar"><i :style="{ width: '38%' }" /></div>
       </div>
     </div>
-    <span
-      class="icon-btn"
-      :class="{ liked }"
-      role="button"
-      aria-label="лайк"
-      @click.stop="toggleLike"
-    >
-      <svg viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 20s-7-4.3-9-9c-1.2-2.8.6-6 3.8-6C9 5 12 8 12 8s3-3 5.2-3C20.4 5 22.2 8.2 21 11c-2 4.7-9 9-9 9z" />
-      </svg>
-    </span>
-    <span class="fab small" role="button" :aria-label="playing ? 'пауза' : 'играть'" @click.stop="togglePlay">
-      <svg v-if="playing" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" />
-      </svg>
-      <svg v-else viewBox="0 0 24 24" fill="currentColor">
-        <path d="M8 5.5v13l11-6.5z" />
-      </svg>
-    </span>
-    <div class="bar"><i :style="{ width: '38%' }" /></div>
-  </button>
+  </div>
 </template>
 
 <script src="./MiniPlayer.ts" lang="ts"></script>

@@ -2,6 +2,7 @@ import { defineComponent, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import AppBar from '@/components/AppBar/AppBar.vue';
+import AppSheet from '@/components/AppSheet/AppSheet.vue';
 import SeekBar from '@/components/SeekBar/SeekBar.vue';
 import SettingRow from '@/components/SettingRow/SettingRow.vue';
 import YandexCard from '@/components/YandexCard/YandexCard.vue';
@@ -11,7 +12,7 @@ import { useToastStore } from '@/stores/toast';
 
 export default defineComponent({
   name: 'SettingsPage',
-  components: { AppBar, SeekBar, SettingRow, YandexCard },
+  components: { AppBar, AppSheet, SeekBar, SettingRow, YandexCard },
   setup() {
     const router = useRouter();
     const auth = useAuthStore();
