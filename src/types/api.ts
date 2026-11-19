@@ -1,4 +1,11 @@
-import type { AnySnapshot, TrackSnapshot } from './snapshots';
+import type {
+  AlbumSnapshot,
+  AnySnapshot,
+  ArtistSnapshot,
+  PlaylistSnapshot,
+  TrackSnapshot,
+  VideoSnapshot,
+} from './snapshots';
 
 export interface ApiResponse<T> {
   errors: string | Record<string, string[]> | null;
@@ -95,12 +102,13 @@ export type WithFavorite<T> = T & { is_favorite: boolean };
 export interface SearchPagePayload {
   query: string;
   page: number;
-  best: Record<string, unknown> | null;
+  /** «Лучшее совпадение»: снапшот любого типа + пометка избранного (api.md §9). У artist поле artists не приходит. */
+  best: (AnySnapshot & { is_favorite: boolean }) | null;
   tracks: SearchSection<WithFavorite<TrackSnapshot>>;
-  albums: SearchSection<WithFavorite<import('./snapshots').AlbumSnapshot>>;
-  artists: SearchSection<WithFavorite<import('./snapshots').ArtistSnapshot>>;
-  playlists: SearchSection<WithFavorite<import('./snapshots').PlaylistSnapshot>>;
-  videos: SearchSection<WithFavorite<import('./snapshots').VideoSnapshot>>;
+  albums: SearchSection<WithFavorite<AlbumSnapshot>>;
+  artists: SearchSection<WithFavorite<ArtistSnapshot>>;
+  playlists: SearchSection<WithFavorite<PlaylistSnapshot>>;
+  videos: SearchSection<WithFavorite<VideoSnapshot>>;
 }
 
 /** data ответа GET /favorites без фильтра: вкладки по типам. Ключ videos всегда на месте (у Яндекса пусто). */

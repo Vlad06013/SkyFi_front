@@ -256,9 +256,9 @@ status: pending|playing_now|played|skipped, snapshot|null}`.
 
 - `is_favorite` — пометка избранного текущего пользователя
   (всегда bool, только в поиске).
-- `best` — необязательное «лучшее совпадение» (форма у
-  источника; может не быть полной тройки идентичности — тогда
-  `is_favorite` внутри него false).
+- `best` — необязательное «лучшее совпадение»: снапшот любого
+  типа + `is_favorite` (форма как у секций; проверено curl'ом —
+  у artist поле `artists` не приходит).
 - Сейчас видео-источник — мок: секция `videos` всегда содержит
   2 ролика на любом запросе (реальные потоки через
   `/videos/get-url`). Аудио-источники секцию отдают пустой.
@@ -273,7 +273,7 @@ status: pending|playing_now|played|skipped, snapshot|null}`.
 | `POST /` | snapshot → `{message, is_favorite: true}`; запись; повтор — no-op |
 | `DELETE /` | snapshot в теле → удалить; сообщение |
 | `POST /check` | snapshot → `{is_favorite}` |
-| `PATCH /sort` | `{type, items: [{source_type, source_id, sort}]}` — новый порядок вкладки (`sort` = индекс в списке) |
+| `PATCH /sort` | `{type, items: [{source_type, source_id, sort}]}` — новый порядок вкладки (`sort` = вес позиции: больший вес выше в списке, бэк отдаёт по убыванию) |
 
 ## 11. Плейлисты (`/playlists`)
 

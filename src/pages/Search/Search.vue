@@ -15,8 +15,8 @@
     </div>
 
     <template v-if="!hasQuery">
-      <div class="sec-label">Недавние</div>
-      <div class="hist">
+      <div v-if="history.length" class="sec-label">Недавние</div>
+      <div v-if="history.length" class="hist">
         <button v-for="item in history" :key="item" class="chip" type="button" @click="useHistory(item)">
           {{ item }}
         </button>
@@ -27,7 +27,7 @@
           <path d="M16.5 16.5 21 21" />
         </svg>
         <div class="et">Ищите или вставьте ссылку</div>
-        <div class="es">После запроса — пилюли. История только на устройстве.</div>
+        <div class="es">Минимум {{ SEARCH_MIN_LENGTH }} символа. История только на устройстве.</div>
       </div>
     </template>
 
@@ -41,51 +41,144 @@
         <button class="chip" :class="{ active: section === 'videos' }" type="button" @click="section = 'videos'">Видео</button>
       </div>
 
-      <SnapshotRow
-        v-if="section === 'best'"
-        kind="media"
-        :title="bestArtist.title"
-        subtitle="Исполнитель"
-        :source="bestArtist.source_type"
-        :cover="bestArtist.cover_url ?? ''"
-        round
-        :liked="bestArtist.is_favorite"
-        @open="openArtist"
-        @menu="openSnapshotMenu($event, bestArtist, 'my-artists')"
-      />
+      <div v-if="offline" class="empty" style="padding-top:28px">
+        <div class="et">Нет соединения</div>
+        <div class="es">Поиск по каталогам работает только онлайн</div>
+      </div>
 
-      <template v-else-if="section === 'tracks'">
+      <div v-else-if="loading && !result" class="search-loading">
+        <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <circle cx="12" cy="12" r="8" opacity=".25" />
+          <path d="M12 4a8 8 0 0 1 8 8" stroke-linecap="round" />
+        </svg>
+      </div>
+
+      <div v-else-if="error && !result" class="empty" style="padding-top:28px">
+        <div class="et">{{ error }}</div>
+        <button class="btn btn-primary" type="button" style="margin-top:12px" @click="retry">Повторить</button>
+      </div>
+
+      <template v-else-if="result">
         <SnapshotRow
-          v-for="track in trackResults"
-          :key="track.source_id"
-          :title="track.title"
-          :subtitle="artistsLine(track.artists)"
-          :source="track.source_type"
-          :cover="trackCover(track)"
-          :liked="track.is_favorite"
-          :downloaded="downloads.isDownloaded(track)"
-          :playing="isPlaying(track)"
-          @open="player.playSnapshot(track)"
-          @menu="openSnapshotMenu($event, track, 'my-tracks')"
+          v-if="section === 'best' && best"
+          :kind="best.type === 'video' ? 'video' : best.type === 'track' ? 'track' : 'media'"
+          :title="bestTitle"
+          :subtitle="bestSubtitle"
+          :source="best.source_type"
+          :cover="bestCover"
+          :round="best.type === 'artist'"
+          :liked="best.is_favorite"
+          :playing="isPlaying(best)"
+          @open="openResult(best)"
+          @menu="openSnapshotMenu($event, best, snapshotMenuContext(best))"
         />
+
+        <template v-else-if="section === 'tracks'">
+          <SnapshotRow
+            v-for="track in trackResults"
+            :key="`${track.source_type}:${track.source_id}`"
+            :title="track.title"
+            :subtitle="artistsLine(track.artists)"
+            :source="track.source_type"
+            :cover="trackCover(track)"
+            :liked="track.is_favorite"
+            :downloaded="downloads.isDownloaded(track)"
+            :playing="isPlaying(track)"
+            @open="openResult(track)"
+            @menu="openSnapshotMenu($event, track, 'my-tracks')"
+          />
+        </template>
+
+        <template v-else-if="section === 'albums'">
+          <SnapshotRow
+            v-for="album in albumResults"
+            :key="`${album.source_type}:${album.source_id}`"
+            kind="media"
+            :title="album.title"
+            :subtitle="albumLine(album)"
+            :source="album.source_type"
+            :cover="album.cover_url ?? ''"
+            :liked="album.is_favorite"
+            @open="openResult(album)"
+            @menu="openSnapshotMenu($event, album, 'my-albums')"
+          />
+        </template>
+
+        <template v-else-if="section === 'artists'">
+          <SnapshotRow
+            v-for="artist in artistResults"
+            :key="`${artist.source_type}:${artist.source_id}`"
+            kind="media"
+            :title="artist.title"
+            subtitle="Исполнитель"
+            :source="artist.source_type"
+            :cover="artist.cover_url ?? ''"
+            round
+            :liked="artist.is_favorite"
+            @open="openResult(artist)"
+            @menu="openSnapshotMenu($event, artist, 'my-artists')"
+          />
+        </template>
+
+        <template v-else-if="section === 'playlists'">
+          <SnapshotRow
+            v-for="playlist in playlistResults"
+            :key="`${playlist.source_type}:${playlist.source_id}`"
+            kind="media"
+            :title="playlist.title"
+            :subtitle="playlist.owner_name ?? 'Плейлист'"
+            :source="playlist.source_type"
+            :cover="playlist.cover_url ?? ''"
+            :liked="playlist.is_favorite"
+            @open="openResult(playlist)"
+            @menu="openSnapshotMenu($event, playlist, 'my-playlists')"
+          />
+        </template>
+
+        <template v-else-if="section === 'videos'">
+          <SnapshotRow
+            v-for="video in videoResults"
+            :key="`${video.source_type}:${video.source_id}`"
+            kind="video"
+            :title="video.title"
+            :subtitle="`${artistsLine(video.artists)} · клип`"
+            :source="video.source_type"
+            :cover="video.cover_url ?? ''"
+            :liked="video.is_favorite"
+            :playing="isPlaying(video)"
+            @open="openResult(video)"
+            @menu="openSnapshotMenu($event, video, 'my-videos')"
+          />
+        </template>
+
+        <div
+          v-if="section !== 'best' && sectionItems.length === 0"
+          class="empty"
+          style="padding-top:20px"
+        >
+          <div class="et">Ничего не найдено</div>
+          <div class="es">По запросу «{{ result.query }}» в этой пилюле пусто</div>
+        </div>
+        <div v-else-if="section === 'best' && !best" class="empty" style="padding-top:20px">
+          <div class="et">Лучшего совпадения нет</div>
+          <div class="es">Загляните в другие пилюли</div>
+        </div>
+
+        <div v-if="loadingMore" class="search-loading">
+          <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <circle cx="12" cy="12" r="8" opacity=".25" />
+            <path d="M12 4a8 8 0 0 1 8 8" stroke-linecap="round" />
+          </svg>
+        </div>
+        <div v-else-if="sectionHasMore" ref="sentinel" class="search-sentinel" aria-hidden="true" />
+        <div v-if="error && result" class="empty" style="padding-top:12px">
+          <div class="et">{{ error }}</div>
+          <button class="btn btn-secondary" type="button" style="margin-top:10px" @click="retry">Повторить</button>
+        </div>
       </template>
 
-      <SnapshotRow
-        v-else-if="section === 'videos'"
-        kind="video"
-        :title="videoResult.title"
-        :subtitle="`${artistsLine(videoResult.artists)} · клип`"
-        :source="videoResult.source_type"
-        :cover="videoResult.cover_url ?? ''"
-        :liked="videoResult.is_favorite"
-        :playing="isPlaying(videoResult)"
-        @open="player.playSnapshot(videoResult)"
-        @menu="openSnapshotMenu($event, videoResult, 'my-videos')"
-      />
-
-      <div v-else class="empty" style="padding-top:20px">
-        <div class="et">Пока пусто в этой пилюле</div>
-        <div class="es">Фикстуры есть у Лучшего, треков и видео</div>
+      <div v-else-if="q.length < SEARCH_MIN_LENGTH" class="empty" style="padding-top:28px">
+        <div class="et">Введите минимум {{ SEARCH_MIN_LENGTH }} символа</div>
       </div>
     </template>
 
@@ -104,3 +197,4 @@
 </template>
 
 <script src="./Search.ts" lang="ts"></script>
+<style scoped src="./Search.css"></style>

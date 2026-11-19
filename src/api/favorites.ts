@@ -16,7 +16,7 @@ export function removeFavorite(snapshot: AnySnapshot) {
   return http.delete<{ message: string }>('favorites', { data: snapshot });
 }
 
-/** Новый порядок вкладки целиком: sort = индекс в списке. */
+/** Новый порядок вкладки целиком: sort = вес позиции, больший вес — выше в списке. */
 export function sortFavorites(type: SnapshotType, items: { source_type: string; source_id: string; sort: number }[]) {
   return http.patch('favorites/sort', { type, items });
 }
