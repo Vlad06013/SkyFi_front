@@ -14,35 +14,36 @@
         <div class="track-artist">{{ statusLine }}</div>
       </div>
       <button
-        v-if="ymState === 'connected' || ymState === 'done'"
+        v-if="connected"
         class="btn btn-ghost sm"
         type="button"
+        :disabled="busy"
         @click="disconnect"
       >
         Отключить
       </button>
     </div>
 
-    <template v-if="ymState === 'idle'">
-      <p class="caption">Волна и импорт живут на аккаунте Яндекса. Поиск и свои файлы уже работают.</p>
-      <button class="btn btn-primary wide" type="button" @click="requestCode">Подключить</button>
-    </template>
-
-    <div v-else-if="ymState === 'starting'" style="display:flex;justify-content:center;padding:18px 0 4px">
+    <div v-if="connected === null && !loadFailed" style="display:flex;justify-content:center;padding:18px 0 4px">
       <svg class="spin" style="width:22px;height:22px;color:var(--color-accent)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
         <circle cx="12" cy="12" r="8" opacity=".25" />
         <path d="M12 4a8 8 0 0 1 8 8" stroke-linecap="round" />
       </svg>
     </div>
 
-    <template v-else-if="ymState === 'awaiting'">
+    <template v-else-if="loadFailed">
+      <p class="caption">Не удалось проверить подключение. Проверьте соединение и попробуйте снова.</p>
+      <button class="btn btn-ghost wide" type="button" @click="refresh">Повторить</button>
+    </template>
+
+    <template v-else-if="awaiting">
       <p class="caption">Скопируйте код, перейдите по ссылке и введите его на странице Яндекса — подключение подтвердится само.</p>
       <div class="ym-code">
         <div class="track-meta">
           <div class="l">Код</div>
-          <div class="n">{{ ymCode }}</div>
+          <div class="n">{{ userCode ?? 'получаем…' }}</div>
         </div>
-        <button class="icon-btn" type="button" aria-label="скопировать код" @click="copied('Код')">
+        <button class="icon-btn" type="button" aria-label="скопировать код" :disabled="!userCode" @click="copy(userCode, 'Код')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <rect x="9" y="9" width="11" height="11" rx="2" />
             <path d="M5 15V7a2 2 0 0 1 2-2h8" />
@@ -52,50 +53,31 @@
       <div class="ym-link">
         <div class="track-meta">
           <div class="l">Ссылка</div>
-          <div class="url">ya.ru/device</div>
+          <div class="url">{{ verificationUrl ?? 'получаем…' }}</div>
         </div>
-        <button class="icon-btn" type="button" aria-label="скопировать ссылку" @click="copied('Ссылка')">
+        <button class="icon-btn" type="button" aria-label="скопировать ссылку" :disabled="!verificationUrl" @click="copy(verificationUrl, 'Ссылка')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <rect x="9" y="9" width="11" height="11" rx="2" />
             <path d="M5 15V7a2 2 0 0 1 2-2h8" />
           </svg>
         </button>
       </div>
-      <button class="btn btn-ghost wide" type="button" @click="requestCode">Перезапросить код</button>
+      <a v-if="verificationUrl" class="btn btn-primary wide" :href="verificationUrl" target="_blank" rel="noopener">Открыть страницу Яндекса</a>
+      <button class="btn btn-ghost wide" type="button" :disabled="busy" @click="connect">Перезапросить код</button>
     </template>
 
-    <template v-else-if="ymState === 'connected'">
-      <div class="ym-stats">
-        <div class="ym-stat"><div class="n">1 248</div><div class="l">треков</div></div>
-        <div class="ym-stat"><div class="n">86</div><div class="l">альбомов</div></div>
-        <div class="ym-stat"><div class="n">12</div><div class="l">плейлистов</div></div>
-        <div class="ym-stat"><div class="n">41</div><div class="l">исполнителей</div></div>
-      </div>
-      <button class="btn btn-primary wide" type="button" @click="startImport">Импортировать</button>
+    <template v-else-if="expired">
+      <p class="caption">Время кода вышло или сессия не завершена. Запросите код заново.</p>
+      <button class="btn btn-primary wide" type="button" :disabled="busy" @click="connect">Перезапросить код</button>
     </template>
 
-    <template v-else-if="ymState === 'importing'">
-      <div class="ym-progress">
-        <div class="ym-progress-head">
-          <span>Импортируем</span>
-          <span class="ym-progress-pct">{{ importPct }}%</span>
-        </div>
-        <div class="ym-bar"><i :style="{ width: `${importPct}%` }" /></div>
-        <div class="hint">{{ importCount }} из 1 248</div>
-      </div>
-      <button class="btn btn-ghost wide" type="button" @click="cancelImport">Отменить</button>
+    <template v-else-if="connected">
+      <p class="caption">Волна и импорт лайков работают на этом аккаунте.</p>
     </template>
 
     <template v-else>
-      <div class="ym-done">
-        <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M5 12.5 9.5 17 19 7.5" />
-        </svg>
-        <div>
-          <strong>Импорт завершён</strong>
-          <p>1 248 треков · 86 альбомов · 12 плейлистов · 41 исполнитель</p>
-        </div>
-      </div>
+      <p class="caption">Волна и импорт живут на аккаунте Яндекса. Поиск и свои файлы уже работают.</p>
+      <button class="btn btn-primary wide" type="button" :disabled="busy" @click="connect">Подключить</button>
     </template>
   </div>
 </template>

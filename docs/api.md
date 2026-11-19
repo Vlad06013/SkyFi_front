@@ -139,12 +139,26 @@ playlist|artist`.
 - Телефон (auth): `POST /qr-login/confirm` `{code}` → 200
   `{status: "confirmed"}`; без токена — 401 «Не авторизован.».
 
-**Яндекс Музыка (аккаунт)**: `POST /yandex-music/auth/device/start`
-(12/мин) → параметры устройственного входа Яндекса (пользователь
-подтверждает на странице Яндекса); `GET /yandex-music/auth/device/
-status` (30/мин) — поллинг; `DELETE /yandex-music/auth` —
-отключить. Не подключён → волна/импорт недоступны
-(эндпоинты отдадут 4xx с сообщением).
+**Яндекс Музыка (аккаунт)**, формы проверены curl'ом:
+- `POST /yandex-music/auth/device/start` (12/мин) →
+  `data: {session_id, status: "pending", verification_url,
+  user_code}` — старт device flow (пользователь вводит код на
+  странице Яндекса). Идемпотентен: при активной сессии
+  возвращает её (тот же код/ссылку). Сервис Яндекса может
+  отдать `verification_url`/`user_code` = null — тогда код и
+  ссылку подхватывает поллинг статуса.
+- `GET /yandex-music/auth/device/status` (30/мин) — одновременно
+  поллинг сессии и проверка «подключён ли аккаунт»:
+  `data: {status, connected, verification_url?, user_code?,
+  message?}`. `status`: `not_started` (сессии нет; `connected` —
+  сохранён ли токен), `pending` (сессия жива, поля кода/ссылки
+  заполнены), `connected` (токен одноразово забран и сохранён
+  только на сервере; сессия удалена), иначе (`expired`/`failed`/
+  `consumed`/др.) — сессия умерла без подключения и удалена.
+- `DELETE /yandex-music/auth` → `data: {connected: false,
+  message}` — отключить аккаунт (токен и сессия удаляются).
+  Не подключён → волна/импорт недоступны (эндпоинты отдадут
+  4xx с сообщением).
 
 ## 4. Устройства (`/player/devices`)
 

@@ -207,6 +207,40 @@ export interface QrConfirmPayload {
 }
 ```
 
+## Яндекс Музыка: подключение аккаунта (api.md §3, формы проверены curl'ом)
+
+```ts
+/** data ответа POST /yandex-music/auth/device/start. Идемпотентен: активную сессию возвращает как есть. */
+export interface YandexDeviceStartPayload {
+  session_id: string;
+  status: string;
+  /** Сервис Яндекса может вернуть null — код/ссылку тогда подхватывает поллинг статуса. */
+  verification_url: string | null;
+  user_code: string | null;
+}
+
+/** data ответа GET /yandex-music/auth/device/status. Бэк может вернуть и другие строки (cancelled и т.п.) — трактуем как «сессия умерла». */
+export type YandexDeviceStatusValue = 'not_started' | 'pending' | 'connected' | 'expired' | 'failed' | 'consumed';
+
+/** data ответа GET /yandex-music/auth/device/status — одновременно поллинг сессии и проверка «подключён ли аккаунт». */
+export interface YandexDeviceStatusPayload {
+  status: YandexDeviceStatusValue;
+  /** Сохранён ли токен Яндекса на сервере. */
+  connected: boolean;
+  /** Заполнены при активной pending-сессии. */
+  verification_url?: string | null;
+  /** Заполнен при активной pending-сессии. */
+  user_code?: string | null;
+  message?: string;
+}
+
+/** data ответа DELETE /yandex-music/auth. */
+export interface YandexDisconnectPayload {
+  connected: boolean;
+  message: string;
+}
+```
+
 ## Потоки
 
 ```ts

@@ -1,110 +1,94 @@
-import { computed, defineComponent, onBeforeUnmount, ref } from 'vue';
+import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { storeToRefs } from 'pinia';
+import { useOnlineStore } from '@/stores/online';
 import { useToastStore } from '@/stores/toast';
-
-type YmState = 'connected' | 'idle' | 'starting' | 'awaiting' | 'importing' | 'done';
-
-const ymCode = '111111';
-const codeDelayMs = 1200;
-const confirmDelayMs = 8000;
-const importStepPct = 4;
-const importTickMs = 150;
-const importTotal = 1248;
+import { useYandexStore } from '@/stores/yandex';
 
 export default defineComponent({
   name: 'YandexCard',
   setup() {
     const toast = useToastStore();
-    const ymState = ref<YmState>('connected');
-    const importPct = ref(0);
-    let codeTimer: ReturnType<typeof setTimeout> | null = null;
-    let confirmTimer: ReturnType<typeof setTimeout> | null = null;
-    let importTimer: ReturnType<typeof setInterval> | null = null;
+    const online = useOnlineStore();
+    const yandex = useYandexStore();
+    const { connected, awaiting, expired, userCode, verificationUrl, busy } = storeToRefs(yandex);
 
-    const isLinked = computed(() =>
-      ['connected', 'importing', 'done'].includes(ymState.value),
-    );
+    /** Первый refresh не удался (офлайн/троттлинг) — показать «повторить». */
+    const loadFailed = ref(false);
+
+    const isLinked = computed(() => connected.value === true);
 
     const statusLine = computed(() => {
-      if (ymState.value === 'idle') return 'не подключён';
-      if (ymState.value === 'starting') return 'получаем код…';
-      if (ymState.value === 'awaiting') return 'ждём подтверждение';
-      if (ymState.value === 'importing') return 'импортируем';
-      if (ymState.value === 'done') return 'подключён · импортировано';
-      return 'подключён';
+      if (connected.value === null && !loadFailed.value) return 'проверяем подключение…';
+      if (awaiting.value) return 'ждём подтверждение';
+      if (connected.value) return 'подключён';
+      if (loadFailed.value) return 'не удалось загрузить';
+      return 'не подключён';
     });
 
-    const importCount = computed(() => Math.round((importTotal * importPct.value) / 100));
-
-    function clearTimers() {
-      if (codeTimer) {
-        clearTimeout(codeTimer);
-        codeTimer = null;
-      }
-      if (confirmTimer) {
-        clearTimeout(confirmTimer);
-        confirmTimer = null;
-      }
-      if (importTimer) {
-        clearInterval(importTimer);
-        importTimer = null;
+    async function refresh() {
+      try {
+        await yandex.refresh();
+        loadFailed.value = false;
+      } catch {
+        loadFailed.value = true;
       }
     }
 
-    function disconnect() {
-      clearTimers();
-      ymState.value = 'idle';
-      toast.show('Яндекс Музыка', 'отключена');
+    function guardOffline(): boolean {
+      if (online.isOnline !== false) return false;
+      toast.show('Нет соединения с сервером', '', true);
+      return true;
     }
 
-    function requestCode() {
-      clearTimers();
-      ymState.value = 'starting';
-      codeTimer = setTimeout(() => {
-        ymState.value = 'awaiting';
-        confirmTimer = setTimeout(() => {
-          ymState.value = 'connected';
-          toast.show('Яндекс Музыка', 'подключена');
-        }, confirmDelayMs);
-      }, codeDelayMs);
+    function connect() {
+      if (busy.value || guardOffline()) return;
+      void yandex.connect().catch((error: unknown) => {
+        toast.show(error instanceof Error ? error.message : 'Не удалось начать подключение', '', true);
+      });
     }
 
-    function startImport() {
-      ymState.value = 'importing';
-      importPct.value = 0;
-      importTimer = setInterval(() => {
-        importPct.value = Math.min(100, importPct.value + importStepPct);
-        if (importPct.value >= 100 && importTimer) {
-          clearInterval(importTimer);
-          importTimer = null;
-          ymState.value = 'done';
-        }
-      }, importTickMs);
+    async function disconnect() {
+      if (busy.value) return;
+      try {
+        await yandex.disconnect();
+        toast.show('Яндекс Музыка', 'отключена');
+      } catch (error) {
+        toast.show(error instanceof Error ? error.message : 'Не удалось отключить', '', true);
+      }
     }
 
-    function cancelImport() {
-      clearTimers();
-      ymState.value = 'connected';
-      toast.show('Импорт', 'отменён');
+    async function copy(text: string | null, what: string) {
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        toast.show(what, 'скопировано');
+      } catch {
+        toast.show(what, `не скопировано: ${text}`, true);
+      }
     }
 
-    function copied(what: string) {
-      toast.show(what, 'скопировано');
-    }
+    // Подтверждение приходит поллингом — сообщаем, когда оно случилось.
+    watch(connected, (now, was) => {
+      if (now === true && was === false) toast.show('Яндекс Музыка', 'подключена');
+    });
 
-    onBeforeUnmount(clearTimers);
+    onMounted(refresh);
+    onBeforeUnmount(() => yandex.stopPolling());
 
     return {
-      ymState,
-      ymCode,
-      importPct,
-      importCount,
+      connected,
+      awaiting,
+      expired,
+      userCode,
+      verificationUrl,
+      busy,
+      loadFailed,
       isLinked,
       statusLine,
+      refresh,
+      connect,
       disconnect,
-      requestCode,
-      startImport,
-      cancelImport,
-      copied,
+      copy,
     };
   },
 });
