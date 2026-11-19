@@ -71,7 +71,6 @@
         :source="track.source_type"
         :playing="isPlaying(track)"
         :offline="isOffline(track)"
-        :liked="favorites.has(track)"
         :downloaded="isDownloaded(track)"
         sortable
         :dragging="sortDrag?.from === index"
