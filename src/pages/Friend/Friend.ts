@@ -1,5 +1,6 @@
 import { computed, defineComponent, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { storeToRefs } from 'pinia';
 import AppBar from '@/components/AppBar/AppBar.vue';
 import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
 import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
@@ -9,16 +10,13 @@ import { mockFriends, friendQueue } from '@/mocks/friends';
 import { favoriteTracks } from '@/mocks/catalog';
 import { coverVar, artistsLine } from '@/lib/cover';
 import { moveItem, sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
-import { plural } from '@/lib/plural';
-import { trackPointer } from '@/lib/pointer-drag';
 import { useFriendsStore } from '@/stores/friends';
 import { useFavoritesStore } from '@/stores/favorites';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
 import type { TrackSnapshot } from '@/types';
 
-const swipeThreshold = 88;
-const tapSlop = 8;
+type FavTab = 'tracks' | 'playlists' | 'artists' | 'albums';
 
 export default defineComponent({
   name: 'FriendPage',
@@ -27,16 +25,24 @@ export default defineComponent({
     const route = useRoute();
     const router = useRouter();
     const player = usePlayerStore();
+    const { current } = storeToRefs(player);
     const toast = useToastStore();
     const friendsStore = useFriendsStore();
     const favorites = useFavoritesStore();
+    const { playlists, albums, artists } = storeToRefs(favorites);
     const { open, items, top, right, sheet, entity, openSnapshotMenu, closeMenu, run } = useMediaMenu();
 
     const queue = ref<TrackSnapshot[]>([...friendQueue]);
     const queueOpen = ref(false);
-    const queueDragging = ref(false);
-    const queueDragY = ref(0);
     const sortDrag = ref<ListSortState | null>(null);
+    const favTab = ref<FavTab>('tracks');
+
+    const favChips: { id: FavTab; label: string }[] = [
+      { id: 'tracks', label: 'Треки' },
+      { id: 'playlists', label: 'Плейлисты' },
+      { id: 'artists', label: 'Артисты' },
+      { id: 'albums', label: 'Альбомы' },
+    ];
 
     const friend = computed(
       () =>
@@ -48,18 +54,26 @@ export default defineComponent({
       () => friend.value.watching && friend.value.current_snapshot?.type === 'video',
     );
 
-    const queueCountLabel = computed(
-      () => `${queue.value.length} ${plural(queue.value.length, ['трек', 'трека', 'треков'])}`,
-    );
+    function toggleQueue() {
+      queueOpen.value = !queueOpen.value;
+    }
 
-    const queueSheetStyle = computed(() => {
-      if (!queueDragY.value) return undefined;
-      return { transform: `translateY(${queueDragY.value}px)` };
-    });
+    function isPlaying(track: TrackSnapshot) {
+      const snap = current.value;
+      return snap?.type === 'track' && snap.source_id === track.source_id;
+    }
 
     function playNow() {
       const snapshot = friend.value.current_snapshot;
       if (snapshot) player.playSnapshot(snapshot);
+    }
+
+    function openArtist(id: string) {
+      router.push(`/artist/${id}`);
+    }
+
+    function openAlbum(id: string) {
+      router.push(`/album/${id}`);
     }
 
     function removeFriend() {
@@ -83,48 +97,30 @@ export default defineComponent({
       });
     }
 
-    function onQueueHeadDrag(event: PointerEvent) {
-      if (event.pointerType === 'mouse' && event.button !== 0) return;
-      event.stopPropagation();
-      const startY = event.clientY;
-      queueDragging.value = true;
-      queueDragY.value = 0;
-      trackPointer(event, {
-        move: (next) => {
-          queueDragY.value = Math.max(0, next.clientY - startY);
-        },
-        up: () => {
-          const dy = queueDragY.value;
-          queueDragging.value = false;
-          queueDragY.value = 0;
-          if (dy > swipeThreshold) {
-            queueOpen.value = false;
-            return;
-          }
-          if (dy < tapSlop) queueOpen.value = !queueOpen.value;
-        },
-      });
-    }
-
     return {
       friend,
       watching,
       favoriteTracks,
       favorites,
+      playlists,
+      albums,
+      artists,
       player,
       queue,
       queueOpen,
-      queueCountLabel,
-      queueDragging,
-      queueSheetStyle,
       sortDrag,
+      favTab,
+      favChips,
       coverVar,
       artistsLine,
+      toggleQueue,
+      isPlaying,
       playNow,
+      openArtist,
+      openAlbum,
       removeFriend,
       onSort,
       sortRowStyle,
-      onQueueHeadDrag,
       openSnapshotMenu,
       open,
       items,

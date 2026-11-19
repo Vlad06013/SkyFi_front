@@ -214,7 +214,8 @@
 
     <div class="subhead" style="margin-top:28px">Вкладка «Моё» · иконка на согласование</div>
     <p class="sec-note">Замена закладки. Контур 1.8px, как у навигации; в таббаре живёт на 22px —
-    рядом с каждым вариантом превью в неактивном и активном состоянии. Выбранного нет, ждём решения.</p>
+    рядом с каждым вариантом превью в неактивном и активном состоянии.
+    <strong>Выбран вариант 3 «Диск с сердцем»</strong> — в приложении.</p>
     <div class="logo-grid">
       <div class="logo-opt">
         <div class="tag-mini">Текущая</div>
@@ -253,7 +254,7 @@
         </div>
       </div>
       <div class="logo-opt">
-        <div class="tag-mini">Вариант 3</div>
+        <div class="tag-mini on">Вариант 3 · выбран</div>
         <div class="logo-stage">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.4"/><path d="M12 15.4s-3.4-2-4.4-4.3c-.6-1.4.3-2.9 1.8-2.9 1 0 2.6 1 2.6 1s1.6-1 2.6-1c1.5 0 2.4 1.5 1.8 2.9-1 2.3-4.4 4.3-4.4 4.3z" fill="currentColor" stroke="none"/></svg>
         </div>
@@ -1369,6 +1370,149 @@
             <div class="es">От 2 символов · имя или почта</div>
           </div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-title">Друзья · очередь (на согласование)</div>
+    <p class="sec-note">Внизу карточки «играет сейчас», внутри неё и по центру — строка <strong>«Очередь»</strong>
+    с фоном и шевроном вниз (без количества). Тап растягивает саму карточку вниз: внутри — сортируемый список
+    (drag за grip), меню строк — по матрице контекстов. Повторный тап сворачивает, драга нет.
+    Друг ничего не играет — карточки нет, но строка остаётся: блок сжимается до одной этой строки.
+    Избранное друга — пилюли «Треки / Плейлисты / Артисты / Альбомы», меню как в «Моё», лайк относится
+    к своему аккаунту. Данные — <code>GET /{user}/queue</code>.</p>
+
+    <style>
+      .q-demo-phone { position: relative; height: 560px; overflow: hidden; }
+      .q-toggle {
+        display: flex; align-items: center; justify-content: center;
+        padding-top: 10px; margin-top: 10px; border-top: 1px solid var(--color-border);
+        cursor: pointer; user-select: none;
+      }
+      .q-toggle .lbl {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 8px 16px; border-radius: 999px;
+        background: var(--color-surface-3);
+        font: 600 12px/1 var(--font-body); color: var(--color-text-primary);
+      }
+      .q-toggle svg { width: 14px; height: 14px; color: var(--color-text-secondary); transition: transform .2s ease; }
+      .q-toggle.is-open svg { transform: rotate(180deg); }
+      .q-body { margin-top: 10px; border-top: 1px solid var(--color-border); padding-top: 8px; }
+      .q-stand {
+        display: flex; align-items: center; justify-content: center;
+        background: var(--color-surface-2); border: 1px solid var(--color-border);
+        border-radius: var(--radius-m); padding: 12px;
+      }
+      .q-stand .q-toggle { border-top: 0; padding-top: 0; margin-top: 0; }
+    </style>
+
+    <div class="layer-grid">
+      <div>
+        <div class="subhead">Закрыта · играет</div>
+        <div class="phone q-demo-phone">
+          <div style="display:flex;align-items:center;gap:8px;color:var(--color-text-secondary);margin-bottom:8px">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 6 8 12.5 14.5 19"/></svg>
+            <span style="font-size:13px">К друзьям</span>
+          </div>
+          <div class="f-head">
+            <div class="avatar ini lg">А</div>
+            <div class="f-name">Аня</div>
+            <div class="f-mail">anya@mail.ru</div>
+          </div>
+          <div class="now-card" style="display:block">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div class="thumb" style="background:var(--gradient-cover-1)"><span class="src" title="Яндекс"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="13.6" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9.6" cy="14.8" r="3.7"/><path d="M12.7 5.6h2.05v9.4H12.7z"/><path d="M14.75 5.6h6.3l-1.7 3.7h-6.3z"/></svg></span></div>
+              <div class="track-meta">
+                <div class="track-title">Радиотишина</div>
+                <div class="track-artist">Sum 41</div>
+                <div class="live"><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>слушает сейчас</div>
+              </div>
+              <button class="fab small" aria-label="включить у себя"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></button>
+            </div>
+            <div class="q-toggle"><span class="lbl">Очередь
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9.5 6 6 6-6"/></svg></span>
+            </div>
+          </div>
+        </div>
+        <p class="state-hint" style="margin-top:10px">Строка внутри карточки, внизу по центру, с фоном. Тап растягивает карточку вниз.</p>
+      </div>
+
+      <div>
+        <div class="subhead">Открыта</div>
+        <div class="phone q-demo-phone">
+          <div style="display:flex;align-items:center;gap:8px;color:var(--color-text-secondary);margin-bottom:8px">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 6 8 12.5 14.5 19"/></svg>
+            <span style="font-size:13px">К друзьям</span>
+          </div>
+          <div class="f-head">
+            <div class="avatar ini lg">А</div>
+            <div class="f-name">Аня</div>
+            <div class="f-mail">anya@mail.ru</div>
+          </div>
+          <div class="now-card" style="display:block">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div class="thumb" style="background:var(--gradient-cover-1)"><span class="src" title="Яндекс"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="13.6" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9.6" cy="14.8" r="3.7"/><path d="M12.7 5.6h2.05v9.4H12.7z"/><path d="M14.75 5.6h6.3l-1.7 3.7h-6.3z"/></svg></span></div>
+              <div class="track-meta">
+                <div class="track-title">Радиотишина</div>
+                <div class="track-artist">Sum 41</div>
+                <div class="live"><span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>слушает сейчас</div>
+              </div>
+              <button class="fab small" aria-label="включить у себя"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></button>
+            </div>
+            <div class="q-toggle is-open"><span class="lbl">Очередь
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9.5 6 6 6-6"/></svg></span>
+            </div>
+            <div class="q-body">
+              <div class="track-row">
+                <span class="grip"><i></i><i></i><i></i></span>
+                <div class="thumb" style="background:var(--gradient-cover-2)"><span class="src" title="Яндекс"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="13.6" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9.6" cy="14.8" r="3.7"/><path d="M12.7 5.6h2.05v9.4H12.7z"/><path d="M14.75 5.6h6.3l-1.7 3.7h-6.3z"/></svg></span></div>
+                <div class="track-meta"><div class="track-title">Still Waiting</div><div class="track-artist">Sum 41</div></div>
+              </div>
+              <div class="track-row">
+                <span class="grip"><i></i><i></i><i></i></span>
+                <div class="thumb" style="background:var(--gradient-cover-3)"><span class="src" title="Яндекс"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="13.6" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9.6" cy="14.8" r="3.7"/><path d="M12.7 5.6h2.05v9.4H12.7z"/><path d="M14.75 5.6h6.3l-1.7 3.7h-6.3z"/></svg></span></div>
+                <div class="track-meta"><div class="track-title">In Too Deep</div><div class="track-artist">Sum 41</div></div>
+              </div>
+              <div class="track-row">
+                <span class="grip"><i></i><i></i><i></i></span>
+                <div class="thumb" style="background:var(--gradient-cover-1)"><span class="src" title="Яндекс"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="13.6" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9.6" cy="14.8" r="3.7"/><path d="M12.7 5.6h2.05v9.4H12.7z"/><path d="M14.75 5.6h6.3l-1.7 3.7h-6.3z"/></svg></span></div>
+                <div class="track-meta"><div class="track-title">The Hell Song</div><div class="track-artist">Sum 41</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="state-hint" style="margin-top:10px">Карточка растянута: тогл с шевроном вверх и сразу список с drag за grip. Тап по строке сворачивает.</p>
+      </div>
+
+      <div>
+        <div class="subhead">Не играет · пилюля на месте</div>
+        <div class="phone q-demo-phone">
+          <div style="display:flex;align-items:center;gap:8px;color:var(--color-text-secondary);margin-bottom:8px">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 6 8 12.5 14.5 19"/></svg>
+            <span style="font-size:13px">К друзьям</span>
+          </div>
+          <div class="f-head">
+            <div class="avatar ini lg g3">К</div>
+            <div class="f-name">Катя</div>
+            <div class="f-mail">katya@mail.ru</div>
+          </div>
+          <div class="q-stand">
+            <div class="q-toggle"><span class="lbl">Очередь
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9.5 6 6 6-6"/></svg></span>
+            </div>
+          </div>
+          <div class="sec-label" style="margin-top:6px">Избранное</div>
+          <div class="track-row">
+            <div class="thumb" style="background:var(--gradient-cover-1)"><span class="src" title="Яндекс"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="13.6" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9.6" cy="14.8" r="3.7"/><path d="M12.7 5.6h2.05v9.4H12.7z"/><path d="M14.75 5.6h6.3l-1.7 3.7h-6.3z"/></svg></span></div>
+            <div class="track-meta"><div class="track-title">Радиотишина</div><div class="track-artist">Sum 41</div></div>
+          </div>
+          <div class="track-row">
+            <div class="thumb" style="background:var(--gradient-cover-2)"><span class="src" title="Яндекс"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="11" cy="13.6" r="8.4" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9.6" cy="14.8" r="3.7"/><path d="M12.7 5.6h2.05v9.4H12.7z"/><path d="M14.75 5.6h6.3l-1.7 3.7h-6.3z"/></svg></span></div>
+            <div class="track-meta"><div class="track-title">Fat Lip</div><div class="track-artist">Sum 41</div></div>
+          </div>
+        </div>
+        <p class="state-hint" style="margin-top:10px">Друг ничего не слушает — карточки «играет сейчас» нет, а строка очереди остаётся: блок сжимается до одной этой строки, тап растянет его (очередь может быть пустой).</p>
       </div>
     </div>
   </section>
