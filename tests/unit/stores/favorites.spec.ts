@@ -158,7 +158,7 @@ describe('stores/favorites', () => {
     expect(favorites.has(track)).toBe(false);
   });
 
-  it('reorder: локальный порядок + PATCH sort индексами', async () => {
+  it('reorder: локальный порядок + PATCH sort весами (больший вес = выше)', async () => {
     loginAsUser();
     useOnlineStore().isOnline = true;
     const favorites = useFavoritesStore();
@@ -168,8 +168,8 @@ describe('stores/favorites', () => {
     expect(favorites.tracks.map((t) => t.source_id)).toEqual(['t2', 't1']);
     await flushPromises();
     expect(sortMock).toHaveBeenCalledWith('track', [
-      { source_type: 'yandex_music', source_id: 't2', sort: 0 },
-      { source_type: 'yandex_music', source_id: 't1', sort: 1 },
+      { source_type: 'yandex_music', source_id: 't2', sort: 1 },
+      { source_type: 'yandex_music', source_id: 't1', sort: 0 },
     ]);
   });
 });

@@ -42,7 +42,7 @@ export const useFavoritesStore = defineStore('favorites', () => {
   function applyAdd(snapshot: AnySnapshot) {
     const section = sections[snapshot.type];
     if (section.value.some((item) => sameIdentity(item, snapshot))) return;
-    section.value = [...section.value, snapshot];
+    section.value = [snapshot, ...section.value];
   }
 
   function applyRemove(snapshot: AnySnapshot) {
@@ -116,7 +116,7 @@ export const useFavoritesStore = defineStore('favorites', () => {
     const items = next.map((snapshot, index) => ({
       source_type: snapshot.source_type,
       source_id: snapshot.source_id,
-      sort: index,
+      sort: next.length - 1 - index,
     }));
     void sortFavorites('track', items).catch(() => undefined);
   }
