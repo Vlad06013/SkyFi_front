@@ -1,0 +1,7 @@
+.back {
+  display: flex;
+  color: var(--color-text-secondary);
+  background: none;
+  border: 0;
+  padding: 0;
+}

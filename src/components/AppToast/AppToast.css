@@ -1,0 +1,7 @@
+.sky-toast.is-error {
+  border-color: rgba(241, 94, 108, 0.45);
+}
+
+.sky-toast.is-error strong {
+  color: var(--color-danger);
+}

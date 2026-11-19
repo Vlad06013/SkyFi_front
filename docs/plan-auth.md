@@ -159,96 +159,96 @@ cypress. `tests/unit/setup.ts` подключён в vite.config, но
 
 ## Этап 0 — Фундамент: HTTP, сессия, онлайн, сплэш
 
-- [ ] 0.1 `tests/unit/setup.ts` — создать (пока пустой +
+- [x] 0.1 `tests/unit/setup.ts` — создать (пока пустой +
       глобальные афтер-каждые: сброс моков и таймеров).
-- [ ] 0.2 `.env` по `env_example` (в .gitignore;
+- [x] 0.2 `.env` по `env_example` (в .gitignore;
       `VITE_API_URL=http://192.168.8.33:8080/api/v1/skyfy/`).
       В `vite.config.ts` — dev-proxy `/api →
       http://192.168.8.33:8080` (changeOrigin) против CORS
       для `npm run dev`.
-- [ ] 0.3 `src/api/http.ts`: axios-инстанс (baseURL
+- [x] 0.3 `src/api/http.ts`: axios-инстанс (baseURL
       `import.meta.env.VITE_API_URL`, timeout 15s), реквест-
       интерсептор с Bearer из `lib/session`, распаковка
       `data`, `ApiError { status, kind, message, fields? }`
       (kind: auth/validation/not-found/rate-limit/server/
       network), экспорт `onUnauthorized(cb)` + реэкспорт
       типа `ApiResponse` из types.
-- [ ] 0.4 `src/lib/session.ts`: `getToken/setToken/clear`
+- [x] 0.4 `src/lib/session.ts`: `getToken/setToken/clear`
       поверх `@capacitor/preferences` (ключ `skyfi.token`).
-- [ ] 0.5 `src/api/health.ts` — `checkHealth(): Promise<boolean>`
+- [x] 0.5 `src/api/health.ts` — `checkHealth(): Promise<boolean>`
       (GET `health` с таймаутом 5 с; true только на 200;
       любой сбой молча → false).
-- [ ] 0.6 `src/stores/online.ts` — `isOnline: boolean | null`
+- [x] 0.6 `src/stores/online.ts` — `isOnline: boolean | null`
       (null = ещё не знаем), `startPolling()/stopPolling()`:
       первая проверка сразу, далее раз в 10 с; на нативе
       пауза/возобновление по appStateChange (@capacitor/app).
-- [ ] 0.7 Сплэш: статичный в `index.html` (чёрный фон,
+- [x] 0.7 Сплэш: статичный в `index.html` (чёрный фон,
       inline SVG знака, «SkyFi») + `src/components/AppSplash/`
       (.vue/.ts/.css по §2.1) — тот же вид, живёт до
       `phase === 'ready'`.
-- [ ] 0.8 `src/stores/app.ts` — `phase: 'splash' | 'ready'`,
+- [x] 0.8 `src/stores/app.ts` — `phase: 'splash' | 'ready'`,
       `bootstrap()` по матрице из «Зафиксированных решений»;
       promise бутстрэпа кладём в модуль, гвард его ждёт.
-- [ ] 0.9 `src/main.ts` + `src/App.vue`: mount сразу со
+- [x] 0.9 `src/main.ts` + `src/App.vue`: mount сразу со
       сплэшем, запуск bootstrap и поллера; `App.vue` рисует
       `AppSplash`, пока не ready, затем роутер.
-- [ ] 0.10 Тесты слоёв 1–3 и 5 (http, session, health,
+- [x] 0.10 Тесты слоёв 1–3 и 5 (http, session, health,
       online, bootstrap) + 6 (гвард).
-- [ ] 0.11 Критерий: `vitest run` зелёный, build+lint ок;
+- [x] 0.11 Критерий: `vitest run` зелёный, build+lint ок;
       ручной прогон: чистый профиль браузера → сплэш →
       login; с токеном → home; бэк выключен → сплэш ≤5с →
       login с баннером.
 
 ## Этап 1 — Стор авторизации
 
-- [ ] 1.1 `npm i @capacitor/preferences` (+ `npx cap sync`
+- [x] 1.1 `npm i @capacitor/preferences` (+ `npx cap sync`
       в конце этапа для APK).
-- [ ] 1.2 Реворк `src/stores/auth.ts`: состояние
+- [x] 1.2 Реворк `src/stores/auth.ts`: состояние
       `user/token/isAuthed/restoring`; действия
       `login/register/logout/restoreSession/rename/
       setAvatar/removeAvatar`; мок-импорты удалены.
       `restoreSession` работает по команде bootstrap
       (онлайн-ветка) и не дёргает сеть в офлайне.
-- [ ] 1.3 `main.ts`: регистрация 401-колбека →
+- [x] 1.3 `main.ts`: регистрация 401-колбека →
       `auth.reset()` + `router.replace('/login')`.
-- [ ] 1.4 Тесты слоя 4 (стор).
-- [ ] 1.5 Критерий: bootstrap-матрица целиком руками:
+- [x] 1.4 Тесты слоя 4 (стор).
+- [x] 1.5 Критерий: bootstrap-матрица целиком руками:
       онлайн+токен → home; онлайн без токена → login;
       офлайн+токен → home; офлайн без токена → login
       с баннером.
 
 ## Этап 2 — Экраны входа (`src/pages/Login/`)
 
-- [ ] 2.1 `src/api/auth.ts`: `login/register/forgotPassword/
+- [x] 2.1 `src/api/auth.ts`: `login/register/forgotPassword/
       resetPassword/fetchUser/logout/updateProfile` (§3 api.md),
       тела ровно по контракту.
-- [ ] 2.2 `Login.ts`: submitLogin → стор, loading, redirect
+- [x] 2.2 `Login.ts`: submitLogin → стор, loading, redirect
       из `route.query.redirect ?? '/home'`; submitRegister с
       полем «Ещё раз» (`password_confirmation`) — в форме
       его нет, добавить; отправка кода; reset с реальным
       полем ввода кода вместо фейкового `ym-code`-ярлыка.
-- [ ] 2.3 Ошибки 422: `.field.is-error` + текст под полем;
+- [x] 2.3 Ошибки 422: `.field.is-error` + текст под полем;
       429/5xx/сеть → тост-стор. Расширить `stores/toast.ts`
       до `{ title, who?, error?: boolean }` (красный вид —
       стиль добавить в kit.css обеих копий). Офлайн-баннер
       и блок сабмита по `stores/online.ts`.
-- [ ] 2.4 Убрать префилл `vlad@mail.ru` и прочие следы мока.
-- [ ] 2.5 Тесты слоя 7 (Login-страница).
-- [ ] 2.6 Критерий: полный флоу регистрации/входа/сброса
+- [x] 2.4 Убрать префилл `vlad@mail.ru` и прочие следы мока.
+- [x] 2.5 Тесты слоя 7 (Login-страница).
+- [x] 2.6 Критерий: полный флоу регистрации/входа/сброса
       против живого бэка руками + юниты зелёные.
 
 ## Этап 3 — Профиль (Settings)
 
-- [ ] 3.1 `api/auth.ts`: `uploadAvatar` (PUT, multipart
+- [x] 3.1 `api/auth.ts`: `uploadAvatar` (PUT, multipart
       `FormData`), `deleteAvatar`.
-- [ ] 3.2 Шит имени → `updateProfile` (PATCH); аватар →
+- [x] 3.2 Шит имени → `updateProfile` (PATCH); аватар →
       upload; сброс аватара → delete; после успеха —
       свежий `fetchUser` в стор.
-- [ ] 3.3 Кнопка выхода → `logout()` стора (API + очистка)
+- [x] 3.3 Кнопка выхода → `logout()` стора (API + очистка)
       → редирект на `/login`.
-- [ ] 3.4 Тесты: стор (rename/avatar/removeAvatar/logout)
+- [x] 3.4 Тесты: стор (rename/avatar/removeAvatar/logout)
       + компонент Settings (сабмиты, превью).
-- [ ] 3.5 Критерий: профиль меняется на бэке, отражается
+- [x] 3.5 Критерий: профиль меняется на бэке, отражается
       после перезапуска приложения.
 
 ## Этап 4 — QR-вход
@@ -256,38 +256,38 @@ cypress. `tests/unit/setup.ts` подключён в vite.config, но
 Типы и формы зафиксированы в `contracts.md` (раздел
 «QR-вход», проверены curl'ом) — блокер снят.
 
-- [ ] 4.1 Перенести QR-типы (`QrStartPayload`, `QrStatusPayload`,
+- [x] 4.1 Перенести QR-типы (`QrStartPayload`, `QrStatusPayload`,
       `QrConfirmPayload`) в `src/types/api.ts`;
       `src/api/qr.ts` (start/status/confirm).
-- [ ] 4.2 Режим `qr` на Login: старт → рендерим `qr_svg` из
+- [x] 4.2 Режим `qr` на Login: старт → рендерим `qr_svg` из
       ответа как есть (бэк отдаёт готовый SVG, своей
       генерации и библиотеки `qrcode` не нужно), поллинг
       `status` раз в 2 с (fake-timers в тестах), confirmed →
       применяем `{token, user}` → `/home`; 404/истёк →
       «Обновить QR». Остановка поллинга на уходе с режима.
-- [ ] 4.3 Роут `/qr-confirm` (requiresAuth, вне табов):
+- [x] 4.3 Роут `/qr-confirm` (requiresAuth, вне табов):
       экран по макету `design/phone/qr.html` — «вход на
       другое устройство», кнопка «Подтвердить» → confirm →
       тост; уже подтверждён/истёк — понятное состояние.
       Прямой заход без `?code=` — редирект на home.
-- [ ] 4.4 Тесты слоя 7 для обоих экранов (поллинг, таймеры,
+- [x] 4.4 Тесты слоя 7 для обоих экранов (поллинг, таймеры,
       подтверждение), контрактные для qr.ts.
-- [ ] 4.5 Критерий: флоу с двумя браузерами — А показывает
+- [x] 4.5 Критерий: флоу с двумя браузерами — А показывает
       QR, Б по ссылке подтверждает → А залогинен.
 
 ## Финал этапа
 
-- [ ] 5.1 e2e-спеки cypress (слой 8): регистрация → вход →
-      выход → редирект; 401-инвалидация; сплэш → home/login.
-      QR и reset — ручной прогон (зависит от бэка).
-- [ ] 5.2 `npx cap sync` + сборка APK, дымовой прогон на
-      устройстве: сплэш, регистрация, восстановление сессии
-      после перезапуска приложения, офлайн-баннер в
-      авиарежиме.
-- [ ] 5.3 Обновить `docs/status.md` (авторизация ✅,
-      инфраструктура: api-клиент ✅, сессия ✅, онлайн-детект
-      ✅, сплэш ✅, тесты ✅), закрыть пункты в этом плане,
-      `unthoughtout.md` — снять решённые вопросы.
+- [x] 5.1 e2e-спеки cypress (слой 8) — 5 спек против живого бэка:
+      гвард/redirect, регистрация → вход → выход, сессия переживает
+      reload, 401-инвалидация (интерсепт), QR-флоу двумя сторонами
+      (ТВ показывает QR, «телефон» подтверждает `cy.request`). Все
+      зелёные. Осторожно: dev-бэк троттлит login/register 6/мин на
+      IP — прогоны вплотную флакают 429, ждать ~минуту между прогонами.
+- [~] 5.2 `npx cap sync android` — сделан (preferences в нативе);
+      **сборка APK (`build_apk.sh`) и дымовой прогон на устройстве —
+      за Владом**: сплэш, регистрация, восстановление сессии после
+      перезапуска приложения, офлайн-баннер в авиарежиме.
+- [x] 5.3 `docs/status.md` обновлён, чекбоксы закрыты.
 
 ## Открытые вопросы (к бэку)
 
@@ -299,3 +299,20 @@ cypress. `tests/unit/setup.ts` подключён в vite.config, но
 - [x] Dev-аккаунт не нужен — регистрируемся через UI
       (для curl-проверок заведён test@skyfi.app).
 - [x] Письма сброса — код вводится руками, почта не важна.
+
+## Итоги и дрейф плана (зафиксировано по факту)
+
+- **CORS**: dev-proxy из шага 0.2 не понадобился — бэк отдаёт
+  `Access-Control-Allow-Origin: *` и эхо разрешённых заголовков
+  (проверено preflight с `Authorization`). `.env` с абсолютным
+  URL работает и в dev, и для APK.
+- **Сессия** хранится как `{token, user}` одним JSON (`skyfi.session`)
+  — офлайн-вход по сохранённому профилю без `GET /user`.
+- **Роутер** стал фабрикой `createAppRouter()` — гвард вшит в
+  фабрику, юнит-тесты живут со своим роутером на тест.
+- **401**: интерсептор глушит сброс сессии, если в запросе не было
+  Authorization (неверный пароль при входе не рвёт сессию).
+- **QR**: бэк отдаёт готовый `qr_svg` — своя генерация не нужна;
+  кнопка «Войти по QR» в офлайне не disabled, а отвечает тостом.
+- **e2e-флак**: dev-троттлинг 6/мин на login/register — между
+  прогонами `cypress run` пауза ~минута.

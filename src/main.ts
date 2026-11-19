@@ -4,6 +4,10 @@ import { IonicVue } from '@ionic/vue';
 
 import App from './App.vue';
 import router from './router';
+import { onUnauthorized } from '@/api/http';
+import { useAuthStore } from '@/stores/auth';
+import { useAppStore } from '@/stores/app';
+import { useOnlineStore } from '@/stores/online';
 
 import '@ionic/vue/css/core.css';
 import '@ionic/vue/css/normalize.css';
@@ -16,11 +20,20 @@ import './styles/app.css';
 import './styles/adaptive.css';
 
 const app = createApp(App);
+const pinia = createPinia();
 
-app.use(createPinia());
+app.use(pinia);
 app.use(IonicVue, { mode: 'md' });
 app.use(router);
 
-router.isReady().then(() => {
-  app.mount('#app');
+onUnauthorized(() => {
+  const auth = useAuthStore(pinia);
+  void auth.reset().then(() => router.replace('/login'));
+});
+
+app.mount('#app');
+
+const appStore = useAppStore(pinia);
+void appStore.bootstrap().finally(() => {
+  void useOnlineStore(pinia).startPolling();
 });

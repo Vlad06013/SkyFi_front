@@ -22,6 +22,7 @@ export default defineComponent({
     const sheet = ref<'name' | 'download' | null>(null);
     const draft = ref(user.value?.name ?? '');
     const avatarInput = ref<HTMLInputElement | null>(null);
+    const avatarBusy = ref(false);
     const appLatest = ref(false);
     const downloadedGb = ref(1.2);
     const builds = [
@@ -36,20 +37,34 @@ export default defineComponent({
     }
 
     function pickAvatar() {
+      if (avatarBusy.value) return;
       avatarInput.value?.click();
     }
 
-    function onAvatarPicked() {
+    async function onAvatarPicked() {
       const file = avatarInput.value?.files?.[0];
       if (!file) return;
-      auth.setAvatar(URL.createObjectURL(file));
-      toast.show('Фото', 'обновлено');
+      avatarBusy.value = true;
+      try {
+        await auth.uploadAvatar(file);
+        toast.show('Фото', 'обновлено');
+      } catch (error) {
+        toast.show(error instanceof Error ? error.message : 'Не удалось загрузить фото', '', true);
+      } finally {
+        avatarBusy.value = false;
+        if (avatarInput.value) avatarInput.value.value = '';
+      }
     }
 
-    function saveName() {
+    async function saveName() {
       const name = draft.value.trim();
-      if (name) auth.rename(name);
-      sheet.value = null;
+      if (!name) return;
+      try {
+        await auth.rename(name);
+        sheet.value = null;
+      } catch (error) {
+        toast.show(error instanceof Error ? error.message : 'Не удалось сохранить имя', '', true);
+      }
     }
 
     function updateApp() {
@@ -67,9 +82,9 @@ export default defineComponent({
       toast.show('Скачанное', 'очищено');
     }
 
-    function logout() {
-      auth.logout();
-      router.push('/login');
+    async function logout() {
+      await auth.logout();
+      await router.replace('/login');
     }
 
     return {
@@ -78,6 +93,7 @@ export default defineComponent({
       sheet,
       draft,
       avatarInput,
+      avatarBusy,
       appLatest,
       downloadedGb,
       builds,

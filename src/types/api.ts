@@ -31,12 +31,19 @@ export interface AuthUser {
   id: number;
   name: string;
   email: string;
-  avatar: string | null;
+  /** Проверено curl'ом: бэк отдаёт avatar_url (не avatar). */
+  avatar_url: string | null;
 }
 
 export interface AuthPayload {
   user: AuthUser;
   token: string;
+}
+
+/** data ответа GET /health (api.md §1.4). */
+export interface HealthPayload {
+  status: 'ok';
+  server_time: string;
 }
 
 export interface PlayerDevice {
@@ -119,4 +126,30 @@ export interface PlaylistPayload {
 export interface WavePayload {
   batch_id: string;
   tracks: TrackSnapshot[];
+}
+
+/* QR-вход (api.md §3, формы проверены curl'ом). */
+
+export interface QrStartPayload {
+  code: string;
+  /** Абсолютный срок жизни кода, ISO 8601 UTC (~15 мин). */
+  expires_at: string;
+  /** Готовый QR в SVG — рендерим как есть, не генерируем. */
+  qr_svg: string;
+}
+
+export type QrStatusValue = 'pending' | 'confirmed';
+
+/** data ответа GET /qr-login/{code} (поллинг ТВ). */
+export interface QrStatusPayload {
+  status: QrStatusValue;
+  /** Заполнены только при confirmed. */
+  token: string | null;
+  /** Полная модель; нужны id/name/email/avatar_url. */
+  user: (AuthUser & Record<string, unknown>) | null;
+}
+
+/** data ответа POST /qr-login/confirm. */
+export interface QrConfirmPayload {
+  status: 'confirmed';
 }

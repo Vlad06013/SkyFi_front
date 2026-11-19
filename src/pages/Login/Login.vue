@@ -18,13 +18,26 @@
         </div>
       </div>
 
+      <div v-if="isOffline" class="auth-offline">
+        <span>Нет соединения с сервером</span>
+        <button class="link" type="button" @click="retry">Повторить</button>
+      </div>
+
       <form v-if="mode === 'login'" class="auth-form" @submit.prevent="submitLogin">
         <label>Email</label>
-        <div class="field"><input v-model="email" type="email" /></div>
+        <div class="field" :class="{ 'is-error': fieldMessage('email') }">
+          <input v-model="email" type="email" autocomplete="email" />
+        </div>
+        <div v-if="fieldMessage('email')" class="field-err">{{ fieldMessage('email') }}</div>
         <label>Пароль</label>
-        <div class="field"><input v-model="password" type="password" placeholder="••••••••" /></div>
-        <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center;margin-top:8px">Войти</button>
-        <button class="btn btn-ghost" type="button" style="width:100%;justify-content:center" @click="mode = 'qr'">
+        <div class="field" :class="{ 'is-error': fieldMessage('password') }">
+          <input v-model="password" type="password" autocomplete="current-password" placeholder="••••••••" />
+        </div>
+        <div v-if="fieldMessage('password')" class="field-err">{{ fieldMessage('password') }}</div>
+        <button class="btn btn-primary" type="submit" :disabled="pending || isOffline" style="width:100%;justify-content:center;margin-top:8px">
+          {{ pending ? 'Входим…' : 'Войти' }}
+        </button>
+        <button class="btn btn-ghost" type="button" @click="switchMode('qr')">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
             <rect x="3" y="3" width="7" height="7" rx="1" />
             <rect x="14" y="3" width="7" height="7" rx="1" />
@@ -35,53 +48,91 @@
         </button>
       </form>
       <div v-if="mode === 'login'" class="auth-links">
-        Нет аккаунта? <button class="link" type="button" @click="mode = 'register'">Создать</button><br>
-        <button class="link" type="button" @click="mode = 'forgot'">забыл пароль</button>
+        Нет аккаунта? <button class="link" type="button" @click="switchMode('register')">Создать</button><br>
+        <button class="link" type="button" @click="switchMode('forgot')">забыл пароль</button>
       </div>
 
       <form v-else-if="mode === 'register'" class="auth-form" @submit.prevent="submitRegister">
         <label>Имя</label>
-        <div class="field"><input v-model="name" placeholder="как к вам обращаться" /></div>
+        <div class="field" :class="{ 'is-error': fieldMessage('name') }">
+          <input v-model="name" placeholder="как к вам обращаться" autocomplete="name" />
+        </div>
+        <div v-if="fieldMessage('name')" class="field-err">{{ fieldMessage('name') }}</div>
         <label>Email</label>
-        <div class="field"><input v-model="email" type="email" /></div>
+        <div class="field" :class="{ 'is-error': fieldMessage('email') }">
+          <input v-model="email" type="email" autocomplete="email" />
+        </div>
+        <div v-if="fieldMessage('email')" class="field-err">{{ fieldMessage('email') }}</div>
         <label>Пароль</label>
-        <div class="field"><input v-model="password" type="password" placeholder="минимум 8" /></div>
-        <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center;margin-top:8px">Создать</button>
+        <div class="field" :class="{ 'is-error': fieldMessage('password') }">
+          <input v-model="password" type="password" autocomplete="new-password" placeholder="минимум 8" />
+        </div>
+        <div v-if="fieldMessage('password')" class="field-err">{{ fieldMessage('password') }}</div>
+        <label>Ещё раз</label>
+        <div class="field" :class="{ 'is-error': fieldMessage('password_confirmation') }">
+          <input v-model="passwordConfirmation" type="password" autocomplete="new-password" placeholder="••••••••" />
+        </div>
+        <div v-if="fieldMessage('password_confirmation')" class="field-err">{{ fieldMessage('password_confirmation') }}</div>
+        <button class="btn btn-primary" type="submit" :disabled="pending || isOffline" style="width:100%;justify-content:center;margin-top:8px">
+          {{ pending ? 'Создаём…' : 'Создать' }}
+        </button>
       </form>
       <div v-if="mode === 'register'" class="auth-links">
-        Уже есть? <button class="link" type="button" @click="mode = 'login'">Войти</button>
+        Уже есть? <button class="link" type="button" @click="switchMode('login')">Войти</button>
       </div>
 
       <form v-else-if="mode === 'forgot'" class="auth-form" @submit.prevent="sendCode">
         <label>Email</label>
-        <div class="field is-focus"><input v-model="email" type="email" /></div>
-        <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center;margin-top:8px">Отправить код</button>
+        <div class="field" :class="{ 'is-error': fieldMessage('email') }">
+          <input v-model="email" type="email" autocomplete="email" />
+        </div>
+        <div v-if="fieldMessage('email')" class="field-err">{{ fieldMessage('email') }}</div>
+        <button class="btn btn-primary" type="submit" :disabled="pending || isOffline" style="width:100%;justify-content:center;margin-top:8px">
+          {{ pending ? 'Отправляем…' : 'Отправить код' }}
+        </button>
       </form>
       <div v-if="mode === 'forgot'" class="auth-links">
-        <button class="link" type="button" @click="mode = 'login'">Назад ко входу</button>
+        <button class="link" type="button" @click="switchMode('login')">Назад ко входу</button>
       </div>
 
-      <form v-else-if="mode === 'reset'" class="auth-form" @submit.prevent="resetPassword">
-        <div class="ym-code is-input">
-          <div class="track-meta">
-            <div class="l">Код из письма</div>
-            <div class="n">{{ code }}<span class="caret" /></div>
-          </div>
+      <form v-else-if="mode === 'reset'" class="auth-form" @submit.prevent="submitReset">
+        <div class="reset-hint">Код отправлен на <b>{{ resetEmail }}</b></div>
+        <label>Код из письма</label>
+        <div class="field" :class="{ 'is-error': fieldMessage('code') }">
+          <input v-model="code" inputmode="numeric" autocomplete="one-time-code" placeholder="цифры из письма" />
         </div>
+        <div v-if="fieldMessage('code')" class="field-err">{{ fieldMessage('code') }}</div>
         <label>Новый пароль</label>
-        <div class="field"><input type="password" placeholder="минимум 8" /></div>
+        <div class="field" :class="{ 'is-error': fieldMessage('password') }">
+          <input v-model="password" type="password" autocomplete="new-password" placeholder="минимум 8" />
+        </div>
+        <div v-if="fieldMessage('password')" class="field-err">{{ fieldMessage('password') }}</div>
         <label>Ещё раз</label>
-        <div class="field"><input type="password" placeholder="••••••••" /></div>
-        <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center;margin-top:8px">Сменить пароль</button>
+        <div class="field" :class="{ 'is-error': fieldMessage('password_confirmation') }">
+          <input v-model="passwordConfirmation" type="password" autocomplete="new-password" placeholder="••••••••" />
+        </div>
+        <div v-if="fieldMessage('password_confirmation')" class="field-err">{{ fieldMessage('password_confirmation') }}</div>
+        <button class="btn btn-primary" type="submit" :disabled="pending || isOffline" style="width:100%;justify-content:center;margin-top:8px">
+          {{ pending ? 'Меняем…' : 'Сменить пароль' }}
+        </button>
       </form>
 
       <template v-else-if="mode === 'qr'">
-        <div class="qr-box"><div class="qr-fake" /></div>
-        <div class="empty" style="padding-top:8px">
+        <div v-if="qrPhase === 'starting'" class="empty" style="padding-top:24px">
+          <div class="es">Получаем код…</div>
+        </div>
+        <div v-else-if="qrPhase === 'polling' && qrSvg" class="qr-box" v-html="qrSvg" />
+        <div v-if="qrPhase === 'expired'" class="empty" style="padding-top:8px">
+          <div class="es">Код устарел — запросите новый.</div>
+          <button class="btn btn-primary" type="button" style="width:100%;justify-content:center;margin-top:12px" @click="startQr">
+            Обновить QR
+          </button>
+        </div>
+        <div v-else-if="qrPhase === 'polling'" class="empty" style="padding-top:8px">
           <div class="es">На другом устройстве откройте SkyFi и наведите камеру.</div>
         </div>
         <div class="auth-links">
-          <button class="link" type="button" @click="mode = 'login'">Войти по email</button>
+          <button class="link" type="button" @click="switchMode('login')">Войти по email</button>
         </div>
       </template>
     </div>
@@ -89,3 +140,5 @@
 </template>
 
 <script src="./Login.ts" lang="ts"></script>
+
+<style scoped src="./Login.css"></style>
