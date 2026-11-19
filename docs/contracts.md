@@ -281,6 +281,32 @@ export interface YandexImportProgressPayload {
 }
 ```
 
+## Загрузки (api.md §15)
+
+Свои файлы — треки с `source_type: "upload"`; `{id}` в путях —
+`source_id` снапшота.
+
+```ts
+/** data ответа GET /uploads — список своих загрузок. */
+export type UploadsPayload = TrackSnapshot[];
+
+/** data ответа POST /uploads — созданная загрузка (форма — TrackSnapshot). */
+export type UploadPayload = TrackSnapshot;
+
+/** Патч метаданных PATCH /uploads/{id}: все поля опциональны. */
+export interface UploadPatch {
+  title?: string;
+  artist_names?: string[];
+  album_title?: string;
+  lyrics?: string | null;
+  visibility?: Visibility;
+}
+```
+
+`POST /uploads` — multipart: `audio` (файл), `title`,
+`artist_names[]`, `album_title` (опционально). Поток файла:
+`GET /uploads/{id}/stream` (постоянная ссылка, качается и для офлайна).
+
 ## Потоки
 
 ```ts

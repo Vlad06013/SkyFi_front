@@ -130,6 +130,23 @@ export interface WavePayload {
   tracks: TrackSnapshot[];
 }
 
+/* Загрузки (api.md §15) */
+
+/** data ответа GET /uploads — список своих загрузок. */
+export type UploadsPayload = TrackSnapshot[];
+
+/** data ответа POST /uploads — созданная загрузка (форма — TrackSnapshot). */
+export type UploadPayload = TrackSnapshot;
+
+/** Патч метаданных PATCH /uploads/{id}: все поля опциональны. */
+export interface UploadPatch {
+  title?: string;
+  artist_names?: string[];
+  album_title?: string;
+  lyrics?: string | null;
+  visibility?: Visibility;
+}
+
 /* QR-вход (api.md §3, формы проверены curl'ом). */
 
 export interface QrStartPayload {

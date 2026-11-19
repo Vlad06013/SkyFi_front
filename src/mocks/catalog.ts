@@ -138,20 +138,6 @@ export const favoriteTracks: TrackSnapshot[] = [
   trackFatLip,
 ];
 
-export const trackOwnDemo: TrackSnapshot = {
-  type: 'track',
-  source_type: 'upload',
-  source_id: 'up-2',
-  title: 'Демо на диване',
-  duration_ms: 187000,
-  cover_url: null,
-  artists: [{ name: 'Я' }],
-  album: null,
-  stream_url: '/local/demo.mp3',
-};
-
-export const uploadedTracks: TrackSnapshot[] = [trackColonel, trackOwnDemo];
-
 export const downloadedTracks: TrackSnapshot[] = [trackRadio, trackColonel, trackFatLip];
 
 /** Контент «В дорогу»: треки + один клип, чтобы проверить смешанный список. */

@@ -337,7 +337,8 @@ websocket-ивентах `friendship.request.sent` / `friendship.request.accepte
 ## 15. Загрузки (`/uploads`)
 
 Свои файлы: `POST /` multipart `{audio (mp3/flac/...), title,
-artist_names: [..]}` → upload; `GET /` — список; `PATCH /{id}`
+artist_names: [..], album_title?}` → upload; `GET /` — список;
+`PATCH /{id}`
 — мета (title, artist_names, album_title, lyrics, visibility);
 `DELETE /{id}`; `GET /{id}/stream` — поток файла (постоянная
 ссылка, качается и для офлайна).

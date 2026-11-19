@@ -8,6 +8,8 @@ export interface UploadDraft {
   artists: string;
   album: string;
   visibility: Visibility;
+  /** null — файл не меняется (режим редактирования меты). */
+  file: File | null;
 }
 
 export default defineComponent({
@@ -18,6 +20,8 @@ export default defineComponent({
     initialAlbum: { type: String, default: '' },
     initialVisibility: { type: String as PropType<Visibility>, default: 'public' },
     submitLabel: { type: String, default: 'Загрузить' },
+    /** Редактирование меты: файл не требуем и не шлём. */
+    requireFile: { type: Boolean, default: true },
   },
   emits: ['upload'],
   setup(props, { emit }) {
@@ -30,6 +34,10 @@ export default defineComponent({
     const titleFocus = ref(false);
     const artistFocus = ref(false);
     const albumFocus = ref(false);
+    const fileInput = ref<HTMLInputElement | null>(null);
+    const pickedFile = ref<File | null>(null);
+
+    const fileName = computed(() => pickedFile.value?.name ?? '');
 
     const visibilityLabel = computed(
       () => visibilityOptions.find((option) => option.value === visibility.value)?.label ?? '',
@@ -41,7 +49,14 @@ export default defineComponent({
     }
 
     function pickFile() {
-      toast.show('Выбор файла', 'появится с бэком · mp3, flac, wav, m4a');
+      fileInput.value?.click();
+    }
+
+    function onFilePicked(event: Event) {
+      const input = event.target as HTMLInputElement;
+      const file = input.files?.[0] ?? null;
+      if (file) pickedFile.value = file;
+      input.value = '';
     }
 
     function submit() {
@@ -50,16 +65,22 @@ export default defineComponent({
         toast.show('Название', 'укажите, как называется трек');
         return;
       }
+      if (props.requireFile && !pickedFile.value) {
+        toast.show('Файл', 'выберите аудиофайл');
+        return;
+      }
       emit('upload', {
         title: name,
         artists: artists.value,
         album: album.value,
         visibility: visibility.value,
+        file: pickedFile.value,
       } satisfies UploadDraft);
       title.value = '';
       artists.value = '';
       album.value = '';
       visibility.value = 'public';
+      pickedFile.value = null;
     }
 
     return {
@@ -73,8 +94,12 @@ export default defineComponent({
       titleFocus,
       artistFocus,
       albumFocus,
+      fileInput,
+      pickedFile,
+      fileName,
       pickVisibility,
       pickFile,
+      onFilePicked,
       submit,
     };
   },

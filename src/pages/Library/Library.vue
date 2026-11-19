@@ -193,6 +193,7 @@
         :initial-artists="editingUpload ? artistsLine(editingUpload.artists) : ''"
         :initial-album="editingUpload?.album?.title ?? ''"
         :initial-visibility="editingUpload?.visibility ?? 'public'"
+        :require-file="!editingUpload"
         :submit-label="editingUpload ? 'Сохранить' : 'Загрузить'"
         @upload="editingUpload ? saveUpload($event) : onUpload($event)"
       />

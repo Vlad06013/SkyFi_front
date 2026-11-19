@@ -13,11 +13,9 @@ import type { UploadDraft } from '@/components/UploadForm/UploadForm';
 import { sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
 import { plural } from '@/lib/plural';
 import { artistsLine, trackCover } from '@/lib/cover';
-import {
-  uploadedTracks,
-} from '@/mocks/catalog';
 import { usePlayerStore } from '@/stores/player';
 import { useFavoritesStore } from '@/stores/favorites';
+import { useUploadsStore } from '@/stores/uploads';
 import { useDownloadsStore } from '@/stores/downloads';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
@@ -53,7 +51,8 @@ export default defineComponent({
     const uploadOpen = ref(false);
     const editing = ref<PlaylistSnapshot | null>(null);
     const editingUpload = ref<TrackSnapshot | null>(null);
-    const uploads = ref<TrackSnapshot[]>([...uploadedTracks]);
+    const uploadsStore = useUploadsStore();
+    const { items: uploads } = storeToRefs(uploadsStore);
     const downloads = useDownloadsStore();
     const downloaded = computed(() => downloads.items);
 
@@ -73,8 +72,12 @@ export default defineComponent({
       },
       onDelete: (item) => {
         if (item.snapshot?.type === 'track' && item.snapshot.source_type === 'upload') {
-          uploads.value = uploads.value.filter((track) => track.source_id !== item.sourceId);
-          toast.show(item.title, 'загрузка удалена');
+          void uploadsStore
+            .remove(item.sourceId)
+            .then(() => toast.show(item.title, 'загрузка удалена'))
+            .catch((error: unknown) => {
+              toast.show(error instanceof Error ? error.message : 'Не удалось удалить', '', true);
+            });
           return;
         }
         if (item.snapshot) {
@@ -192,53 +195,56 @@ export default defineComponent({
       editing.value = null;
     }
 
-    function onUpload(draft: UploadDraft) {
-      const track: TrackSnapshot = {
-        type: 'track',
-        source_type: 'upload',
-        source_id: `up-${Date.now()}`,
-        title: draft.title,
-        duration_ms: null,
-        cover_url: null,
-        artists: draft.artists
-          .split(',')
-          .map((name) => ({ name: name.trim() }))
-          .filter((artist) => artist.name),
-        album: draft.album.trim() ? { title: draft.album.trim() } : null,
-        stream_url: null,
-        visibility: draft.visibility,
-      };
-      uploads.value = [track, ...uploads.value];
-      uploadOpen.value = false;
-      const visibilityHint: Record<Visibility, string> = {
+    function splitArtists(value: string): string[] {
+      return value
+        .split(',')
+        .map((name) => name.trim())
+        .filter(Boolean);
+    }
+
+    function visibilityHint(visibility: Visibility): string {
+      const hints: Record<Visibility, string> = {
         public: 'видят все',
         friends: 'видят друзья',
         private: 'только вы',
       };
-      toast.show(track.title, `загружено · ${visibilityHint[draft.visibility]}`);
+      return hints[visibility];
     }
 
-    function saveUpload(draft: UploadDraft) {
+    async function onUpload(draft: UploadDraft) {
+      if (!draft.file) {
+        toast.show('Файл', 'выберите аудиофайл', true);
+        return;
+      }
+      try {
+        await uploadsStore.add(draft.file, {
+          title: draft.title,
+          artistNames: splitArtists(draft.artists),
+          albumTitle: draft.album.trim(),
+        });
+        uploadOpen.value = false;
+        toast.show(draft.title, `загружено · ${visibilityHint(draft.visibility)}`);
+      } catch (error) {
+        toast.show(error instanceof Error ? error.message : 'Не удалось загрузить', '', true);
+      }
+    }
+
+    async function saveUpload(draft: UploadDraft) {
       const current = editingUpload.value;
       if (!current) return;
-      const album = draft.album.trim();
-      uploads.value = uploads.value.map((track) =>
-        track.source_id === current.source_id
-          ? {
-              ...track,
-              title: draft.title,
-              artists: draft.artists
-                .split(',')
-                .map((name) => ({ name: name.trim() }))
-                .filter((artist) => artist.name),
-              album: album ? { title: album } : null,
-              visibility: draft.visibility,
-            }
-          : track,
-      );
-      editingUpload.value = null;
-      uploadOpen.value = false;
-      toast.show(draft.title, 'загрузка сохранена');
+      try {
+        await uploadsStore.update(current.source_id, {
+          title: draft.title,
+          artist_names: splitArtists(draft.artists),
+          album_title: draft.album.trim(),
+          visibility: draft.visibility,
+        });
+        editingUpload.value = null;
+        uploadOpen.value = false;
+        toast.show(draft.title, 'загрузка сохранена');
+      } catch (error) {
+        toast.show(error instanceof Error ? error.message : 'Не удалось сохранить', '', true);
+      }
     }
 
     function openUpload() {
