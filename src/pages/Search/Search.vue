@@ -46,7 +46,7 @@
         <div class="es">Поиск по каталогам работает только онлайн</div>
       </div>
 
-      <div v-else-if="loading && !result" class="search-loading">
+      <div v-else-if="loading && !result" class="loading-line">
         <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
           <circle cx="12" cy="12" r="8" opacity=".25" />
           <path d="M12 4a8 8 0 0 1 8 8" stroke-linecap="round" />
@@ -164,13 +164,13 @@
           <div class="es">Загляните в другие пилюли</div>
         </div>
 
-        <div v-if="loadingMore" class="search-loading">
+        <div v-if="loadingMore" class="loading-line">
           <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
             <circle cx="12" cy="12" r="8" opacity=".25" />
             <path d="M12 4a8 8 0 0 1 8 8" stroke-linecap="round" />
           </svg>
         </div>
-        <div v-else-if="sectionHasMore" ref="sentinel" class="search-sentinel" aria-hidden="true" />
+        <div v-else-if="sectionHasMore" ref="sentinel" class="more-sentinel" aria-hidden="true" />
         <div v-if="error && result" class="empty" style="padding-top:12px">
           <div class="et">{{ error }}</div>
           <button class="btn btn-secondary" type="button" style="margin-top:10px" @click="retry">Повторить</button>
@@ -197,4 +197,3 @@
 </template>
 
 <script src="./Search.ts" lang="ts"></script>
-<style scoped src="./Search.css"></style>

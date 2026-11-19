@@ -295,6 +295,23 @@ status: pending|playing_now|played|skipped, snapshot|null}`.
 | `DELETE /items` | `{<конверт playlist>, index}` |
 | `PATCH /items/reorder` | `{<конверт playlist>, order: [index...]}` |
 
+### Детали сущностей: `POST /details`
+
+Единая выдача деталей для `type` ∈ `album|artist|playlist`
+(проверено curl'ом). Тело — конверт снапшота
+(`type`, `source_type`, `source_id`; `title` необязателен — бэк
+резолвит сущность по паре источника) + `page`/`limit` (пагинация
+треков, как в поиске).
+
+Ответ — `{entity, tracks, albums}`:
+
+- `entity` — снапшот запрошенной сущности (полный: у album
+  `artists/year/track_count`, у playlist `owner_name/
+  item_count`, у artist `cover_url`);
+- `tracks` — `{items: [TrackSnapshot], total, has_more}`;
+- `albums` — `{items: [AlbumSnapshot], total, has_more}`
+  (наполнена у artist, у album/playlist пустая).
+
 ## 12. Друзья (`/friends`)
 
 | Метод/путь | Тело → Ответ |

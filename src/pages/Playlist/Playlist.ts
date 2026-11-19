@@ -1,59 +1,65 @@
-import { computed, defineComponent, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { computed, defineComponent } from 'vue';
 import AppBar from '@/components/AppBar/AppBar.vue';
 import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
 import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
+import { useEntityDetails } from '@/composables/useEntityDetails';
 import { coverVar, artistsLine, trackCover } from '@/lib/cover';
-import { playlistRoad, playlistRoadContent } from '@/mocks/catalog';
 import { usePlayerStore } from '@/stores/player';
 import { useFavoritesStore } from '@/stores/favorites';
 import { useToastStore } from '@/stores/toast';
-import type { AnySnapshot } from '@/types';
+import type { PlaylistSnapshot } from '@/types';
 
 export default defineComponent({
   name: 'PlaylistPage',
   components: { AppBar, MediaOverlays, SnapshotRow, SourceBadge },
   setup() {
-    const route = useRoute();
     const player = usePlayerStore();
     const favorites = useFavoritesStore();
     const toast = useToastStore();
-    const { open, items, top, right, sheet, entity, openSnapshotMenu, closeMenu, run } = useMediaMenu({
-      onDeletePlaylist: (item) => {
-        if (item.snapshot) removeFromPlaylist(item.snapshot);
-      },
-    });
+    const { entity, tracks, hasMore, loading, loadingMore, error, retry, loadMore, sentinel } =
+      useEntityDetails('playlist');
+    const playlist = computed(() => entity.value as PlaylistSnapshot | null);
 
-    const playlist = computed(
-      () => favorites.playlists.find((p) => p.source_id === route.params.id) ?? playlistRoad,
-    );
+    const own = computed(() => playlist.value?.source_type === 'skyfi');
+    const liked = computed(() => (playlist.value ? favorites.has(playlist.value) : false));
 
-    const own = computed(() => playlist.value.source_type === 'skyfi');
+    const { open, items, top, right, sheet, entity: menuEntity, openSnapshotMenu, closeMenu, run } =
+      useMediaMenu();
 
-    const contentById = ref<Record<string, AnySnapshot[]>>({
-      [playlistRoad.source_id]: [...playlistRoadContent],
-    });
-    const content = computed(() => contentById.value[String(route.params.id)] ?? []);
+    function playAll() {
+      const first = tracks.value[0];
+      if (first) player.playSnapshot(first);
+    }
 
-    function removeFromPlaylist(snapshot: AnySnapshot) {
-      const id = String(route.params.id);
-      const list = contentById.value[id];
-      if (!list) return;
-      contentById.value = {
-        ...contentById.value,
-        [id]: list.filter((item) => item.source_id !== snapshot.source_id),
-      };
-      toast.show(snapshot.title, 'удалено из плейлиста');
+    function toggleLike() {
+      const target = playlist.value;
+      if (!target) return;
+      favorites
+        .toggle(target)
+        .then((added) => toast.show(target.title, added ? 'добавлено в избранное' : 'убрано из избранного'))
+        .catch((cause: unknown) =>
+          toast.show(cause instanceof Error ? cause.message : 'Не удалось обновить избранное', '', true),
+        );
     }
 
     return {
       playlist,
+      tracks,
+      hasMore,
+      loading,
+      loadingMore,
+      error,
+      retry,
+      loadMore,
+      sentinel,
       own,
-      content,
+      liked,
       favorites,
       player,
+      playAll,
+      toggleLike,
       coverVar,
       artistsLine,
       trackCover,
@@ -63,7 +69,7 @@ export default defineComponent({
       top,
       right,
       sheet,
-      entity,
+      entity: menuEntity,
       closeMenu,
       run,
     };

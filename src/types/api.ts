@@ -111,6 +111,13 @@ export interface SearchPagePayload {
   videos: SearchSection<WithFavorite<VideoSnapshot>>;
 }
 
+/** data ответа POST /details (api.md §11): entity + секции; пагинация — по трекам. */
+export interface EntityDetailsPayload {
+  entity: AlbumSnapshot | ArtistSnapshot | PlaylistSnapshot;
+  tracks: SearchSection<TrackSnapshot>;
+  albums: SearchSection<AlbumSnapshot>;
+}
+
 /** data ответа GET /favorites без фильтра: вкладки по типам. Ключ videos всегда на месте (у Яндекса пусто). */
 export interface FavoritesPayload {
   tracks: TrackSnapshot[];

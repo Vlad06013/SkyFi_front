@@ -14,7 +14,7 @@ import { useFriendsStore } from '@/stores/friends';
 import { useFavoritesStore } from '@/stores/favorites';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
-import type { TrackSnapshot } from '@/types';
+import type { AlbumSnapshot, ArtistSnapshot, TrackSnapshot } from '@/types';
 
 type FavTab = 'tracks' | 'playlists' | 'artists' | 'albums';
 
@@ -68,12 +68,12 @@ export default defineComponent({
       if (snapshot) player.playSnapshot(snapshot);
     }
 
-    function openArtist(id: string) {
-      router.push(`/artist/${id}`);
+    function openArtist(artist: ArtistSnapshot) {
+      router.push(`/artist/${artist.source_type}/${artist.source_id}`);
     }
 
-    function openAlbum(id: string) {
-      router.push(`/album/${id}`);
+    function openAlbum(album: AlbumSnapshot) {
+      router.push(`/album/${album.source_type}/${album.source_id}`);
     }
 
     function removeFriend() {

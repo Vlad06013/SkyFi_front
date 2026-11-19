@@ -138,7 +138,7 @@
         :cover="artist.cover_url ?? ''"
         round
         :liked="favorites.has(artist)"
-        @open="openArtist(artist.source_id)"
+        @open="openArtist(artist)"
         @menu="openSnapshotMenu($event, artist, 'my-artists')"
       />
     </template>
@@ -152,7 +152,7 @@
         :source="album.source_type"
         :cover="album.cover_url ?? ''"
         :liked="favorites.has(album)"
-        @open="openAlbum(album.source_id)"
+        @open="openAlbum(album)"
         @menu="openSnapshotMenu($event, album, 'my-albums')"
       />
     </template>

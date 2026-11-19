@@ -285,6 +285,16 @@
 .spin { width: 16px; height: 16px; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* Центровой спиннер подгрузки и сентинел догрузки по прокрутке. */
+.loading-line {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0 8px;
+  color: var(--color-accent);
+}
+.loading-line .spin { width: 22px; height: 22px; }
+.more-sentinel { height: 48px; }
+
 .field {
   display: flex; align-items: center; gap: 8px;
   background: var(--color-surface-2);

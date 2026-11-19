@@ -250,7 +250,7 @@ export default defineComponent({
         return;
       }
       const paths = { album: '/album', artist: '/artist', playlist: '/playlist' } as const;
-      void router.push(`${paths[snapshot.type]}/${snapshot.source_id}`);
+      void router.push(`${paths[snapshot.type]}/${snapshot.source_type}/${snapshot.source_id}`);
     }
 
     async function onLike(entity: MenuEntity) {

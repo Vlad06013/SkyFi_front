@@ -87,7 +87,7 @@
         :subtitle="`${pl.item_count} · ${pl.owner_name}`"
         :source="pl.source_type"
         :cover="pl.cover_url ?? ''"
-        @open="openPlaylist(pl.source_id)"
+        @open="openPlaylist(pl)"
         @menu="openSnapshotMenu($event, pl, 'my-playlists', pl.owner_name ?? undefined)"
       />
     </template>
@@ -101,7 +101,7 @@
         :subtitle="`${artistsLine(album.artists)} · ${album.year}`"
         :source="album.source_type"
         :cover="album.cover_url ?? ''"
-        @open="openAlbum(album.source_id)"
+        @open="openAlbum(album)"
         @menu="openSnapshotMenu($event, album, 'my-albums')"
       />
     </template>
@@ -116,7 +116,7 @@
         :source="artist.source_type"
         :cover="artist.cover_url ?? ''"
         round
-        @open="openArtist(artist.source_id)"
+        @open="openArtist(artist)"
         @menu="openSnapshotMenu($event, artist, 'my-artists')"
       />
     </template>

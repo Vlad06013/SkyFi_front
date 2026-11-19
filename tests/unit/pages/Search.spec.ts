@@ -210,14 +210,14 @@ describe('pages/Search', () => {
     await typeAndSearch(wrapper, 'sum 41');
     await openSection(wrapper, 'Треки');
 
-    expect(wrapper.find('.search-sentinel').exists()).toBe(true);
+    expect(wrapper.find('.more-sentinel').exists()).toBe(true);
 
     vmLoadMore(wrapper);
     await flushPromises();
 
     expect(fetchMock).toHaveBeenLastCalledWith({ q: 'sum 41', limit: 20, page: 2 });
     expect(wrapper.findAll('.track-row')).toHaveLength(4);
-    expect(wrapper.find('.search-sentinel').exists()).toBe(false);
+    expect(wrapper.find('.more-sentinel').exists()).toBe(false);
   });
 
   it('ошибка первой страницы → блок с повтором; повтор догоняет выдачу', async () => {
@@ -277,7 +277,7 @@ describe('pages/Search', () => {
     await openSection(wrapper, 'Альбомы');
 
     await wrapper.find('.pl-row').trigger('click');
-    expect(routerMocks.push).toHaveBeenCalledWith('/album/al1');
+    expect(routerMocks.push).toHaveBeenCalledWith('/album/yandex_music/al1');
   });
 
   it('история подставляет запрос из чипа', async () => {

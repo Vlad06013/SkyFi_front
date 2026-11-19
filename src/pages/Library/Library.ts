@@ -20,7 +20,14 @@ import { useDownloadsStore } from '@/stores/downloads';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
 import { useLibraryTab, type LibraryTab } from '@/composables/useLibraryTab';
-import type { PlaylistSnapshot, TrackSnapshot, VideoSnapshot, Visibility } from '@/types';
+import type {
+  AlbumSnapshot,
+  ArtistSnapshot,
+  PlaylistSnapshot,
+  TrackSnapshot,
+  VideoSnapshot,
+  Visibility,
+} from '@/types';
 import type { MenuEntity } from '@/lib/media-menu';
 
 export default defineComponent({
@@ -140,9 +147,11 @@ export default defineComponent({
     }
 
     function listenCollection(item: MenuEntity) {
-      if (item.snapshot?.type === 'playlist') openPlaylist(item.sourceId);
-      else if (item.snapshot?.type === 'album') openAlbum(item.sourceId);
-      else if (item.snapshot?.type === 'artist') openArtist(item.sourceId);
+      const snapshot = item.snapshot;
+      if (!snapshot) return;
+      if (snapshot.type === 'playlist') openPlaylist(snapshot);
+      else if (snapshot.type === 'album') openAlbum(snapshot);
+      else if (snapshot.type === 'artist') openArtist(snapshot);
       player.playSnapshot(tracks.value[0]);
     }
 
@@ -161,8 +170,8 @@ export default defineComponent({
       });
     }
 
-    function openPlaylist(id: string) {
-      router.push(`/playlist/${id}`);
+    function openPlaylist(playlist: PlaylistSnapshot) {
+      router.push(`/playlist/${playlist.source_type}/${playlist.source_id}`);
     }
 
     function openCreate() {
@@ -254,12 +263,12 @@ export default defineComponent({
 
     const uploadTitle = computed(() => (editingUpload.value ? 'Изменить трек' : 'Загрузить трек'));
 
-    function openAlbum(id: string) {
-      router.push(`/album/${id}`);
+    function openAlbum(album: AlbumSnapshot) {
+      router.push(`/album/${album.source_type}/${album.source_id}`);
     }
 
-    function openArtist(id: string) {
-      router.push(`/artist/${id}`);
+    function openArtist(artist: ArtistSnapshot) {
+      router.push(`/artist/${artist.source_type}/${artist.source_id}`);
     }
 
     return {
