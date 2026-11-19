@@ -43,6 +43,15 @@ export default defineComponent({
       await nextTick();
       const element = document.getElementById('qr-reader');
       if (!element) return;
+
+      // Камера доступна только в secure context (https или localhost).
+      // По http://192.168.x.x mediaDevices отсутствует, и браузер даже не
+      // показывает запрос разрешения — падаем с понятной ошибкой сразу.
+      if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+        error.value = 'Камера доступна только по защищённому соединению (HTTPS). Откройте приложение по https-адресу или через приложение SkyFi.';
+        return;
+      }
+
       scanner = new Html5Qrcode(element.id);
       try {
         await scanner.start(
@@ -60,8 +69,22 @@ export default defineComponent({
         );
       } catch {
         await stop();
-        error.value = 'Не удалось открыть камеру. Разрешите доступ и попробуйте снова.';
+        error.value = await cameraErrorMessage();
       }
+    }
+
+    async function cameraErrorMessage(): Promise<string> {
+      // Отказ в настройках сайта — браузер не покажет запрос повторно,
+      // пока доступ не включить вручную.
+      try {
+        const status = await navigator.permissions?.query({ name: 'camera' as PermissionName });
+        if (status?.state === 'denied') {
+          return 'Доступ к камере заблокирован в настройках сайта. Включите его (значок замка в адресной строке) и нажмите «Повторить».';
+        }
+      } catch {
+        // Permissions API недоступен (WebView) — оставляем общее сообщение.
+      }
+      return 'Не удалось открыть камеру. Разрешите доступ и попробуйте снова.';
     }
 
     watch(
@@ -76,6 +99,6 @@ export default defineComponent({
       void stop();
     });
 
-    return { error };
+    return { error, retry: start };
   },
 });

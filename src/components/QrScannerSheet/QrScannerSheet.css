@@ -26,3 +26,7 @@
 .qr-scan-err {
   color: var(--color-danger);
 }
+
+.qr-scan .btn {
+  align-self: center;
+}
