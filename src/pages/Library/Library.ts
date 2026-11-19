@@ -56,7 +56,7 @@ export default defineComponent({
     const editingUpload = ref<TrackSnapshot | null>(null);
     const uploads = ref<TrackSnapshot[]>([...uploadedTracks]);
     const downloads = useDownloadsStore();
-    const downloaded = downloads.items;
+    const downloaded = computed(() => downloads.items);
 
     const { open, items, top, right, sheet, entity, openSnapshotMenu, closeMenu, run } = useMediaMenu({
       onListen: (item) => listenCollection(item),
@@ -94,8 +94,8 @@ export default defineComponent({
       albums: `${albums.value.length} ${plural(albums.value.length, ['альбом', 'альбома', 'альбомов'])}`,
       artists: `${artists.value.length} ${plural(artists.value.length, ['артист', 'артиста', 'артистов'])}`,
       videos: `${videos.value.length} видео`,
-      uploads: '',
-      downloaded: '',
+      uploads: `${uploads.value.length} ${plural(uploads.value.length, ['трек', 'трека', 'треков'])}`,
+      downloaded: `${downloaded.value.length} ${plural(downloaded.value.length, ['трек', 'трека', 'треков'])}`,
     }));
 
     const showDownloadAll = computed(

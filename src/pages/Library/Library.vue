@@ -15,7 +15,7 @@
     </div>
 
     <div v-if="tab === 'uploads'" class="dl-all-bar">
-      <span class="dl-count" />
+      <span class="dl-count">{{ counts.uploads }}</span>
       <div class="dl-bar-side">
         <button class="icon-btn ghost" type="button" aria-label="загрузить трек" @click="openUpload">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
@@ -23,6 +23,10 @@
           </svg>
         </button>
       </div>
+    </div>
+
+    <div v-if="tab === 'downloaded'" class="dl-all-bar">
+      <span class="dl-count">{{ counts.downloaded }}</span>
     </div>
 
     <div v-if="showDownloadAll" class="dl-all-bar">

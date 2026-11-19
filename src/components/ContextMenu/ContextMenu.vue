@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <div v-if="open" class="ctx-layer">
-      <div class="ctx-scrim" @pointerdown="close" />
+      <div class="ctx-scrim" @click="close" />
       <div class="ctx ctx-pop" :style="popStyle" @click.stop>
         <slot />
       </div>

@@ -246,7 +246,9 @@
   .panel h3 { font-family: var(--font-display); font-size: 15px; font-weight: 700; margin-bottom: 14px; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: .08em; }
 
   .track-row { display: flex; align-items: center; gap: 6px; padding: 6px 2px; border-radius: var(--radius-m); }
-  .track-row:hover { background: var(--color-surface-2); }
+  @media (hover: hover) {
+    .track-row:hover { background: var(--color-surface-2); }
+  }
   .thumb { width: 44px; height: 44px; border-radius: var(--radius-s); flex-shrink: 0; border: 1px solid var(--color-border); }
   .track-meta { flex: 1; min-width: 0; }
   .track-title { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -698,8 +700,7 @@
     transform: scale(1.02);
   }
   .track-row.is-drag .grip { color: var(--color-text-primary); cursor: grabbing; }
-  .track-row .more { color: var(--color-text-faint); flex-shrink: 0; }
-  .track-row .more:hover { color: var(--color-text-primary); }
+  .track-row .more { flex-shrink: 0; }
   .ctx {
     margin-top: 6px; padding: 6px; max-width: 280px;
     background: #1c1c1c; border-radius: var(--radius-m);
