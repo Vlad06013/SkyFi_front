@@ -1,50 +1,64 @@
 import { defineStore } from 'pinia';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { fetchShares } from '@/api/shares';
+import { useAuthStore } from '@/stores/auth';
+import { useFriendsStore } from '@/stores/friends';
+import { useOnlineStore } from '@/stores/online';
+import type { AnySnapshot } from '@/types';
 
-/** Входящая заявка в панели уведомлений (мок панели; заявки на странице друзей — из API). */
-const incomingRequestMock = {
-  id: 9,
-  name: 'Никита',
-  initial: 'Н',
-  tone: 'g1' as const,
-};
-
+/** Входящая шара для панели: то, что приходит в GET /shares + флаг непрочитанности. */
 export interface ShareNotice {
   id: number;
-  title: string;
-  sub: string;
+  senderName: string;
+  snapshot: AnySnapshot;
   unread: boolean;
 }
 
 export const useNotificationsStore = defineStore('notifications', () => {
   const open = ref(false);
-  const request = ref<{ id: number; name: string; initial: string; tone: 'g1' } | null>(incomingRequestMock);
-  const shares = ref<ShareNotice[]>([
-    { id: 1, title: 'Радиотишина', sub: 'Илья поделился · трек · в плеер', unread: true },
-    { id: 2, title: 'Heaven :x: Hell', sub: 'Аня поделилась · альбом · в избранное', unread: true },
-    { id: 3, title: 'В дорогу', sub: 'Макс поделился · плейлист', unread: false },
-  ]);
+  const shares = ref<ShareNotice[]>([]);
+  /** Первичная загрузка GET /shares прошла (неудача сбрасывает — повторим). */
+  const sharesLoaded = ref(false);
+
+  const friends = useFriendsStore();
+  /** Входящие заявки живут в friends store (incoming) — дублировать не будем. */
+  const requests = computed(() => friends.incoming);
 
   const unreadCount = computed(
-    () => (request.value ? 1 : 0) + shares.value.filter((share) => share.unread).length,
+    () => requests.value.length + shares.value.filter((share) => share.unread).length,
   );
   const hasUnread = computed(() => unreadCount.value > 0);
+
+  /** Ленивая загрузка шаров: при открытии панели и при входе/возврате онлайна. */
+  function ensure() {
+    if (sharesLoaded.value) return;
+    void fetchShares()
+      .then((items) => {
+        shares.value = items.map((item) => ({
+          id: item.id,
+          senderName: item.sender.name,
+          snapshot: item.snapshot,
+          unread: false,
+        }));
+        sharesLoaded.value = true;
+      })
+      .catch(() => {
+        sharesLoaded.value = false;
+      });
+  }
+
+  /** Сокет share.sent: новая шара — вверх списка, непрочитанная. */
+  function prependShare(item: { id: number; senderName: string; snapshot: AnySnapshot }) {
+    if (shares.value.some((share) => share.id === item.id)) return;
+    shares.value = [{ ...item, unread: true }, ...shares.value];
+    sharesLoaded.value = true;
+  }
 
   function toggle() {
     open.value = !open.value;
   }
 
   function close() {
-    open.value = false;
-  }
-
-  function accept() {
-    request.value = null;
-    open.value = false;
-  }
-
-  function decline() {
-    request.value = null;
     open.value = false;
   }
 
@@ -58,17 +72,37 @@ export const useNotificationsStore = defineStore('notifications', () => {
     shares.value = shares.value.map((share) => ({ ...share, unread: false }));
   }
 
+  function reset() {
+    shares.value = [];
+    sharesLoaded.value = false;
+    open.value = false;
+  }
+
+  // Автозагрузка как у друзей/избранного: вход + возврат онлайна; выход чистит.
+  const auth = useAuthStore();
+  const online = useOnlineStore();
+  watch(
+    () => [auth.isAuthed, online.isOnline] as const,
+    ([authed, isOnline]) => {
+      if (authed && isOnline) ensure();
+      if (!authed) reset();
+    },
+    { immediate: true },
+  );
+
   return {
     open,
-    request,
     shares,
+    sharesLoaded,
+    requests,
     unreadCount,
     hasUnread,
     toggle,
     close,
-    accept,
-    decline,
+    ensure,
+    prependShare,
     markRead,
     markAllRead,
+    reset,
   };
 });

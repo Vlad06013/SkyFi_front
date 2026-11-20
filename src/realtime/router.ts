@@ -8,8 +8,8 @@ export interface EventChannel {
 }
 
 export interface RouterHooks {
-  /** Серверный id моего устройства — для эхо-глушения. */
-  getMyDeviceId: () => number | null;
+  /** Идентификаторы моего устройства (серверный id + uuid) — для эхо-глушения. */
+  getMyOriginIds: () => Array<number | string | null | undefined>;
 }
 
 export interface EventMeta {
@@ -27,12 +27,12 @@ export function resetSeenCommands(): void {
   seenCommands.clear();
 }
 
-/** true — ивент от моей же команды (origin_device_id = мой серверный id). */
+/** true — ивент от моей же команды (origin_device_id совпал с одним из моих id). */
 export function isOwnEcho(
   originDeviceId: number | string | null | undefined,
-  myDeviceId: number | null,
+  myOriginIds: Array<number | string | null | undefined>,
 ): boolean {
-  return originDeviceId != null && myDeviceId != null && originDeviceId === myDeviceId;
+  return originDeviceId != null && myOriginIds.some((id) => id != null && id === originDeviceId);
 }
 
 /** true — command_id уже встречался, эта доставка — повтор. */
@@ -58,8 +58,15 @@ export function createRouter(hooks: RouterHooks) {
         origin_device_id?: number | string | null;
         command_id?: string | null;
       };
-      if (meta.echo && isOwnEcho(payload.origin_device_id, hooks.getMyDeviceId())) return;
-      if (meta.dedup && markCommand(payload.command_id)) return;
+      if (meta.echo && isOwnEcho(payload.origin_device_id, hooks.getMyOriginIds())) {
+        console.debug(`[realtime] ${name} — своё эхо, пропущен`, payload);
+        return;
+      }
+      if (meta.dedup && markCommand(payload.command_id)) {
+        console.debug(`[realtime] ${name} — повтор command_id, пропущен`, payload);
+        return;
+      }
+      console.debug(`[realtime] ${name}`, payload);
       handler(payload);
     });
   }

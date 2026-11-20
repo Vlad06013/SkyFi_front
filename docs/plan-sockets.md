@@ -32,6 +32,18 @@ payload — `contracts.md` «Сокеты», правила клиента — `
 | `playback.state.updated` | User.{id} + friends.{id} | `{state, origin_device_id, command_id}` | плеер: version-gate + эхо |
 | `playback.queue.updated` | User.{id} + friends.{id} | `{item: {title,artists}\|null, origin_device_id, command_id}` | тост + рефетч очереди |
 
+## На сверку бэк-агенту (провод 2026-11-20, smoke-скриптом)
+
+1. `playback.device.connected.origin_device_id` = uuid регистрации;
+   в `changed`/`disconnected` — серверный int id. api.md §17 не
+   различает; фронт глушит эхо по обоим. Лучше унифицировать на бэке
+   или явно зафиксировать различие.
+2. `friendship.request.sent/accepted`: payload обёрнут в
+   `{friendship: {...}}`, api.md §17 рисует дружбу «целиком» без
+   ключа — дописать обёртку в доку.
+3. Панель уведомлений до сих пор на моке: заявки/шары прилетают в
+   сторы и тосты, но бейджи панели — отдельная UI-задача (вне этапа).
+
 ## Общая семантика
 
 - Эхо-глушение: `origin_device_id` = мой `data.id` устройства → не
@@ -86,13 +98,29 @@ src/types/realtime.ts — payload-типы из contracts.md
 - [x] Юнит-тесты: 36 новых (api, lib/device, стор, router, хендлеры).
       Всего 248.
 
-### Этап 2. Дружба (социал)
-- [ ] Хендлеры `friendship.request.sent/accepted` → upsert в friends
-      store (секции incoming/outgoing/friends) + уведомление.
-- [ ] Хендлер `friend.queue.item.added` → тост + рефетч очереди.
-- [ ] Хендлер `share.sent` → тост + обновление «поделились со мной».
-- [ ] Панель уведомлений: заявки/шары из сторов вместо мока.
-- [ ] Юнит-тесты хендлеров.
+### Этап 2. Дружба (социал) — ✅ готово 2026-11-20
+- [x] Хендлеры `friendship.request.sent/accepted` → upsert в friends
+      store (incoming / outgoing→friends), payload на проводе обёрнут
+      в `{friendship}` (curl 2026-11-20) — зафиксировано в
+      `types/realtime.ts`, на сверку api.md.
+- [x] Хендлер `friend.queue.item.added` → тост «{name} добавил в
+      очередь» + форс-рефетч очереди (player store `refreshQueue`).
+- [x] Хендлер `share.sent` → шара в панель уведомлений (непрочитанная) +
+      тост «{name} поделился»; экран входящих шаров с кнопками
+      «в плейлист/избранное» — отдельная задача, пока панель.
+- [x] Панель уведомлений без моков: заявки — из friends incoming
+      (принять/отклонить прямо в панели), шары — `GET /shares` +
+      `prependShare` по сокету; бейдж = заявки + непрочитанные шары;
+      «прочитать все» гасит шары.
+- [x] Тосты по ивентам дружбы: заявка/принята/в очередь/шара —
+      глобальный AppToast, 5 с.
+- [x] Эхо-глушение расширено: `playback.device.connected` несёт
+      origin_device_id = uuid, остальные — серверный id (провод
+      2026-11-20); сравниваем с обоими.
+- [x] Сокет-аутз проверена живьём end-to-end (pusher-js: login →
+      `/broadcasting/auth` → private-App.Models.User.{id} → все
+      ивенты этапов 1–2 доходят, скрипт-пробник в /tmp).
+- [x] Юнит-тесты: роутер (uuid-эхо), social-хендлеры. Всего 257.
 
 ### Этап 3. Плеер (последним, отдельная схема)
 - [ ] Схема применения состояния (version-gate, эхо, конфликты

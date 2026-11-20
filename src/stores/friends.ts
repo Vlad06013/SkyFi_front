@@ -119,6 +119,25 @@ export const useFriendsStore = defineStore('friends', () => {
     }
   }
 
+  /** Сокет friendship.request.sent: заявка мне — в incoming. Списки не загружены — пропускаем (ensure подтянет свежие). */
+  function applyRequestSent(friendship: FriendshipPayload) {
+    if (!loaded.value) return;
+    const entry = toEntry(friendship, auth.user?.id);
+    if (!incoming.value.some((item) => item.user.id === entry.user.id)) {
+      incoming.value = [entry, ...incoming.value];
+    }
+  }
+
+  /** Сокет friendship.request.accepted: мою заявку приняли — outgoing → friends. */
+  function applyRequestAccepted(friendship: FriendshipPayload) {
+    if (!loaded.value) return;
+    const entry = toEntry(friendship, auth.user?.id);
+    outgoing.value = outgoing.value.filter((item) => item.user.id !== entry.user.id);
+    if (!friends.value.some((item) => item.user.id === entry.user.id)) {
+      friends.value = [entry, ...friends.value];
+    }
+  }
+
   function clearAll() {
     friends.value = [];
     incoming.value = [];
@@ -148,5 +167,7 @@ export const useFriendsStore = defineStore('friends', () => {
     removeFriend,
     cancelOutgoing,
     sendRequest,
+    applyRequestSent,
+    applyRequestAccepted,
   };
 });

@@ -12,7 +12,7 @@ export default defineConfig({
     // HTTPS нужен для getUserMedia (сканер QR): браузер даёт доступ к камере
     // только в secure context (https или localhost). Без него на телефоне
     // по http://192.168.x.x разрешение не запрашивается вовсе.
-    basicSsl(),
+    // basicSsl(),
     vue(),
     legacy()
   ],

@@ -7,12 +7,21 @@ import {
   handleDeviceConnected,
   handleDeviceDisconnected,
 } from '@/realtime/handlers/devices';
+import {
+  handleFriendQueueItemAdded,
+  handleFriendshipRequestAccepted,
+  handleFriendshipRequestSent,
+  handleShareSent,
+} from '@/realtime/handlers/social';
 import { useAuthStore } from '@/stores/auth';
 import { useDevicesStore } from '@/stores/devices';
 import type {
+  FriendQueueItemAddedPayload,
+  FriendshipEventPayload,
   PlaybackDeviceChangedPayload,
   PlaybackDeviceConnectedPayload,
   PlaybackDeviceDisconnectedPayload,
+  ShareSentPayload,
 } from '@/types/realtime';
 
 export type RealtimeStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'offline';
@@ -34,7 +43,9 @@ export function onRealtimeReconnect(handler: () => void): () => void {
 function subscribeOwnChannel(userId: number) {
   if (!echo) return;
   const channel = echo.private(`App.Models.User.${userId}`);
-  const router = createRouter({ getMyDeviceId: () => useDevicesStore().myDeviceId });
+  const devices = useDevicesStore();
+  // connected несёт uuid устройства, остальные ивенты — серверный id (api.md §17, провод 2026-11-20).
+  const router = createRouter({ getMyOriginIds: () => [devices.myDeviceId, devices.myDeviceUuid] });
   router.listen<PlaybackDeviceConnectedPayload>(channel, '.playback.device.connected', { echo: true }, handleDeviceConnected);
   router.listen<PlaybackDeviceChangedPayload>(channel, '.playback.device.changed', { echo: true }, handleDeviceChanged);
   router.listen<PlaybackDeviceDisconnectedPayload>(
@@ -43,27 +54,42 @@ function subscribeOwnChannel(userId: number) {
     { echo: true, dedup: true },
     handleDeviceDisconnected,
   );
+  router.listen<FriendshipEventPayload>(channel, '.friendship.request.sent', {}, handleFriendshipRequestSent);
+  router.listen<FriendshipEventPayload>(channel, '.friendship.request.accepted', {}, handleFriendshipRequestAccepted);
+  router.listen<FriendQueueItemAddedPayload>(channel, '.friend.queue.item.added', {}, handleFriendQueueItemAdded);
+  router.listen<ShareSentPayload>(channel, '.share.sent', {}, handleShareSent);
 }
 
 /** Подключение и подписка на свой канал. Повторный вызов — no-op. */
 export function startRealtime(userId: number) {
   if (echo) return;
   status.value = 'connecting';
-  echo = createEcho();
+  try {
+    echo = createEcho();
+  } catch (cause) {
+    // Например, не задан VITE_REVERB_APP_KEY — не должно убивать приложение молча.
+    console.error('[realtime] не удалось создать Echo:', cause);
+    status.value = 'idle';
+    return;
+  }
   const connection = echo.connector.pusher.connection;
   connection.bind('connected', () => {
+    console.info(`[realtime] соединение установлено (user ${userId})`);
     if (!wasConnected) subscribeOwnChannel(userId);
     else reconnectHandlers.forEach((handler) => handler());
     wasConnected = true;
     status.value = 'connected';
   });
   connection.bind('disconnected', () => {
+    console.warn('[realtime] соединение разорвано');
     status.value = wasConnected ? 'reconnecting' : 'offline';
   });
   connection.bind('unavailable', () => {
+    console.warn('[realtime] сервер недоступен (unavailable)');
     status.value = 'offline';
   });
   connection.bind('failed', () => {
+    console.error('[realtime] соединение не удалось (failed)');
     status.value = 'offline';
   });
 }

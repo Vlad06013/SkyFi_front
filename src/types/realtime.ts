@@ -1,4 +1,5 @@
-import type { PlayerStateView, PlayerDevice } from '@/types/api';
+import type { FriendshipPayload, PlayerStateView, PlayerDevice } from '@/types/api';
+import type { AnySnapshot } from '@/types/snapshots';
 
 /** Payload ивентов сокетов (api.md §17, contracts.md «Сокеты»). */
 
@@ -39,5 +40,11 @@ export interface PlaybackDeviceDisconnectedPayload {
 export interface ShareSentPayload {
   share_id: number;
   sender: { id: number; name: string };
-  snapshot: unknown;
+  snapshot: AnySnapshot;
+}
+
+/** friendship.request.sent/accepted (api.md §17). На проводе дружба
+ *  обёрнута в ключ (curl 2026-11-20), api.md рисует её «целиком». */
+export interface FriendshipEventPayload {
+  friendship: FriendshipPayload;
 }

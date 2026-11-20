@@ -10,7 +10,6 @@ vi.mock('@/api/http', () => ({
     patch: vi.fn(),
     delete: vi.fn(),
   },
-  httpRaw: {},
 }));
 
 const getMock = vi.mocked(http.get);

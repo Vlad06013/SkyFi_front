@@ -30,11 +30,16 @@ export const usePlayerStore = defineStore('player', () => {
   /** Ленивый первичный GET очереди: стор живёт и без авторизации, поэтому не в конструкторе. */
   async function ensureQueue() {
     if (queueLoaded.value) return;
-    queueLoaded.value = true;
+    await refreshQueue();
+  }
+
+  /** Форс-рефетч очереди (сокеты playback.queue.updated / friend.queue.item.added). */
+  async function refreshQueue() {
     try {
       queue.value = sortQueue(await fetchQueue());
+      queueLoaded.value = true;
     } catch {
-      queueLoaded.value = false;
+      /* очередь догрузится при следующем открытии */
     }
   }
 
@@ -236,6 +241,7 @@ export const usePlayerStore = defineStore('player', () => {
     toggleRepeat,
     playSnapshot,
     ensureQueue,
+    refreshQueue,
     enqueueSnapshot,
     removeQueueItem,
     reorderQueue,
