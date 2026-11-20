@@ -7,7 +7,7 @@
     :style="playerDragStyle"
     @pointerdown="onPlayerDragStart"
   >
-    <img v-if="clipMode" class="clip-bg" :src="clipFrame" alt="">
+    <img v-if="clipMode && clipPoster" class="clip-bg" :src="clipPoster" alt="">
     <div v-if="clipMode" class="clip-scrim" />
 
     <div class="now-playing-inner">
@@ -92,6 +92,7 @@
           <div class="p-now">
             <div class="thumb" :style="{ background: coverVar(current.source_type) }">
               <img v-if="current.type === 'track'" :src="trackCover(current)" alt="">
+              <img v-else-if="current.cover_url" :src="current.cover_url" alt="">
               <SourceBadge :source="current.source_type" />
             </div>
             <div class="track-meta">
@@ -121,10 +122,12 @@
               <SnapshotRow
                 v-for="({ item, snapshot }, index) in queueRows"
                 :key="item.id"
+                :kind="queueRowKind(snapshot)"
                 :title="snapshot.title"
                 :subtitle="artistsLine(snapshot.artists)"
                 :source="snapshot.source_type"
-                :cover="snapshot.type === 'track' ? trackCover(snapshot) : ''"
+                :cover="queueRowCover(snapshot)"
+                :round="snapshot.type === 'artist'"
                 sortable
                 removable
                 :menuable="false"

@@ -13,7 +13,6 @@ import { entityFromSnapshot } from '@/lib/media-menu';
 import { trackPointer } from '@/lib/pointer-drag';
 import { formatTime } from '@/lib/time';
 import { usePlayerStore } from '@/stores/player';
-import clipFrame from '../../../design/shared/clip-frame.jpg';
 import type { AnySnapshot, QueueItem } from '@/types';
 
 type Layer = 'now' | 'queue' | 'lyrics';
@@ -38,6 +37,10 @@ export default defineComponent({
       queueLoaded,
     } = storeToRefs(player);
     const playing = computed(() => player.state.is_playing);
+    /** Фон клип-режима — превью текущего видео; пока нет видео/превью — чёрный фон. */
+    const clipPoster = computed(() =>
+      current.value && current.value.type === 'video' ? (current.value.cover_url ?? '') : '',
+    );
     const { liked, toggleLike } = useSnapshotLike(() => player.current);
     const repeatLabel = computed(() => {
       if (state.value.repeat_mode === 'one') return 'повтор одного';
@@ -66,6 +69,18 @@ export default defineComponent({
         .map((item: QueueItem) => ({ item, snapshot: item.snapshot }))
         .filter((row): row is { item: QueueItem; snapshot: AnySnapshot } => row.snapshot !== null),
     );
+
+    /** Форма строки по типу снапшота: видео — широкое 16:9-превью (96px), медиа — обложка. */
+    function queueRowKind(snapshot: AnySnapshot): 'track' | 'video' | 'media' {
+      if (snapshot.type === 'video') return 'video';
+      if (snapshot.type === 'track') return 'track';
+      return 'media';
+    }
+
+    function queueRowCover(snapshot: AnySnapshot): string {
+      if (snapshot.type === 'track') return trackCover(snapshot);
+      return snapshot.cover_url ?? '';
+    }
 
     const layer = ref<Layer>('now');
     const {
@@ -116,7 +131,8 @@ export default defineComponent({
         clearTimeout(idleTimer);
         idleTimer = null;
       }
-      if (clipMode.value && expanded.value && !qualityOpen.value) {
+      // Раскрытая очередь не даём плееру уйти в простой — сначала её закрыть.
+      if (clipMode.value && expanded.value && !qualityOpen.value && layer.value !== 'queue') {
         idleTimer = setTimeout(() => {
           clipIdle.value = true;
         }, clipIdleDelay);
@@ -141,7 +157,7 @@ export default defineComponent({
       void rootEl.value.requestFullscreen();
     }
 
-    watch([clipMode, expanded, qualityOpen], wake);
+    watch([clipMode, expanded, qualityOpen, layer], wake);
 
     onMounted(() => {
       wake();
@@ -343,10 +359,12 @@ export default defineComponent({
       playerDragStyle,
       queueSheetStyle,
       topLabel,
-      clipFrame,
+      clipPoster,
       coverVar,
       artistsLine,
       trackCover,
+      queueRowKind,
+      queueRowCover,
       sortRowStyle,
       formatTime,
       togglePlay,
