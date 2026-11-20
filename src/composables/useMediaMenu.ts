@@ -78,18 +78,20 @@ export function useMediaMenu(hooks: {
     menu.value = null;
   }
 
-  function enqueue(snapshot: AnySnapshot) {
+  async function enqueue(snapshot: AnySnapshot) {
     const playingId = current.value && 'source_id' in current.value ? current.value.source_id : null;
     if (snapshot.source_id === playingId) {
       toast.show(snapshot.title, 'уже играет');
       return;
     }
-    if (queue.value.some((item) => item.source_id === snapshot.source_id)) {
+    if (queue.value.some((item) => item.snapshot?.source_id === snapshot.source_id)) {
       toast.show(snapshot.title, 'уже в очереди');
       return;
     }
-    queue.value = [...queue.value, snapshot];
-    toast.show(`${snapshot.title} — ${entity.value.artist}`, 'добавлено в очередь');
+    const added = await player.enqueueSnapshot(snapshot);
+    if (added) {
+      toast.show(`${snapshot.title} — ${entity.value.artist}`, 'добавлено в очередь');
+    }
   }
 
   function run(action: MenuAction) {
@@ -97,7 +99,7 @@ export function useMediaMenu(hooks: {
     menu.value = null;
     entity.value = target;
     if (action === 'queue' && target.snapshot) {
-      enqueue(target.snapshot);
+      void enqueue(target.snapshot);
       return;
     }
     if (action === 'like') {

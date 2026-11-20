@@ -26,11 +26,12 @@ export default defineComponent({
     downloaded: { type: Boolean, default: false },
     offline: { type: Boolean, default: false },
     sortable: { type: Boolean, default: false },
+    removable: { type: Boolean, default: false },
     menuable: { type: Boolean, default: true },
     dragging: { type: Boolean, default: false },
     dragStyle: { type: Object as PropType<Record<string, string> | undefined>, default: undefined },
   },
-  emits: ['open', 'menu', 'sort'],
+  emits: ['open', 'menu', 'sort', 'remove'],
   setup(props, { emit }) {
     const rootClass = computed(() => {
       if (props.kind === 'video') return 'vid-row';

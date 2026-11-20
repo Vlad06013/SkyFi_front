@@ -1,13 +1,17 @@
 import { acceptHMRUpdate, defineStore } from 'pinia';
 import { computed, ref, watch } from 'vue';
+import { addToQueue, fetchQueue, removeFromQueue, reorderPending } from '@/api/queue';
+import { moveItem } from '@/lib/list-sort';
 import { favoriteTracks } from '@/mocks/catalog';
 import { mockPlayerState } from '@/mocks/player';
-import type { AnySnapshot, RepeatMode } from '@/types';
+import { useToastStore } from '@/stores/toast';
+import type { AnySnapshot, QueueItem, RepeatMode } from '@/types';
 
 const repeatCycle: RepeatMode[] = ['off', 'all', 'one'];
 const skipRestartAfter = 3;
 
 export const usePlayerStore = defineStore('player', () => {
+  const toast = useToastStore();
   const state = ref(mockPlayerState.state);
   const expanded = ref(false);
   const clipMode = ref(false);
@@ -15,9 +19,55 @@ export const usePlayerStore = defineStore('player', () => {
   const clipQualities = [360, 720, 1080];
   const localDeviceId = ref(1);
   const volume = ref(72);
-  const queue = ref<AnySnapshot[]>(
-    favoriteTracks.filter((track) => track.source_id !== state.value.current_snapshot?.source_id),
-  );
+  /** Серверная очередь — источник истины (api.md §6); статусы пока не используем. */
+  const queue = ref<QueueItem[]>([]);
+  /** Первичная загрузка очереди прошла (неудача сбрасывает флажок — повторим при следующем открытии). */
+  const queueLoaded = ref(false);
+
+  function sortQueue(items: QueueItem[]): QueueItem[] {
+    return [...items].sort((a, b) => a.position - b.position);
+  }
+
+  /** Ленивый первичный GET очереди: стор живёт и без авторизации, поэтому не в конструкторе. */
+  async function ensureQueue() {
+    if (queueLoaded.value) return;
+    queueLoaded.value = true;
+    try {
+      queue.value = sortQueue(await fetchQueue());
+    } catch {
+      queueLoaded.value = false;
+    }
+  }
+
+  /** Добавление в конец очереди. true — сервер принял. */
+  async function enqueueSnapshot(snapshot: AnySnapshot): Promise<boolean> {
+    try {
+      queue.value = sortQueue(await addToQueue(snapshot));
+      return true;
+    } catch (cause) {
+      toast.show(cause instanceof Error ? cause.message : 'Не удалось добавить в очередь', '', true);
+      return false;
+    }
+  }
+
+  async function removeQueueItem(id: number) {
+    try {
+      queue.value = sortQueue(await removeFromQueue(id));
+    } catch (cause) {
+      toast.show(cause instanceof Error ? cause.message : 'Не удалось убрать из очереди', '', true);
+    }
+  }
+
+  /** Перестановка по индексам: бэку уходит список id ожидающих в новом порядке. */
+  async function reorderQueue(from: number, to: number) {
+    if (from === to) return;
+    const items = moveItem(queue.value, from, to).map((item) => item.id);
+    try {
+      queue.value = sortQueue(await reorderPending(items));
+    } catch (cause) {
+      toast.show(cause instanceof Error ? cause.message : 'Не удалось изменить порядок', '', true);
+    }
+  }
 
   function snapshotId(snapshot: AnySnapshot | null | undefined) {
     return snapshot && 'source_id' in snapshot ? snapshot.source_id : null;
@@ -25,19 +75,9 @@ export const usePlayerStore = defineStore('player', () => {
 
   function dropFromQueue(sourceId: string | null) {
     if (!sourceId) return;
-    if (queue.value.some((track) => track.source_id === sourceId)) {
-      queue.value = queue.value.filter((track) => track.source_id !== sourceId);
+    if (queue.value.some((item) => item.snapshot?.source_id === sourceId)) {
+      queue.value = queue.value.filter((item) => item.snapshot?.source_id !== sourceId);
     }
-  }
-
-  function reorderQueue(from: number, to: number) {
-    if (from === to) return;
-    const next = [...queue.value];
-    if (from < 0 || to < 0 || from >= next.length || to >= next.length) return;
-    const [item] = next.splice(from, 1);
-    if (!item) return;
-    next.splice(to, 0, item);
-    queue.value = next;
   }
 
   const current = computed(() => state.value.current_snapshot);
@@ -52,7 +92,7 @@ export const usePlayerStore = defineStore('player', () => {
     return favoriteTracks[(from + delta + favoriteTracks.length) % favoriteTracks.length];
   }
   const previewNext = computed<AnySnapshot | null>(
-    () => queue.value[0] ?? (favoriteTracks.length ? cycleInContext(1) : null),
+    () => queue.value[0]?.snapshot ?? (favoriteTracks.length ? cycleInContext(1) : null),
   );
   const previewPrevious = computed<AnySnapshot | null>(
     () => (favoriteTracks.length ? cycleInContext(-1) : null),
@@ -104,7 +144,8 @@ export const usePlayerStore = defineStore('player', () => {
 
   function skipBy(delta: number) {
     if (delta > 0 && queue.value.length) {
-      playSnapshot(queue.value[0]);
+      const next = queue.value[0]?.snapshot;
+      if (next) playSnapshot(next);
       return;
     }
     const tracks = favoriteTracks;
@@ -193,6 +234,7 @@ export const usePlayerStore = defineStore('player', () => {
     localDeviceId,
     volume,
     queue,
+    queueLoaded,
     current,
     title,
     artist,
@@ -206,6 +248,9 @@ export const usePlayerStore = defineStore('player', () => {
     toggleShuffle,
     toggleRepeat,
     playSnapshot,
+    ensureQueue,
+    enqueueSnapshot,
+    removeQueueItem,
     reorderQueue,
     skipNext,
     skipPrevious,

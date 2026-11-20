@@ -616,6 +616,11 @@
 }
 .track-row.is-drag .grip { cursor: grabbing; }
 .track-row .more { flex-shrink: 0; }
+.track-row .rm { flex-shrink: 0; }
+@media (hover: hover) {
+  .track-row .rm { color: var(--color-text-faint); }
+  .track-row .rm:hover { color: var(--color-danger); }
+}
 .ctx {
   margin-top: 6px; padding: 6px; max-width: 280px;
   background: #1c1c1c; border-radius: var(--radius-m);

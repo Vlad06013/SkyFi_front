@@ -8,12 +8,13 @@ import { useLyrics } from '@/composables/useLyrics';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { coverVar, artistsLine, trackCover } from '@/lib/cover';
-import { moveItem, sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
+import { sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
 import { entityFromSnapshot } from '@/lib/media-menu';
 import { trackPointer } from '@/lib/pointer-drag';
 import { formatTime } from '@/lib/time';
 import { usePlayerStore } from '@/stores/player';
 import clipFrame from '../../../design/shared/clip-frame.jpg';
+import type { AnySnapshot, QueueItem } from '@/types';
 
 type Layer = 'now' | 'queue' | 'lyrics';
 
@@ -34,6 +35,7 @@ export default defineComponent({
       clipMode,
       clipQuality,
       queue,
+      queueLoaded,
     } = storeToRefs(player);
     const playing = computed(() => player.state.is_playing);
     const { liked, toggleLike } = useSnapshotLike(() => player.current);
@@ -53,7 +55,17 @@ export default defineComponent({
       seekRatio,
       toggleClips,
       setClipQuality,
+      ensureQueue,
+      removeQueueItem,
+      reorderQueue,
     } = player;
+
+    /** Строки очереди для UI: элементы без снапшота не рисуем. */
+    const queueRows = computed(() =>
+      queue.value
+        .map((item: QueueItem) => ({ item, snapshot: item.snapshot }))
+        .filter((row): row is { item: QueueItem; snapshot: AnySnapshot } => row.snapshot !== null),
+    );
 
     const layer = ref<Layer>('now');
     const {
@@ -203,6 +215,7 @@ export default defineComponent({
     function openQueue() {
       closeMenu();
       sheet.value = null;
+      void ensureQueue();
       layer.value = layer.value === 'queue' ? 'now' : 'queue';
     }
 
@@ -265,7 +278,7 @@ export default defineComponent({
         },
         onEnd: (from, to) => {
           sortDrag.value = null;
-          queue.value = moveItem(queue.value, from, to);
+          void reorderQueue(from, to);
         },
       });
     }
@@ -309,6 +322,8 @@ export default defineComponent({
       clipIdle,
       isFullscreen,
       queue,
+      queueRows,
+      queueLoaded,
       playing,
       repeatLabel,
       layer,
@@ -352,6 +367,7 @@ export default defineComponent({
       onPlayerDragStart,
       onSortStart,
       onQueueDragStart,
+      removeQueueItem,
       open,
       items,
       top,

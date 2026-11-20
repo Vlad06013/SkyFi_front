@@ -66,6 +66,18 @@
     </svg>
 
     <button
+      v-if="removable"
+      class="icon-btn rm"
+      type="button"
+      aria-label="убрать"
+      @click.stop="emit('remove')"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <path d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5" />
+      </svg>
+    </button>
+
+    <button
       v-if="menuable"
       class="icon-btn more"
       type="button"

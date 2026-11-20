@@ -119,19 +119,24 @@
             </div>
             <div class="p-sheet-body list-sort" :class="{ 'is-sorting': Boolean(sortDrag) }">
               <SnapshotRow
-                v-for="(track, index) in queue"
-                :key="track.source_id"
-                :title="track.title"
-                :subtitle="artistsLine(track.artists)"
-                :source="track.source_type"
-                :cover="track.type === 'track' ? trackCover(track) : ''"
+                v-for="({ item, snapshot }, index) in queueRows"
+                :key="item.id"
+                :title="snapshot.title"
+                :subtitle="artistsLine(snapshot.artists)"
+                :source="snapshot.source_type"
+                :cover="snapshot.type === 'track' ? trackCover(snapshot) : ''"
                 sortable
+                removable
                 :menuable="false"
                 :dragging="sortDrag?.from === index"
                 :drag-style="sortRowStyle(index, sortDrag)"
-                @open="playSnapshot(track)"
+                @open="playSnapshot(snapshot)"
                 @sort="onSortStart($event, index)"
+                @remove="removeQueueItem(item.id)"
               />
+              <div v-if="queueLoaded && !queueRows.length" class="empty" style="padding-top:20px">
+                <div class="et">Очередь пуста</div>
+              </div>
             </div>
           </div>
         </template>
