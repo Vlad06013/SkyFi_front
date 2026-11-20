@@ -131,8 +131,8 @@ export default defineComponent({
         clearTimeout(idleTimer);
         idleTimer = null;
       }
-      // Раскрытая очередь не даём плееру уйти в простой — сначала её закрыть.
-      if (clipMode.value && expanded.value && !qualityOpen.value && layer.value !== 'queue') {
+      // Раскрытые очередь/текст не даём плееру уйти в простой — сначала закрыть слой.
+      if (clipMode.value && expanded.value && !qualityOpen.value && layer.value === 'now') {
         idleTimer = setTimeout(() => {
           clipIdle.value = true;
         }, clipIdleDelay);

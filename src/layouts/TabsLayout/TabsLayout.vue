@@ -1,7 +1,11 @@
 <template>
   <div class="sky-shell" :class="{ 'is-wave': isHome }">
     <div class="sky-body">
-      <router-view />
+      <router-view v-slot="{ Component }">
+        <keep-alive>
+          <component :is="Component" />
+        </keep-alive>
+      </router-view>
     </div>
     <div class="sky-dock">
       <MiniPlayer v-if="!isHome" />
