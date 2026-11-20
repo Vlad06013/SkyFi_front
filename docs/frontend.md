@@ -311,14 +311,15 @@ main.ts рядом со startPolling; роутер `router.ts` даёт кажд
   добавил: {title}» + рефетч.
 - Reconnect — `GET /player` (полная подмена состояния), хук
   `onRealtimeReconnect`.
-- Дев-гребешки: dev-сервер с basicSsl отдаёт https-страницу, а браузер
-  блокирует `ws://` с https-страницы (mixed content). Для проверки
-  сокетов в браузере временно отключи basicSsl в vite.config.ts
-  (http://localhost:5173 — камере сканера QR в этой сессии не нужна)
-  либо проверяй с девайса. Схема сокета — `VITE_REVERB_SCHEME`,
-  бэковый Reverb dev поднимается без TLS (ws). Слой пишет в консоль
-  с префиксом `[realtime]`: адрес подключения, статусы, входящие
-  ивенты и причины пропусков.
+- Дев-связка https + сокеты: dev-сервер на basicSsl (https) — нужен
+  камере сканера QR и clipboard (secure context). Reverb на бэке
+  plain ws, а https-страница не может в ws:// (mixed content), поэтому
+  dev гонит сокеты через прокси vite: при `VITE_REVERB_PROXY=true`
+  клиент стучится в wss://<dev-сервер>/app/{key} и /broadcasting/auth,
+  vite пересылает на ws://VITE_REVERB_HOST:PORT (см. server.proxy в
+  vite.config.ts). В проде флаг выключен — прямое подключение по
+  VITE_REVERB_*. Слой пишет в консоль с префиксом `[realtime]`: адрес
+  подключения, статусы, входящие ивенты и причины пропусков.
 
 ## 11. Локальное хранилище
 

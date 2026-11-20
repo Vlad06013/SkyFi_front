@@ -5,3 +5,8 @@ VITE_REVERB_APP_KEY=vpu88awigtkvxluumpff
 VITE_REVERB_HOST=192.168.8.33
 VITE_REVERB_PORT=8081
 VITE_REVERB_SCHEME=http
+# Dev-прокси сокетов через vite: страница https (basicSsl), Reverb plain ws.
+# Клиент ходит в wss://<dev-сервер>/app/{key} и /broadcasting/auth, vite
+# пересылает на ws://VITE_REVERB_HOST:VITE_REVERB_PORT (см. vite.config.ts).
+# В проде закомментировать — клиент подключится напрямую по VITE_REVERB_*.
+VITE_REVERB_PROXY=true
