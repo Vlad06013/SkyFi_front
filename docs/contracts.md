@@ -442,9 +442,8 @@ export interface PlaybackDeviceDisconnectedPayload {
 export interface FriendshipSide {
   id: number;
   name: string;
-  /** Здесь avatar (не avatar_url, как в профиле) — бэк пока
-   * не унифицировал имена полей. */
-  avatar: string | null;
+  /** Полный URL (как в профиле), null без аватара. */
+  avatar_url: string | null;
   current_snapshot: AnySnapshot | null;
 }
 
@@ -463,6 +462,18 @@ export interface FriendshipOverviewPayload {
   friends: FriendshipPayload[];
   incoming: FriendshipPayload[];
   outgoing: FriendshipPayload[];
+}
+
+/** data ответа GET /friends/search-users: найденные пользователи
+ * со статусом заявки. user_id — id пользователя (не путать с
+ * friendship_id — id заявки); avatar_url — полный URL. */
+export interface UserSearchItem {
+  user_id: number;
+  name: string;
+  email: string;
+  avatar_url: string | null;
+  friendship_id: number | null;
+  friendship_status: string | null;
 }
 
 export interface ShareSentPayload {

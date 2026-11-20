@@ -1,6 +1,13 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
-import { incomingRequest } from '@/mocks/friends';
+
+/** Входящая заявка в панели уведомлений (мок панели; заявки на странице друзей — из API). */
+const incomingRequestMock = {
+  id: 9,
+  name: 'Никита',
+  initial: 'Н',
+  tone: 'g1' as const,
+};
 
 export interface ShareNotice {
   id: number;
@@ -11,7 +18,7 @@ export interface ShareNotice {
 
 export const useNotificationsStore = defineStore('notifications', () => {
   const open = ref(false);
-  const request = ref<{ id: number; name: string; initial: string; tone: 'g1' } | null>(incomingRequest);
+  const request = ref<{ id: number; name: string; initial: string; tone: 'g1' } | null>(incomingRequestMock);
   const shares = ref<ShareNotice[]>([
     { id: 1, title: 'Радиотишина', sub: 'Илья поделился · трек · в плеер', unread: true },
     { id: 2, title: 'Heaven :x: Hell', sub: 'Аня поделилась · альбом · в избранное', unread: true },

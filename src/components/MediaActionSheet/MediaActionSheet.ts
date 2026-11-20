@@ -3,9 +3,11 @@ import { storeToRefs } from 'pinia';
 import AppSheet from '@/components/AppSheet/AppSheet.vue';
 import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
+import { addToFriendQueue, shareWithFriend } from '@/api/friends';
 import { coverVar, trackCover } from '@/lib/cover';
+import { friendInitial, friendTone } from '@/lib/friends';
 import { favoritePlaylists } from '@/mocks/catalog';
-import { useFriendsStore } from '@/stores/friends';
+import { useFriendsStore, type FriendEntry } from '@/stores/friends';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
 import type { MediaSheet, MenuEntity } from '@/lib/media-menu';
@@ -39,9 +41,7 @@ export default defineComponent({
     const visibleFriends = computed(() => {
       const q = friendQuery.value.trim().toLowerCase();
       if (!q) return friendsStore.friends;
-      return friendsStore.friends.filter(
-        (friend) => friend.name.toLowerCase().includes(q) || friend.email.toLowerCase().includes(q),
-      );
+      return friendsStore.friends.filter((friend) => friend.user.name.toLowerCase().includes(q));
     });
 
     const coverImage = computed(() => {
@@ -58,7 +58,10 @@ export default defineComponent({
         if (next === 'share') {
           void navigator.clipboard?.writeText(`https://skyfi.app/t/${props.entity.sourceId}`).catch(() => undefined);
         }
-        if (next === 'friend-queue' || next === 'friend-share') friendQuery.value = '';
+        if (next === 'friend-queue' || next === 'friend-share') {
+          friendQuery.value = '';
+          void friendsStore.ensure();
+        }
       },
     );
 
@@ -67,14 +70,26 @@ export default defineComponent({
       emit('close');
     }
 
-    function pickQueue(name: string) {
-      toast.show(`${props.entity.title} — ${name} в очередь`, 'отправили другу');
-      close();
+    async function pickQueue(friend: FriendEntry) {
+      if (!props.entity.snapshot) return;
+      try {
+        await addToFriendQueue(friend.user.id, props.entity.snapshot);
+        toast.show(`${props.entity.title} — ${friend.user.name} в очередь`, 'отправили другу');
+        close();
+      } catch (cause) {
+        toast.show(cause instanceof Error ? cause.message : 'Не удалось отправить', '', true);
+      }
     }
 
-    function pickShare(name: string) {
-      toast.show(`${props.entity.title} — ${props.entity.artist}`, `поделились с ${name}`);
-      close();
+    async function pickShare(friend: FriendEntry) {
+      if (!props.entity.snapshot) return;
+      try {
+        await shareWithFriend(friend.user.id, props.entity.snapshot);
+        toast.show(`${props.entity.title} — ${props.entity.artist}`, `поделились с ${friend.user.name}`);
+        close();
+      } catch (cause) {
+        toast.show(cause instanceof Error ? cause.message : 'Не удалось поделиться', '', true);
+      }
     }
 
     function pickPlaylist(name: string) {
@@ -116,7 +131,7 @@ export default defineComponent({
       close();
     }
 
-    return {
+      return {
       state,
       title,
       friendQuery,
@@ -132,6 +147,8 @@ export default defineComponent({
       shareExternally,
       deviceCaption,
       pickDevice,
+      friendInitial,
+      friendTone,
       coverVar,
     };
   },

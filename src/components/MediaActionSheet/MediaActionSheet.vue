@@ -25,15 +25,18 @@
           </div>
           <button
             v-for="friend in visibleFriends"
-            :key="friend.id"
+            :key="friend.friendshipId"
             class="friend-row"
             type="button"
-            @click="sheet === 'friend-share' ? pickShare(friend.name) : pickQueue(friend.name)"
+            @click="sheet === 'friend-share' ? pickShare(friend) : pickQueue(friend)"
           >
-            <div class="avatar ini" :class="friend.tone">{{ friend.initial }}</div>
+            <div class="avatar ini" :class="friendTone(friend.user.id)">
+              <img v-if="friend.user.avatar_url" :src="friend.user.avatar_url" alt="">
+              <template v-else>{{ friendInitial(friend.user.name) }}</template>
+            </div>
             <div class="track-meta">
-              <div class="track-title">{{ friend.name }}</div>
-              <div class="idle">{{ friend.email }}</div>
+              <div class="track-title">{{ friend.user.name }}</div>
+              <div v-if="friend.live" class="idle">{{ friend.live }}</div>
             </div>
             <svg
               v-if="sheet === 'friend-queue'"

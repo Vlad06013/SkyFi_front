@@ -258,13 +258,11 @@ export interface YandexImportProgressPayload {
 
 /* Друзья (api.md §12, формы — contracts.md). */
 
-/** Сторона дружбы: sender/receiver. `avatar` здесь, а не `avatar_url`
- * (в профиле GET /user — avatar_url): бэк имена не унифицировал,
- * смотрим поле по эндпоинту. */
 export interface FriendshipSide {
   id: number;
   name: string;
-  avatar: string | null;
+  /** Полный URL (как в профиле), null без аватара. */
+  avatar_url: string | null;
   /** Текущий снапшот плеера этой стороны — отдаётся всегда (null, если состояния плеера нет). */
   current_snapshot: AnySnapshot | null;
 }
@@ -290,4 +288,22 @@ export interface FriendshipOverviewPayload {
 export interface FriendQueueItemAddedPayload {
   added_by: { id: number; name: string };
   item: { source_id: string; title: string; artists: string[] };
+}
+
+/** data ответа GET /friends/{user}/now-playing (api.md §12). */
+export interface FriendNowPlayingPayload {
+  is_playing: boolean;
+  snapshot: AnySnapshot | null;
+}
+
+/** data ответа GET /friends/search-users: найденные пользователи
+ * со статусом заявки. user_id — id пользователя (не путать с
+ * friendship_id — id заявки); avatar_url — полный URL. */
+export interface UserSearchItem {
+  user_id: number;
+  name: string;
+  email: string;
+  avatar_url: string | null;
+  friendship_id: number | null;
+  friendship_status: string | null;
 }
