@@ -8,6 +8,7 @@ import { useMediaMenu } from '@/composables/useMediaMenu';
 import { fetchSearch } from '@/api/search';
 import { artistsLine, trackCover } from '@/lib/cover';
 import { getSearchHistory, pushSearchHistory, clearSearchHistory } from '@/lib/search-history';
+import { openSnapshot } from '@/lib/open-snapshot';
 import type { MenuContext, MenuEntity } from '@/lib/media-menu';
 import { usePlayerStore } from '@/stores/player';
 import { useFavoritesStore } from '@/stores/favorites';
@@ -244,13 +245,7 @@ export default defineComponent({
     }
 
     function openResult(snapshot: AnySnapshot | null | undefined) {
-      if (!snapshot) return;
-      if (snapshot.type === 'track' || snapshot.type === 'video') {
-        player.playSnapshot(snapshot);
-        return;
-      }
-      const paths = { album: '/album', artist: '/artist', playlist: '/playlist' } as const;
-      void router.push(`${paths[snapshot.type]}/${snapshot.source_type}/${snapshot.source_id}`);
+      openSnapshot(router, snapshot);
     }
 
     async function onLike(entity: MenuEntity) {

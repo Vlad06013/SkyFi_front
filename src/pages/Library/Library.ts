@@ -12,6 +12,7 @@ import type { PlaylistDraft } from '@/components/PlaylistForm/PlaylistForm';
 import type { UploadDraft } from '@/components/UploadForm/UploadForm';
 import { sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
 import { plural } from '@/lib/plural';
+import { openSnapshot } from '@/lib/open-snapshot';
 import { artistsLine, trackCover } from '@/lib/cover';
 import { usePlayerStore } from '@/stores/player';
 import { useFavoritesStore } from '@/stores/favorites';
@@ -171,7 +172,7 @@ export default defineComponent({
     }
 
     function openPlaylist(playlist: PlaylistSnapshot) {
-      router.push(`/playlist/${playlist.source_type}/${playlist.source_id}`);
+      openSnapshot(router, playlist);
     }
 
     function openCreate() {
@@ -264,11 +265,11 @@ export default defineComponent({
     const uploadTitle = computed(() => (editingUpload.value ? 'Изменить трек' : 'Загрузить трек'));
 
     function openAlbum(album: AlbumSnapshot) {
-      router.push(`/album/${album.source_type}/${album.source_id}`);
+      openSnapshot(router, album);
     }
 
     function openArtist(artist: ArtistSnapshot) {
-      router.push(`/artist/${artist.source_type}/${artist.source_id}`);
+      openSnapshot(router, artist);
     }
 
     return {

@@ -1,9 +1,10 @@
 import { defineComponent, onMounted, onBeforeUnmount, watch } from 'vue';
 import { storeToRefs } from 'pinia';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { friendInitial, friendTone } from '@/lib/friends';
+import { openSnapshot } from '@/lib/open-snapshot';
 import { useFriendsStore } from '@/stores/friends';
-import { useNotificationsStore } from '@/stores/notifications';
+import { useNotificationsStore, type ShareNotice } from '@/stores/notifications';
 import { usePlayerStore } from '@/stores/player';
 import type { AnySnapshot } from '@/types';
 
@@ -24,11 +25,19 @@ export default defineComponent({
     const { markRead, markAllRead, close, ensure } = notifications;
     const { expanded } = storeToRefs(usePlayerStore());
     const route = useRoute();
+    const router = useRouter();
 
     // Открыли панель — догружаем шары (лениво, при первом разе).
     watch(open, (value) => {
       if (value) ensure();
     });
+
+    /** Клик по шаре: как обычный клик по снапшоту (плеер/деталка) + гасим непрочитанность. */
+    function openShare(share: ShareNotice) {
+      markRead(share.id);
+      openSnapshot(router, share.snapshot);
+      close();
+    }
 
     function onDocPointerDown(event: PointerEvent) {
       if (!open.value) return;
@@ -56,8 +65,8 @@ export default defineComponent({
       shares,
       unreadCount,
       hasUnread,
-      markRead,
       markAllRead,
+      openShare,
       accept: friends.accept,
       decline: friends.decline,
       friendInitial,

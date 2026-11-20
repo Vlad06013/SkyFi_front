@@ -37,8 +37,11 @@ export function useEntityDetails(type: DetailsEntityType) {
   const sourceId = computed(() => String(route.params.id ?? ''));
 
   async function load(page: number) {
-    // Страница под keep-alive: при уходе параметры роута пустые — глушим.
-    if (!sourceType.value || !sourceId.value) return;
+    // Страницы деталек под keep-alive (TabsLayout): при переходе
+    // artist→album живая «чужая» страница видит новые параметры роута
+    // и раньше слала запрос со своим type и чужим id (422 на бэке).
+    // Грузим только когда активен наш роут; пустые параметры — как раньше.
+    if (route.name !== type || !sourceType.value || !sourceId.value) return;
     const gen = ++generation;
     error.value = null;
     if (page === 1) {

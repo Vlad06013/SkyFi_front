@@ -29,8 +29,8 @@
       :class="{ 'is-unread': share.unread }"
       role="button"
       tabindex="0"
-      @click="markRead(share.id)"
-      @keydown.enter="markRead(share.id)"
+      @click="openShare(share)"
+      @keydown.enter="openShare(share)"
     >
       <div class="thumb" style="background:var(--gradient-cover-1)" />
       <div class="n-body">

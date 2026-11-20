@@ -7,6 +7,7 @@ import type { EntityDetailsPayload, TrackSnapshot } from '@/types';
 
 const routerMocks = vi.hoisted(() => ({
   push: vi.fn(),
+  name: 'artist' as string,
   params: { source: 'yandex_music', id: '6964' } as Record<string, string>,
 }));
 
@@ -14,7 +15,7 @@ vi.mock('vue-router', async () => {
   const actual = await vi.importActual<typeof import('vue-router')>('vue-router');
   return {
     ...actual,
-    useRoute: () => ({ params: routerMocks.params }),
+    useRoute: () => ({ name: routerMocks.name, params: routerMocks.params }),
     useRouter: () => ({ push: routerMocks.push }),
   };
 });
@@ -108,5 +109,20 @@ describe('pages/Artist', () => {
 
     await row.trigger('click');
     expect(routerMocks.push).toHaveBeenCalledWith('/album/yandex_music/al1');
+  });
+
+  it('keep-alive: под чужим роутом (album) страница artist НЕ шлёт /details', async () => {
+    // Регрессия: живая artist-страница видит параметры album-роута и слала
+    // запрос {type: artist, id альбома} → 422. Грузим только свой роут.
+    routerMocks.name = 'album';
+    routerMocks.params = { source: 'yandex_music', id: '35527045' };
+
+    mountPage();
+    await flushPromises();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    routerMocks.name = 'artist';
+    routerMocks.params = { source: 'yandex_music', id: '6964' };
   });
 });

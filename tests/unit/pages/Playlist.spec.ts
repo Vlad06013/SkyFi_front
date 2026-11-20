@@ -16,7 +16,7 @@ vi.mock('vue-router', async () => {
   const actual = await vi.importActual<typeof import('vue-router')>('vue-router');
   return {
     ...actual,
-    useRoute: () => ({ params: routerMocks.params }),
+    useRoute: () => ({ name: 'playlist', params: routerMocks.params }),
     useRouter: () => ({ push: routerMocks.push }),
   };
 });
