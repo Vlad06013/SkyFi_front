@@ -53,8 +53,8 @@ Sanctum Bearer-токен: `Authorization: Bearer <token>`.
 ### 1.4. Health (без авторизации)
 
 `GET /health` (под базовым префиксом, фактически
-`/api/v1/skyfy/health` — уточнено curl'ом, голый `/health`
-отдаёт 404) → `{ status: "ok", server_time }`. Служит
+`/api/v1/skyfy/health` — голый `/health` отдаёт 404) →
+`{ status: "ok", server_time }`. Служит
 офлайн-детекту: неуспешный запрос = бэк недоступен (сеть есть —
 иначе fetch не ушёл бы; токен не при чём, auth тут нет).
 
@@ -87,16 +87,17 @@ Sanctum Bearer-токен: `Authorization: Bearer <token>`.
 
 Общий конверт (все типы): `type`, `source_type`, `source_id`,
 `title`, `artists: [{name, source_id?}]` (исполнители/авторы,
-может быть `[]`). Проверено curl'ом: у artist-снапшотов поле
-`artists` не приходит (ни в поиске, ни в избранном) — фронт от
-него не зависит, подзаголовок строки артиста — фиксированный.
+может быть `[]`). Проверено: у artist-снапшотов поле `artists`
+не приходит (ни в поиске, ни в избранном) — фронт от него не
+зависит, подзаголовок строки артиста фиксированный.
 
-- **track**: + `duration_ms|null`, `cover_url|null` (обложка трека из
-  источника; у Яндекса заполняется импортом), `album {title?, year?,
-  cover_url?, source_id?}|null`, `lyrics|null` (на проводе не
-  приходит — отдельный роут), `stream_url|null` (постоянная
-  ссылка, только у источников со стабильными URL; у Яндекса
-  всегда null), `sort|null`.
+- **track**: + `duration_ms|null`, `album {title?, year?,
+  cover_url?, source_id?}|null`, `cover_url|null` (собственная
+  обложка трека; null — фолбэк на `album.cover_url`), `lyrics|null`
+  (на проводе не приходит — отдельный роут), `stream_url|null`
+  (постоянная ссылка, только у источников со стабильными URL; у
+  Яндекса всегда null), `sort|null` (вес позиции: больше = выше
+  во вкладке).
 - **video**: + `duration_ms|null`, `cover_url|null` (постер),
   `watch_url|null` (постоянная страница в источнике — кнопка
   «оригинал», шаринг; не для воспроизведения), `sort|null`.
@@ -124,25 +125,22 @@ playlist|artist`.
 | `PUT /profile/avatar` | multipart `avatar` (image) |
 | `DELETE /profile/avatar` | → дефолтный аватар |
 
-Форма `user` в register/login/`GET /user` (проверено curl'ом):
-`{id, name, email, avatar_url}`. QR-поллинг при confirmed
-отдаёт полную модель (лишние поля `email_verified_at`,
-`avatar`, `created_at`, `updated_at`) — фронту нужны те же
-`id/name/email/avatar_url`.
+Форма `user` в register/login/`GET /user`: `{id, name, email,
+avatar_url}`. QR-поллинг при confirmed отдаёт полную модель
+(лишние поля `email_verified_at`, `avatar`, `created_at`,
+`updated_at`) — фронту нужны те же `id/name/email/avatar_url`.
 
-**QR-вход** (для ТВ/магнитолы), формы проверены curl'ом:
-- `POST /qr-login` → `data: {code, expires_at, qr_svg}` —
-  код, абсолютный срок (ISO 8601 UTC, ~15 мин) и готовый
-  QR в SVG. Фронт рендерит `qr_svg` как есть, сам QR
-  не генерирует.
-- ТВ поллит `GET /qr-login/{code}` → `data: {status,
-  token, user}`: `pending` — `token`/`user` null;
-  `confirmed` — полные `token` + `user`, ими и логинимся;
-  нет кода — 404 «QR-код не найден.».
+**QR-вход** (для ТВ/магнитолы):
+- `POST /qr-login` → `data: {code, expires_at, qr_svg}` — код,
+  абсолютный срок (ISO 8601 UTC, ~15 мин) и готовый QR в SVG.
+  Фронт рендерит `qr_svg` как есть, сам QR не генерирует.
+- ТВ поллит `GET /qr-login/{code}` → `data: {status, token, user}`:
+  `pending` — `token`/`user` null; `confirmed` — полные `token` +
+  `user`, ими и логинимся; нет кода — 404 «QR-код не найден.».
 - Телефон (auth): `POST /qr-login/confirm` `{code}` → 200
   `{status: "confirmed"}`; без токена — 401 «Не авторизован.».
 
-**Яндекс Музыка (аккаунт)**, формы проверены curl'ом:
+**Яндекс Музыка (аккаунт)**:
 - `POST /yandex-music/auth/device/start` (12/мин) →
   `data: {session_id, status: "pending", verification_url,
   user_code}` — старт device flow (пользователь вводит код на
@@ -258,9 +256,11 @@ status: pending|playing_now|played|skipped, snapshot|null}`.
 
 - `is_favorite` — пометка избранного текущего пользователя
   (всегда bool, только в поиске).
-- `best` — необязательное «лучшее совпадение»: снапшот любого
-  типа + `is_favorite` (форма как у секций; проверено curl'ом —
-  у artist поле `artists` не приходит).
+- `best` — необязательное «лучшее совпадение» в общей
+  снапшотной форме + `is_favorite` (как item секций); невалидный
+  best от источника отдаётся как null. При поиске по ссылке
+  (q = URL) best — разрешённая сущность. У artist в best поле
+  `artists` не приходит — как и в секциях.
 - Сейчас видео-источник — мок: секция `videos` всегда содержит
   2 ролика на любом запросе (реальные потоки через
   `/videos/get-url`). Аудио-источники секцию отдают пустой.
@@ -271,11 +271,11 @@ status: pending|playing_now|played|skipped, snapshot|null}`.
 
 | Метод/путь | Тело → Ответ |
 |---|---|
-| `GET /?type=` | без type — все вкладки `{tracks: [...], videos: [...], albums: [...], artists: [...], playlists: [...]}` (снапшоты, отсортированы; `videos` всегда на месте, у Яндекса пусто); с type — одна секция |
+| `GET /?type=` | без type — все вкладки `{tracks: [...], videos: [...], albums: [...], artists: [...], playlists: [...]}` (снапшоты, отсортированы; `videos` всегда на месте, у аудио-источников пусто); с type — одна секция |
 | `POST /` | snapshot → `{message, is_favorite: true}`; запись; повтор — no-op |
 | `DELETE /` | snapshot в теле → удалить; сообщение |
 | `POST /check` | snapshot → `{is_favorite}` |
-| `PATCH /sort` | `{type, items: [{source_type, source_id, sort}]}` — новый порядок вкладки (`sort` = вес позиции: больший вес выше в списке, бэк отдаёт по убыванию) |
+| `PATCH /sort` | `{type, items: [{source_type, source_id, sort}]}` — новый порядок вкладки. Только `type: "track"`; `sort` — вес позиции (больше = выше во вкладке), хранится и отдаётся как есть, выдача по убыванию |
 
 ## 11. Плейлисты (`/playlists`)
 
@@ -297,17 +297,16 @@ status: pending|playing_now|played|skipped, snapshot|null}`.
 
 ### Детали сущностей: `POST /details`
 
-Единая выдача деталей для `type` ∈ `album|artist|playlist`
-(проверено curl'ом). Тело — конверт снапшота
-(`type`, `source_type`, `source_id`; `title` необязателен — бэк
-резолвит сущность по паре источника) + `page`/`limit` (пагинация
-треков, как в поиске).
+Единая выдача деталей для `type` ∈ `album|artist|playlist`.
+Тело — конверт снапшота (`type`, `source_type`, `source_id`;
+`title` необязателен — бэк резолвит сущность по паре источника)
++ `page`/`limit` (пагинация треков, как в поиске).
 
 Ответ — `{entity, tracks, albums}`:
 
 - `entity` — снапшот запрошенной сущности (полный: у album
-  `artists/year/track_count`, у playlist `owner_name/
-  item_count`, у artist `cover_url`);
+  `artists/year/track_count`, у playlist `owner_name/item_count`,
+  у artist `cover_url`);
 - `tracks` — `{items: [TrackSnapshot], total, has_more}`;
 - `albums` — `{items: [AlbumSnapshot], total, has_more}`
   (наполнена у artist, у album/playlist пустая).
@@ -319,9 +318,8 @@ status: pending|playing_now|played|skipped, snapshot|null}`.
 | `POST /request` (20/мин) | `{user_id}` → заявка |
 | `POST /requests/{friendship}/accept` | → дружба |
 | `DELETE /{friendship}` | → отклонить/удалить |
-| `GET /` | → друзья |
+| `GET /?section=&q=` | → `{friends, incoming, outgoing}` — секции дружбы одним запросом (без фильтра — все три; `section` ∈ friends\|incoming\|outgoing оставляет одну, остальные пустые; `q` фильтрует по имени собеседника) |
 | `GET /search-users?q=` | → пользователи + статус заявки |
-| `GET /requests/incoming`, `/outgoing` | → заявки |
 | `GET /{user}` | → профиль друга |
 | `GET /{user}/now-playing` | → `{is_playing, snapshot\|null}` |
 | `GET /{user}/favorites` | → вкладки избранного друга |
@@ -335,6 +333,9 @@ status: pending|playing_now|played|skipped, snapshot|null}`.
 плеера нет). Отдаётся всегда, независимо от is_playing: на странице
 друзей берём сторону, которая не я. То же поле приходит в
 websocket-ивентах `friendship.request.sent` / `friendship.request.accepted`.
+Внимание: здесь аватар — поле `avatar`, а в профиле
+(`GET /user` и др.) — `avatar_url`: бэк пока не унифицировал
+имена, фронт смотрит поле по эндпоинту.
 
 ## 13. Шары и ссылки
 
@@ -356,23 +357,20 @@ websocket-ивентах `friendship.request.sent` / `friendship.request.accepte
 ## 15. Загрузки (`/uploads`)
 
 Свои файлы: `POST /` multipart `{audio (mp3/flac/...), title,
-artist_names: [..], album_title?}` → upload; `GET /` — список;
-`PATCH /{id}`
+artist_names: [..]}` → upload; `GET /` — список; `PATCH /{id}`
 — мета (title, artist_names, album_title, lyrics, visibility);
 `DELETE /{id}`; `GET /{id}/stream` — поток файла (постоянная
 ссылка, качается и для офлайна).
 
 ## 16. Импорт из Яндекса (`/import/yandex-music`)
 
-Формы по коду бэка (контроллер `YandexMusicImportController`).
 Без подключённого Яндекса summary/start — 422 «Яндекс Музыка
 не подключена.».
 
 - `GET /summary` → `data: {<type>: {total, existing}}` по ключам
-  `tracks`/`videos`/`albums`/`playlists`/`artists`: `total` —
-  сколько лайкнуто в Яндексе, `existing` — сколько уже перенесено
-  в SkyFi (маркер `import_source: "yandex"`). Видео Яндекс не
-  лайкает: `total` у `videos` всегда 0.
+  `tracks`/`albums`/`artists`/`playlists`: `total` — сколько
+  лайкнуто в Яндексе, `existing` — сколько уже перенесено в SkyFi
+  (маркер `import_source: "yandex"`).
 - `POST /` (12/мин) → прогресс созданной задачи (старая запись
   пользователя удаляется). Джоба уходит в очередь.
 - `GET /` → прогресс активной (или последней) задачи, `data:

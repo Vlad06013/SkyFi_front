@@ -27,14 +27,16 @@ interface SnapshotBase {
 export interface TrackSnapshot extends SnapshotBase {
   type: 'track';
   duration_ms: number | null;
-  /** Обложка трека из источника; null — пока бэк её не привёз. */
-  cover_url: string | null;
   album: {
     title?: string;
     year?: string;
     cover_url?: string;
     source_id?: string;
   } | null;
+  /** Собственная обложка трека (у Яндекса — track cover_uri,
+   * совпадает с обложкой альбома). null — фолбэк на
+   * album.cover_url. У upload всегда null. */
+  cover_url: string | null;
   /** Постоянная ссылка, только у источников со стабильными URL
    * (upload). У Яндекса null — запросить /audio/get-url. */
   stream_url: string | null;
@@ -125,7 +127,7 @@ export interface AuthUser {
   id: number;
   name: string;
   email: string;
-  /** Проверено curl'ом: бэк отдаёт avatar_url (не avatar). */
+  /** Проверено: профиль отдаёт avatar_url (не avatar). */
   avatar_url: string | null;
 }
 
@@ -180,7 +182,7 @@ export interface HealthPayload {
 }
 ```
 
-## QR-вход (api.md §3, формы проверены curl'ом)
+## QR-вход (api.md §3)
 
 ```ts
 /** data ответа POST /qr-login. */
@@ -209,7 +211,7 @@ export interface QrConfirmPayload {
 }
 ```
 
-## Яндекс Музыка: подключение аккаунта (api.md §3, формы проверены curl'ом)
+## Яндекс Музыка: подключение аккаунта (api.md §3)
 
 ```ts
 /** data ответа POST /yandex-music/auth/device/start. Идемпотентен: активную сессию возвращает как есть. */
@@ -243,7 +245,7 @@ export interface YandexDisconnectPayload {
 }
 ```
 
-## Импорт «Мне нравится» из Яндекс Музыки (api.md §16, формы по коду бэка)
+## Импорт «Мне нравится» из Яндекс Музыки (api.md §16)
 
 ```ts
 export interface YandexImportSection {
@@ -253,10 +255,9 @@ export interface YandexImportSection {
   existing: number;
 }
 
-/** data ответа GET /import/yandex-music/summary. Видео Яндекс не лайкает: total всегда 0. */
+/** data ответа GET /import/yandex-music/summary. */
 export interface YandexImportSummaryPayload {
   tracks: YandexImportSection;
-  videos: YandexImportSection;
   albums: YandexImportSection;
   playlists: YandexImportSection;
   artists: YandexImportSection;
@@ -304,7 +305,7 @@ export interface UploadPatch {
 ```
 
 `POST /uploads` — multipart: `audio` (файл), `title`,
-`artist_names[]`, `album_title` (опционально). Поток файла:
+`artist_names[]`, `album_title`. Поток файла:
 `GET /uploads/{id}/stream` (постоянная ссылка, качается и для офлайна).
 
 ## Потоки
@@ -351,7 +352,9 @@ export type WithFavorite<T> = T & { is_favorite: boolean };
 export interface SearchPagePayload {
   query: string;
   page: number;
-  best: Record<string, unknown> | null;
+  /** Лучшее совпадение: общая снапшотная форма + is_favorite,
+   * как item секций. */
+  best: WithFavorite<AnySnapshot> | null;
   tracks: SearchSection<WithFavorite<TrackSnapshot>>;
   albums: SearchSection<WithFavorite<AlbumSnapshot>>;
   artists: SearchSection<WithFavorite<ArtistSnapshot>>;
@@ -363,10 +366,10 @@ export interface SearchPagePayload {
 ## Избранное, плейлисты, волна
 
 ```ts
-/** data ответа GET /favorites без фильтра: вкладки по типам. Ключ videos всегда на месте (у Яндекса пусто). */
+/** data ответа GET /favorites без фильтра: вкладки по типам.
+ * Ключ videos всегда на месте (у аудио-источников пусто). */
 export interface FavoritesPayload {
   tracks: TrackSnapshot[];
-  videos: VideoSnapshot[];
   albums: AlbumSnapshot[];
   artists: ArtistSnapshot[];
   playlists: PlaylistSnapshot[];
@@ -439,6 +442,8 @@ export interface PlaybackDeviceDisconnectedPayload {
 export interface FriendshipSide {
   id: number;
   name: string;
+  /** Здесь avatar (не avatar_url, как в профиле) — бэк пока
+   * не унифицировал имена полей. */
   avatar: string | null;
   current_snapshot: AnySnapshot | null;
 }
@@ -449,6 +454,15 @@ export interface FriendshipPayload {
   receiver: FriendshipSide;
   status: string;
   created_at: string | null;
+}
+
+/** GET /friends: обзор дружбы секциями. Без фильтра наполнены
+ * все три; ?section=friends|incoming|outgoing оставляет одну
+ * (остальные пустые). ?q= фильтрует по имени собеседника. */
+export interface FriendshipOverviewPayload {
+  friends: FriendshipPayload[];
+  incoming: FriendshipPayload[];
+  outgoing: FriendshipPayload[];
 }
 
 export interface ShareSentPayload {
@@ -470,9 +484,9 @@ export const mockTrack: TrackSnapshot = {
   source_id: '111',
   title: 'Radio Silence',
   duration_ms: 203310,
-  cover_url: null,
   artists: [{ name: 'Sum 41', source_id: '5950' }],
   album: { title: 'Heaven :x: Hell', year: '2024', cover_url: 'https://example.com/c.webp' },
+  cover_url: 'https://example.com/c.webp',
   stream_url: null,
 };
 
