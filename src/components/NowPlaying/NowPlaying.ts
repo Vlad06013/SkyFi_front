@@ -4,6 +4,7 @@ import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
 import SeekBar from '@/components/SeekBar/SeekBar.vue';
 import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
+import { useLyrics } from '@/composables/useLyrics';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { coverVar, artistsLine, trackCover } from '@/lib/cover';
@@ -55,6 +56,33 @@ export default defineComponent({
     } = player;
 
     const layer = ref<Layer>('now');
+    const {
+      lines: lyricLines,
+      loading: lyricLoading,
+      error: lyricError,
+      synced: lyricSynced,
+      retry: retryLyrics,
+    } = useLyrics(
+      () => (current.value?.type === 'track' ? current.value : null),
+      () => layer.value === 'lyrics',
+    );
+    const activeLyricLine = computed(() => {
+      if (!lyricSynced.value || !lyricLines.value) return -1;
+      const positionMs = state.value.position_seconds * 1000;
+      let active = -1;
+      for (let index = 0; index < lyricLines.value.length; index += 1) {
+        const timeMs = lyricLines.value[index].time_ms;
+        if (timeMs === null || timeMs > positionMs) break;
+        active = index;
+      }
+      return active;
+    });
+    const lyrEl = ref<HTMLElement | null>(null);
+    watch(activeLyricLine, (index) => {
+      if (index < 0) return;
+      const el = lyrEl.value?.children[index];
+      if (el instanceof HTMLElement) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    });
     const playerDragging = ref(false);
     const queueDragging = ref(false);
     const playerDragY = ref(0);
@@ -284,6 +312,13 @@ export default defineComponent({
       playing,
       repeatLabel,
       layer,
+      lyricLines,
+      lyricLoading,
+      lyricError,
+      lyricSynced,
+      activeLyricLine,
+      lyrEl,
+      retryLyrics,
       playerDragging,
       queueDragging,
       playerDragY,

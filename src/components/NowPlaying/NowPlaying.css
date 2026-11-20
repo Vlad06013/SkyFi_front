@@ -177,6 +177,10 @@
   user-select: text;
 }
 
+.now-playing .lyr {
+  user-select: text;
+}
+
 @media (min-width: 701px) {
   .now-playing-inner {
     padding: max(18px, env(safe-area-inset-top)) 28px max(20px, env(safe-area-inset-bottom));

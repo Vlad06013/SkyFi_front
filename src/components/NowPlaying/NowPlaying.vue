@@ -136,11 +136,26 @@
           </div>
         </template>
 
-        <div v-else-if="layer === 'lyrics'" class="lyr">
-          <div>эфир гудит в ночи</div>
-          <div class="now">радиотишина</div>
-          <div>не выключай меня</div>
-          <div>я буду здесь</div>
+        <div v-else-if="layer === 'lyrics'" ref="lyrEl" class="lyr">
+          <template v-if="lyricLoading">
+            <div>загружаем текст…</div>
+          </template>
+          <template v-else-if="lyricError">
+            <div>{{ lyricError }}</div>
+            <div>
+              <button class="btn btn-ghost sm" type="button" @click="retryLyrics">повторить</button>
+            </div>
+          </template>
+          <template v-else-if="lyricLines">
+            <div
+              v-for="(line, index) in lyricLines"
+              :key="index"
+              :class="{ now: lyricSynced && index === activeLyricLine }"
+            >{{ line.text }}</div>
+          </template>
+          <template v-else>
+            <div>текст не найден</div>
+          </template>
         </div>
 
         <div
