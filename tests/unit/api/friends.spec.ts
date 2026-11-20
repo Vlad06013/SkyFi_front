@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { http } from '@/api/http';
 import {
-  acceptFriendship,
+  acceptFriendRequest,
   addToFriendQueue,
-  deleteFriendship,
   fetchFriendProfile,
   fetchFriendshipOverview,
   fetchFriendNowPlaying,
   fetchFriendQueue,
+  removeFriend,
   reorderFriendQueue,
   searchUsers,
   sendFriendRequest,
@@ -73,16 +73,16 @@ describe('api/friends', () => {
     expect(postMock).toHaveBeenCalledWith('friends/request', { user_id: 7 });
   });
 
-  it('POST friends/requests/{id}/accept', async () => {
+  it('POST friends/{userId}/accept: принять входящую заявку', async () => {
     postMock.mockResolvedValue({} as never);
-    await acceptFriendship(9);
-    expect(postMock).toHaveBeenCalledWith('friends/requests/9/accept');
+    await acceptFriendRequest(3);
+    expect(postMock).toHaveBeenCalledWith('friends/3/accept');
   });
 
-  it('DELETE friends/{id}: отклонить/удалить', async () => {
+  it('DELETE friends/{userId}: отклонить/отменить/расфрендить', async () => {
     deleteMock.mockResolvedValue({} as never);
-    await deleteFriendship(9);
-    expect(deleteMock).toHaveBeenCalledWith('friends/9');
+    await removeFriend(3);
+    expect(deleteMock).toHaveBeenCalledWith('friends/3');
   });
 
   it('GET профиль/now-playing/очередь друга по user id', async () => {

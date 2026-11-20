@@ -17,7 +17,7 @@
     <template v-if="!query">
       <template v-if="incoming.length">
         <div class="sec-label">Заявки <span>{{ incoming.length }}</span></div>
-        <div v-for="entry in incoming" :key="entry.friendshipId" class="friend-row">
+        <div v-for="entry in incoming" :key="entry.user.id" class="friend-row">
           <div class="avatar ini" :class="friendTone(entry.user.id)">
             <img v-if="entry.user.avatar_url" :src="entry.user.avatar_url" alt="">
             <template v-else>{{ friendInitial(entry.user.name) }}</template>
@@ -27,10 +27,10 @@
             <div class="idle">хочет в друзья</div>
           </div>
           <div class="n-actions">
-            <button class="icon-btn ghost ok" type="button" aria-label="принять" @click="accept(entry.friendshipId)">
+            <button class="icon-btn ghost ok" type="button" aria-label="принять" @click="accept(entry.user.id)">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 9.5 17 19 7.5" /></svg>
             </button>
-            <button class="icon-btn ghost bad" type="button" aria-label="отклонить" @click="decline(entry.friendshipId)">
+            <button class="icon-btn ghost bad" type="button" aria-label="отклонить" @click="decline(entry.user.id)">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 5l14 14M19 5 5 19" /></svg>
             </button>
           </div>
@@ -40,7 +40,7 @@
       <div class="sec-label">Друзья <span>{{ friends.length }}</span></div>
       <button
         v-for="entry in friends"
-        :key="entry.friendshipId"
+        :key="entry.user.id"
         class="friend-row"
         type="button"
         @click="openFriend(entry.user.id)"
@@ -70,7 +70,7 @@
 
       <template v-if="outgoing.length">
         <div class="sec-label">Отправлено <span>{{ outgoing.length }}</span></div>
-        <div v-for="entry in outgoing" :key="entry.friendshipId" class="friend-row">
+        <div v-for="entry in outgoing" :key="entry.user.id" class="friend-row">
           <div class="avatar ini" :class="friendTone(entry.user.id)">
             <img v-if="entry.user.avatar_url" :src="entry.user.avatar_url" alt="">
             <template v-else>{{ friendInitial(entry.user.name) }}</template>
@@ -79,7 +79,7 @@
             <div class="track-title">{{ entry.user.name }}</div>
             <div class="idle">заявка отправлена</div>
           </div>
-          <button class="btn btn-ghost sm" type="button" @click="cancelOutgoing(entry.friendshipId)">Отменить</button>
+          <button class="btn btn-ghost sm" type="button" @click="cancelOutgoing(entry.user.id)">Отменить</button>
         </div>
       </template>
 

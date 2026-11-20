@@ -72,6 +72,9 @@ export default defineComponent({
 
     /** Профиль + now-playing + избранное друга одним пакетом (api.md §12). */
     async function load() {
+      // Страница под keep-alive: при уходе параметр роута уже не число — глушим.
+      const id = userId.value;
+      if (!Number.isFinite(id)) return;
       const gen = ++generation;
       loading.value = true;
       loadError.value = null;
@@ -181,13 +184,13 @@ export default defineComponent({
     }
 
     async function removeFriend() {
-      const removed = await friendsStore.removeByUserId(userId.value);
+      const removed = await friendsStore.removeFriend(userId.value);
       if (removed) {
         toast.show(profile.value?.name ?? '', 'удалён из друзей');
         router.back();
         return;
       }
-      if (!friendsStore.loaded) toast.show('Список друзей не загружен', 'попробуйте снова', true);
+      toast.show('Не удалось удалить друга', 'попробуйте снова', true);
     }
 
     function onSort(event: PointerEvent, index: number) {

@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia';
 import { ref, watch } from 'vue';
 import {
-  acceptFriendship,
-  deleteFriendship,
+  acceptFriendRequest,
   fetchFriendshipOverview,
+  removeFriend as removeFriendApi,
   sendFriendRequest,
 } from '@/api/friends';
 import { liveLine } from '@/lib/friends';
@@ -12,9 +12,8 @@ import { useOnlineStore } from '@/stores/online';
 import { useToastStore } from '@/stores/toast';
 import type { FriendshipOverviewPayload, FriendshipPayload, FriendshipSide } from '@/types';
 
-/** Друг для UI: дружба + сторона, которая не я. */
+/** Друг для UI: сторона дружбы, которая не я. Дружба адресуется по id пользователя. */
 export interface FriendEntry {
-  friendshipId: number;
   user: FriendshipSide;
   /** «Сейчас играет» строкой для списка (null — плеер пуст). */
   live: string | null;
@@ -26,7 +25,6 @@ function toEntry(friendship: FriendshipPayload, myId: number | undefined): Frien
   const user =
     myId !== undefined && friendship.sender.id === myId ? friendship.receiver : friendship.sender;
   return {
-    friendshipId: friendship.id,
     user,
     live: liveLine(user.current_snapshot),
     watching: user.current_snapshot?.type === 'video',
@@ -66,30 +64,32 @@ export const useFriendsStore = defineStore('friends', () => {
     return fetchAll().catch(() => undefined);
   }
 
-  async function accept(friendshipId: number) {
+  /** Принять входящую заявку (адресуется по id отправителя). */
+  async function accept(userId: number) {
     try {
-      const friendship = await acceptFriendship(friendshipId);
-      incoming.value = incoming.value.filter((item) => item.friendshipId !== friendshipId);
+      const friendship = await acceptFriendRequest(userId);
+      incoming.value = incoming.value.filter((entry) => entry.user.id !== userId);
       friends.value = [toEntry(friendship, auth.user?.id), ...friends.value];
     } catch (cause) {
       toast.show(errorMessage(cause, 'Не удалось принять заявку'), '', true);
     }
   }
 
-  async function decline(friendshipId: number) {
+  /** Отклонить входящую заявку. */
+  async function decline(userId: number) {
     try {
-      await deleteFriendship(friendshipId);
-      incoming.value = incoming.value.filter((item) => item.friendshipId !== friendshipId);
+      await removeFriendApi(userId);
+      incoming.value = incoming.value.filter((entry) => entry.user.id !== userId);
     } catch (cause) {
       toast.show(errorMessage(cause, 'Не удалось отклонить заявку'), '', true);
     }
   }
 
-  /** Удаление дружбы по id дружбы. true — удалено. */
-  async function removeFriend(friendshipId: number): Promise<boolean> {
+  /** Удалить из друзей. true — удалено. */
+  async function removeFriend(userId: number): Promise<boolean> {
     try {
-      await deleteFriendship(friendshipId);
-      friends.value = friends.value.filter((item) => item.friendshipId !== friendshipId);
+      await removeFriendApi(userId);
+      friends.value = friends.value.filter((entry) => entry.user.id !== userId);
       return true;
     } catch (cause) {
       toast.show(errorMessage(cause, 'Не удалось удалить друга'), '', true);
@@ -97,33 +97,25 @@ export const useFriendsStore = defineStore('friends', () => {
     }
   }
 
-  /** Удаление дружбы по id пользователя (страница друга знает user id,
-   * DELETE ждёт friendship id — находим по обзору, подгружая его при необходимости). */
-  async function removeByUserId(userId: number): Promise<boolean> {
-    if (!loaded.value) await ensure();
-    const entry = friends.value.find((item) => item.user.id === userId);
-    if (!entry) return false;
-    return removeFriend(entry.friendshipId);
-  }
-
-  async function cancelOutgoing(friendshipId: number) {
+  /** Отменить исходящую заявку. */
+  async function cancelOutgoing(userId: number) {
     try {
-      await deleteFriendship(friendshipId);
-      outgoing.value = outgoing.value.filter((item) => item.friendshipId !== friendshipId);
+      await removeFriendApi(userId);
+      outgoing.value = outgoing.value.filter((entry) => entry.user.id !== userId);
     } catch (cause) {
       toast.show(errorMessage(cause, 'Не удалось отменить заявку'), '', true);
     }
   }
 
-  /** Отправка заявки. Успех — id созданной дружбы (нужен для «Отменить»), иначе null. */
-  async function sendRequest(userId: number): Promise<number | null> {
+  /** Отправка заявки. true — отправлено. */
+  async function sendRequest(userId: number): Promise<boolean> {
     try {
       const friendship = await sendFriendRequest(userId);
       outgoing.value = [toEntry(friendship, auth.user?.id), ...outgoing.value];
-      return friendship.id;
+      return true;
     } catch (cause) {
       toast.show(errorMessage(cause, 'Не удалось отправить заявку'), '', true);
-      return null;
+      return false;
     }
   }
 
@@ -154,7 +146,6 @@ export const useFriendsStore = defineStore('friends', () => {
     accept,
     decline,
     removeFriend,
-    removeByUserId,
     cancelOutgoing,
     sendRequest,
   };

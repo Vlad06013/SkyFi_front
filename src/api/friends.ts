@@ -32,14 +32,14 @@ export function sendFriendRequest(userId: number) {
   return http.post<FriendshipPayload>('friends/request', { user_id: userId });
 }
 
-/** Принять заявку (api.md §12). */
-export function acceptFriendship(friendshipId: number) {
-  return http.post<FriendshipPayload>(`friends/requests/${friendshipId}/accept`);
+/** Принять входящую заявку от пользователя (api.md §12). */
+export function acceptFriendRequest(userId: number) {
+  return http.post<FriendshipPayload>(`friends/${userId}/accept`);
 }
 
-/** Отклонить заявку / удалить дружбу (api.md §12). */
-export function deleteFriendship(friendshipId: number) {
-  return http.delete<unknown>(`friends/${friendshipId}`);
+/** Снять связь: отклонить входящую / отменить исходящую / удалить из друзей (api.md §12). */
+export function removeFriend(userId: number) {
+  return http.delete<unknown>(`friends/${userId}`);
 }
 
 /** Профиль друга (api.md §12). Предположение: форма AuthUser

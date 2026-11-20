@@ -316,8 +316,8 @@ status: pending|playing_now|played|skipped, snapshot|null}`.
 | Метод/путь | Тело → Ответ |
 |---|---|
 | `POST /request` (20/мин) | `{user_id}` → заявка |
-| `POST /requests/{friendship}/accept` | → дружба |
-| `DELETE /{friendship}` | → отклонить/удалить |
+| `POST /{user}/accept` | → дружба (принять входящую заявку от пользователя) |
+| `DELETE /{user}` | → снять связь: отклонить входящую / отменить исходящую / удалить из друзей |
 | `GET /?section=&q=` | → `{friends, incoming, outgoing}` — секции дружбы одним запросом (без фильтра — все три; `section` ∈ friends\|incoming\|outgoing оставляет одну, остальные пустые; `q` фильтрует по имени собеседника) |
 | `GET /search-users?q=` | → `[{user_id, name, email, avatar_url, friendship_id, friendship_status}]` — `user_id` — id пользователя, `friendship_id` — id заявки; `avatar_url` полный URL (как в профиле) |
 | `GET /{user}` | → профиль друга |
@@ -334,7 +334,8 @@ status: pending|playing_now|played|skipped, snapshot|null}`.
 друзей берём сторону, которая не я. То же поле приходит в
 websocket-ивентах `friendship.request.sent` / `friendship.request.accepted`.
 Во всех пользовательских формах аватар — поле `avatar_url` (полный
-URL, null без аватара).
+URL, null без аватара). Дружба адресуется по id пользователя — id
+записи дружбы на провод не уходит (в т.ч. accept/удаление).
 
 ## 13. Шары и ссылки
 

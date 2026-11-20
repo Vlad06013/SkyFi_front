@@ -13,8 +13,8 @@ vi.mock('@/api/friends', () => ({
   fetchFriendshipOverview: vi.fn(),
   searchUsers: vi.fn(),
   sendFriendRequest: vi.fn(),
-  acceptFriendship: vi.fn(),
-  deleteFriendship: vi.fn(),
+  acceptFriendRequest: vi.fn(),
+  removeFriend: vi.fn(),
   fetchFriendProfile: vi.fn(),
   fetchFriendNowPlaying: vi.fn(),
   fetchFriendFavorites: vi.fn(),
@@ -25,8 +25,8 @@ vi.mock('@/api/friends', () => ({
 }));
 
 const overviewMock = vi.mocked(friendsApi.fetchFriendshipOverview);
-const acceptMock = vi.mocked(friendsApi.acceptFriendship);
-const deleteMock = vi.mocked(friendsApi.deleteFriendship);
+const acceptMock = vi.mocked(friendsApi.acceptFriendRequest);
+const removeMock = vi.mocked(friendsApi.removeFriend);
 const sendMock = vi.mocked(friendsApi.sendFriendRequest);
 
 const track: TrackSnapshot = {
@@ -63,7 +63,7 @@ describe('stores/friends', () => {
     setActivePinia(createPinia());
     overviewMock.mockReset();
     acceptMock.mockReset();
-    deleteMock.mockReset();
+    removeMock.mockReset();
     sendMock.mockReset();
   });
 
@@ -90,12 +90,12 @@ describe('stores/friends', () => {
     expect(liveLine(null)).toBeNull();
   });
 
-  it('accept: заявка уходит из incoming, друг появляется в friends', async () => {
+  it('accept: заявка уходит из incoming, друг появляется в friends (по user id)', async () => {
     const accepted = makeFriendship(2, 2, 1);
     acceptMock.mockResolvedValue(accepted as never);
     authAsMe();
     const store = useFriendsStore();
-    store.incoming = [{ friendshipId: 2, user: accepted.sender, live: null, watching: false }];
+    store.incoming = [{ user: accepted.sender, live: null, watching: false }];
     await flushPromises();
 
     await store.accept(2);
@@ -105,51 +105,48 @@ describe('stores/friends', () => {
     expect(store.friends.map((entry) => entry.user.id)).toEqual([2]);
   });
 
-  it('decline: DELETE + фильтр incoming; ошибка — тост', async () => {
-    deleteMock.mockResolvedValue({} as never);
+  it('decline: DELETE по user id + фильтр incoming; ошибка — тост', async () => {
+    removeMock.mockResolvedValue({} as never);
     authAsMe();
     const store = useFriendsStore();
     store.incoming = [
-      { friendshipId: 2, user: { id: 2, name: 'User2', avatar_url: null, current_snapshot: null }, live: null, watching: false },
+      { user: { id: 2, name: 'User2', avatar_url: null, current_snapshot: null }, live: null, watching: false },
     ];
 
     await store.decline(2);
 
-    expect(deleteMock).toHaveBeenCalledWith(2);
+    expect(removeMock).toHaveBeenCalledWith(2);
     expect(store.incoming).toHaveLength(0);
 
-    deleteMock.mockRejectedValueOnce(new Error('offline'));
+    removeMock.mockRejectedValueOnce(new Error('offline'));
     await store.decline(2);
     expect(useToastStore().toast?.error).toBe(true);
   });
 
-  it('sendRequest: дружба в outgoing, успех — id дружбы', async () => {
+  it('sendRequest: дружба в outgoing, true при успехе', async () => {
     sendMock.mockResolvedValue(makeFriendship(5, 1, 7) as never);
     authAsMe();
     const store = useFriendsStore();
     await flushPromises();
 
-    const friendshipId = await store.sendRequest(7);
+    const sent = await store.sendRequest(7);
 
-    expect(friendshipId).toBe(5);
+    expect(sent).toBe(true);
     expect(sendMock).toHaveBeenCalledWith(7);
     expect(store.outgoing.map((entry) => entry.user.id)).toEqual([7]);
   });
 
-  it('removeByUserId: подгружает обзор, находит дружбу, удаляет', async () => {
-    overviewMock.mockResolvedValue({
-      friends: [makeFriendship(1, 1, 3)],
-      incoming: [],
-      outgoing: [],
-    } as never);
-    deleteMock.mockResolvedValue({} as never);
+  it('removeFriend: DELETE по user id, дружба пропадает из списка', async () => {
+    removeMock.mockResolvedValue({} as never);
     authAsMe();
     const store = useFriendsStore();
+    const friendship = makeFriendship(1, 1, 3);
+    store.friends = [{ user: friendship.receiver, live: null, watching: false }];
 
-    const removed = await store.removeByUserId(3);
+    const removed = await store.removeFriend(3);
 
     expect(removed).toBe(true);
-    expect(deleteMock).toHaveBeenCalledWith(1);
+    expect(removeMock).toHaveBeenCalledWith(3);
     expect(store.friends).toHaveLength(0);
   });
 

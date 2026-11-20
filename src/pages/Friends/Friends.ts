@@ -76,28 +76,25 @@ export default defineComponent({
     }
 
     async function addUser(user: UserSearchItem) {
-      const friendshipId = await friendsStore.sendRequest(user.user_id);
-      if (friendshipId !== null) {
-        patchFound(user.user_id, { friendship_id: friendshipId, friendship_status: 'outgoing' });
+      const sent = await friendsStore.sendRequest(user.user_id);
+      if (sent) {
+        patchFound(user.user_id, { friendship_status: 'outgoing' });
       }
     }
 
     async function cancelRequest(user: UserSearchItem) {
-      if (user.friendship_id === null) return;
-      await friendsStore.cancelOutgoing(user.friendship_id);
-      patchFound(user.user_id, { friendship_id: null, friendship_status: 'none' });
+      await friendsStore.cancelOutgoing(user.user_id);
+      patchFound(user.user_id, { friendship_status: 'none' });
     }
 
     async function acceptRequest(user: UserSearchItem) {
-      if (user.friendship_id === null) return;
-      await friendsStore.accept(user.friendship_id);
+      await friendsStore.accept(user.user_id);
       patchFound(user.user_id, { friendship_status: 'friends' });
     }
 
     async function declineRequest(user: UserSearchItem) {
-      if (user.friendship_id === null) return;
-      await friendsStore.decline(user.friendship_id);
-      patchFound(user.user_id, { friendship_id: null, friendship_status: 'none' });
+      await friendsStore.decline(user.user_id);
+      patchFound(user.user_id, { friendship_status: 'none' });
     }
 
     return {

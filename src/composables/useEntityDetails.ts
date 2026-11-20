@@ -37,6 +37,8 @@ export function useEntityDetails(type: DetailsEntityType) {
   const sourceId = computed(() => String(route.params.id ?? ''));
 
   async function load(page: number) {
+    // Страница под keep-alive: при уходе параметры роута пустые — глушим.
+    if (!sourceType.value || !sourceId.value) return;
     const gen = ++generation;
     error.value = null;
     if (page === 1) {

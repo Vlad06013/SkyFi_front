@@ -2,16 +2,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { flushPromises, mount } from '@vue/test-utils';
 import * as friendsApi from '@/api/friends';
-import { useFriendsStore } from '@/stores/friends';
 import Friends from '@/pages/Friends/Friends.vue';
 import type { FriendshipPayload, UserSearchItem } from '@/types';
+
+const routerMocks = vi.hoisted(() => ({
+  push: vi.fn(),
+}));
+
+vi.mock('vue-router', async () => {
+  const actual = await vi.importActual<typeof import('vue-router')>('vue-router');
+  return {
+    ...actual,
+    useRouter: () => ({ push: routerMocks.push }),
+  };
+});
 
 vi.mock('@/api/friends', () => ({
   fetchFriendshipOverview: vi.fn(),
   searchUsers: vi.fn(),
   sendFriendRequest: vi.fn(),
-  acceptFriendship: vi.fn(),
-  deleteFriendship: vi.fn(),
+  acceptFriendRequest: vi.fn(),
+  removeFriend: vi.fn(),
   fetchFriendProfile: vi.fn(),
   fetchFriendNowPlaying: vi.fn(),
   fetchFriendFavorites: vi.fn(),
@@ -24,8 +35,8 @@ vi.mock('@/api/friends', () => ({
 const overviewMock = vi.mocked(friendsApi.fetchFriendshipOverview);
 const searchUsersMock = vi.mocked(friendsApi.searchUsers);
 const sendMock = vi.mocked(friendsApi.sendFriendRequest);
-const acceptMock = vi.mocked(friendsApi.acceptFriendship);
-const deleteMock = vi.mocked(friendsApi.deleteFriendship);
+const acceptMock = vi.mocked(friendsApi.acceptFriendRequest);
+const removeMock = vi.mocked(friendsApi.removeFriend);
 
 function searchItem(patch: Partial<UserSearchItem>): UserSearchItem {
   return {
@@ -33,7 +44,6 @@ function searchItem(patch: Partial<UserSearchItem>): UserSearchItem {
     name: '',
     email: '',
     avatar_url: null,
-    friendship_id: null,
     friendship_status: null,
     ...patch,
   };
@@ -50,9 +60,9 @@ function makeFriendship(id: number, senderId: number, receiverId: number): Frien
 }
 
 const FOUND: UserSearchItem[] = [
-  searchItem({ user_id: 2, name: 'Катя', email: 'katya@mail.ru', friendship_id: 5, friendship_status: 'outgoing' }),
-  searchItem({ user_id: 3, name: 'Никита', email: 'nikita@mail.ru', friendship_id: 9, friendship_status: 'incoming' }),
-  searchItem({ user_id: 4, name: 'Аня', email: 'anya@mail.ru', friendship_id: 4, friendship_status: 'friends' }),
+  searchItem({ user_id: 2, name: 'Катя', email: 'katya@mail.ru', friendship_status: 'outgoing' }),
+  searchItem({ user_id: 3, name: 'Никита', email: 'nikita@mail.ru', friendship_status: 'incoming' }),
+  searchItem({ user_id: 4, name: 'Аня', email: 'anya@mail.ru', friendship_status: 'friends' }),
   searchItem({ user_id: 7, name: 'Макс', email: 'max@mail.ru' }),
 ];
 
@@ -70,7 +80,7 @@ describe('pages/Friends', () => {
     searchUsersMock.mockReset();
     sendMock.mockReset();
     acceptMock.mockReset();
-    deleteMock.mockReset();
+    removeMock.mockReset();
     overviewMock.mockResolvedValue({ friends: [], incoming: [], outgoing: [] } as never);
     searchUsersMock.mockResolvedValue(FOUND as never);
   });
@@ -122,14 +132,14 @@ describe('pages/Friends', () => {
     expect(max.find('.btn').text()).toBe('Добавить');
   });
 
-  it('«Отменить» в поиске шлёт DELETE и возвращает пользователя в общий список', async () => {
-    deleteMock.mockResolvedValue({} as never);
+  it('«Отменить» в поиске шлёт DELETE по user id и возвращает пользователя в общий список', async () => {
+    removeMock.mockResolvedValue({} as never);
     const wrapper = await typeAndSearch('а');
 
     await rowByName(wrapper, 'Катя').find('.btn').trigger('click');
     await flushPromises();
 
-    expect(deleteMock).toHaveBeenCalledWith(5);
+    expect(removeMock).toHaveBeenCalledWith(2);
     const katya = rowByName(wrapper, 'Катя');
     expect(katya.find('.btn').text()).toBe('Добавить');
   });
@@ -145,7 +155,6 @@ describe('pages/Friends', () => {
     const max = rowByName(wrapper, 'Макс');
     expect(max.text()).toContain('заявка отправлена');
     expect(max.find('.btn').text()).toBe('Отменить');
-    expect(useFriendsStore().outgoing.map((entry) => entry.friendshipId)).toContain(11);
   });
 
   it('входящую заявку из поиска можно принять', async () => {
@@ -155,7 +164,7 @@ describe('pages/Friends', () => {
     await rowByName(wrapper, 'Никита').find('[aria-label="принять"]').trigger('click');
     await flushPromises();
 
-    expect(acceptMock).toHaveBeenCalledWith(9);
+    expect(acceptMock).toHaveBeenCalledWith(3);
     const nikita = rowByName(wrapper, 'Никита');
     expect(nikita.text()).toContain('Друзья');
   });

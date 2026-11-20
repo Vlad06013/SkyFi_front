@@ -25,7 +25,7 @@
           </div>
           <button
             v-for="friend in visibleFriends"
-            :key="friend.friendshipId"
+            :key="friend.user.id"
             class="friend-row"
             type="button"
             @click="sheet === 'friend-share' ? pickShare(friend) : pickQueue(friend)"

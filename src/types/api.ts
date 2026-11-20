@@ -297,13 +297,12 @@ export interface FriendNowPlayingPayload {
 }
 
 /** data ответа GET /friends/search-users: найденные пользователи
- * со статусом заявки. user_id — id пользователя (не путать с
- * friendship_id — id заявки); avatar_url — полный URL. */
+ * со статусом заявки; avatar_url — полный URL. Дружба адресуется
+ * по id пользователя — id записи дружбы на провод не уходит. */
 export interface UserSearchItem {
   user_id: number;
   name: string;
   email: string;
   avatar_url: string | null;
-  friendship_id: number | null;
   friendship_status: string | null;
 }
