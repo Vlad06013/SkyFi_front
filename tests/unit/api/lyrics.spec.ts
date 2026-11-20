@@ -39,4 +39,18 @@ describe('api/lyrics', () => {
     postMock.mockResolvedValue(lines);
     await expect(fetchLyrics(track)).resolves.toEqual(lines);
   });
+
+  it('на проводе старая форма {lyrics: [...]} — нормализуем (curl 2026-11-20)', async () => {
+    const lines = [{ text: 'строка', time_ms: null }];
+    postMock.mockResolvedValue({ lyrics: lines, source_url: 'https://example.com' });
+    await expect(fetchLyrics(track)).resolves.toEqual(lines);
+  });
+
+  it('пустой массив и null — текста нет', async () => {
+    postMock.mockResolvedValue({ lyrics: [] });
+    await expect(fetchLyrics(track)).resolves.toBeNull();
+
+    postMock.mockResolvedValue(null);
+    await expect(fetchLyrics(track)).resolves.toBeNull();
+  });
 });
