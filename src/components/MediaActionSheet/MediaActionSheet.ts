@@ -4,6 +4,7 @@ import AppSheet from '@/components/AppSheet/AppSheet.vue';
 import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { addToFriendQueue, shareWithFriend } from '@/api/friends';
+import { fetchShareUrl } from '@/api/shares';
 import { coverVar, trackCover } from '@/lib/cover';
 import { friendInitial, friendTone } from '@/lib/friends';
 import { favoritePlaylists } from '@/mocks/catalog';
@@ -52,17 +53,48 @@ export default defineComponent({
       return '';
     });
 
+    const shareUrl = ref<string | null>(null);
+    const shareLoading = ref(false);
+    let sharePromise: Promise<string | null> | null = null;
+
+    /** Публичная ссылка источника с бэка (api.md §13); параллельные вызовы дедуплицируем. */
+    function resolveShareUrl(): Promise<string | null> {
+      if (shareUrl.value) return Promise.resolve(shareUrl.value);
+      if (!props.entity.snapshot || sharePromise) return sharePromise ?? Promise.resolve(null);
+      shareLoading.value = true;
+      sharePromise = fetchShareUrl(props.entity.snapshot)
+        .then((payload) => {
+          shareUrl.value = payload.url;
+          return payload.url;
+        })
+        .catch((cause) => {
+          toast.show(cause instanceof Error ? cause.message : 'Не удалось получить ссылку', '', true);
+          return null;
+        })
+        .finally(() => {
+          shareLoading.value = false;
+          sharePromise = null;
+        });
+      return sharePromise;
+    }
+
     watch(
       () => props.sheet,
       (next) => {
         if (next === 'share') {
-          void navigator.clipboard?.writeText(`https://skyfi.app/t/${props.entity.sourceId}`).catch(() => undefined);
+          shareUrl.value = null;
+          // Открыли «Поделиться» — ссылка запрашивается и сразу копируется.
+          void resolveShareUrl().then((url) => {
+            if (url) void navigator.clipboard?.writeText(url).catch(() => undefined);
+          });
         }
         if (next === 'friend-queue' || next === 'friend-share') {
           friendQuery.value = '';
           void friendsStore.ensure();
         }
       },
+      // Монтирование сразу с открытым шитом — тоже обрабатываем.
+      { immediate: true },
     );
 
     function close() {
@@ -102,7 +134,8 @@ export default defineComponent({
     }
 
     async function shareExternally() {
-      const url = `https://skyfi.app/t/${props.entity.sourceId}`;
+      const url = await resolveShareUrl();
+      if (!url) return;
       if (typeof navigator.share === 'function') {
         try {
           await navigator.share({
@@ -115,6 +148,7 @@ export default defineComponent({
         }
         return;
       }
+      await navigator.clipboard?.writeText(url).catch(() => undefined);
       toast.show('Поделиться', 'не поддерживается здесь · ссылка в буфере');
     }
 
@@ -139,6 +173,8 @@ export default defineComponent({
       visibleFriends,
       favoritePlaylists,
       coverImage,
+      shareUrl,
+      shareLoading,
       close,
       pickQueue,
       pickShare,

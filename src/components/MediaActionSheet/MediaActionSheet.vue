@@ -84,10 +84,18 @@
         </template>
 
         <template v-else-if="sheet === 'share'">
-          <div class="copied">
+          <div v-if="shareLoading" class="copied">
+            <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <circle cx="12" cy="12" r="8" opacity=".25" />
+              <path d="M12 4a8 8 0 0 1 8 8" stroke-linecap="round" />
+            </svg>
+            получаем ссылку…
+          </div>
+          <div v-else-if="shareUrl" class="copied">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 9.5 17 19 7.5" /></svg>
             Ссылка уже в буфере
           </div>
+          <div v-else class="copied">не удалось получить ссылку</div>
           <button class="friend-row" type="button" style="padding:8px 4px" @click="openInAppShare">
             <div class="avatar ini" style="background:linear-gradient(135deg,#3ee87f,#0a3d24)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
