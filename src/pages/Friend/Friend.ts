@@ -2,6 +2,7 @@ import { computed, defineComponent, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import AppBar from '@/components/AppBar/AppBar.vue';
+import AppConfirm from '@/components/AppConfirm/AppConfirm.vue';
 import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
 import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
@@ -38,7 +39,7 @@ function byPosition(items: QueueItem[]): QueueItem[] {
 
 export default defineComponent({
   name: 'FriendPage',
-  components: { AppBar, MediaOverlays, SnapshotRow, SourceBadge },
+  components: { AppBar, AppConfirm, MediaOverlays, SnapshotRow, SourceBadge },
   setup() {
     const route = useRoute();
     const router = useRouter();
@@ -193,6 +194,12 @@ export default defineComponent({
       toast.show('Не удалось удалить друга', 'попробуйте снова', true);
     }
 
+    const confirmOpen = ref(false);
+
+    function askRemoveFriend() {
+      confirmOpen.value = true;
+    }
+
     function onSort(event: PointerEvent, index: number) {
       const container = (event.currentTarget as HTMLElement).closest('.list-sort');
       if (!(container instanceof HTMLElement)) return;
@@ -237,6 +244,8 @@ export default defineComponent({
       openAlbum,
       openPlaylist,
       removeFriend,
+      askRemoveFriend,
+      confirmOpen,
       onSort,
       queueRowKind,
       queueRowCover,

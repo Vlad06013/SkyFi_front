@@ -21,7 +21,7 @@
         <div class="f-name">{{ profile?.name ?? '' }}</div>
         <div class="f-mail">{{ profile?.email }}</div>
         <div style="margin-top:10px">
-          <button class="btn btn-danger sm" type="button" @click="removeFriend">Удалить из друзей</button>
+          <button class="btn btn-danger sm" type="button" @click="askRemoveFriend">Удалить из друзей</button>
         </div>
       </div>
 
@@ -181,6 +181,15 @@
         </div>
       </template>
     </template>
+
+    <AppConfirm
+      :open="confirmOpen"
+      title="Удалить из друзей?"
+      message="Вы перестанете быть друзьями."
+      confirm-label="Удалить"
+      @confirm="removeFriend"
+      @close="confirmOpen = false"
+    />
 
     <MediaOverlays
       :open="open"

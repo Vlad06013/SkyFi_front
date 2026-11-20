@@ -39,6 +39,7 @@ const profileMock = vi.mocked(friendsApi.fetchFriendProfile);
 const nowPlayingMock = vi.mocked(friendsApi.fetchFriendNowPlaying);
 const favoritesMock = vi.mocked(friendsApi.fetchFriendFavorites);
 const overviewMock = vi.mocked(friendsApi.fetchFriendshipOverview);
+const removeMock = vi.mocked(friendsApi.removeFriend);
 
 describe('pages/Friend', () => {
   beforeEach(() => {
@@ -47,6 +48,8 @@ describe('pages/Friend', () => {
     nowPlayingMock.mockReset();
     favoritesMock.mockReset();
     overviewMock.mockReset();
+    removeMock.mockReset();
+    routerMocks.back.mockReset();
     routeMock.current.params.id = '3';
     overviewMock.mockResolvedValue({ friends: [], incoming: [], outgoing: [] } as never);
     profileMock.mockResolvedValue({ id: 3, name: 'Аня', email: 'anya@mail.ru', avatar_url: null } as never);
@@ -59,7 +62,7 @@ describe('pages/Friend', () => {
   function mountPage() {
     const pinia = createPinia();
     setActivePinia(pinia);
-    return mount(Friend, { global: { plugins: [pinia] } });
+    return mount(Friend, { global: { plugins: [pinia], stubs: { teleport: true } } });
   }
 
   it('грузит данные друга по id из роута', async () => {
@@ -85,5 +88,21 @@ describe('pages/Friend', () => {
     expect(profileMock).not.toHaveBeenCalledWith(NaN);
     expect(nowPlayingMock).not.toHaveBeenCalledWith(NaN);
     expect(favoritesMock).not.toHaveBeenCalledWith(NaN);
+  });
+
+  it('удаление друга идёт через подтверждение', async () => {
+    removeMock.mockResolvedValue({} as never);
+    const wrapper = mountPage();
+    await flushPromises();
+    expect(removeMock).not.toHaveBeenCalled();
+
+    await wrapper.find('.btn-danger').trigger('click');
+    expect(wrapper.text()).toContain('Удалить из друзей?');
+
+    await wrapper.findAll('.confirm-btn')[0].trigger('click');
+    await flushPromises();
+
+    expect(removeMock).toHaveBeenCalledWith(3);
+    expect(routerMocks.back).toHaveBeenCalled();
   });
 });
