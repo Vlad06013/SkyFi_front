@@ -29,8 +29,14 @@ describe('api/lyrics', () => {
   });
 
   it('POST audio/lyrics с track-снапшотом в теле', async () => {
-    postMock.mockResolvedValue({ lyrics: null } as never);
+    postMock.mockResolvedValue(null);
     await fetchLyrics(track);
     expect(postMock).toHaveBeenCalledWith('audio/lyrics', track);
+  });
+
+  it('ответ — строки текста напрямую (api.md §7), не объект', async () => {
+    const lines = [{ text: 'строка', time_ms: 1200 }];
+    postMock.mockResolvedValue(lines);
+    await expect(fetchLyrics(track)).resolves.toEqual(lines);
   });
 });

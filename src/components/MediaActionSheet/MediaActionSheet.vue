@@ -122,12 +122,14 @@
         </template>
 
         <template v-else-if="sheet === 'devices'">
-          <div class="select-menu">
+          <div v-if="!deviceLoaded" class="idle" style="padding:12px 4px">загружаем устройства…</div>
+          <div v-else-if="!deviceList.length" class="idle" style="padding:12px 4px">Нет устройств в сети</div>
+          <div v-else class="select-menu">
             <button
-              v-for="device in state.devices"
+              v-for="device in deviceList"
               :key="device.id"
               class="select-opt"
-              :class="{ 'is-on': device.id === state.active_device_id }"
+              :class="{ 'is-on': device.id === activeDeviceId }"
               type="button"
               @click="pickDevice(device.id)"
             >
@@ -136,7 +138,7 @@
                 <span v-if="deviceCaption(device)" class="osub">{{ deviceCaption(device) }}</span>
               </span>
               <svg
-                v-if="device.id === state.active_device_id"
+                v-if="device.id === activeDeviceId"
                 class="tick"
                 viewBox="0 0 24 24"
                 fill="none"

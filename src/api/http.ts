@@ -95,3 +95,6 @@ export const http = {
   patch: <T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> => request<T>(instance.patch(url, data, config) as Promise<unknown>),
   delete: <T>(url: string, config?: AxiosRequestConfig): Promise<T> => request<T>(instance.delete(url, config) as Promise<unknown>),
 };
+
+/** Сырой axios-инстанс — для эндпоинтов вне API-обёртки (handshake /broadcasting/auth). */
+export const httpRaw = instance;

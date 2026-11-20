@@ -246,7 +246,7 @@
 
 .lyr {
   margin: 12px 0 8px; min-height: 168px;
-  display: flex; flex-direction: column; justify-content: center; gap: 10px;
+  display: flex; flex-direction: column; justify-content: safe center; gap: 10px;
   text-align: center;
 }
 .lyr div { font-size: 14px; color: var(--color-text-faint); line-height: 1.35; }

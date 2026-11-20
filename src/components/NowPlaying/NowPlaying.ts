@@ -105,8 +105,20 @@ export default defineComponent({
       return active;
     });
     const lyrEl = ref<HTMLElement | null>(null);
+    /** Первая активация после загрузки строк пропускается: текст открываем
+     *  с начала, а не с активной строки (позиция может быть любой).
+     *  Дальше слой следит за сменой строк. Возврат в -1 (новый трек) —
+     *  снова вооружаем пропуск. */
+    let lyricScrolled = false;
     watch(activeLyricLine, (index) => {
-      if (index < 0) return;
+      if (index < 0) {
+        lyricScrolled = false;
+        return;
+      }
+      if (!lyricScrolled) {
+        lyricScrolled = true;
+        return;
+      }
       const el = lyrEl.value?.children[index];
       if (el instanceof HTMLElement) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
     });

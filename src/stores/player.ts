@@ -17,7 +17,6 @@ export const usePlayerStore = defineStore('player', () => {
   const clipMode = ref(false);
   const clipQuality = ref(720);
   const clipQualities = [360, 720, 1080];
-  const localDeviceId = ref(1);
   const volume = ref(72);
   /** Серверная очередь — источник истины (api.md §6); статусы пока не используем. */
   const queue = ref<QueueItem[]>([]);
@@ -195,17 +194,6 @@ export const usePlayerStore = defineStore('player', () => {
     clipQuality.value = quality;
   }
 
-  function activateDevice(id: number) {
-    state.value = {
-      ...state.value,
-      active_device_id: id,
-      devices: state.value.devices.map((device) => ({
-        ...device,
-        is_active: device.id === id,
-      })),
-    };
-  }
-
   function syncClipMode() {
     if (current.value?.type === 'video') clipMode.value = true;
   }
@@ -231,7 +219,6 @@ export const usePlayerStore = defineStore('player', () => {
     clipMode,
     clipQuality,
     clipQualities,
-    localDeviceId,
     volume,
     queue,
     queueLoaded,
@@ -258,7 +245,6 @@ export const usePlayerStore = defineStore('player', () => {
     seekRatio,
     toggleClips,
     setClipQuality,
-    activateDevice,
     openExpanded,
     closeExpanded,
     setVolume,

@@ -289,8 +289,18 @@ disabled/пропускаются в схеме next). Конец любого �
 
 ## 10. Сокеты-клиент
 
-Echo + Reverb (api.md §17). Правила:
-- Подписка на свой канал + `friends.{id}` друзей.
+Echo + Reverb (api.md §17). Слой — `src/realtime/` (единый фасад:
+`startRealtime/stopRealtime`, статус, `bindSessionRealtime()` из
+main.ts рядом со startPolling; роутер `router.ts` даёт каждому ивенту
+эхо-глушение по origin_device_id и дедуп по command_id). Хендлеры
+только пишут в Pinia-сторы; UI о сокетах не знает. Готовность по
+этапам — docs/plan-sockets.md.
+
+Правила:
+- Подписка на свой канал + `friends.{id}` друзей (друзья — этап 3).
+- Устройства (этап 1, готово): `playback.device.*` → `stores/devices`
+  (presence-список, «это устройство» по серверному id); presence —
+  регистрация по uuid + heartbeat 30 с (пауза в фоне на нативе).
 - На `playback.state.updated`: если `version` новее локального
   — применить; если `origin_device_id` = мой id — пропустить
   (своё эхо).
@@ -299,7 +309,8 @@ Echo + Reverb (api.md §17). Правила:
   null — рефетч очереди.
 - На `friend.queue.item.added` — тост «{added_by.name}
   добавил: {title}» + рефетч.
-- Reconnect — `GET /player` (полная подмена состояния).
+- Reconnect — `GET /player` (полная подмена состояния), хук
+  `onRealtimeReconnect`.
 
 ## 11. Локальное хранилище
 

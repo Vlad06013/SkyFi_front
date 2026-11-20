@@ -5,8 +5,10 @@ import { IonicVue } from '@ionic/vue';
 import App from './App.vue';
 import router from './router';
 import { onUnauthorized } from '@/api/http';
+import { bindSessionRealtime } from '@/realtime';
 import { useAuthStore } from '@/stores/auth';
 import { useAppStore } from '@/stores/app';
+import { useDevicesStore } from '@/stores/devices';
 import { useOnlineStore } from '@/stores/online';
 
 import '@ionic/vue/css/core.css';
@@ -36,4 +38,7 @@ app.mount('#app');
 const appStore = useAppStore(pinia);
 void appStore.bootstrap().finally(() => {
   void useOnlineStore(pinia).startPolling();
+  // Session-scoped сервисы: presence устройства + сокеты (docs/plan-sockets.md).
+  useDevicesStore(pinia).bindPresence();
+  bindSessionRealtime();
 });

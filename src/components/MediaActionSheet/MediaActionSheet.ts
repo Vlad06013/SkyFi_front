@@ -1,5 +1,4 @@
 import { computed, defineComponent, ref, watch, type PropType } from 'vue';
-import { storeToRefs } from 'pinia';
 import AppSheet from '@/components/AppSheet/AppSheet.vue';
 import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
@@ -8,8 +7,8 @@ import { fetchShareUrl } from '@/api/shares';
 import { coverVar, trackCover } from '@/lib/cover';
 import { friendInitial, friendTone } from '@/lib/friends';
 import { favoritePlaylists } from '@/mocks/catalog';
+import { useDevicesStore } from '@/stores/devices';
 import { useFriendsStore, type FriendEntry } from '@/stores/friends';
-import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
 import type { MediaSheet, MenuEntity } from '@/lib/media-menu';
 import type { PlayerDevice } from '@/types';
@@ -23,10 +22,9 @@ export default defineComponent({
   },
   emits: ['close', 'update:sheet'],
   setup(props, { emit }) {
-    const player = usePlayerStore();
-    const { state, localDeviceId } = storeToRefs(player);
     const toast = useToastStore();
     const friendsStore = useFriendsStore();
+    const devicesStore = useDevicesStore();
     const friendQuery = ref('');
     const friendFocus = ref(false);
 
@@ -92,6 +90,9 @@ export default defineComponent({
           friendQuery.value = '';
           void friendsStore.ensure();
         }
+        if (next === 'devices') {
+          void devicesStore.ensure();
+        }
       },
       // Монтирование сразу с открытым шитом — тоже обрабатываем.
       { immediate: true },
@@ -152,21 +153,26 @@ export default defineComponent({
       toast.show('Поделиться', 'не поддерживается здесь · ссылка в буфере');
     }
 
+    const deviceList = computed(() => devicesStore.devices);
+    const deviceLoaded = computed(() => devicesStore.loaded);
+    const activeDeviceId = computed(() => devicesStore.activeId);
+    const myDeviceId = computed(() => devicesStore.myDeviceId);
+
     function deviceCaption(device: PlayerDevice) {
-      if (device.id === localDeviceId.value) return 'это устройство';
-      if (device.id === state.value.active_device_id) return '';
+      if (device.id === myDeviceId.value) return 'это устройство';
+      if (device.id === activeDeviceId.value) return '';
       return 'не активен';
     }
 
-    function pickDevice(id: number) {
-      player.activateDevice(id);
-      const name = state.value.devices.find((device) => device.id === id)?.name ?? '';
-      toast.show(name, 'играет здесь');
-      close();
+    async function pickDevice(id: number) {
+      const name = deviceList.value.find((device) => device.id === id)?.name ?? '';
+      if (await devicesStore.activate(id)) {
+        toast.show(name, 'играет здесь');
+        close();
+      }
     }
 
       return {
-      state,
       title,
       friendQuery,
       friendFocus,
@@ -181,6 +187,9 @@ export default defineComponent({
       pickPlaylist,
       openInAppShare,
       shareExternally,
+      deviceList,
+      deviceLoaded,
+      activeDeviceId,
       deviceCaption,
       pickDevice,
       friendInitial,

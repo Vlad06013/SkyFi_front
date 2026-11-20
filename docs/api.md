@@ -72,9 +72,12 @@ Sanctum Bearer-токен: `Authorization: Bearer <token>`.
 
 Каждый мутирующий роут плеера/очереди/устройств принимает:
 
-- `origin_device_id` — id строки устройства-инициатора
-  (`POST /player/devices`, ответ `data.id`); int или строка в
-  query-параметрах DELETE. Устройство-инициатор глушит эхо
+- `origin_device_id` — идентификатор устройства-инициатора.
+  Двухфазный: при регистрации (`POST /player/devices`) клиент
+  ещё не знает id строки и шлёт собственный `device_uuid`
+  (строгий UUID); со всех последующих команд это `data.id`
+  созданного устройства (int, либо строка в query-параметрах
+  DELETE). Устройство-инициатор глушит эхо
   своих же команд по этому полю.
 - `command_id` — uuid команды, генерирует клиент на каждую
   команду; дедупликация повторных доставок.
@@ -171,10 +174,10 @@ avatar_url}`. QR-поллинг при confirmed отдаёт полную мо�
 
 | Метод/путь | Тело → Ответ |
 |---|---|
-| `GET /` | → список устройств `{id, name, type, is_active, last_seen_at, ...}` (только онлайн; presence-модель) |
+| `GET /` | → `{devices: [{id, name, type, is_active, last_seen_at, ...}]}` (только онлайн; presence-модель) |
 | `POST /` (30/мин) | `{name, type: phone\|computer\|car\|tv, origin_device_id: uuid, command_id}` → устройство; повторная регистрация по тому же uuid обновляет профиль |
 | `PATCH /{device}/activate` (30/мин) | `{origin_device_id, command_id}` → это устройство — активное (играет) |
-| `POST /heartbeat` (120/мин) | `{device_uuid}` → продлить presence |
+| `POST /player/devices/heartbeat` (120/мин) | `{device_uuid: uuid}` → `{message: "ok"}` — продлить presence; неизвестный uuid — 404 |
 | `DELETE /{device}` | query `?origin_device_id&command_id` → удалить |
 
 ## 5. Плеер (`/player`)
@@ -228,7 +231,7 @@ status: pending|playing_now|played|skipped, snapshot|null}`.
 |---|---|
 | `POST /get-url` | track-снапшот → `{url, ttlSec}` — временная ссылка на поток (Яндекс), ссылку не хранить: запросить заново по снапшоту. Клиент кеширует URL до истечения TTL. |
 | `POST /file` | track-снапшот → mp3-файл целиком (прокси с нужными Referer). Это эндпоинт **скачивания для офлайна**. |
-| `POST /lyrics` | track-снапшот → `{lyrics: [{text, time_ms|null}]|null, source_url?}` |
+| `POST /lyrics` | track-снапшот → `[{text, time_ms|null}]` \| null — строки текста; `time_ms` null — без таймкодов; `text: ""` — разделитель строф (рисуем пустую строку) |
 
 ## 8. Видео (`/videos`)
 
@@ -389,7 +392,10 @@ artist_names: [..]}` → upload; `GET /` — список; `PATCH /{id}`
 
 **Транспорт**: Laravel Reverb (WebSocket), драйвер в конфиге
 бэка. Аутентификация каналов — sanctum (тот же токен,
-handshake `/broadcasting/auth`). Фронт: официальный Echo-клиент.
+handshake `POST /broadcasting/auth` — путь на корне origin, вне
+префикса `/api/v1/skyfy`; ответ без обёртки, сырой
+`{auth: "..."}` от Reverb, не наш `errors/data`). Фронт:
+официальный Echo-клиент.
 
 **Каналы** (private):
 - `App.Models.User.{id}` — личный канал пользователя (только

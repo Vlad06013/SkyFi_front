@@ -3,11 +3,11 @@ import { fetchLyrics, type LyricsLine } from '@/api/lyrics';
 import type { TrackSnapshot } from '@/types';
 
 /**
- * Текст песни для now-playing (api.md §7, POST /audio/lyrics).
- * Запрос уходит при открытом слое lyrics и при смене трека
- * внутри него (generation-защита от гонок, как в useEntityDetails).
- * `time_ms` может отсутствовать — тогда synced=false и
- * подсветка активной строки не используется.
+ * Текст песни для now-playing (api.md §7, POST /audio/lyrics —
+ * ответ: строки текста или null). Запрос уходит при открытом слое
+ * lyrics и при смене трека внутри него (generation-защита от гонок,
+ * как в useEntityDetails). `time_ms` может отсутствовать — тогда
+ * synced=false и подсветка активной строки не используется.
  */
 export function useLyrics(
   getTrack: () => TrackSnapshot | null,
@@ -29,9 +29,9 @@ export function useLyrics(
     error.value = null;
     lines.value = null;
     try {
-      const payload = await fetchLyrics(track);
+      const result = await fetchLyrics(track);
       if (gen !== generation) return;
-      lines.value = payload.lyrics && payload.lyrics.length > 0 ? payload.lyrics : null;
+      lines.value = result && result.length > 0 ? result : null;
       loadedFor = track.source_id;
     } catch {
       if (gen !== generation) return;
