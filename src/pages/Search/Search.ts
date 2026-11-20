@@ -7,7 +7,7 @@ import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import { fetchSearch } from '@/api/search';
 import { artistsLine, trackCover } from '@/lib/cover';
-import { getSearchHistory, pushSearchHistory } from '@/lib/search-history';
+import { getSearchHistory, pushSearchHistory, clearSearchHistory } from '@/lib/search-history';
 import type { MenuContext, MenuEntity } from '@/lib/media-menu';
 import { usePlayerStore } from '@/stores/player';
 import { useFavoritesStore } from '@/stores/favorites';
@@ -274,6 +274,23 @@ export default defineComponent({
       section.value = 'best';
     }
 
+    const inputEl = ref<HTMLInputElement | null>(null);
+
+    function clearQuery() {
+      query.value = '';
+      inputEl.value?.focus();
+    }
+
+    async function clearHistory() {
+      try {
+        await clearSearchHistory();
+        history.value = [];
+        toast.show('история поиска очищена');
+      } catch {
+        toast.show('Не удалось очистить историю', '', true);
+      }
+    }
+
     return {
       query,
       history,
@@ -283,6 +300,9 @@ export default defineComponent({
       offline,
       q,
       SEARCH_MIN_LENGTH,
+      inputEl,
+      clearQuery,
+      clearHistory,
       loading,
       loadingMore,
       error,

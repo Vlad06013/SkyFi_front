@@ -24,3 +24,8 @@ export async function pushSearchHistory(query: string): Promise<string[]> {
   await Preferences.set({ key: HISTORY_KEY, value: JSON.stringify(next) });
   return next;
 }
+
+/** Полная очистка истории поиска на устройстве. */
+export async function clearSearchHistory(): Promise<void> {
+  await Preferences.remove({ key: HISTORY_KEY });
+}

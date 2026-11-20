@@ -7,15 +7,30 @@
         <path d="M16.5 16.5 21 21" />
       </svg>
       <input
+        ref="inputEl"
         v-model="query"
         placeholder="трек, ссылка, email"
         @focus="focused = true"
         @blur="focused = false"
       >
+      <button
+        v-if="hasQuery"
+        class="field-clear"
+        type="button"
+        aria-label="очистить поиск"
+        @click="clearQuery"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <path d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5" />
+        </svg>
+      </button>
     </div>
 
     <template v-if="!hasQuery">
-      <div v-if="history.length" class="sec-label">Недавние</div>
+      <div v-if="history.length" class="sec-label">
+        Недавние
+        <button class="hist-clear" type="button" @click="clearHistory">очистить</button>
+      </div>
       <div v-if="history.length" class="hist">
         <button v-for="item in history" :key="item" class="chip" type="button" @click="useHistory(item)">
           {{ item }}
@@ -197,3 +212,5 @@
 </template>
 
 <script src="./Search.ts" lang="ts"></script>
+
+<style scoped src="./Search.css"></style>

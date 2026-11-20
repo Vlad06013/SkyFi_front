@@ -3,7 +3,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { ApiError } from '@/api/http';
 import * as searchApi from '@/api/search';
-import { getSearchHistory, pushSearchHistory } from '@/lib/search-history';
+import { getSearchHistory, pushSearchHistory, clearSearchHistory } from '@/lib/search-history';
 import { useOnlineStore } from '@/stores/online';
 import Search from '@/pages/Search/Search.vue';
 import type { ArtistSnapshot, SearchPagePayload, TrackSnapshot } from '@/types';
@@ -27,11 +27,13 @@ vi.mock('@/api/search', () => ({
 vi.mock('@/lib/search-history', () => ({
   getSearchHistory: vi.fn(),
   pushSearchHistory: vi.fn(),
+  clearSearchHistory: vi.fn(),
 }));
 
 const fetchMock = vi.mocked(searchApi.fetchSearch);
 const getHistoryMock = vi.mocked(getSearchHistory);
 const pushHistoryMock = vi.mocked(pushSearchHistory);
+const clearHistoryMock = vi.mocked(clearSearchHistory);
 
 function makeTrack(id: string, patch: Partial<TrackSnapshot> = {}): TrackSnapshot {
   return {
@@ -104,8 +106,10 @@ describe('pages/Search', () => {
     fetchMock.mockReset();
     getHistoryMock.mockReset();
     pushHistoryMock.mockReset();
+    clearHistoryMock.mockReset();
     getHistoryMock.mockResolvedValue([]);
     pushHistoryMock.mockResolvedValue([]);
+    clearHistoryMock.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -293,5 +297,33 @@ describe('pages/Search', () => {
     await flushPromises();
 
     expect(fetchMock).toHaveBeenCalledWith({ q: 'би-2', limit: 20, page: 1 });
+  });
+
+  it('крестик в поле очищает запрос и убирает выдачу', async () => {
+    fetchMock.mockResolvedValue(makePayload());
+    const wrapper = mountPage();
+    await typeAndSearch(wrapper, 'sum 41');
+    expect(wrapper.find('.field-clear').exists()).toBe(true);
+
+    await wrapper.find('.field-clear').trigger('click');
+    await vi.advanceTimersByTimeAsync(400);
+    await flushPromises();
+
+    expect((wrapper.find('input').element as HTMLInputElement).value).toBe('');
+    expect(wrapper.find('.field-clear').exists()).toBe(false);
+    expect(wrapper.text()).toContain('Ищите или вставьте ссылку');
+  });
+
+  it('очистка истории удаляет чипы и шлёт запрос в storage', async () => {
+    getHistoryMock.mockResolvedValue(['би-2', 'sum 41']);
+    const wrapper = mountPage();
+    await flushPromises();
+    expect(wrapper.findAll('.hist .chip')).toHaveLength(2);
+
+    await wrapper.find('.hist-clear').trigger('click');
+    await flushPromises();
+
+    expect(clearHistoryMock).toHaveBeenCalledTimes(1);
+    expect(wrapper.find('.hist').exists()).toBe(false);
   });
 });
