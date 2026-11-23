@@ -20,7 +20,8 @@ export interface OpenPlayOptions {
 export function openSnapshot(router: Router, snapshot: AnySnapshot | null | undefined, play?: OpenPlayOptions) {
   if (!snapshot) return;
   if (snapshot.type === 'track' || snapshot.type === 'video') {
-    usePlayerStore().playSnapshot(snapshot, play?.playbackSource ?? PLAY_SOURCE_SINGLE, {
+    // Тап по строке: текущий снапшот — пауза/плей, иной — прямой запуск.
+    void usePlayerStore().playOrToggle(snapshot, play?.playbackSource ?? PLAY_SOURCE_SINGLE, {
       contextItems: play?.contextItems,
       contextRef: play?.contextRef,
     });

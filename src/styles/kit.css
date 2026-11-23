@@ -230,6 +230,11 @@
   object-fit: cover; display: block;
   background: #000;
 }
+/* Полный экран (двойной тап): обложечный cover кадрирует слишком сильно —
+   на весь экран растягиваем contain'ом. */
+.clip-video:fullscreen {
+  object-fit: contain;
+}
 .is-clip .p-title, .is-clip .p-artist { text-shadow: 0 1px 16px rgba(0,0,0,.7); }
 .is-clip .p-artist { color: rgba(255,255,255,.78); }
 .is-clip .p-times { color: rgba(255,255,255,.55); }

@@ -20,6 +20,8 @@ let appliedKey: string | null = null;
 /** Летящий запрос: следующий запуск его отменяет — при быстром скипе на бэк
  *  уходит только последний запрос, а не вся пролистанная очередь. */
 let loadAbort: AbortController | null = null;
+/** Позиция для восстановления после подмены клипом: src пересоздаёт поток. */
+let resumeAt: number | null = null;
 
 function ensureAudio(): HTMLAudioElement {
   if (!audio) {
@@ -34,12 +36,17 @@ export function useAudioPlayback() {
 
   async function loadSnapshot(snapshot: AnySnapshot | null) {
     const el = ensureAudio();
+    // Клип подменяет трек: пока эффективный снапшот — видео, аудио молчит.
+    // Поток сбрасываем целиком: вернёмся за свежей ссылкой и общей позицией
+    // (за время клипа позиция ушла вперёд — элемент с места остановки
+    // не продолжает).
     if (!player.isActiveDevice || !snapshot || snapshot.type !== 'track') {
       el.pause();
       // Подмена/остановка: летящий запрос уже никому не нужен — отменяем.
       loadAbort?.abort();
       loadAbort = null;
       loadedKey = null;
+      appliedKey = null;
       return;
     }
     const key = snapshotKey(snapshot);
@@ -52,13 +59,17 @@ export function useAudioPlayback() {
     loadAbort = controller;
     try {
       const { url } = await fetchAudioUrl(snapshot, controller.signal);
-      // Пока запрашивали ссылку, трек мог смениться — не грузим старое.
-      if (!player.current || snapshotKey(player.current) !== key) {
+      // Пока запрашивали ссылку, эффективный снапшот мог смениться (клип,
+      // другой трек) — не грузим старое.
+      if (!player.effectiveCurrent || snapshotKey(player.effectiveCurrent) !== key) {
         if (loadedKey === key) loadedKey = null;
         return;
       }
       appliedKey = key;
       el.src = url;
+      // Продолжаем с общей позиции: после клипа она ушла вперёд, при обычном
+      // старте трека позиция ~0 и seek на 0 — безопасный no-op.
+      resumeAt = player.positionSeconds;
       if (player.state.is_playing) void el.play().catch(() => undefined);
     } catch {
       // Отменён следующим запросом — не ошибка, молча выходим.
@@ -70,17 +81,20 @@ export function useAudioPlayback() {
     }
   }
 
-  // Смена трека или получение роли активного устройства — повод подгрузить поток.
-  watch([() => player.current, () => player.isActiveDevice], ([snapshot]) => loadSnapshot(snapshot), {
+  // Смена эффективного снапшота (трек/клип) или роли активного устройства —
+  // повод подгрузить поток или замолчать.
+  watch([() => player.effectiveCurrent, () => player.isActiveDevice], ([snapshot]) => loadSnapshot(snapshot), {
     immediate: true,
   });
 
   // is_playing с сервера: активное устройство подчиняется, пульт глушит звук.
+  // Пока эффективный снапшот — клип, элемент не трогаем: src старый, иначе
+  // воспроизведение пошло бы одновременно с видео.
   watch(
     () => player.isActiveDevice && player.state.is_playing,
     (shouldPlay) => {
       const el = ensureAudio();
-      if (!player.isActiveDevice) {
+      if (!player.isActiveDevice || player.effectiveCurrent?.type !== 'track') {
         el.pause();
         return;
       }
@@ -98,7 +112,7 @@ export function useAudioPlayback() {
     (position) => {
       const el = audio;
       if (!el || !player.isActiveDevice) return;
-      if (!player.current || snapshotKey(player.current) !== loadedKey) return;
+      if (!player.effectiveCurrent || snapshotKey(player.effectiveCurrent) !== loadedKey) return;
       const ended = el.ended;
       if (Number.isFinite(el.duration) && Math.abs(el.currentTime - position) > 2.5) {
         el.currentTime = position;
@@ -106,6 +120,24 @@ export function useAudioPlayback() {
       // repeat=one: бэк отвечает seek(0) без смены is_playing — элемент после
       // 'ended' остался на паузе, автоповтор должен его возобновить.
       if (ended && player.state.is_playing) void el.play().catch(() => undefined);
+    },
+  );
+
+  // Тап при рассинхроне (сервер: играем, элемент молчит) — пинаем элемент.
+  // Убитый поток (el.error) перезагружаем: play() мёртвой ссылке не поможет.
+  watch(
+    () => player.engineKick,
+    () => {
+      if (!player.isActiveDevice || !player.state.is_playing) return;
+      if (player.effectiveCurrent?.type !== 'track') return;
+      const el = ensureAudio();
+      if (el.error) {
+        loadedKey = null;
+        appliedKey = null;
+        void loadSnapshot(player.effectiveCurrent);
+        return;
+      }
+      void el.play().catch(() => undefined);
     },
   );
 
@@ -125,21 +157,32 @@ export function useAudioPlayback() {
     const el = ensureAudio();
     el.addEventListener('ended', () => {
       const store = usePlayerStore();
-      if (store.isActiveDevice) store.handleTrackEnded();
+      // Клип активен — переходом управляет видео-элемент, аудио лишь замолчало.
+      if (store.isActiveDevice && store.effectiveCurrent?.type === 'track') store.handleTrackEnded();
+    });
+    el.addEventListener('loadedmetadata', () => {
+      if (resumeAt != null) {
+        el.currentTime = resumeAt;
+        resumeAt = null;
+      }
     });
     el.addEventListener('playing', () => {
-      if (usePlayerStore().current?.type === 'track') usePlayerStore().setAudioPlaying(true);
+      const store = usePlayerStore();
+      if (store.effectiveCurrent?.type === 'track') store.setAudioPlaying(true);
     });
     el.addEventListener('pause', () => {
-      if (usePlayerStore().current?.type === 'track') usePlayerStore().setAudioPlaying(false);
+      const store = usePlayerStore();
+      if (store.effectiveCurrent?.type === 'track') store.setAudioPlaying(false);
     });
     el.addEventListener('error', () => {
-      if (usePlayerStore().current?.type === 'track') usePlayerStore().setAudioPlaying(false);
+      const store = usePlayerStore();
+      resumeAt = null;
+      if (store.effectiveCurrent?.type === 'track') store.setAudioPlaying(false);
     });
     el.addEventListener('timeupdate', () => {
       const store = usePlayerStore();
-      if (!store.isActiveDevice || store.current?.type !== 'track') return;
-      if (snapshotKey(store.current) !== loadedKey) return;
+      if (!store.isActiveDevice || store.effectiveCurrent?.type !== 'track') return;
+      if (snapshotKey(store.effectiveCurrent) !== loadedKey) return;
       store.anchorFromAudio(el.currentTime);
     });
   }

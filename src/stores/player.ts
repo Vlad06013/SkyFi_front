@@ -13,7 +13,7 @@ import { onRealtimeReconnect } from '@/realtime';
 import { useAuthStore } from '@/stores/auth';
 import { useDevicesStore } from '@/stores/devices';
 import { useToastStore } from '@/stores/toast';
-import type { AnySnapshot, EchoFields, PlaySource, PlayerStatePayload, PlayerStateView, QueueItem, RepeatMode } from '@/types';
+import type { AnySnapshot, EchoFields, PlaySource, PlayerStatePayload, PlayerStateView, QueueItem, RepeatMode, TrackSnapshot, VideoSnapshot } from '@/types';
 
 const repeatCycle: RepeatMode[] = ['off', 'all', 'one'];
 
@@ -43,6 +43,33 @@ export const usePlayerStore = defineStore('player', () => {
     const qualities = new Set([...clipQualityLadder, ...clipStreams.value.map((stream) => stream.quality)]);
     return [...qualities].sort((a, b) => b - a);
   });
+  /**
+   * Клип для текущего трека (режим клипов, api.md §8): видео из /videos/resolve.
+   * Серверный current_snapshot не трогаем — клип локальная подмена потока,
+   * очередь/волна/пульт продолжают работать с треком.
+   */
+  const clipVideo = ref<VideoSnapshot | null>(null);
+  /** Ключ трека (snapshotKey), для которого резолвили клип — смена трека инвалидирует. */
+  const clipTrackKey = ref<string | null>(null);
+  const clipStatus = ref<'idle' | 'resolving' | 'ready' | 'unavailable'>('idle');
+  /** Эффективное видео для видео-движка: чистое видео из выдачи или клип на треке. */
+  const clipPlaybackVideo = computed<VideoSnapshot | null>(() => {
+    const snap = current.value;
+    if (snap?.type === 'video') return snap;
+    if (snap && clipMode.value && clipVideo.value && clipTrackKey.value === snapshotKey(snap)) {
+      return clipVideo.value;
+    }
+    return null;
+  });
+  /** Клип реально играет — аудио-движок молчит, позицию ведёт видео. */
+  const clipActive = computed(() => clipPlaybackVideo.value !== null);
+  /**
+   * Эффективный снапшот воспроизведения: клип фактически подменяет трек —
+   * движки и прогресс видят видео, очередь/волна/переходы — по-прежнему трек.
+   * Позиция одна на оба снапшота: секунда N на клипе ≠ секунде N трека,
+   * это осознанный компромисс (frontend.md §7).
+   */
+  const effectiveCurrent = computed<AnySnapshot | null>(() => clipPlaybackVideo.value ?? current.value);
   const volume = ref(72);
 
   /** Серверная очередь — источник истины (api.md §6). */
@@ -325,6 +352,24 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
+  /**
+   * Тап по строке списка (единое поведение списков): текущий снапшот —
+   * пауза/плей (togglePlay: при рассинхроне пинает элемент), иной — прямой
+   * запуск. Совпадение по snapshotKey, а не по идентичности объектов.
+   */
+  async function playOrToggle(
+    snapshot: AnySnapshot,
+    playbackSource: PlaySource = 'single',
+    opts: { rollSeed?: boolean; contextItems?: AnySnapshot[]; contextRef?: string | null } = {},
+  ) {
+    const current = state.value.current_snapshot;
+    if (current && snapshotKey(current) === snapshotKey(snapshot)) {
+      await togglePlay();
+      return;
+    }
+    await playSnapshot(snapshot, playbackSource, opts);
+  }
+
   async function togglePlay() {
     if (!canCommand.value) {
       state.value = { ...state.value, is_playing: !state.value.is_playing };
@@ -337,6 +382,15 @@ export const usePlayerStore = defineStore('player', () => {
       return;
     }
     const wasPlaying = state.value.is_playing;
+    // Рассинхрон после загрузки страницы/сбоя потока: сервер уверен, что
+    // играем, а элемент активного устройства молчит (автоплей отклонён,
+    // ссылка протухла). Обычный toggle дал бы паузу — и второй тап (resume)
+    // не помог бы: is_playing не меняется, вотчеры элемент не пинают.
+    // Пинаем движок напрямую, сервер не трогаем.
+    if (wasPlaying && isActiveDevice.value && !audioPlaying.value) {
+      kickEngine();
+      return;
+    }
     // Оптимистично, с откатом по ошибке (plan-player.md §5). Пауза сама
     // увозит позицию — висящий seek отменяем, чтобы не дёргать бэк дважды.
     if (wasPlaying) cancelPendingSeek();
@@ -434,10 +488,61 @@ export const usePlayerStore = defineStore('player', () => {
 
   /** Аудио-элемент активного устройства реально звучит (метит композабл по событиям). */
   const audioPlaying = ref(false);
+  /**
+   * Пинок движку: элемент должен реально заиграть. Счётчик, а не колбэк —
+   * движки (аудио/видео) сами решают, кто из них текущий, по своим вотчерам.
+   */
+  const engineKick = ref(0);
 
   function setAudioPlaying(playing: boolean) {
     audioPlaying.value = playing;
   }
+
+  function kickEngine() {
+    engineKick.value += 1;
+  }
+
+  // --- Подмена значка: фактическое воспроизведение против мнения сервера
+
+  /**
+   * Рассинхрон: сервер уверен, что играем, а элемент активного устройства
+   * молчит (после загрузки страницы автоплей отклонён, протухший поток).
+   * Пульт и гости зеркалят сервер — им верить нечему.
+   */
+  const playbackDesynced = computed(
+    () =>
+      state.value.is_playing &&
+      !!state.value.current_snapshot &&
+      canCommand.value &&
+      isActiveDevice.value &&
+      !audioPlaying.value,
+  );
+  /** Мгновенная подмена мелькает на переходах (подгрузка потока ~секунду). */
+  const DESYNC_GRACE_MS = 1_500;
+  /** Рассинхрон дольше грейса — показываем паузу честно. */
+  const desyncGracePassed = ref(false);
+  let desyncTimer: ReturnType<typeof setTimeout> | null = null;
+  watch(playbackDesynced, (desynced) => {
+    if (desyncTimer) {
+      clearTimeout(desyncTimer);
+      desyncTimer = null;
+    }
+    if (!desynced) {
+      desyncGracePassed.value = false;
+      return;
+    }
+    desyncTimer = setTimeout(() => {
+      desyncTimer = null;
+      desyncGracePassed.value = true;
+    }, DESYNC_GRACE_MS);
+  });
+
+  /** Фактическое воспроизведение для UI: иконка плея, эквалайзер, анимации. */
+  const isPlaying = computed(() => {
+    if (!state.value.is_playing) return false;
+    if (!playbackDesynced.value) return true;
+    return !desyncGracePassed.value;
+  });
 
   const extrapolatedPosition = computed(() => {
     if (!state.value.is_playing) return anchor.value;
@@ -540,7 +645,9 @@ export const usePlayerStore = defineStore('player', () => {
     return '';
   });
   const durationSeconds = computed(() => {
-    const snap = current.value;
+    // Длительность эффективного снапшота: в клип-режиме ползунок живёт
+    // по длительности клипа, а не трека.
+    const snap = effectiveCurrent.value;
     if (snap && (snap.type === 'track' || snap.type === 'video')) {
       return (snap.duration_ms ?? 0) / 1000;
     }
@@ -600,11 +707,50 @@ export const usePlayerStore = defineStore('player', () => {
     seek(ratio * durationSeconds.value);
   }
 
-  // --- Прочее UI
+  // --- Режим клипов (api.md §8): тогл — локальное UI-состояние, резолв — в useVideoPlayback
 
   function toggleClips() {
-    clipMode.value = !clipMode.value;
+    if (clipMode.value) {
+      clipMode.value = false;
+      clearClip();
+      return;
+    }
+    clipMode.value = true;
   }
+
+  function setClipResolving() {
+    clipStatus.value = 'resolving';
+  }
+
+  /** Резолв приехал: клип закрепляется за треком, потоки — в общую лестницу качеств. */
+  function setClipResolved(track: TrackSnapshot, video: VideoSnapshot, streams: VideoStream[]) {
+    clipTrackKey.value = snapshotKey(track);
+    clipVideo.value = video;
+    clipStatus.value = 'ready';
+    setClipStreams(streams);
+  }
+
+  /** Клипа нет (video: null) или резолв упал — остаёмся на аудио, индикатор в плеере. */
+  function setClipUnavailable() {
+    clipVideo.value = null;
+    clipTrackKey.value = null;
+    clipStatus.value = 'unavailable';
+  }
+
+  function clearClip() {
+    clipVideo.value = null;
+    clipTrackKey.value = null;
+    clipStatus.value = 'idle';
+    clipStreams.value = [];
+  }
+
+  // Смена трека инвалидирует клип: движок резолвит заново, пока режим включён.
+  watch(
+    () => (current.value ? snapshotKey(current.value) : null),
+    (key) => {
+      if (key !== clipTrackKey.value) clearClip();
+    },
+  );
 
   function setClipQuality(quality: number) {
     clipQuality.value = quality;
@@ -672,12 +818,22 @@ export const usePlayerStore = defineStore('player', () => {
     clipQuality,
     clipQualities,
     clipStreams,
+    clipVideo,
+    clipTrackKey,
+    clipStatus,
+    clipPlaybackVideo,
+    clipActive,
     setClipStreams,
+    setClipResolving,
+    setClipResolved,
+    setClipUnavailable,
+    clearClip,
     volume,
     queue,
     queueLoaded,
     isActiveDevice,
     current,
+    effectiveCurrent,
     title,
     artist,
     previewNext,
@@ -688,12 +844,15 @@ export const usePlayerStore = defineStore('player', () => {
     progress,
     positionSeconds,
     audioPlaying,
+    engineKick,
+    isPlaying,
     setAudioPlaying,
     anchorFromAudio,
     togglePlay,
     toggleShuffle,
     toggleRepeat,
     playSnapshot,
+    playOrToggle,
     ensureQueue,
     refreshQueue,
     enqueueSnapshot,

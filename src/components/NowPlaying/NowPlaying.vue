@@ -6,6 +6,8 @@
     :class="{ 'is-dragging': playerDragging, 'is-clip': clipMode, 'is-clip-idle': clipIdle }"
     :style="playerDragStyle"
     @pointerdown="onPlayerDragStart"
+    @click="onClipTap"
+    @dblclick="onClipDblTap"
   >
     <img v-if="clipMode && clipPoster" class="clip-bg" :src="clipPoster" alt="">
     <div v-if="clipMode" class="clip-scrim" />

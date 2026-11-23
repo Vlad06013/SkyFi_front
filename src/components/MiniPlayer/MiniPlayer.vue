@@ -14,6 +14,13 @@
       >
         <div class="mini-player">
           <div class="thumb" :style="{ background: coverVar(pane.snapshot.source_type) }">
+            <div
+              v-if="index === 1 && clipActive"
+              :ref="onClipHost"
+              class="mp-clip-host"
+              @click="onClipTap"
+              @dblclick="onClipDblTap"
+            />
             <template v-if="pane.snapshot.type === 'video'">
               <img v-if="pane.snapshot.cover_url" class="mp-cover" :src="pane.snapshot.cover_url" alt="">
               <span class="vid-badge" aria-hidden="true">

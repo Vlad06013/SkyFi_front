@@ -13,7 +13,8 @@ export default defineComponent({
   setup() {
     const player = usePlayerStore();
     const { current, title, artist, progress } = storeToRefs(player);
-    const playing = computed(() => player.state.is_playing);
+    /** Фактическое воспроизведение (не мнение сервера) — для иконки и пламени. */
+    const playing = computed(() => player.isPlaying);
     const { togglePlay, openExpanded, skipNext, skipPrevious } = player;
     const { liked, toggleLike } = useSnapshotLike(() => player.current);
 

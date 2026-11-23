@@ -27,3 +27,19 @@
   object-fit: cover;
   display: block;
 }
+
+/* Клип в мини-плеере: хост лежит поверх обложки, thumb сам его обрезает
+   по скруглению. Видео-элемент создаётся императивно — стиль через :deep. */
+.mp-clip-host {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  z-index: 1;
+}
+
+.mp-clip-host :deep(.clip-video) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}

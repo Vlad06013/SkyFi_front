@@ -1,34 +1,88 @@
 import { ref, watch } from 'vue';
-import { fetchVideoStreams } from '@/api/videos';
+import { fetchVideoStreams, resolveVideo } from '@/api/videos';
 import { snapshotKey } from '@/lib/playback-engine';
+import { useOnlineStore } from '@/stores/online';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
-import type { VideoSnapshot } from '@/types';
+import type { TrackSnapshot, VideoSnapshot } from '@/types';
 
 /**
- * Видео-движок (клипы, api.md §8): потоки через `/videos/get-url` со ссылками
- * в разных качествах. Список качеств селекта — из ответа; пунктов лестницы,
- * которых в ответе нет, селект рисует неактивными. Картинка крепится в хост
- * развёрнутого плеера; сворачивание убирает видео из DOM, но воспроизведение
- * продолжается звуком (как аудио-движок).
+ * Видео-движок (клипы, api.md §8): видео-снапшоты играют напрямую через
+ * `/videos/get-url`; для трека с включённым режимом клипов бэк матчит
+ * «трек → видео» через `/videos/resolve` (video: null — клипа нет, остаёмся
+ * на аудио, индикатор в плеере). Потоки со ссылками в разных качествах,
+ * TTL — по истечении запрашиваются заново. Картинка крепится в хост
+ * развёрнутого плеера; сворачивание перекладывает её в мини-плеер —
+ * воспроизведение не прерывается (нет хоста — элемент остаётся без
+ * родителя и поёт дальше, из DOM его не выкидываем). Тап по видео —
+ * пауза/плей, двойной тап — полный экран.
  */
 
 let video: HTMLVideoElement | null = null;
 let bound = false;
+/** Задержка одинарного тапа: за это время успевает прийти dblclick. */
+const TAP_FULLSCREEN_DELAY_MS = 260;
 /** Ключ видео, для которого уже подняты потоки — сравнение по snapshotKey. */
 let loadedKey: string | null = null;
 /** Ключ видео, чьи потоки реально стоят в элементе (loadedKey — бронь до ответа). */
 let appliedKey: string | null = null;
-/** Летящий запрос: следующий его отменяет — при быстром скипе уходит только последний. */
+/** Летящий запрос потоков: следующий его отменяет — при быстром скипе уходит только последний. */
 let loadAbort: AbortController | null = null;
-/** Позиция для восстановления после смены качества: src пересоздаёт поток. */
+/** Летящий резолв: тогл выкл/смена трека отменяют — ответ уже никому не нужен. */
+let resolveAbort: AbortController | null = null;
+/** Таймер продления TTL: перед протуханием ссылок перезапрашиваем потоки. */
+let ttlTimer: ReturnType<typeof setTimeout> | null = null;
+/** Позиция для восстановления после смены качества/продления: src пересоздаёт поток. */
 let resumeAt: number | null = null;
 
 /** Хост в развёрнутом плеере: сюда крепится видео-элемент (null — свёрнут/не клип). */
 const clipHost = ref<HTMLElement | null>(null);
+/** Хост в мини-плеере: сворачивание перекладывает видео сюда — клип поёт дальше. */
+const miniClipHost = ref<HTMLElement | null>(null);
 
 export function setClipHost(el: HTMLElement | null) {
   clipHost.value = el;
+}
+
+export function setMiniClipHost(el: HTMLElement | null) {
+  miniClipHost.value = el;
+}
+
+/** Полный экран по двойному тапу — на сам элемент, чтобы работало из мини-плеера. */
+export function toggleClipFullscreen() {
+  const el = video;
+  if (!el || !usePlayerStore().clipActive) return;
+  if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+  else void el.requestFullscreen().catch(() => undefined);
+}
+
+/**
+ * Пара обработчиков тапов по клипу: одинарный — пауза/плей через стор (все
+ * устройства подчиняются), двойной — полный экран. Одинарный ждёт
+ * TAP_FULLSCREEN_DELAY_MS: браузер шлёт click, click, dblclick, и без паузы
+ * плей переключился бы дважды перед разворачиванием. Компонент вешает
+ * обработчики на свой хост: в развёрнутом плеере тап до элемента доходит
+ * только через всплытие (см. NowPlaying).
+ */
+export function clipTapHandlers() {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const click = () => {
+    if (!usePlayerStore().clipActive) return;
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      void usePlayerStore().togglePlay();
+    }, TAP_FULLSCREEN_DELAY_MS);
+  };
+  const dblclick = () => {
+    if (!usePlayerStore().clipActive) return;
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    toggleClipFullscreen();
+  };
+  return { click, dblclick };
 }
 
 function ensureVideo(): HTMLVideoElement {
@@ -41,43 +95,82 @@ function ensureVideo(): HTMLVideoElement {
   return video;
 }
 
+/** Потоки текущего эффективного видео обновились — переприменить с сохранением позиции. */
+function reapplyStreams() {
+  if (!usePlayerStore().isActiveDevice) return;
+  applyStream();
+}
+
+function applyStream(resumePosition?: number) {
+  const el = ensureVideo();
+  const player = usePlayerStore();
+  const stream = activeStream(player.clipStreams, player.clipQuality);
+  if (!stream || el.src === stream.url) return;
+  // Свежий клип на треке стартует с серверной позиции трека; смена качества
+  // и продление TTL — с текущей позиции элемента.
+  resumeAt =
+    resumePosition ??
+    (Number.isFinite(el.currentTime) && el.currentTime > 0 ? el.currentTime : null);
+  el.src = stream.url;
+  if (player.isActiveDevice && player.state.is_playing) void el.play().catch(() => undefined);
+  syncAttachment();
+}
+
+function activeStream(streams: { quality: number; url: string }[], preferred: number) {
+  return (
+    streams.find((stream) => stream.quality === preferred) ??
+    [...streams].sort((a, b) => b.quality - a.quality)[0]
+  );
+}
+
+function syncAttachment() {
+  const el = ensureVideo();
+  const player = usePlayerStore();
+  const host = clipHost.value ?? miniClipHost.value;
+  const show = host != null && player.clipPlaybackVideo != null && player.clipStreams.length > 0;
+  if (show && host && el.parentElement !== host) host.appendChild(el);
+  // Из DOM убираем только когда играть нечего. Хоста нет (домашняя без
+  // мини-плеера) — элемент остаётся без родителя, воспроизведение продолжается.
+  if (!show && el.parentElement && (player.clipPlaybackVideo == null || player.clipStreams.length === 0)) el.remove();
+}
+
+/** Перед протуханием ссылок (ttl_sec) догоняем потоки заново — src пересоздаётся с той же позиции. */
+function scheduleTtlRefresh(ttlSec: number, snapshot: VideoSnapshot) {
+  if (ttlTimer) clearTimeout(ttlTimer);
+  const key = snapshotKey(snapshot);
+  const delay = Math.max(5_000, ttlSec * 1000 - 15_000);
+  ttlTimer = setTimeout(() => {
+    ttlTimer = null;
+    const store = usePlayerStore();
+    const current = store.clipPlaybackVideo;
+    if (!store.isActiveDevice || !current || snapshotKey(current) !== key) return;
+    void refreshStreams(current);
+  }, delay);
+}
+
+async function refreshStreams(snapshot: VideoSnapshot) {
+  try {
+    const payload = await fetchVideoStreams(snapshot);
+    const store = usePlayerStore();
+    if (!store.clipPlaybackVideo || snapshotKey(store.clipPlaybackVideo) !== snapshotKey(snapshot)) return;
+    store.setClipStreams(payload.streams);
+    reapplyStreams();
+    scheduleTtlRefresh(payload.ttl_sec, snapshot);
+  } catch {
+    // Один тихий пролёт: следующий тогл/смена трека перезапросят, автоповтором не злоупотребляем.
+  }
+}
+
 export function useVideoPlayback() {
   const player = usePlayerStore();
   const toast = useToastStore();
 
-  function currentVideo(): VideoSnapshot | null {
-    const snap = player.current;
-    return snap && snap.type === 'video' ? snap : null;
-  }
-
-  /** Активный поток: выбранное качество, если есть; иначе максимум из доступных. */
-  function activeStream() {
-    const streams = player.clipStreams;
-    return (
-      streams.find((stream) => stream.quality === player.clipQuality) ??
-      [...streams].sort((a, b) => b.quality - a.quality)[0]
-    );
-  }
-
-  function syncAttachment() {
-    const el = ensureVideo();
-    const show = clipHost.value != null && currentVideo() != null && player.clipStreams.length > 0;
-    if (show && clipHost.value && el.parentElement !== clipHost.value) clipHost.value.appendChild(el);
-    if (!show && el.parentElement) el.remove();
-  }
-
-  function applyStream() {
-    const el = ensureVideo();
-    const stream = activeStream();
-    if (!stream || el.src === stream.url) return;
-    resumeAt = Number.isFinite(el.currentTime) && el.currentTime > 0 ? el.currentTime : null;
-    el.src = stream.url;
-    if (player.isActiveDevice && player.state.is_playing) void el.play().catch(() => undefined);
-    syncAttachment();
-  }
-
   async function loadVideo(snapshot: VideoSnapshot | null) {
     const el = ensureVideo();
+    if (ttlTimer && !snapshot) {
+      clearTimeout(ttlTimer);
+      ttlTimer = null;
+    }
     if (!player.isActiveDevice || !snapshot) {
       el.pause();
       // Подмена/остановка: летящий запрос уже никому не нужен — отменяем.
@@ -93,6 +186,15 @@ export function useVideoPlayback() {
     }
     const key = snapshotKey(snapshot);
     if (key === appliedKey || key === loadedKey) return;
+    // Клип на треке: потоки приехали вместе с resolve — только применяем.
+    // Позиция общая с треком: клип стартует с неё (0 — тоже валидная позиция).
+    if (player.clipVideo && snapshotKey(player.clipVideo) === key) {
+      loadedKey = key;
+      appliedKey = key;
+      applyStream(player.positionSeconds);
+      syncAttachment();
+      return;
+    }
     loadedKey = key;
     loadAbort?.abort();
     const controller = new AbortController();
@@ -101,14 +203,14 @@ export function useVideoPlayback() {
       const payload = await fetchVideoStreams(snapshot, controller.signal);
       if (controller.signal.aborted) return;
       // Пока запрашивали, видео могло смениться — старое не применяем.
-      const now = currentVideo();
-      if (!now || snapshotKey(now) !== key) {
+      if (!player.clipPlaybackVideo || snapshotKey(player.clipPlaybackVideo) !== key) {
         if (loadedKey === key) loadedKey = null;
         return;
       }
       appliedKey = key;
       player.setClipStreams(payload.streams);
       applyStream();
+      scheduleTtlRefresh(payload.ttl_sec, snapshot);
     } catch (cause) {
       // Отменён следующим запросом — не ошибка, молча выходим.
       if (controller.signal.aborted) return;
@@ -119,10 +221,55 @@ export function useVideoPlayback() {
     }
   }
 
-  // Смена видео или получение роли активного устройства — повод подгрузить потоки.
+  /** Резолв «трек → видео»: video null — честно «клипа нет», остаёмся на аудио. */
+  async function resolveClip(track: TrackSnapshot) {
+    const key = snapshotKey(track);
+    player.setClipResolving();
+    resolveAbort?.abort();
+    const controller = new AbortController();
+    resolveAbort = controller;
+    try {
+      const payload = await resolveVideo(track, controller.signal);
+      if (controller.signal.aborted) return;
+      // Пока резолвили, трек мог смениться или режим выключили — старое не применяем.
+      if (!player.clipMode || !player.current || snapshotKey(player.current) !== key) return;
+      if (!payload.video) {
+        player.setClipUnavailable();
+        return;
+      }
+      player.setClipResolved(track, payload.video, payload.streams);
+      scheduleTtlRefresh(payload.ttl_sec, payload.video);
+      void loadVideo(payload.video);
+    } catch (cause) {
+      if (controller.signal.aborted) return;
+      if (player.current && snapshotKey(player.current) === key) player.setClipUnavailable();
+      toast.show(cause instanceof Error ? cause.message : 'Не удалось найти клип', '', true);
+    } finally {
+      if (resolveAbort === controller) resolveAbort = null;
+    }
+  }
+
+  // Эффективное видео (снапшот или клип на треке) или роль активного устройства
+  // изменились — поднимаем/меняем потоки.
   watch(
-    [() => player.current, () => player.isActiveDevice],
-    ([snapshot]) => loadVideo(snapshot && snapshot.type === 'video' ? snapshot : null),
+    [() => player.clipPlaybackVideo, () => player.isActiveDevice],
+    ([snapshot]) => loadVideo(snapshot),
+    { immediate: true },
+  );
+
+  // Режим клипов на треке: резолвим, пока трек тот же и режим включён.
+  watch(
+    [() => player.clipMode, () => player.current, () => player.isActiveDevice, () => useOnlineStore().isOnline],
+    ([clipModeOn, snapshot, active, online]) => {
+      if (!clipModeOn || !active || !snapshot || snapshot.type !== 'track') return;
+      if (player.clipTrackKey === snapshotKey(snapshot) || player.clipStatus === 'resolving') return;
+      if (online === false) {
+        player.setClipUnavailable();
+        toast.show('Клипы недоступны без сети', '', true);
+        return;
+      }
+      void resolveClip(snapshot);
+    },
     { immediate: true },
   );
 
@@ -130,15 +277,31 @@ export function useVideoPlayback() {
   watch(
     () => player.isActiveDevice && player.state.is_playing,
     (shouldPlay) => {
-      if (!player.isActiveDevice || currentVideo() == null) return;
+      if (!player.isActiveDevice || player.clipPlaybackVideo == null) return;
       const el = ensureVideo();
       if (shouldPlay) void el.play().catch(() => undefined);
       else el.pause();
     },
   );
 
+  // Тап при рассинхроне (сервер: играем, элемент молчит) — пинаем элемент.
+  // Мёртвый поток здесь не лечим: ошибка потока и так уводит в фолбэк на аудио.
+  watch(
+    () => player.engineKick,
+    () => {
+      if (!player.isActiveDevice || !player.state.is_playing || !player.clipActive) return;
+      void ensureVideo().play().catch(() => undefined);
+    },
+  );
+
   // Смена качества в селекте — переключаем поток с сохранением позиции.
-  watch(() => player.clipQuality, () => applyStream());
+  watch(
+    () => player.clipQuality,
+    () => applyStream(),
+  );
+
+  // Обновление потоков (продление TTL) — переприменяем активное качество.
+  watch(() => player.clipStreams, () => reapplyStreams());
 
   // Подгонка дрейфа к серверной позиции — только при большом расхождении.
   watch(
@@ -146,7 +309,7 @@ export function useVideoPlayback() {
     (position) => {
       const el = video;
       if (!el || !player.isActiveDevice) return;
-      const snap = currentVideo();
+      const snap = player.clipPlaybackVideo;
       if (!snap || snapshotKey(snap) !== loadedKey) return;
       const ended = el.ended;
       if (Number.isFinite(el.duration) && Math.abs(el.currentTime - position) > 2.5) {
@@ -166,9 +329,10 @@ export function useVideoPlayback() {
     { immediate: true },
   );
 
-  // Хост появляется/исчезает с развёрнутым плеером — видео крепим/снимаем.
+  // Хосты появляются/исчезают с развёрнутым/мини-плеером, меняются потоки/
+  // видео — элемент крепим/снимаем.
   watch(
-    [clipHost, () => player.clipStreams.length, () => player.current?.type],
+    [clipHost, miniClipHost, () => player.clipStreams.length, () => player.clipPlaybackVideo],
     () => syncAttachment(),
   );
 
@@ -179,7 +343,7 @@ export function useVideoPlayback() {
     const el = ensureVideo();
     el.addEventListener('ended', () => {
       const store = usePlayerStore();
-      if (store.isActiveDevice && store.current?.type === 'video') store.handleTrackEnded();
+      if (store.isActiveDevice && store.clipActive) store.handleTrackEnded();
     });
     el.addEventListener('loadedmetadata', () => {
       if (resumeAt != null) {
@@ -188,18 +352,29 @@ export function useVideoPlayback() {
       }
     });
     el.addEventListener('playing', () => {
-      if (usePlayerStore().current?.type === 'video') usePlayerStore().setAudioPlaying(true);
+      const store = usePlayerStore();
+      if (store.clipActive) store.setAudioPlaying(true);
     });
     el.addEventListener('pause', () => {
-      if (usePlayerStore().current?.type === 'video') usePlayerStore().setAudioPlaying(false);
+      const store = usePlayerStore();
+      if (store.clipActive) store.setAudioPlaying(false);
     });
     el.addEventListener('error', () => {
-      if (usePlayerStore().current?.type === 'video') usePlayerStore().setAudioPlaying(false);
+      const store = usePlayerStore();
+      if (store.current?.type === 'video') {
+        store.setAudioPlaying(false);
+        return;
+      }
+      // Ошибка потока клипа — фолбэк на аудио (frontend.md §7), режим не трогаем.
+      if (store.clipActive) {
+        store.setClipUnavailable();
+        useToastStore().show('Клип недоступен, продолжаем аудио', '', true);
+      }
     });
     el.addEventListener('timeupdate', () => {
       const store = usePlayerStore();
-      if (!store.isActiveDevice || store.current?.type !== 'video') return;
-      if (snapshotKey(store.current) !== loadedKey) return;
+      if (!store.isActiveDevice || !store.clipActive || !store.clipPlaybackVideo) return;
+      if (snapshotKey(store.clipPlaybackVideo) !== loadedKey) return;
       store.anchorFromAudio(el.currentTime);
     });
   }

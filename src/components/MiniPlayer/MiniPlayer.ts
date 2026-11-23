@@ -1,6 +1,7 @@
-import { computed, defineComponent, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { usePlayerStore } from '@/stores/player';
+import { clipTapHandlers, setMiniClipHost } from '@/composables/useVideoPlayback';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { trackPointer } from '@/lib/pointer-drag';
 import { artistsLine, coverVar, trackCover } from '@/lib/cover';
@@ -17,10 +18,26 @@ export default defineComponent({
   components: { SourceBadge },
   setup() {
     const player = usePlayerStore();
-    const { current, previewNext, previewPrevious, progress } = storeToRefs(player);
-    const playing = computed(() => player.state.is_playing);
+    const { current, previewNext, previewPrevious, progress, clipActive } = storeToRefs(player);
+    /** Фактическое воспроизведение (не мнение сервера) — для иконки плеера. */
+    const playing = computed(() => player.isPlaying);
     const { togglePlay, openExpanded, skipRestartAfter } = player;
     const { liked, toggleLike } = useSnapshotLike(() => player.current);
+
+    /** Хост клипа в центральной панели: сворачивание переносит видео сюда. */
+    const clipHostEl = ref<HTMLElement | null>(null);
+    watch(clipHostEl, (el) => setMiniClipHost(el));
+    function onClipHost(el: unknown) {
+      clipHostEl.value = el instanceof HTMLElement ? el : null;
+    }
+    const clipTaps = clipTapHandlers();
+    /** Тап по клипу в мини-плеере: одинарный — пауза/плей, двойной — полный экран. */
+    function onClipTap() {
+      clipTaps.click();
+    }
+    function onClipDblTap() {
+      clipTaps.dblclick();
+    }
 
     const trackEl = ref<HTMLElement | null>(null);
     const dragging = ref(false);
@@ -101,7 +118,9 @@ export default defineComponent({
 
     function onDragStart(event: PointerEvent) {
       if (event.pointerType === 'mouse' && event.button !== 0) return;
-      if (event.target instanceof Element && event.target.closest('.icon-btn, .fab')) return;
+      // По клипу тап = пауза/плей, двойной — полный экран (см. useVideoPlayback) —
+      // не конфликтуем с жестом «тап разворачивает плеер».
+      if (event.target instanceof Element && event.target.closest('.icon-btn, .fab, .clip-video')) return;
       const el = trackEl.value;
       if (!el) return;
       startClientX = event.clientX;
@@ -158,6 +177,11 @@ export default defineComponent({
       playing,
       panes,
       progress,
+      clipActive,
+      clipHostEl,
+      onClipHost,
+      onClipTap,
+      onClipDblTap,
       trackEl,
       coverVar,
       trackCover,

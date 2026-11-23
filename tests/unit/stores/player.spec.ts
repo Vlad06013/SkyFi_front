@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
+import * as playerApi from '@/api/player';
 import * as queueApi from '@/api/queue';
+import { useAuthStore } from '@/stores/auth';
+import { useDevicesStore } from '@/stores/devices';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
-import type { QueueItem, TrackSnapshot } from '@/types';
+import type { QueueItem, TrackSnapshot, VideoSnapshot } from '@/types';
 
 vi.mock('@/api/queue', () => ({
   fetchQueue: vi.fn(),
@@ -12,10 +15,21 @@ vi.mock('@/api/queue', () => ({
   reorderPending: vi.fn(),
 }));
 
+vi.mock('@/api/player', () => ({
+  fetchPlayerState: vi.fn(),
+  playSnapshot: vi.fn(),
+  pausePlayback: vi.fn(),
+  resumePlayback: vi.fn(),
+  seekTo: vi.fn(),
+  patchPlaybackOptions: vi.fn(),
+}));
+
 const fetchQueueMock = vi.mocked(queueApi.fetchQueue);
 const addToQueueMock = vi.mocked(queueApi.addToQueue);
 const removeFromQueueMock = vi.mocked(queueApi.removeFromQueue);
 const reorderPendingMock = vi.mocked(queueApi.reorderPending);
+const pausePlaybackMock = vi.mocked(playerApi.pausePlayback);
+const playSnapshotMock = vi.mocked(playerApi.playSnapshot);
 
 const track: TrackSnapshot = {
   type: 'track',
@@ -128,5 +142,160 @@ describe('stores/player: очередь', () => {
     await player.ensureQueue();
 
     expect(player.previewNext?.source_id).toBe('t1');
+  });
+});
+
+const clip: VideoSnapshot = {
+  type: 'video',
+  source_type: 'yandex_music',
+  source_id: 'v1',
+  title: 'радиотишина (клип)',
+  artists: [{ name: 'завтра' }],
+  duration_ms: 150000,
+  cover_url: null,
+  watch_url: null,
+};
+
+describe('stores/player: подмена снапшота клипом', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  function playingTrack() {
+    const player = usePlayerStore();
+    player.state = { ...player.state, current_snapshot: track, is_playing: true };
+    return player;
+  }
+
+  it('клип подменяет трек в effectiveCurrent и длительности', () => {
+    const player = playingTrack();
+    expect(player.effectiveCurrent?.source_id).toBe('t1');
+    expect(player.durationSeconds).toBe(200);
+
+    player.toggleClips();
+    player.setClipResolved(track, clip, [{ quality: 720, url: 'https://cdn.test/720.mp4' }]);
+
+    expect(player.clipActive).toBe(true);
+    expect(player.effectiveCurrent?.source_id).toBe('v1');
+    // Ползунок живёт по длительности клипа, метаданные — по-прежнему трека.
+    expect(player.durationSeconds).toBe(150);
+    expect(player.title).toBe('радиотишина');
+  });
+
+  it('тогл обратно возвращает трек, общая позиция сохраняется', () => {
+    const player = playingTrack();
+    player.toggleClips();
+    player.setClipResolved(track, clip, [{ quality: 720, url: 'https://cdn.test/720.mp4' }]);
+    player.state = { ...player.state, is_playing: false, position_seconds: 42 };
+
+    player.toggleClips();
+
+    expect(player.clipActive).toBe(false);
+    expect(player.effectiveCurrent?.source_id).toBe('t1');
+    expect(player.durationSeconds).toBe(200);
+    expect(player.state.position_seconds).toBe(42);
+  });
+
+  it('клип недоступен — остаёмся на треке', () => {
+    const player = playingTrack();
+    player.toggleClips();
+    player.setClipUnavailable();
+
+    expect(player.clipActive).toBe(false);
+    expect(player.effectiveCurrent?.source_id).toBe('t1');
+    expect(player.durationSeconds).toBe(200);
+  });
+
+  it('чистое видео в current — эффективный снапшот само видео', () => {
+    const player = usePlayerStore();
+    player.state = { ...player.state, current_snapshot: clip };
+
+    expect(player.effectiveCurrent?.source_id).toBe('v1');
+    expect(player.durationSeconds).toBe(150);
+  });
+});
+
+describe('stores/player: рассинхрон сервера с реальным воспроизведением', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    pausePlaybackMock.mockReset();
+    playSnapshotMock.mockReset();
+  });
+
+  /** Активное автризованное устройство, сервер уверен, что играем трек. */
+  function desyncedPlayer() {
+    const auth = useAuthStore();
+    auth.user = { id: 1 } as never;
+    const devices = useDevicesStore();
+    devices.myDeviceUuid = 'uuid-1';
+    const player = usePlayerStore();
+    player.state = {
+      ...player.state,
+      current_snapshot: track,
+      is_playing: true,
+      active_device_id: 'uuid-1',
+    };
+    return player;
+  }
+
+  it('togglePlay: элемент молчит — пинок движка, пауза на бэк не уходит', async () => {
+    const player = desyncedPlayer();
+
+    await player.togglePlay();
+
+    expect(pausePlaybackMock).not.toHaveBeenCalled();
+    expect(player.engineKick).toBe(1);
+    expect(player.state.is_playing).toBe(true);
+  });
+
+  it('togglePlay: элемент реально играет — обычная пауза', async () => {
+    const player = desyncedPlayer();
+    player.setAudioPlaying(true);
+    pausePlaybackMock.mockResolvedValue({ state: { ...player.state, is_playing: false }, queue: [] } as never);
+
+    await player.togglePlay();
+
+    expect(pausePlaybackMock).toHaveBeenCalledTimes(1);
+    expect(player.engineKick).toBe(0);
+  });
+
+  it('isPlaying: грейс, затем честная пауза; элемент заиграл — сразу плей', async () => {
+    vi.useFakeTimers();
+    try {
+      const player = desyncedPlayer();
+      expect(player.isPlaying).toBe(true);
+      await vi.advanceTimersByTimeAsync(1_600);
+      expect(player.isPlaying).toBe(false);
+      player.setAudioPlaying(true);
+      expect(player.isPlaying).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('isPlaying: пульт зеркалит сервер, пауза — сразу false', () => {
+    const player = desyncedPlayer();
+    player.state = { ...player.state, active_device_id: 'другое-устройство' };
+    expect(player.isPlaying).toBe(true);
+
+    const paused = desyncedPlayer();
+    paused.state = { ...paused.state, is_playing: false };
+    expect(paused.isPlaying).toBe(false);
+  });
+
+  it('playOrToggle: тап по текущему — тоггл, по иному — прямой запуск', async () => {
+    const player = desyncedPlayer();
+    player.setAudioPlaying(true);
+    pausePlaybackMock.mockResolvedValue({ state: { ...player.state, is_playing: false }, queue: [] } as never);
+    playSnapshotMock.mockResolvedValue({ state: { ...player.state }, queue: [] } as never);
+
+    await player.playOrToggle(track);
+    expect(pausePlaybackMock).toHaveBeenCalledTimes(1);
+    expect(playSnapshotMock).not.toHaveBeenCalled();
+
+    const other = { ...track, source_id: 't2' };
+    await player.playOrToggle(other);
+    expect(playSnapshotMock).toHaveBeenCalledTimes(1);
+    expect(playSnapshotMock.mock.calls[0]?.[0]).toEqual(other);
   });
 });

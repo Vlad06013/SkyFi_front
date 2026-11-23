@@ -6,7 +6,7 @@ import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { useLyrics } from '@/composables/useLyrics';
 import { useMediaMenu } from '@/composables/useMediaMenu';
-import { setClipHost } from '@/composables/useVideoPlayback';
+import { clipTapHandlers, setClipHost } from '@/composables/useVideoPlayback';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { coverVar, artistsLine, trackCover } from '@/lib/cover';
 import { sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
@@ -41,7 +41,8 @@ export default defineComponent({
       queue,
       queueLoaded,
     } = storeToRefs(player);
-    const playing = computed(() => player.state.is_playing);
+    /** Фактическое воспроизведение (не мнение сервера) — для иконки и эквалайзера. */
+    const playing = computed(() => player.isPlaying);
     /** Фон клип-режима — превью текущего видео; пока нет видео/превью — чёрный фон. */
     const clipPoster = computed(() =>
       current.value && current.value.type === 'video' ? (current.value.cover_url ?? '') : '',
@@ -59,7 +60,6 @@ export default defineComponent({
       toggleRepeat,
       skipNext,
       skipPrevious,
-      playSnapshot,
       seekRatio,
       toggleClips,
       setClipQuality,
@@ -87,10 +87,11 @@ export default defineComponent({
       return snapshot.cover_url ?? '';
     }
 
-    /** Тап по элементу очереди: прямой запуск с source=queue — бэк сам
-     *  двигает статусы (pending → playing_now, прежний — played). */
+    /** Тап по элементу очереди: текущий — пауза/плей, иной прямой запуск
+     *  с source=queue — бэк сам двигает статусы (pending → playing_now,
+     *  прежний — played). */
     function playFromQueue(snapshot: AnySnapshot) {
-      playSnapshot(snapshot, PLAY_SOURCE_QUEUE);
+      void player.playOrToggle(snapshot, PLAY_SOURCE_QUEUE);
     }
 
     const layer = ref<Layer>('now');
@@ -149,6 +150,7 @@ export default defineComponent({
     /** Хост для видео-элемента клипа: композабл крепит/снимает его по этому ref. */
     const clipHostEl = ref<HTMLElement | null>(null);
     watch(clipHostEl, (el) => setClipHost(el));
+    const clipTaps = clipTapHandlers();
 
     /** Качества, реально приехавшие в потоках /videos/get-url — остальные неактивны. */
     const clipStreamQualities = computed(() => new Set(clipStreams.value.map((stream) => stream.quality)));
@@ -284,8 +286,28 @@ export default defineComponent({
 
     function isNoDragTarget(target: EventTarget | null) {
       return target instanceof Element && Boolean(
-        target.closest('button, a, input, .ctx, .seek, .seek-bar, .p-sheet-head, .p-sheet-body, .sheet-mask, .sky-toast, .clip-quality, .clip-quality-mask'),
+        target.closest('button, a, input, .ctx, .ctx-scrim, .lyr, .seek, .seek-bar, .p-sheet-head, .p-sheet-body, .sheet-mask, .sky-toast, .clip-quality, .clip-quality-mask'),
       );
+    }
+
+    /**
+     * Тап по области клипа: одинарный — пауза/плей, двойной — полный экран.
+     * Вешается на корень: в развёрнутом плеере до самого видео тап не доходит
+     * (слоёный UI поверх), а в простое (is-clip-idle) клики идут через
+     * pointer-events:none слоя — в обоих случаях событие всплывает сюда.
+     */
+    function onClipTap(event: MouseEvent) {
+      if (!clipMode.value || layer.value !== 'now') return;
+      if (isNoDragTarget(event.target)) return;
+      wake();
+      clipTaps.click();
+    }
+
+    function onClipDblTap(event: MouseEvent) {
+      if (!clipMode.value || layer.value !== 'now') return;
+      if (isNoDragTarget(event.target)) return;
+      wake();
+      clipTaps.dblclick();
     }
 
     function onPlayerDragStart(event: PointerEvent) {
@@ -293,6 +315,11 @@ export default defineComponent({
       if (sheet.value) return;
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       if (isNoDragTarget(event.target)) return;
+      // В клип-режиме свободная область живёт для тапов (play/pause,
+      // полный экран): trackPointer глушит click через preventDefault на
+      // pointerdown, поэтому драг здесь не стартуем. Свайп на сворачивание —
+      // с хрома экрана (кнопка «свернуть» на месте).
+      if (clipMode.value) return;
       if (open.value) closeMenu();
       const startX = event.clientX;
       const startY = event.clientY;
@@ -408,7 +435,6 @@ export default defineComponent({
       toggleRepeat,
       skipNext,
       skipPrevious,
-      playSnapshot,
       playFromQueue,
       seekRatio,
       toggleClips,
@@ -418,6 +444,8 @@ export default defineComponent({
       openQueue,
       onClips,
       openNowMenu,
+      onClipTap,
+      onClipDblTap,
       onPlayerDragStart,
       onSortStart,
       onQueueDragStart,
