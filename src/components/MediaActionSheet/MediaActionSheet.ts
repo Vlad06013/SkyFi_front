@@ -155,18 +155,18 @@ export default defineComponent({
 
     const deviceList = computed(() => devicesStore.devices);
     const deviceLoaded = computed(() => devicesStore.loaded);
-    const activeDeviceId = computed(() => devicesStore.activeId);
-    const myDeviceId = computed(() => devicesStore.myDeviceId);
+    const activeDeviceUuid = computed(() => devicesStore.activeUuid);
+    const myDeviceUuid = computed(() => devicesStore.myDeviceUuid);
 
     function deviceCaption(device: PlayerDevice) {
-      if (device.id === myDeviceId.value) return 'это устройство';
-      if (device.id === activeDeviceId.value) return '';
+      if (device.device_uuid === myDeviceUuid.value) return 'это устройство';
+      if (device.device_uuid === activeDeviceUuid.value) return '';
       return 'не активен';
     }
 
-    async function pickDevice(id: number) {
-      const name = deviceList.value.find((device) => device.id === id)?.name ?? '';
-      if (await devicesStore.activate(id)) {
+    async function pickDevice(deviceUuid: string) {
+      const name = deviceList.value.find((device) => device.device_uuid === deviceUuid)?.name ?? '';
+      if (await devicesStore.activate(deviceUuid)) {
         toast.show(name, 'играет здесь');
         close();
       }
@@ -189,7 +189,7 @@ export default defineComponent({
       shareExternally,
       deviceList,
       deviceLoaded,
-      activeDeviceId,
+      activeDeviceUuid,
       deviceCaption,
       pickDevice,
       friendInitial,

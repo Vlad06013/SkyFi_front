@@ -8,7 +8,8 @@ import { useMediaMenu } from '@/composables/useMediaMenu';
 import { fetchSearch } from '@/api/search';
 import { artistsLine, trackCover } from '@/lib/cover';
 import { getSearchHistory, pushSearchHistory, clearSearchHistory } from '@/lib/search-history';
-import { openSnapshot } from '@/lib/open-snapshot';
+import { openSnapshot, type OpenPlayOptions } from '@/lib/open-snapshot';
+import { PLAY_SOURCE_SEARCH } from '@/lib/play-sources';
 import type { MenuContext, MenuEntity } from '@/lib/media-menu';
 import { usePlayerStore } from '@/stores/player';
 import { useFavoritesStore } from '@/stores/favorites';
@@ -244,8 +245,8 @@ export default defineComponent({
       };
     }
 
-    function openResult(snapshot: AnySnapshot | null | undefined) {
-      openSnapshot(router, snapshot);
+    function openResult(snapshot: AnySnapshot | null | undefined, play?: OpenPlayOptions) {
+      openSnapshot(router, snapshot, play);
     }
 
     async function onLike(entity: MenuEntity) {
@@ -322,6 +323,7 @@ export default defineComponent({
       snapshotMenuContext,
       isPlaying,
       openResult,
+      playSourceSearch: PLAY_SOURCE_SEARCH,
       loadMore,
       retry,
       useHistory,

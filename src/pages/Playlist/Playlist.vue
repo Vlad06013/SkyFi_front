@@ -41,7 +41,7 @@
         :source="track.source_type"
         :cover="trackCover(track)"
         :liked="favorites.has(track)"
-        @open="player.playSnapshot(track)"
+        @open="player.playSnapshot(track, playSourcePlaylist, { contextItems: tracks, contextRef: playlist?.source_id ?? null })"
         @menu="openSnapshotMenu($event, track, 'my-playlist-track')"
       />
       <div v-if="!tracks.length" class="empty">

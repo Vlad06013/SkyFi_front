@@ -18,7 +18,6 @@ vi.mock('@/api/devices', () => ({
 
 vi.mock('@/lib/device', () => ({
   ensureDevice: vi.fn(),
-  saveServerId: vi.fn(),
   getDevice: vi.fn(),
   clearDevice: vi.fn(),
 }));
@@ -40,11 +39,12 @@ const fetchDevicesMock = vi.mocked(devicesApi.fetchDevices);
 const activateDeviceMock = vi.mocked(devicesApi.activateDevice);
 const sendHeartbeatMock = vi.mocked(devicesApi.sendHeartbeat);
 const ensureDeviceMock = vi.mocked(identity.ensureDevice);
-const saveServerIdMock = vi.mocked(identity.saveServerId);
 
-const device = (id: number, isActive = false): PlayerDevice => ({
-  id,
-  name: `dev-${id}`,
+const uuid = (n: number) => `9f1c7a2e-4b3d-4c8a-9e5f-2d6b0a1c4f7${n}`;
+
+const device = (n: number, isActive = false): PlayerDevice => ({
+  device_uuid: uuid(n),
+  name: `dev-${n}`,
   type: 'phone',
   is_active: isActive,
   last_seen_at: null,
@@ -60,8 +60,7 @@ describe('stores/devices', () => {
     setActivePinia(createPinia());
     vi.useFakeTimers();
     vi.clearAllMocks();
-    ensureDeviceMock.mockResolvedValue({ uuid: 'uuid-1', serverId: null });
-    saveServerIdMock.mockResolvedValue({ uuid: 'uuid-1', serverId: 5 });
+    ensureDeviceMock.mockResolvedValue({ uuid: 'uuid-1' });
   });
 
   describe('список', () => {
@@ -72,7 +71,7 @@ describe('stores/devices', () => {
       await store.ensure();
       expect(store.devices).toHaveLength(2);
       expect(store.loaded).toBe(true);
-      expect(store.activeId).toBe(2);
+      expect(store.activeUuid).toBe(uuid(2));
     });
 
     it('неудача сбрасывает флажок — повторим при следующем открытии', async () => {
@@ -102,18 +101,18 @@ describe('stores/devices', () => {
       const store = useDevicesStore();
       store.devices = [device(1, true), device(2)];
 
-      store.applyChanged(2);
-      expect(store.devices.find((d) => d.id === 1)?.is_active).toBe(false);
-      expect(store.devices.find((d) => d.id === 2)?.is_active).toBe(true);
-      expect(store.activeId).toBe(2);
+      store.applyChanged(uuid(2));
+      expect(store.devices.find((d) => d.device_uuid === uuid(1))?.is_active).toBe(false);
+      expect(store.devices.find((d) => d.device_uuid === uuid(2))?.is_active).toBe(true);
+      expect(store.activeUuid).toBe(uuid(2));
     });
 
     it('applyDisconnected убирает устройство', () => {
       const store = useDevicesStore();
       store.devices = [device(1), device(2)];
 
-      store.applyDisconnected(1);
-      expect(store.devices.map((d) => d.id)).toEqual([2]);
+      store.applyDisconnected(uuid(1));
+      expect(store.devices.map((d) => d.device_uuid)).toEqual([uuid(2)]);
     });
   });
 
@@ -121,28 +120,37 @@ describe('stores/devices', () => {
     it('успех: оптимистично переключает, сервер подтвердил', async () => {
       const store = useDevicesStore();
       store.devices = [device(1, true), device(2)];
-      store.myDeviceId = 1;
+      store.myDeviceUuid = 'uuid-1';
       activateDeviceMock.mockResolvedValue({ state: null as never, queue: [] });
 
-      await expect(store.activate(2)).resolves.toBe(true);
-      expect(activateDeviceMock).toHaveBeenCalledWith(2, { origin_device_id: 1, command_id: expect.any(String) });
-      expect(store.activeId).toBe(2);
+      await expect(store.activate(uuid(2))).resolves.toBe(true);
+      expect(activateDeviceMock).toHaveBeenCalledWith(uuid(2), { origin_device_id: 'uuid-1', command_id: expect.any(String) });
+      expect(store.activeUuid).toBe(uuid(2));
     });
 
     it('ошибка: откат к прежнему активному + тост', async () => {
       const store = useDevicesStore();
       const toast = useToastStore();
       store.devices = [device(1, true), device(2)];
+      store.myDeviceUuid = 'uuid-1';
       activateDeviceMock.mockRejectedValue(new Error('бэк упал'));
 
-      await expect(store.activate(2)).resolves.toBe(false);
-      expect(store.activeId).toBe(1);
+      await expect(store.activate(uuid(2))).resolves.toBe(false);
+      expect(store.activeUuid).toBe(uuid(1));
       expect(toast.toast?.error).toBe(true);
+    });
+
+    it('мой uuid неизвестен — не вызываем API, тост', async () => {
+      const store = useDevicesStore();
+      store.devices = [device(1), device(2)];
+
+      await expect(store.activate(uuid(2))).resolves.toBe(false);
+      expect(activateDeviceMock).not.toHaveBeenCalled();
     });
   });
 
   describe('presence', () => {
-    it('registerPresence: регистрирует, сохраняет серверный id, добавляет в список', async () => {
+    it('registerPresence: регистрирует по uuid и добавляет в список', async () => {
       registerDeviceMock.mockResolvedValue(device(5, true));
       const store = useDevicesStore();
 
@@ -153,17 +161,16 @@ describe('stores/devices', () => {
         origin_device_id: 'uuid-1',
         command_id: expect.any(String),
       });
-      expect(saveServerIdMock).toHaveBeenCalledWith(5);
-      expect(store.myDeviceId).toBe(5);
-      expect(store.devices.some((d) => d.id === 5)).toBe(true);
+      expect(store.myDeviceUuid).toBe('uuid-1');
+      expect(store.devices.some((d) => d.device_uuid === uuid(5))).toBe(true);
     });
 
-    it('registerPresence: бэк недоступен — false, без серверного id', async () => {
+    it('registerPresence: бэк недоступен — false, в список не добавлено', async () => {
       registerDeviceMock.mockRejectedValue(new Error('down'));
       const store = useDevicesStore();
 
       await expect(store.registerPresence()).resolves.toBe(false);
-      expect(store.myDeviceId).toBeNull();
+      expect(store.devices).toHaveLength(0);
     });
 
     it('bindPresence: auth+online → регистрация + heartbeat раз в интервал', async () => {
@@ -178,7 +185,7 @@ describe('stores/devices', () => {
       store.bindPresence();
       await flush();
 
-      expect(store.myDeviceId).toBe(5);
+      expect(store.myDeviceUuid).toBe('uuid-1');
       expect(sendHeartbeatMock).not.toHaveBeenCalled();
 
       await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS);
@@ -200,11 +207,11 @@ describe('stores/devices', () => {
       const store = useDevicesStore();
       store.bindPresence();
       await flush();
-      expect(store.myDeviceId).toBe(5);
+      expect(store.myDeviceUuid).toBe('uuid-1');
 
       auth.user = null;
       await flush();
-      expect(store.myDeviceId).toBeNull();
+      expect(store.myDeviceUuid).toBeNull();
       expect(store.devices).toHaveLength(0);
 
       const calls = sendHeartbeatMock.mock.calls.length;

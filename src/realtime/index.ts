@@ -8,6 +8,11 @@ import {
   handleDeviceDisconnected,
 } from '@/realtime/handlers/devices';
 import {
+  handlePlaybackQueueUpdated,
+  handlePlaybackStateUpdated,
+  handleWaveUpdated,
+} from '@/realtime/handlers/playback';
+import {
   handleFriendQueueItemAdded,
   handleFriendshipRequestAccepted,
   handleFriendshipRequestSent,
@@ -21,7 +26,10 @@ import type {
   PlaybackDeviceChangedPayload,
   PlaybackDeviceConnectedPayload,
   PlaybackDeviceDisconnectedPayload,
+  PlaybackQueueUpdatedPayload,
+  PlaybackStateUpdatedPayload,
   ShareSentPayload,
+  WaveUpdatedPayload,
 } from '@/types/realtime';
 
 export type RealtimeStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'offline';
@@ -44,8 +52,7 @@ function subscribeOwnChannel(userId: number) {
   if (!echo) return;
   const channel = echo.private(`App.Models.User.${userId}`);
   const devices = useDevicesStore();
-  // connected несёт uuid устройства, остальные ивенты — серверный id (api.md §17, провод 2026-11-20).
-  const router = createRouter({ getMyOriginIds: () => [devices.myDeviceId, devices.myDeviceUuid] });
+  const router = createRouter({ getMyOriginIds: () => [devices.myDeviceUuid] });
   router.listen<PlaybackDeviceConnectedPayload>(channel, '.playback.device.connected', { echo: true }, handleDeviceConnected);
   router.listen<PlaybackDeviceChangedPayload>(channel, '.playback.device.changed', { echo: true }, handleDeviceChanged);
   router.listen<PlaybackDeviceDisconnectedPayload>(
@@ -58,6 +65,10 @@ function subscribeOwnChannel(userId: number) {
   router.listen<FriendshipEventPayload>(channel, '.friendship.request.accepted', {}, handleFriendshipRequestAccepted);
   router.listen<FriendQueueItemAddedPayload>(channel, '.friend.queue.item.added', {}, handleFriendQueueItemAdded);
   router.listen<ShareSentPayload>(channel, '.share.sent', {}, handleShareSent);
+  // Плеер: стейт (version-gate в сторе), очередь (тост + рефетч), окно волны (рефетч целиком).
+  router.listen<PlaybackStateUpdatedPayload>(channel, '.playback.state.updated', { echo: true, dedup: true }, handlePlaybackStateUpdated);
+  router.listen<PlaybackQueueUpdatedPayload>(channel, '.playback.queue.updated', { echo: true, dedup: true }, handlePlaybackQueueUpdated);
+  router.listen<WaveUpdatedPayload>(channel, '.playback.wave.updated', { echo: true, dedup: true }, handleWaveUpdated);
 }
 
 /** Подключение и подписка на свой канал. Повторный вызов — no-op. */

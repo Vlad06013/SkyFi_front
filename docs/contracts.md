@@ -107,7 +107,7 @@ export type PlaySource =
   | 'search'
   | 'playlist'
   | 'uploads'
-  | 'yandex_wave';
+  | 'wave';
 
 export type QueueItemStatus = 'pending' | 'playing_now' | 'played' | 'skipped';
 export type DeviceType = 'phone' | 'computer' | 'car' | 'tv';
@@ -115,7 +115,8 @@ export type Visibility = 'public' | 'friends' | 'private';
 
 /** Эхо-поля команд (api.md §1.6). */
 export interface EchoFields {
-  origin_device_id: number | string;
+  /** Постоянный UUID устройства-инициатора (= devices[].device_uuid). */
+  origin_device_id: string;
   command_id: string;
 }
 ```
@@ -137,7 +138,7 @@ export interface AuthPayload {
 }
 
 export interface PlayerDevice {
-  id: number;
+  device_uuid: string;
   name: string;
   type: DeviceType;
   is_active: boolean;
@@ -165,8 +166,14 @@ export interface PlayerStateView {
   play_source: PlaySource;
   previous_play_source: PlaySource;
   previous_play_source_snapshot: AnySnapshot | null;
-  wave_anchor: string | null;
-  active_device_id: number | null;
+  /** Opaque-ссылка контекста от клиента (поиск/плейлист): бэк не парсит. */
+  context_ref: string | null;
+  /** Opaque-сид детерминированного шаффла: одинаковый порядок на всех устройствах. */
+  shuffle_seed: string | null;
+  /** Время последнего замера позиции (ISO 8601) — свежесть для экстраполяции. */
+  position_updated_at: string | null;
+  /** device_uuid активного устройства; null — никто не воспроизводит. */
+  active_device_id: string | null;
   devices: PlayerDevice[];
 }
 
@@ -389,8 +396,8 @@ export interface PlaylistPayload {
 }
 
 export interface WavePayload {
-  batch_id: string;
-  tracks: TrackSnapshot[];
+  /** Полное окно ротации в порядке следования; пустым не бывает. */
+  snapshots: AnySnapshot[];
 }
 
 export type WaveFeedbackType =
@@ -407,13 +414,19 @@ export type WaveFeedbackType =
 ```ts
 export interface PlaybackStateUpdatedPayload {
   state: PlayerStateView;
-  origin_device_id: number | string | null;
+  origin_device_id: string | null;
   command_id: string | null;
 }
 
 export interface PlaybackQueueUpdatedPayload {
   item: { title: string; artists: string[] } | null;
-  origin_device_id: number | string | null;
+  origin_device_id: string | null;
+  command_id: string | null;
+}
+
+/** playback.wave.updated: окно волны изменилось — клиент делает GET /wave. */
+export interface WaveUpdatedPayload {
+  origin_device_id: string | null;
   command_id: string | null;
 }
 
@@ -424,18 +437,18 @@ export interface FriendQueueItemAddedPayload {
 
 export interface PlaybackDeviceConnectedPayload {
   device: PlayerDevice;
-  origin_device_id: number | string | null;
+  origin_device_id: string | null;
 }
 
 export interface PlaybackDeviceChangedPayload {
-  device_id: number;
-  origin_device_id: number | string | null;
+  device_uuid: string;
+  origin_device_id: string | null;
 }
 
 export interface PlaybackDeviceDisconnectedPayload {
-  device_id: number;
+  device_uuid: string;
   device_name: string;
-  origin_device_id: number | string | null;
+  origin_device_id: string | null;
   command_id: string | null;
 }
 
@@ -544,10 +557,12 @@ export const mockPlayerState: PlayerStatePayload = {
     play_source: 'favorites',
     previous_play_source: 'single',
     previous_play_source_snapshot: null,
-    wave_anchor: null,
-    active_device_id: 1,
+    context_ref: null,
+    shuffle_seed: null,
+    position_updated_at: new Date().toISOString(),
+    active_device_id: '9f1c7a2e-4b3d-4c8a-9e5f-2d6b0a1c4f77',
     devices: [
-      { id: 1, name: 'Pixel 7', type: 'phone', is_active: true, last_seen_at: new Date().toISOString() },
+      { device_uuid: '9f1c7a2e-4b3d-4c8a-9e5f-2d6b0a1c4f77', name: 'Pixel 7', type: 'phone', is_active: true, last_seen_at: new Date().toISOString() },
     ],
   },
   queue: [

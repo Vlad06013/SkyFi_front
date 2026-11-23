@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearDevice, ensureDevice, getDevice, saveServerId } from '@/lib/device';
+import { clearDevice, ensureDevice, getDevice } from '@/lib/device';
 
 const memory = vi.hoisted(() => new Map<string, string>());
 
@@ -27,26 +27,20 @@ describe('lib/device', () => {
   it('ensureDevice генерирует строгий UUID и персистит его', async () => {
     const first = await ensureDevice();
     expect(first.uuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
-    expect(first.serverId).toBeNull();
 
     const again = await ensureDevice();
     expect(again.uuid).toBe(first.uuid);
     await expect(getDevice()).resolves.toEqual(first);
   });
 
-  it('saveServerId дописывает серверный id, uuid не меняется', async () => {
-    const stored = await ensureDevice();
-    await expect(saveServerId(42)).resolves.toEqual({ uuid: stored.uuid, serverId: 42 });
-    await expect(getDevice()).resolves.toEqual({ uuid: stored.uuid, serverId: 42 });
-  });
-
-  it('saveServerId без записи → null', async () => {
-    await expect(saveServerId(42)).resolves.toBeNull();
-  });
-
   it('битый JSON → null', async () => {
     memory.set('skyfi.device', '{oops');
     await expect(getDevice()).resolves.toBeNull();
+  });
+
+  it('запись старого формата (с серверным id) читается по uuid', async () => {
+    memory.set('skyfi.device', JSON.stringify({ uuid: 'uuid-legacy', serverId: 42 }));
+    await expect(getDevice()).resolves.toEqual({ uuid: 'uuid-legacy', serverId: 42 });
   });
 
   it('clearDevice удаляет запись', async () => {

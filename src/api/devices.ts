@@ -1,5 +1,5 @@
 import { http } from '@/api/http';
-import type { DeviceType, PlayerDevice, PlayerStatePayload } from '@/types';
+import type { DeviceType, EchoFields, PlayerDevice, PlayerStatePayload } from '@/types';
 
 /** data ответа GET /player/devices (api.md §4): объект с ключом, не плоский список. */
 interface DevicesPayload {
@@ -12,9 +12,8 @@ export function fetchDevices() {
 }
 
 /**
- * Регистрация устройства (api.md §4). `origin_device_id` — локальный uuid
- * устройства (валидация бэка требует строгий UUID); повторная регистрация
- * по тому же uuid обновляет профиль и возвращает тот же серверный `id`.
+ * Регистрация устройства (api.md §4). `origin_device_id` — постоянный uuid
+ * устройства; повторная регистрация по тому же uuid обновляет профиль.
  */
 export function registerDevice(input: {
   name: string;
@@ -25,20 +24,20 @@ export function registerDevice(input: {
   return http.post<PlayerDevice>('player/devices', input);
 }
 
-/** Смена активного устройства (api.md §4). Эхо-поля — серверный id устройства. */
-export function activateDevice(id: number, echo: { origin_device_id: number; command_id: string }) {
-  return http.patch<PlayerStatePayload>(`player/devices/${id}/activate`, echo);
+/** Смена активного устройства (api.md §4). `{device}` в пути — device_uuid; эхо — телом. */
+export function activateDevice(deviceUuid: string, echo: EchoFields) {
+  return http.patch<PlayerStatePayload>(`player/devices/${deviceUuid}/activate`, echo);
 }
 
-/** Удаление устройства (api.md §4, query-эхо-поля). */
-export function removeDevice(id: number, echo: { origin_device_id: number; command_id: string }) {
-  return http.delete<{ message: string }>(`player/devices/${id}`, { params: echo });
+/** Удаление устройства (api.md §4). `{device}` в пути — device_uuid; эхо-поля — телом. */
+export function removeDevice(deviceUuid: string, echo: EchoFields) {
+  return http.delete<{ message: string }>(`player/devices/${deviceUuid}`, { data: echo });
 }
 
 /**
- * Продление presence (api.md §4). `device_uuid` — локальный uuid
- * устройства (валидация бэка требует строгий UUID).
+ * Продление presence (api.md §4). Тело — `{origin_device_id}` с постоянным
+ * uuid устройства; неизвестный uuid — 404.
  */
 export function sendHeartbeat(deviceUuid: string) {
-  return http.post<{ message: string }>('player/devices/heartbeat', { device_uuid: deviceUuid });
+  return http.post<{ message: string }>('player/devices/heartbeat', { origin_device_id: deviceUuid });
 }

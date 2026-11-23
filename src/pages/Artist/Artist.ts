@@ -8,6 +8,7 @@ import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import { useEntityDetails } from '@/composables/useEntityDetails';
 import { coverVar, artistsLine, trackCover } from '@/lib/cover';
+import { PLAY_SOURCE_ARTIST } from '@/lib/play-sources';
 import { useFavoritesStore } from '@/stores/favorites';
 import { usePlayerStore } from '@/stores/player';
 import type { AlbumSnapshot, ArtistSnapshot } from '@/types';
@@ -36,7 +37,7 @@ export default defineComponent({
 
     function playAll() {
       const first = tracks.value[0];
-      if (first) player.playSnapshot(first);
+      if (first) player.playSnapshot(first, PLAY_SOURCE_ARTIST, { contextItems: tracks.value });
     }
 
     function isPlaying(track: { source_id: string }) {
@@ -57,6 +58,7 @@ export default defineComponent({
     return {
       artist,
       tracks,
+      playSourceArtist: PLAY_SOURCE_ARTIST,
       albums,
       hasMore,
       loading,

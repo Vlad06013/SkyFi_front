@@ -9,6 +9,7 @@
   >
     <img v-if="clipMode && clipPoster" class="clip-bg" :src="clipPoster" alt="">
     <div v-if="clipMode" class="clip-scrim" />
+    <div v-if="clipMode" ref="clipHostEl" class="clip-host" />
 
     <div class="now-playing-inner">
       <div class="now-top">
@@ -65,7 +66,8 @@
           :key="quality"
           type="button"
           class="select-opt"
-          :class="{ 'is-on': quality === clipQuality }"
+          :class="{ 'is-on': quality === clipQuality, 'is-disabled': !clipQualityAvailable(quality) }"
+          :disabled="!clipQualityAvailable(quality)"
           @click="pickQuality(quality)"
         >
           <span>{{ quality }}<span class="osub">{{ quality === clipQuality ? 'активно' : 'выбрать' }}</span></span>
@@ -133,7 +135,7 @@
                 :menuable="false"
                 :dragging="sortDrag?.from === index"
                 :drag-style="sortRowStyle(index, sortDrag)"
-                @open="playSnapshot(snapshot)"
+                @open="playFromQueue(snapshot)"
                 @sort="onSortStart($event, index)"
                 @remove="removeQueueItem(item.id)"
               />
@@ -189,7 +191,7 @@
         @update:model-value="seekRatio($event / 100)"
       />
       <div class="p-times">
-        <span>{{ formatTime(state.position_seconds) }}</span>
+        <span>{{ formatTime(positionSeconds) }}</span>
         <span>{{ formatTime(durationSeconds) }}</span>
       </div>
 

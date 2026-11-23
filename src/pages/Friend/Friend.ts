@@ -16,6 +16,7 @@ import {
 } from '@/api/friends';
 import { coverVar, artistsLine, trackCover } from '@/lib/cover';
 import { friendInitial, friendTone } from '@/lib/friends';
+import { PLAY_SOURCE_SINGLE } from '@/lib/play-sources';
 import { moveItem, sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
 import { useFriendsStore } from '@/stores/friends';
 import { usePlayerStore } from '@/stores/player';
@@ -169,7 +170,7 @@ export default defineComponent({
     }
 
     function playNow() {
-      if (snapshot.value) player.playSnapshot(snapshot.value);
+      if (snapshot.value) player.playSnapshot(snapshot.value, PLAY_SOURCE_SINGLE);
     }
 
     function openArtist(artist: ArtistSnapshot) {
@@ -235,6 +236,7 @@ export default defineComponent({
       coverVar,
       artistsLine,
       trackCover,
+      playSourceSingle: PLAY_SOURCE_SINGLE,
       friendInitial,
       friendTone,
       toggleQueue,

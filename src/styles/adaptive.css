@@ -52,9 +52,15 @@
 }
 
 .sky-shell.is-wave .wave-page .appbar,
-.sky-shell.is-wave .wave-stage > :not(.wave-blobs) {
+.sky-shell.is-wave .wave-stage > :not(.wave-blobs):not(.wave-return) {
   position: relative;
   z-index: 1;
+}
+
+/* Кнопка «В волну» — над диском и огненной аурой (z-index из kit.css). */
+.sky-shell.is-wave .wave-stage > .wave-return {
+  position: relative;
+  z-index: 2;
 }
 
 .sky-shell .n-pop {

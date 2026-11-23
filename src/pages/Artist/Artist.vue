@@ -45,7 +45,7 @@
           :cover="trackCover(track)"
           :liked="favorites.has(track)"
           :playing="isPlaying(track)"
-          @open="player.playSnapshot(track)"
+          @open="player.playSnapshot(track, playSourceArtist, { contextItems: tracks })"
           @menu="openSnapshotMenu($event, track, 'my-album-track')"
         />
         <div v-if="!tracks.length" class="empty">

@@ -3,14 +3,13 @@ import { Preferences } from '@capacitor/preferences';
 const DEVICE_KEY = 'skyfi.device';
 
 /**
- * Локальная идентичность устройства. `uuid` генерируется на устройстве
- * и является origin_device_id при регистрации (api.md §1.6, §4); `serverId`
- * — data.id из ответа POST /player/devices, им подписываем команды
- * и сравниваем эхо в ивентах.
+ * Локальная идентичность устройства: постоянный uuid, генерируется на
+ * устройстве. Это единственный идентификатор устройства на проводе —
+ * origin_device_id команд и device_uuid в путях/списках (api.md §1.6, §4);
+ * серверных id устройств больше нет.
  */
 export interface StoredDevice {
   uuid: string;
-  serverId: number | null;
 }
 
 export async function getDevice(): Promise<StoredDevice | null> {
@@ -28,18 +27,9 @@ export async function getDevice(): Promise<StoredDevice | null> {
 export async function ensureDevice(): Promise<StoredDevice> {
   const stored = await getDevice();
   if (stored) return stored;
-  const device: StoredDevice = { uuid: crypto.randomUUID(), serverId: null };
+  const device: StoredDevice = { uuid: crypto.randomUUID() };
   await Preferences.set({ key: DEVICE_KEY, value: JSON.stringify(device) });
   return device;
-}
-
-/** Сохраняем серверный id после регистрации (повторные запуски не дёргают лишний POST). */
-export async function saveServerId(serverId: number): Promise<StoredDevice | null> {
-  const stored = await getDevice();
-  if (!stored) return null;
-  const next: StoredDevice = { ...stored, serverId };
-  await Preferences.set({ key: DEVICE_KEY, value: JSON.stringify(next) });
-  return next;
 }
 
 export async function clearDevice(): Promise<void> {

@@ -16,6 +16,7 @@
         <span class="wave-blob wave-blob-b" />
         <span class="wave-blob wave-blob-c" />
       </div>
+      <button v-if="showJoinWave" class="wave-return" type="button" @click="joinWave">В волну</button>
       <div class="wave-disc" role="button" tabindex="0" aria-label="развернуть плеер" @click="openExpanded">
         <div class="wave-flame" :class="{ 'wave-flame-on': playing }" aria-hidden="true">
           <span class="wave-flame-ring" />
@@ -29,7 +30,7 @@
         </div>
       </div>
       <div class="wave-pill" role="button" tabindex="0" aria-label="развернуть плеер" @click="openExpanded">
-        <span class="wave-pill-fill" style="width:38%" />
+        <span class="wave-pill-fill" :style="{ width: progress + '%' }" />
         <span class="wave-pill-text">{{ artist }} — {{ title }}</span>
         <button class="icon-btn" :class="{ liked }" type="button" aria-label="в избранном" @click.stop="toggleLike">
           <svg viewBox="0 0 24 24" fill="currentColor">

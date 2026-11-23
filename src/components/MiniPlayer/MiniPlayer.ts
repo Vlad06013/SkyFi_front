@@ -17,7 +17,7 @@ export default defineComponent({
   components: { SourceBadge },
   setup() {
     const player = usePlayerStore();
-    const { current, previewNext, previewPrevious } = storeToRefs(player);
+    const { current, previewNext, previewPrevious, progress } = storeToRefs(player);
     const playing = computed(() => player.state.is_playing);
     const { togglePlay, openExpanded, skipRestartAfter } = player;
     const { liked, toggleLike } = useSnapshotLike(() => player.current);
@@ -157,6 +157,7 @@ export default defineComponent({
       liked,
       playing,
       panes,
+      progress,
       trackEl,
       coverVar,
       trackCover,

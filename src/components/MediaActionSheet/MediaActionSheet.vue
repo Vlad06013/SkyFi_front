@@ -127,18 +127,18 @@
           <div v-else class="select-menu">
             <button
               v-for="device in deviceList"
-              :key="device.id"
+              :key="device.device_uuid"
               class="select-opt"
-              :class="{ 'is-on': device.id === activeDeviceId }"
+              :class="{ 'is-on': device.device_uuid === activeDeviceUuid }"
               type="button"
-              @click="pickDevice(device.id)"
+              @click="pickDevice(device.device_uuid)"
             >
               <span>
                 {{ device.name }}
                 <span v-if="deviceCaption(device)" class="osub">{{ deviceCaption(device) }}</span>
               </span>
               <svg
-                v-if="device.id === activeDeviceId"
+                v-if="device.device_uuid === activeDeviceUuid"
                 class="tick"
                 viewBox="0 0 24 24"
                 fill="none"

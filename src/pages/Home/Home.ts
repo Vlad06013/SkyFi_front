@@ -12,10 +12,16 @@ export default defineComponent({
   components: { SourceBadge, OfflineBanner },
   setup() {
     const player = usePlayerStore();
-    const { current, title, artist } = storeToRefs(player);
+    const { current, title, artist, progress } = storeToRefs(player);
     const playing = computed(() => player.state.is_playing);
     const { togglePlay, openExpanded, skipNext, skipPrevious } = player;
     const { liked, toggleLike } = useSnapshotLike(() => player.current);
+
+    // Волна — отдельный режим с серверной ротацией (api.md §14). Кнопка
+    // входа висит, пока плеер не в волне; любое включение трека вне волны
+    // снова её показывает (play_source меняется с 'wave').
+    const showJoinWave = computed(() => player.state.play_source !== 'wave');
+    const joinWave = player.joinWave;
 
     const notifications = useNotificationsStore();
     const { hasUnread } = storeToRefs(notifications);
@@ -27,6 +33,9 @@ export default defineComponent({
       artist,
       liked,
       playing,
+      progress,
+      showJoinWave,
+      joinWave,
       togglePlay,
       toggleLike,
       openExpanded,

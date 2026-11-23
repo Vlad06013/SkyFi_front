@@ -51,7 +51,7 @@
               <path d="M8 5.5v13l11-6.5z" />
             </svg>
           </span>
-          <div class="bar"><i :style="{ width: '38%' }" /></div>
+          <div class="bar"><i :style="{ width: progress + '%' }" /></div>
         </div>
       </div>
     </div>

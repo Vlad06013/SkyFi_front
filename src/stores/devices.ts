@@ -34,12 +34,11 @@ export const useDevicesStore = defineStore('devices', () => {
   const devices = ref<PlayerDevice[]>([]);
   /** Первичный GET прошёл (неудача сбрасывает флажок — повторим при следующем открытии шита). */
   const loaded = ref(false);
-  /** Серверный id этого устройства — подпись команд и эхо-глушение (api.md §1.6). */
-  const myDeviceId = ref<number | null>(null);
-  /** Локальный uuid этого устройства (origin_device_id регистрации). */
+  /** Постоянный uuid этого устройства — единственный его идентификатор на проводе:
+   *  подпись команд (origin_device_id) и эхо-глушение (api.md §1.6). */
   const myDeviceUuid = ref<string | null>(null);
 
-  const activeId = computed(() => devices.value.find((device) => device.is_active)?.id ?? null);
+  const activeUuid = computed(() => devices.value.find((device) => device.is_active)?.device_uuid ?? null);
 
   /** Ленивый первичный GET списка для шита устройств. */
   async function ensure() {
@@ -55,32 +54,36 @@ export const useDevicesStore = defineStore('devices', () => {
   // --- Мутации списка: общие для ответов API и сокет-ивентов playback.device.*
 
   function applyConnected(device: PlayerDevice) {
-    const index = devices.value.findIndex((item) => item.id === device.id);
+    const index = devices.value.findIndex((item) => item.device_uuid === device.device_uuid);
     if (index >= 0) devices.value[index] = device;
     else devices.value = [...devices.value, device];
   }
 
-  function applyChanged(deviceId: number) {
+  function applyChanged(deviceUuid: string) {
     devices.value = devices.value.map((device) => ({
       ...device,
-      is_active: device.id === deviceId,
+      is_active: device.device_uuid === deviceUuid,
     }));
   }
 
-  function applyDisconnected(deviceId: number) {
-    devices.value = devices.value.filter((device) => device.id !== deviceId);
+  function applyDisconnected(deviceUuid: string) {
+    devices.value = devices.value.filter((device) => device.device_uuid !== deviceUuid);
   }
 
   /** Активация устройства (api.md §4): оптимистично, откат при ошибке. */
-  async function activate(id: number): Promise<boolean> {
-    const prevActive = activeId.value;
-    applyChanged(id);
-    const echo = { origin_device_id: myDeviceId.value ?? 0, command_id: crypto.randomUUID() };
+  async function activate(deviceUuid: string): Promise<boolean> {
+    if (!myDeviceUuid.value) {
+      toast.show('Устройство ещё не зарегистрировано', '', true);
+      return false;
+    }
+    const prevActive = activeUuid.value;
+    applyChanged(deviceUuid);
+    const echo = { origin_device_id: myDeviceUuid.value, command_id: crypto.randomUUID() };
     try {
-      await devicesApi.activateDevice(id, echo);
+      await devicesApi.activateDevice(deviceUuid, echo);
       return true;
     } catch (cause) {
-      if (prevActive != null) applyChanged(prevActive);
+      if (prevActive) applyChanged(prevActive);
       toast.show(cause instanceof Error ? cause.message : 'Не удалось переключить устройство', '', true);
       return false;
     }
@@ -107,24 +110,20 @@ export const useDevicesStore = defineStore('devices', () => {
 
   /**
    * Регистрация устройства. Идемпотентна: повторный вызов по тому же
-   * uuid на бэке обновляет профиль и возвращает тот же серверный id.
-   * Ошибки глушим — presence не критична для UI. true — устройство
-   * зарегистрировано (можно слать heartbeat).
+   * uuid на бэке обновляет профиль. Ошибки глушим — presence не критична
+   * для UI. true — устройство зарегистрировано (можно слать heartbeat).
    */
   async function registerPresence(): Promise<boolean> {
     registerPromise ??= (async () => {
       try {
         const stored = await identity.ensureDevice();
         myDeviceUuid.value = stored.uuid;
-        myDeviceId.value = stored.serverId;
         const device = await devicesApi.registerDevice({
           name: await resolveDeviceName(),
           type: deviceType(),
           origin_device_id: stored.uuid,
           command_id: crypto.randomUUID(),
         });
-        await identity.saveServerId(device.id);
-        myDeviceId.value = device.id;
         applyConnected(device);
         return true;
       } catch {
@@ -145,7 +144,6 @@ export const useDevicesStore = defineStore('devices', () => {
   function reset() {
     devices.value = [];
     loaded.value = false;
-    myDeviceId.value = null;
     myDeviceUuid.value = null;
     stopPresence();
   }
@@ -189,9 +187,8 @@ export const useDevicesStore = defineStore('devices', () => {
   return {
     devices,
     loaded,
-    myDeviceId,
     myDeviceUuid,
-    activeId,
+    activeUuid,
     ensure,
     activate,
     applyConnected,

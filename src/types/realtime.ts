@@ -5,13 +5,19 @@ import type { AnySnapshot } from '@/types/snapshots';
 
 export interface PlaybackStateUpdatedPayload {
   state: PlayerStateView;
-  origin_device_id: number | string | null;
+  origin_device_id: string | null;
   command_id: string | null;
 }
 
 export interface PlaybackQueueUpdatedPayload {
   item: { title: string; artists: string[] } | null;
-  origin_device_id: number | string | null;
+  origin_device_id: string | null;
+  command_id: string | null;
+}
+
+/** playback.wave.updated (api.md §17): окно волны изменилось — клиент делает GET /wave. */
+export interface WaveUpdatedPayload {
+  origin_device_id: string | null;
   command_id: string | null;
 }
 
@@ -22,18 +28,18 @@ export interface FriendQueueItemAddedPayload {
 
 export interface PlaybackDeviceConnectedPayload {
   device: PlayerDevice;
-  origin_device_id: number | string | null;
+  origin_device_id: string | null;
 }
 
 export interface PlaybackDeviceChangedPayload {
-  device_id: number;
-  origin_device_id: number | string | null;
+  device_uuid: string;
+  origin_device_id: string | null;
 }
 
 export interface PlaybackDeviceDisconnectedPayload {
-  device_id: number;
+  device_uuid: string;
   device_name: string;
-  origin_device_id: number | string | null;
+  origin_device_id: string | null;
   command_id: string | null;
 }
 

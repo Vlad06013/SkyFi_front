@@ -84,7 +84,7 @@
           :round="best.type === 'artist'"
           :liked="best.is_favorite"
           :playing="isPlaying(best)"
-          @open="openResult(best)"
+          @open="openResult(best, { playbackSource: playSourceSearch, contextItems: trackResults, contextRef: q })"
           @menu="openSnapshotMenu($event, best, snapshotMenuContext(best))"
         />
 
@@ -99,7 +99,7 @@
             :liked="track.is_favorite"
             :downloaded="downloads.isDownloaded(track)"
             :playing="isPlaying(track)"
-            @open="openResult(track)"
+            @open="openResult(track, { playbackSource: playSourceSearch, contextItems: trackResults, contextRef: q })"
             @menu="openSnapshotMenu($event, track, 'my-tracks')"
           />
         </template>
@@ -161,7 +161,7 @@
             :cover="video.cover_url ?? ''"
             :liked="video.is_favorite"
             :playing="isPlaying(video)"
-            @open="openResult(video)"
+            @open="openResult(video, { playbackSource: playSourceSearch, contextItems: videoResults, contextRef: q })"
             @menu="openSnapshotMenu($event, video, 'my-videos')"
           />
         </template>

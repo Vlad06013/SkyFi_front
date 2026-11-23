@@ -8,8 +8,8 @@ export interface EventChannel {
 }
 
 export interface RouterHooks {
-  /** Идентификаторы моего устройства (серверный id + uuid) — для эхо-глушения. */
-  getMyOriginIds: () => Array<number | string | null | undefined>;
+  /** uuid моего устройства — для эхо-глушения (api.md §17: origin_device_id всегда device_uuid). */
+  getMyOriginIds: () => Array<string | null | undefined>;
 }
 
 export interface EventMeta {
@@ -27,10 +27,10 @@ export function resetSeenCommands(): void {
   seenCommands.clear();
 }
 
-/** true — ивент от моей же команды (origin_device_id совпал с одним из моих id). */
+/** true — ивент от моей же команды (origin_device_id совпал с моим device_uuid). */
 export function isOwnEcho(
-  originDeviceId: number | string | null | undefined,
-  myOriginIds: Array<number | string | null | undefined>,
+  originDeviceId: string | null | undefined,
+  myOriginIds: Array<string | null | undefined>,
 ): boolean {
   return originDeviceId != null && myOriginIds.some((id) => id != null && id === originDeviceId);
 }
@@ -55,7 +55,7 @@ export function createRouter(hooks: RouterHooks) {
   ) {
     channel.listen(name, (raw: unknown) => {
       const payload = raw as P & {
-        origin_device_id?: number | string | null;
+        origin_device_id?: string | null;
         command_id?: string | null;
       };
       if (meta.echo && isOwnEcho(payload.origin_device_id, hooks.getMyOriginIds())) {

@@ -170,6 +170,8 @@
 .mini-player .bar i {
   display: block; height: 100%; width: 38%;
   background: linear-gradient(90deg, rgba(30,215,96,.16), rgba(30,215,96,.38));
+  /* Позиция прилетает тиками ~1 раз/сек — линейный переход превращает их в плавное заполнение. */
+  transition: width 1s linear;
 }
 
 .cover-big { position: relative; overflow: hidden; }
@@ -221,6 +223,12 @@
 .is-clip .clip-scrim {
   position: absolute; inset: 0; pointer-events: none;
   background: linear-gradient(180deg, rgba(0,0,0,.42) 0%, rgba(0,0,0,.08) 30%, rgba(0,0,0,.4) 58%, rgba(0,0,0,.88) 100%);
+}
+.is-clip .clip-video {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover; display: block;
+  background: #000;
 }
 .is-clip .p-title, .is-clip .p-artist { text-shadow: 0 1px 16px rgba(0,0,0,.7); }
 .is-clip .p-artist { color: rgba(255,255,255,.78); }
@@ -571,6 +579,9 @@
 .select-opt.is-off .osub { color: var(--color-text-faint); }
 .select-opt.is-disabled { opacity: .38; color: var(--color-text-faint); cursor: default; }
 .select-opt.is-disabled .osub { color: var(--color-text-faint); }
+.select-opt:disabled { opacity: .38; color: var(--color-text-faint); cursor: default; }
+.select-opt:disabled .osub { color: var(--color-text-faint); }
+.select-opt:disabled:hover { background: transparent; }
 
 .thumb, .cover, .cover-big, .hero-cover { position: relative; overflow: hidden; }
 .thumb img, .cover img, .cover-big img, .hero-cover img {
@@ -1013,6 +1024,8 @@
   width: 0;
   background: linear-gradient(90deg, rgba(30,215,96,.16), rgba(30,215,96,.38));
   pointer-events: none;
+  /* Та же тиковая позиция, что и в мини-плеере — заполняем плавно, а не рывками. */
+  transition: width 1s linear;
 }
 .wave-pill-text {
   position: relative;

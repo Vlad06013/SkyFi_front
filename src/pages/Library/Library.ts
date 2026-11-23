@@ -13,6 +13,7 @@ import type { UploadDraft } from '@/components/UploadForm/UploadForm';
 import { sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
 import { plural } from '@/lib/plural';
 import { openSnapshot } from '@/lib/open-snapshot';
+import { PLAY_SOURCE_FAVORITES, PLAY_SOURCE_SINGLE, PLAY_SOURCE_UPLOADS } from '@/lib/play-sources';
 import { artistsLine, trackCover } from '@/lib/cover';
 import { usePlayerStore } from '@/stores/player';
 import { useFavoritesStore } from '@/stores/favorites';
@@ -153,7 +154,7 @@ export default defineComponent({
       if (snapshot.type === 'playlist') openPlaylist(snapshot);
       else if (snapshot.type === 'album') openAlbum(snapshot);
       else if (snapshot.type === 'artist') openArtist(snapshot);
-      player.playSnapshot(tracks.value[0]);
+      player.playSnapshot(tracks.value[0], PLAY_SOURCE_FAVORITES, { contextItems: tracks.value });
     }
 
     function onSort(event: PointerEvent, index: number) {
@@ -283,6 +284,9 @@ export default defineComponent({
       sortDrag,
       player,
       favorites,
+      playSourceFavorites: PLAY_SOURCE_FAVORITES,
+      playSourceUploads: PLAY_SOURCE_UPLOADS,
+      playSourceSingle: PLAY_SOURCE_SINGLE,
       counts,
       showDownloadAll,
       artistsLine,

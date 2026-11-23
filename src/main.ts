@@ -6,10 +6,13 @@ import App from './App.vue';
 import router from './router';
 import { onUnauthorized } from '@/api/http';
 import { bindSessionRealtime } from '@/realtime';
+import { useAudioPlayback } from '@/composables/useAudioPlayback';
+import { useVideoPlayback } from '@/composables/useVideoPlayback';
 import { useAuthStore } from '@/stores/auth';
 import { useAppStore } from '@/stores/app';
 import { useDevicesStore } from '@/stores/devices';
 import { useOnlineStore } from '@/stores/online';
+import { usePlayerStore } from '@/stores/player';
 
 import '@ionic/vue/css/core.css';
 import '@ionic/vue/css/normalize.css';
@@ -41,4 +44,8 @@ void appStore.bootstrap().finally(() => {
   // Session-scoped сервисы: presence устройства + сокеты (docs/plan-sockets.md).
   useDevicesStore(pinia).bindPresence();
   bindSessionRealtime();
+  // Плеер: серверное состояние + реконнект-рефетч + аудио-движок (docs/plan-player.md).
+  usePlayerStore(pinia).bindServerPlayback();
+  useAudioPlayback();
+  useVideoPlayback();
 });

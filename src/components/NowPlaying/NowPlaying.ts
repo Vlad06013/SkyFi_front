@@ -6,10 +6,12 @@ import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { useLyrics } from '@/composables/useLyrics';
 import { useMediaMenu } from '@/composables/useMediaMenu';
+import { setClipHost } from '@/composables/useVideoPlayback';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { coverVar, artistsLine, trackCover } from '@/lib/cover';
 import { sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
 import { entityFromSnapshot } from '@/lib/media-menu';
+import { PLAY_SOURCE_QUEUE } from '@/lib/play-sources';
 import { trackPointer } from '@/lib/pointer-drag';
 import { formatTime } from '@/lib/time';
 import { usePlayerStore } from '@/stores/player';
@@ -30,9 +32,12 @@ export default defineComponent({
       album,
       progress,
       durationSeconds,
+      positionSeconds,
       state,
       clipMode,
       clipQuality,
+      clipQualities,
+      clipStreams,
       queue,
       queueLoaded,
     } = storeToRefs(player);
@@ -82,6 +87,12 @@ export default defineComponent({
       return snapshot.cover_url ?? '';
     }
 
+    /** Тап по элементу очереди: прямой запуск с source=queue — бэк сам
+     *  двигает статусы (pending → playing_now, прежний — played). */
+    function playFromQueue(snapshot: AnySnapshot) {
+      playSnapshot(snapshot, PLAY_SOURCE_QUEUE);
+    }
+
     const layer = ref<Layer>('now');
     const {
       lines: lyricLines,
@@ -95,7 +106,7 @@ export default defineComponent({
     );
     const activeLyricLine = computed(() => {
       if (!lyricSynced.value || !lyricLines.value) return -1;
-      const positionMs = state.value.position_seconds * 1000;
+      const positionMs = positionSeconds.value * 1000;
       let active = -1;
       for (let index = 0; index < lyricLines.value.length; index += 1) {
         const timeMs = lyricLines.value[index].time_ms;
@@ -135,7 +146,15 @@ export default defineComponent({
     const clipIdleDelay = 5000;
     let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const clipQualities = player.clipQualities;
+    /** Хост для видео-элемента клипа: композабл крепит/снимает его по этому ref. */
+    const clipHostEl = ref<HTMLElement | null>(null);
+    watch(clipHostEl, (el) => setClipHost(el));
+
+    /** Качества, реально приехавшие в потоках /videos/get-url — остальные неактивны. */
+    const clipStreamQualities = computed(() => new Set(clipStreams.value.map((stream) => stream.quality)));
+    function clipQualityAvailable(quality: number) {
+      return clipStreamQualities.value.has(quality);
+    }
 
     function wake() {
       clipIdle.value = false;
@@ -152,6 +171,7 @@ export default defineComponent({
     }
 
     function pickQuality(quality: number) {
+      if (!clipQualityAvailable(quality)) return;
       setClipQuality(quality);
       qualityOpen.value = false;
     }
@@ -341,11 +361,14 @@ export default defineComponent({
       album,
       progress,
       durationSeconds,
+      positionSeconds,
       liked,
       state,
       clipMode,
       clipQuality,
       clipQualities,
+      clipHostEl,
+      clipQualityAvailable,
       qualityOpen,
       clipIdle,
       isFullscreen,
@@ -386,6 +409,7 @@ export default defineComponent({
       skipNext,
       skipPrevious,
       playSnapshot,
+      playFromQueue,
       seekRatio,
       toggleClips,
       pickQuality,

@@ -72,13 +72,12 @@ Sanctum Bearer-токен: `Authorization: Bearer <token>`.
 
 Каждый мутирующий роут плеера/очереди/устройств принимает:
 
-- `origin_device_id` — идентификатор устройства-инициатора.
-  Двухфазный: при регистрации (`POST /player/devices`) клиент
-  ещё не знает id строки и шлёт собственный `device_uuid`
-  (строгий UUID); со всех последующих команд это `data.id`
-  созданного устройства (int, либо строка в query-параметрах
-  DELETE). Устройство-инициатор глушит эхо
-  своих же команд по этому полю.
+- `origin_device_id` — постоянный UUID устройства-инициатора
+  (`device_uuid`: клиент генерирует при первой регистрации
+  устройства, `POST /player/devices`; совпадает с
+  `devices[].device_uuid`). Устройство-инициатор глушит эхо
+  своих же команд по этому полю. Эхо-поля всегда телом команды,
+  включая DELETE.
 - `command_id` — uuid команды, генерирует клиент на каждую
   команду; дедупликация повторных доставок.
 
@@ -166,19 +165,22 @@ avatar_url}`. QR-поллинг при confirmed отдаёт полную мо�
 
 ## 4. Устройства (`/player/devices`)
 
-Приложение при старте регистрирует устройство и дальше ссылается
-на `data.id` как на `origin_device_id`. Presence: устройство
-«живо», пока шлёт heartbeat чаще порога онлайна; активное
-устройство плеера (`active_device_id`) обнуляется, если оно
-перестало отмечаться.
+Приложение при старте регистрирует устройство со своим
+`device_uuid` (постоянный UUID клиента) и дальше адресуется
+только по нему: `{device}` в путях, `origin_device_id` в телах
+команд и `active_device_id` в состоянии плеера — это всегда
+`device_uuid`, int-id устройств на провод не уходит. Presence:
+устройство «живо», пока шлёт heartbeat чаще порога онлайна;
+активное устройство плеера (`active_device_id`) обнуляется,
+если оно перестало отмечаться.
 
 | Метод/путь | Тело → Ответ |
 |---|---|
-| `GET /` | → `{devices: [{id, name, type, is_active, last_seen_at, ...}]}` (только онлайн; presence-модель) |
+| `GET /` | → `{devices: [{device_uuid, name, type, is_active, last_seen_at}]}` (только онлайн; presence-модель) |
 | `POST /` (30/мин) | `{name, type: phone\|computer\|car\|tv, origin_device_id: uuid, command_id}` → устройство; повторная регистрация по тому же uuid обновляет профиль |
-| `PATCH /{device}/activate` (30/мин) | `{origin_device_id, command_id}` → это устройство — активное (играет) |
-| `POST /player/devices/heartbeat` (120/мин) | `{device_uuid: uuid}` → `{message: "ok"}` — продлить presence; неизвестный uuid — 404 |
-| `DELETE /{device}` | query `?origin_device_id&command_id` → удалить |
+| `PATCH /{device}/activate` (30/мин) | `{origin_device_id, command_id}` → это устройство — активное (играет); `{device}` в пути — `device_uuid` |
+| `POST /player/devices/heartbeat` (120/мин) | `{origin_device_id: uuid}` → `{message: "ok"}` — продлить presence; неизвестный uuid — 404 |
+| `DELETE /{device}` | тело `{origin_device_id, command_id}` → удалить; `{device}` в пути — `device_uuid` |
 
 ## 5. Плеер (`/player`)
 
@@ -190,8 +192,9 @@ avatar_url}`. QR-поллинг при confirmed отдаёт полную мо�
 `{ state: { id, current_snapshot|null, position_seconds,
 is_playing, repeat_mode: off|one|all, shuffle_enabled, version,
 play_source, previous_play_source, previous_play_source_snapshot|
-null, wave_anchor|null, active_device_id|null, devices[] },
-queue: QueueItem[] }`.
+null, context_ref|null, shuffle_seed|null, position_updated_at|
+null (ISO 8601, свежесть замера позиции), active_device_id|null
+(device_uuid активного устройства), devices[] }, queue: QueueItem[] }`.
 
 `QueueItem`: `{id, player_state_id, added_by_user_id, position,
 status: pending|playing_now|played|skipped, snapshot|null}`.
@@ -202,11 +205,22 @@ status: pending|playing_now|played|skipped, snapshot|null}`.
 
 | Метод/путь | Тело → Ответ |
 |---|---|
-| `POST /play` | `{snapshot: {<конверт любого типа>}, playback_source: single\|favorites\|search\|playlist\|uploads\|yandex_wave, origin_device_id, command_id, wave_anchor?}` → новое состояние; позиция 0, is_playing=true |
+| `POST /play` | `{snapshot: {<конверт любого типа>}, playback_source: single\|queue\|favorites\|search\|playlist\|uploads\|wave, origin_device_id, command_id, context_ref?, shuffle_seed?}` → новое состояние; позиция 0, is_playing=true |
 | `POST /pause` | `{origin_device_id, command_id}` |
 | `POST /resume` | `{origin_device_id, command_id}` |
 | `POST /seek` | `{position_seconds, origin_device_id, command_id}` |
-| `PATCH /options` | `{options: {repeat_mode?, shuffle_enabled?}, origin_device_id, command_id}` |
+| `PATCH /options` | `{options: {repeat_mode?, shuffle_enabled?}, origin_device_id, command_id, shuffle_seed?}` |
+
+`context_ref` и `shuffle_seed` — непрозрачные строки клиента,
+бэк не парсит: поле передали (даже null) — перезаписали, не
+передали — не трогаем. `shuffle_seed` доезжает до остальных
+устройств и через `PATCH /options` (переключение shuffle без
+смены трека).
+
+Жизненный цикл очереди: `POST /play` с `playback_source=queue`
+потребляет элемент — ожидающий элемент с тем же снапшотом
+становится playing_now, прежний playing_now помечается played
+и удаляется.
 
 Все команды возвращают состояние целиком и диспатчат
 `playback.state.updated`.
@@ -221,7 +235,7 @@ status: pending|playing_now|played|skipped, snapshot|null}`.
 |---|---|
 | `GET /` | → очередь целиком |
 | `POST /` (60/мин) | snapshot (плоский конверт любого типа) + `origin_device_id?`, `command_id?` → очередь целиком; бродкаст с item `{title, artists}` |
-| `DELETE /{queueItem}` | query `?origin_device_id&command_id` → очередь; бродкаст item=null |
+| `DELETE /{queueItem}` | тело `origin_device_id?`, `command_id?` → очередь; бродкаст item=null |
 | `PATCH /reorder` (60/мин) | `{items: [id...] (перестановка id ожидающих), origin_device_id?, command_id?}` → очередь; бродкаст item=null |
 | `PATCH /{queueItem}/status` (120/мин) | `{status}` — плеер помечает playing_now/played/skipped; бродкаста нет |
 
@@ -350,12 +364,21 @@ URL, null без аватара). Дружба адресуется по id по
 
 ## 14. Волна (`/wave`)
 
-Только с подключённым Яндексом (иначе 4xx + сообщение).
+Сервер — источник истины ротации: он хранит окно волны, сам
+догружает его у источника (Яндекс-ротор) порциями и чистит
+от прослушанного. Клиент синхронизирует окно целиком: ответ
+всегда полное окно, никогда пустой; «окно не выросло» —
+догрузки сейчас нет. batch_id и якоря на провод не уходят;
+реальное изменение окна рассылается как `playback.wave.updated`.
+
+Только с подключённым Яндексом (иначе 422 + сообщение).
+Отключение Яндекса (`DELETE /yandex-music/auth`, §16) чистит
+окна волны этого источника.
 
 | Метод/путь | Тело → Ответ |
 |---|---|
-| `GET /wave` | → `{batch_id, tracks: [TrackSnapshot]}` — порция ротации; продолжение по `wave_anchor` из плеера |
-| `POST /wave/feedback` | `{track_id, type: like\|dislike\|skip\|trackStarted\|trackFinished\|radioStarted}` — реакции ротации |
+| `GET /wave` (60/мин) | query `?origin_device_id&command_id` (опционально) → `{snapshots: [Snapshot]}` — полное окно ротации в порядке следования |
+| `POST /wave/feedback` | `{track_id, type: like\|dislike\|skip\|trackStarted\|trackFinished\|radioStarted, total_played_seconds?}` — реакции ротации; batch_id бэк подставляет сам из сохранённого окна |
 
 ## 15. Загрузки (`/uploads`)
 
@@ -409,16 +432,17 @@ handshake `POST /broadcasting/auth` — путь на корне origin, вне
 |---|---|---|---|
 | `playback.state.updated` | User.{id}, friends.{id} | `{state, origin_device_id, command_id}` | любая команда плеера; `state` — тот же JSON, что `GET /player` |
 | `playback.queue.updated` | User.{id}, friends.{id} | `{item: {title, artists}\|null, origin_device_id, command_id}` | add (item заполнен — тост «добавлено»), remove/reorder (null) |
+| `playback.wave.updated` | User.{id} | `{origin_device_id, command_id}` | окно волны изменилось (холодный старт, догрузка): клиент инвалидирует локальную копию и делает `GET /wave` |
 | `friend.queue.item.added` | User.{id} очередника | `{added_by: {id, name}, item: {source_id, title, artists}}` | друг добавил в мою очередь |
 | `playback.device.connected` | User.{id} | `{device, origin_device_id}` | регистрация устройства |
-| `playback.device.changed` | User.{id} | `{device_id, origin_device_id}` | смена активного устройства |
-| `playback.device.disconnected` | User.{id} | `{device_id, device_name, origin_device_id, command_id}` | удаление устройства |
+| `playback.device.changed` | User.{id} | `{device_uuid, origin_device_id}` | смена активного устройства |
+| `playback.device.disconnected` | User.{id} | `{device_uuid, device_name, origin_device_id, command_id}` | удаление устройства |
 | `friendship.request.sent` | получатель | дружба целиком `{id, sender{...}, receiver{...}, status}` | заявка |
 | `friendship.request.accepted` | отправитель | то же | принята |
 | `share.sent` | получатель | `{share_id, sender: {id, name}, snapshot}` | шара |
 
 **Семантика эхо**: устройство-инициатор сравнивает
-`origin_device_id` со своим `data.id` устройства — совпало,
+`origin_device_id` со своим `device_uuid` — совпало,
 значит эта команда его же: применять локально повторно не надо
 (он уже применил оптимистично). `command_id` — дополнительная
 дедупликация. Playback-ивенты на канале `friends.{id}` —

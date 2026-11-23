@@ -94,7 +94,7 @@
             sortable
             :dragging="sortDrag?.from === index"
             :drag-style="sortRowStyle(index, sortDrag)"
-            @open="player.playSnapshot(row)"
+            @open="player.playSnapshot(row, playSourceSingle)"
             @menu="openSnapshotMenu($event, row, queueMenuContext(row))"
             @sort="onSort($event, index)"
           />
@@ -124,7 +124,7 @@
           :source="track.source_type"
           :cover="trackCover(track)"
           :playing="isPlaying(track)"
-          @open="player.playSnapshot(track)"
+          @open="player.playSnapshot(track, playSourceSingle)"
           @menu="openSnapshotMenu($event, track, 'my-tracks')"
         />
         <div v-if="!favoriteTracks.length" class="empty" style="padding-top:16px">

@@ -29,10 +29,17 @@ export type PlaySource =
   | 'search'
   | 'playlist'
   | 'uploads'
-  | 'yandex_wave';
+  | 'wave';
 export type QueueItemStatus = 'pending' | 'playing_now' | 'played' | 'skipped';
 export type DeviceType = 'phone' | 'computer' | 'car' | 'tv';
 export type Visibility = 'public' | 'friends' | 'private';
+
+/** Эхо-поля команд (api.md §1.6): подпись инициатора + дедуп доставок. */
+export interface EchoFields {
+  /** Постоянный UUID устройства-инициатора (= devices[].device_uuid). */
+  origin_device_id: string;
+  command_id: string;
+}
 
 export interface AuthUser {
   id: number;
@@ -54,7 +61,7 @@ export interface HealthPayload {
 }
 
 export interface PlayerDevice {
-  id: number;
+  device_uuid: string;
   name: string;
   type: DeviceType;
   is_active: boolean;
@@ -81,8 +88,14 @@ export interface PlayerStateView {
   play_source: PlaySource;
   previous_play_source: PlaySource;
   previous_play_source_snapshot: AnySnapshot | null;
-  wave_anchor: string | null;
-  active_device_id: number | null;
+  /** Opaque-ссылка контекста от клиента (поиск/плейлист): бэк не парсит (api.md §5). */
+  context_ref: string | null;
+  /** Opaque-сид детерминированного шаффла: одинаковый порядок на всех устройствах. */
+  shuffle_seed: string | null;
+  /** Время последнего замера позиции (ISO 8601) — свежесть для экстраполяции. */
+  position_updated_at: string | null;
+  /** device_uuid активного устройства; null — никто не воспроизводит. */
+  active_device_id: string | null;
   devices: PlayerDevice[];
 }
 
@@ -140,10 +153,19 @@ export interface PlaylistPayload {
   snapshots: AnySnapshot[];
 }
 
+/** data ответа GET /wave (api.md §14): полное окно ротации в порядке следования; пустым не бывает. */
 export interface WavePayload {
-  batch_id: string;
-  tracks: TrackSnapshot[];
+  snapshots: AnySnapshot[];
 }
+
+/** Тело POST /wave/feedback (api.md §14) — реакции ротации; batch_id бэк подставляет сам. */
+export type WaveFeedbackType =
+  | 'like'
+  | 'dislike'
+  | 'skip'
+  | 'trackStarted'
+  | 'trackFinished'
+  | 'radioStarted';
 
 /* Загрузки (api.md §15) */
 

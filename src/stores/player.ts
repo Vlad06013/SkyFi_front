@@ -1,27 +1,462 @@
 import { acceptHMRUpdate, defineStore } from 'pinia';
 import { computed, ref, watch } from 'vue';
-import { addToQueue, fetchQueue, removeFromQueue, reorderPending } from '@/api/queue';
+import * as playerApi from '@/api/player';
+import * as queueApi from '@/api/queue';
+import * as waveApi from '@/api/wave';
+import type { VideoStream } from '@/api/videos';
+import { fetchFavorites } from '@/api/favorites';
+import { resolveNext, resolvePrevious, snapshotKey, SKIP_RESTART_AFTER, type EngineAction, type EngineContext } from '@/lib/playback-engine';
 import { moveItem } from '@/lib/list-sort';
 import { favoriteTracks } from '@/mocks/catalog';
 import { mockPlayerState } from '@/mocks/player';
+import { onRealtimeReconnect } from '@/realtime';
+import { useAuthStore } from '@/stores/auth';
+import { useDevicesStore } from '@/stores/devices';
 import { useToastStore } from '@/stores/toast';
-import type { AnySnapshot, QueueItem, RepeatMode } from '@/types';
+import type { AnySnapshot, EchoFields, PlaySource, PlayerStatePayload, PlayerStateView, QueueItem, RepeatMode } from '@/types';
 
 const repeatCycle: RepeatMode[] = ['off', 'all', 'one'];
-const skipRestartAfter = 3;
+
+/** Период репорта позиции с активного устройства (api.md §5, план §3). */
+export const POSITION_REPORT_INTERVAL_MS = 10_000;
+
+/** Пауза после последнего движения ползунка, через которую seek уходит на сервер. */
+export const SEEK_COMMIT_DELAY_MS = 300;
 
 export const usePlayerStore = defineStore('player', () => {
   const toast = useToastStore();
-  const state = ref(mockPlayerState.state);
+
+  // --- Состояние (источник истины — сервер; до первого ответа живёт мок)
+
+  const state = ref<PlayerStateView>(mockPlayerState.state);
+  /** Серверный стейт уже применялся (мок перекрыт). До этого version-gate не работает. */
+  let serverStateApplied = false;
+
   const expanded = ref(false);
   const clipMode = ref(false);
   const clipQuality = ref(720);
-  const clipQualities = [360, 720, 1080];
+  /** Базовая лестница селекта; дополняется качествами из ответа /videos/get-url. */
+  const clipQualityLadder = [360, 720, 1080];
+  /** Потоки текущего видео — какие пункты селекта активны (api.md §8). */
+  const clipStreams = ref<VideoStream[]>([]);
+  const clipQualities = computed(() => {
+    const qualities = new Set([...clipQualityLadder, ...clipStreams.value.map((stream) => stream.quality)]);
+    return [...qualities].sort((a, b) => b - a);
+  });
   const volume = ref(72);
-  /** Серверная очередь — источник истины (api.md §6); статусы пока не используем. */
+
+  /** Серверная очередь — источник истины (api.md §6). */
   const queue = ref<QueueItem[]>([]);
-  /** Первичная загрузка очереди прошла (неудача сбрасывает флажок — повторим при следующем открытии). */
   const queueLoaded = ref(false);
+
+  /** Материализованный контекст (plan-player.md §2); для волны — серверное окно. */
+  const contextItems = ref<AnySnapshot[]>([...favoriteTracks]);
+  /** Для какого play_source загружен contextItems (null — мок-начальник). */
+  let contextSource: PlaySource | null = null;
+  /** Токен гонок контекста: применяет результат только последний запрос. */
+  let contextToken = 0;
+
+  // --- Роли и команды (api.md §1.6: эхо-поля всегда с uuid устройства)
+
+  /** Активное устройство = источник истины воспроизведения (plan-player.md §5). */
+  const isActiveDevice = computed(() => {
+    const uuid = useDevicesStore().myDeviceUuid;
+    return uuid != null && state.value.active_device_id === uuid;
+  });
+
+  const canCommand = computed(() => useAuthStore().isAuthed);
+
+  function echo(): EchoFields | null {
+    const origin = useDevicesStore().myDeviceUuid;
+    return origin ? { origin_device_id: origin, command_id: crypto.randomUUID() } : null;
+  }
+
+  /** Текст ошибки сети/бэка для тоста. */
+  function errorText(cause: unknown, fallback: string) {
+    return cause instanceof Error ? cause.message : fallback;
+  }
+
+  async function resync() {
+    try {
+      applyServerState(await playerApi.fetchPlayerState(), { force: true });
+    } catch {
+      /* resync — лучшее, что могли */
+    }
+  }
+
+  // --- Применение состояния: ответ команды (force) → сокет (version-gate) → GET на reconnect (force)
+
+  function anchorPosition() {
+    anchor.value = state.value.position_seconds;
+    anchorAt = Date.now();
+  }
+
+  function applyServerState(payload: PlayerStatePayload, opts: { force?: boolean } = {}) {
+    if (!payload?.state) return;
+    if (!opts.force && serverStateApplied && payload.state.version <= state.value.version) return;
+    serverStateApplied = true;
+    // DEBUG(2026-11-23): фиксация расхождения снапшота на проводе — убрать после сверки.
+    if (payload.state.current_snapshot) {
+      console.debug('[player] state.current_snapshot keys:', Object.keys(payload.state.current_snapshot));
+    }
+    state.value = payload.state;
+    queue.value = sortQueue(payload.queue ?? []);
+    queueLoaded.value = true;
+    anchorPosition();
+    void syncContextWithSource();
+  }
+
+  /** Сокет-ивент playback.state.updated (эхо и дедуп уже отсеял роутер). */
+  function applySocketState(view: PlayerStateView) {
+    applyServerState({ state: view, queue: queue.value });
+  }
+
+  // --- Контекст (resolver, plan-player.md §2/§7): пока favorites с API и волна целиком
+
+  async function syncContextWithSource() {
+    const source = state.value.play_source;
+    if (source === contextSource) return;
+    const token = ++contextToken;
+    contextSource = source;
+    try {
+      if (source === 'favorites') {
+        const favorites = await fetchFavorites();
+        if (token !== contextToken || contextSource !== 'favorites') return;
+        contextItems.value = favorites.tracks;
+      } else if (source === 'wave') {
+        const window = await waveApi.fetchWaveWindow();
+        if (token !== contextToken || contextSource !== 'wave') return;
+        contextItems.value = window;
+      } else {
+        contextItems.value = [];
+      }
+    } catch {
+      /* контекст догрузится со следующим переходом */
+    }
+  }
+
+  /** Ивент playback.wave.updated: окно изменилось — перечитываем целиком (api.md §14). */
+  function invalidateWave() {
+    if (contextSource === 'wave') contextSource = null;
+    void syncContextWithSource();
+  }
+
+  // --- Догрузка окна по исчерпании контекста: пока GET /wave провоцирует рост
+  // окна сам (api.md §14), фронт дёргает его, когда до конца волны остаётся
+  // играть текущий трек. Срабатывает на переходе «стал последним» — пока
+  // сидим на последнем треке повторных запросов нет (окно не выросло — не выросло).
+
+  const waveTailReached = computed(() => {
+    if (state.value.play_source !== 'wave' || !state.value.current_snapshot) return false;
+    const items = contextItems.value;
+    if (!items.length) return false;
+    const index = items.findIndex((item) => snapshotKey(item) === snapshotKey(state.value.current_snapshot!));
+    return index === items.length - 1;
+  });
+
+  watch(waveTailReached, (reached) => {
+    if (!reached) return;
+    void waveApi
+      .fetchWaveWindow()
+      .then((window) => {
+        if (contextSource !== 'wave' || state.value.play_source !== 'wave') return;
+        contextItems.value = window;
+      })
+      .catch(() => {
+        /* следующий переход на хвост повторит */
+      });
+  });
+
+  /**
+   * Вход в волну с главной: окно у сервера уже есть, играем его первый
+   * снапшот с source=wave — ротация дальше пойдёт по этому окну.
+   */
+  async function joinWave() {
+    try {
+      const window = await waveApi.fetchWaveWindow();
+      const first = window[0];
+      if (!first) return;
+      await playSnapshot(first, 'wave', { contextItems: window });
+    } catch (cause) {
+      toast.show(errorText(cause, 'Не удалось включить волну'), '', true);
+    }
+  }
+
+  async function loadFavoritesContext(): Promise<AnySnapshot[]> {
+    if (contextSource === 'favorites' && contextItems.value.length) return contextItems.value;
+    const token = ++contextToken;
+    contextSource = 'favorites';
+    try {
+      const favorites = await fetchFavorites();
+      if (token === contextToken && contextSource === 'favorites') contextItems.value = favorites.tracks;
+    } catch {
+      /* fallback без списка — не страшно */
+    }
+    return contextItems.value;
+  }
+
+  // --- Движок переходов (lib/playback-engine.ts)
+
+  function engineContext(): EngineContext {
+    return {
+      current: state.value.current_snapshot,
+      playSource: state.value.play_source,
+      previousSource: state.value.previous_play_source,
+      previous: state.value.previous_play_source_snapshot,
+      repeatMode: state.value.repeat_mode,
+      shuffleEnabled: state.value.shuffle_enabled,
+      seed:
+        state.value.shuffle_seed ??
+        `static:${useAuthStore().user?.id ?? 0}:${state.value.play_source}:${state.value.context_ref ?? ''}`,
+      queuePending: queue.value
+        .filter((item) => item.status === 'pending' && item.snapshot)
+        .map((item) => item.snapshot as AnySnapshot),
+      contextItems: contextItems.value,
+    };
+  }
+
+  let transitioning = false;
+
+  async function runAction(action: EngineAction) {
+    switch (action.action) {
+      case 'play':
+        await playSnapshot(action.snapshot, action.playbackSource, { rollSeed: false });
+        break;
+      case 'restart':
+        await restartTrack();
+        break;
+      case 'fallback_favorites': {
+        const favorites = await loadFavoritesContext();
+        if (favorites.length) await playSnapshot(favorites[0], 'favorites', { rollSeed: false });
+        else toast.show('В избранном пусто', '', true);
+        break;
+      }
+      case 'noop':
+        break;
+    }
+  }
+
+  function skipNext(reason: 'manual' | 'ended' = 'manual') {
+    if (transitioning) return;
+    cancelPendingSeek();
+    transitioning = true;
+    void runAction(resolveNext(engineContext(), reason)).finally(() => {
+      transitioning = false;
+    });
+  }
+
+  /** Автопереход по `ended` с аудио-элемента. */
+  function handleTrackEnded() {
+    skipNext('ended');
+  }
+
+  async function skipPrevious() {
+    if (transitioning) return;
+    cancelPendingSeek();
+    transitioning = true;
+    void runAction(resolvePrevious(engineContext(), state.value.position_seconds)).finally(() => {
+      transitioning = false;
+    });
+  }
+
+  /** Рестарт текущего трека: позиция 0, воспроизведение продолжается. */
+  async function restartTrack() {
+    cancelPendingSeek();
+    if (!canCommand.value) {
+      state.value = { ...state.value, position_seconds: 0, is_playing: true };
+      anchorPosition();
+      return;
+    }
+    const fields = echo();
+    if (!fields) return;
+    try {
+      applyServerState(await playerApi.seekTo(0, fields), { force: true });
+    } catch (cause) {
+      toast.show(errorText(cause, 'Не удалось перезапустить трек'), '', true);
+    }
+  }
+
+  /**
+   * Прямой запуск (api.md §5). Пользовательский тап — rollSeed: ролл сида
+   * детерминированного shuffle; переходы движка ключ не трогают. Тап из
+   * списка передаёт contextItems — движок строит переходы сразу, без
+   * ожидания resolver (plan-player.md §2).
+   */
+  async function playSnapshot(
+    snapshot: AnySnapshot,
+    playbackSource: PlaySource = 'single',
+    opts: { rollSeed?: boolean; contextItems?: AnySnapshot[]; contextRef?: string | null } = {},
+  ) {
+    cancelPendingSeek();
+    dropFromQueue(snapshotId(snapshot));
+    if (opts.contextItems) {
+      contextItems.value = opts.contextItems;
+      contextSource = playbackSource;
+    }
+    if (!canCommand.value) {
+      state.value = {
+        ...state.value,
+        current_snapshot: snapshot,
+        position_seconds: 0,
+        is_playing: true,
+        play_source: playbackSource,
+      };
+      anchorPosition();
+      return;
+    }
+    const fields = echo();
+    if (!fields) {
+      toast.show('Устройство ещё не зарегистрировано', '', true);
+      return;
+    }
+    try {
+      // Тап из списка всегда задаёт контекст — ref шлём (null чистит старое).
+      const extra: { context_ref?: string | null; shuffle_seed?: string | null } = {
+        shuffle_seed: opts.rollSeed === false ? undefined : crypto.randomUUID(),
+      };
+      if (playbackSource !== 'single' || opts.contextRef !== undefined) {
+        extra.context_ref = opts.contextRef ?? null;
+      }
+      const payload = await playerApi.playSnapshot(snapshot, playbackSource, fields, extra);
+      applyServerState(payload, { force: true });
+    } catch (cause) {
+      toast.show(errorText(cause, 'Не удалось включить'), '', true);
+      void resync();
+    }
+  }
+
+  async function togglePlay() {
+    if (!canCommand.value) {
+      state.value = { ...state.value, is_playing: !state.value.is_playing };
+      anchorPosition();
+      return;
+    }
+    const fields = echo();
+    if (!fields) {
+      toast.show('Устройство ещё не зарегистрировано', '', true);
+      return;
+    }
+    const wasPlaying = state.value.is_playing;
+    // Оптимистично, с откатом по ошибке (plan-player.md §5). Пауза сама
+    // увозит позицию — висящий seek отменяем, чтобы не дёргать бэк дважды.
+    if (wasPlaying) cancelPendingSeek();
+    state.value = { ...state.value, is_playing: !wasPlaying };
+    anchorPosition();
+    try {
+      const payload = wasPlaying
+        ? await playerApi.pausePlayback(fields, Math.round(extrapolatedPosition.value))
+        : await playerApi.resumePlayback(fields);
+      applyServerState(payload, { force: true });
+    } catch (cause) {
+      state.value = { ...state.value, is_playing: wasPlaying };
+      anchorPosition();
+      toast.show(errorText(cause, 'Не удалось переключить воспроизведение'), '', true);
+      void resync();
+    }
+  }
+
+  async function toggleRepeat() {
+    const index = repeatCycle.indexOf(state.value.repeat_mode);
+    const next = repeatCycle[(index + 1) % repeatCycle.length];
+    if (!canCommand.value) {
+      state.value = { ...state.value, repeat_mode: next };
+      return;
+    }
+    const fields = echo();
+    if (!fields) return;
+    try {
+      applyServerState(await playerApi.patchPlaybackOptions({ repeat_mode: next }, fields), { force: true });
+    } catch (cause) {
+      toast.show(errorText(cause, 'Не удалось сменить повтор'), '', true);
+    }
+  }
+
+  async function toggleShuffle() {
+    const next = !state.value.shuffle_enabled;
+    if (!canCommand.value) {
+      state.value = { ...state.value, shuffle_enabled: next };
+      return;
+    }
+    const fields = echo();
+    if (!fields) return;
+    // Включение — ролл ключа («перемешать заново»); выключение — seed: null (plan-player.md §2).
+    try {
+      applyServerState(await playerApi.patchPlaybackOptions({ shuffle_enabled: next }, fields, next ? crypto.randomUUID() : null), {
+        force: true,
+      });
+    } catch (cause) {
+      toast.show(errorText(cause, 'Не удалось переключить shuffle'), '', true);
+    }
+  }
+
+  // --- Позиция: экстраполяция от якоря (пульты и активное устройство без аудио)
+
+  const anchor = ref(state.value.position_seconds);
+  let anchorAt = Date.now();
+  /** 1-секундный тикер: двигает экстраполированную позицию и шлёт периодический репорт. */
+  const nowTick = ref(0);
+  let positionTimer: ReturnType<typeof setInterval> | null = null;
+
+  function startPositionTicker() {
+    stopPositionTicker();
+    positionTimer = setInterval(() => {
+      nowTick.value = Date.now();
+      if (canCommand.value && isActiveDevice.value && state.value.is_playing) {
+        void reportPosition();
+      }
+    }, 1000);
+  }
+
+  function stopPositionTicker() {
+    if (positionTimer) {
+      clearInterval(positionTimer);
+      positionTimer = null;
+    }
+  }
+
+  /** Периодический репорт позиции — намеренно бродкастит пультам (сверка А, 2026-11-23). */
+  let lastReportAt = 0;
+
+  async function reportPosition() {
+    const now = Date.now();
+    if (now - lastReportAt < POSITION_REPORT_INTERVAL_MS) return;
+    const seconds = Math.round(extrapolatedPosition.value);
+    if (Math.abs(seconds - state.value.position_seconds) < 3) return;
+    lastReportAt = now;
+    const fields = echo();
+    if (!fields) return;
+    try {
+      applyServerState(await playerApi.seekTo(seconds, fields), { force: true });
+    } catch {
+      /* следующий тик повторит */
+    }
+  }
+
+  /** Аудио-элемент активного устройства реально звучит (метит композабл по событиям). */
+  const audioPlaying = ref(false);
+
+  function setAudioPlaying(playing: boolean) {
+    audioPlaying.value = playing;
+  }
+
+  const extrapolatedPosition = computed(() => {
+    if (!state.value.is_playing) return anchor.value;
+    // Активное устройство: позиция идёт только когда аудио реально звучит —
+    // иначе пока догружается ссылка/буфер, ползунок бежит вперёд звука.
+    if (isActiveDevice.value && !audioPlaying.value) return anchor.value;
+    return anchor.value + (nowTick.value - anchorAt) / 1000;
+  });
+
+  /** Актуальная позиция из аудио-элемента: переустанавливает якорь экстраполяции. */
+  function anchorFromAudio(seconds: number) {
+    anchor.value = seconds;
+    anchorAt = Date.now();
+  }
+
+  /** Экстраполированная позиция в секундах — для ползунка, времён и синхротекста. */
+  const positionSeconds = computed(() => Math.max(0, extrapolatedPosition.value));
+
+  // --- Очередь (api.md §6)
 
   function sortQueue(items: QueueItem[]): QueueItem[] {
     return [...items].sort((a, b) => a.position - b.position);
@@ -36,7 +471,7 @@ export const usePlayerStore = defineStore('player', () => {
   /** Форс-рефетч очереди (сокеты playback.queue.updated / friend.queue.item.added). */
   async function refreshQueue() {
     try {
-      queue.value = sortQueue(await fetchQueue());
+      queue.value = sortQueue(await queueApi.fetchQueue());
       queueLoaded.value = true;
     } catch {
       /* очередь догрузится при следующем открытии */
@@ -46,30 +481,30 @@ export const usePlayerStore = defineStore('player', () => {
   /** Добавление в конец очереди. true — сервер принял. */
   async function enqueueSnapshot(snapshot: AnySnapshot): Promise<boolean> {
     try {
-      queue.value = sortQueue(await addToQueue(snapshot));
+      queue.value = sortQueue(await queueApi.addToQueue(snapshot));
       return true;
     } catch (cause) {
-      toast.show(cause instanceof Error ? cause.message : 'Не удалось добавить в очередь', '', true);
+      toast.show(errorText(cause, 'Не удалось добавить в очередь'), '', true);
       return false;
     }
   }
 
   async function removeQueueItem(id: number) {
     try {
-      queue.value = sortQueue(await removeFromQueue(id));
+      queue.value = sortQueue(await queueApi.removeFromQueue(id));
     } catch (cause) {
-      toast.show(cause instanceof Error ? cause.message : 'Не удалось убрать из очереди', '', true);
+      toast.show(errorText(cause, 'Не удалось убрать из очереди'), '', true);
     }
   }
 
-  /** Перестановка по индексам: бэку уходит список id ожидающих в новом порядке. */
+  /** Перестановка по индексам: бэку уходит список id ожидающих элементов в новом порядке. */
   async function reorderQueue(from: number, to: number) {
     if (from === to) return;
     const items = moveItem(queue.value, from, to).map((item) => item.id);
     try {
-      queue.value = sortQueue(await reorderPending(items));
+      queue.value = sortQueue(await queueApi.reorderPending(items));
     } catch (cause) {
-      toast.show(cause instanceof Error ? cause.message : 'Не удалось изменить порядок', '', true);
+      toast.show(errorText(cause, 'Не удалось изменить порядок'), '', true);
     }
   }
 
@@ -84,23 +519,21 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
+  // --- Производные для UI
+
   const current = computed(() => state.value.current_snapshot);
   const title = computed(() => current.value?.title ?? '');
   const artist = computed(() =>
     current.value?.artists.map((a) => a.name).join(', ') ?? '',
   );
-  function cycleInContext(delta: number) {
-    const sourceId = snapshotId(current.value);
-    const index = favoriteTracks.findIndex((track) => track.source_id === sourceId);
-    const from = index < 0 ? 0 : index;
-    return favoriteTracks[(from + delta + favoriteTracks.length) % favoriteTracks.length];
-  }
-  const previewNext = computed<AnySnapshot | null>(
-    () => queue.value[0]?.snapshot ?? (favoriteTracks.length ? cycleInContext(1) : null),
-  );
-  const previewPrevious = computed<AnySnapshot | null>(
-    () => (favoriteTracks.length ? cycleInContext(-1) : null),
-  );
+  const previewNext = computed<AnySnapshot | null>(() => {
+    const action = resolveNext(engineContext(), 'manual');
+    return action.action === 'play' ? action.snapshot : null;
+  });
+  const previewPrevious = computed<AnySnapshot | null>(() => {
+    const action = resolvePrevious(engineContext(), SKIP_RESTART_AFTER);
+    return action.action === 'play' ? action.snapshot : null;
+  });
   const album = computed(() => {
     const snap = current.value;
     if (snap?.type === 'track') return snap.album?.title ?? '';
@@ -116,66 +549,34 @@ export const usePlayerStore = defineStore('player', () => {
   const progress = computed(() => {
     const duration = durationSeconds.value;
     if (!duration) return 0;
-    return Math.min(100, (state.value.position_seconds / duration) * 100);
+    return Math.min(100, (extrapolatedPosition.value / duration) * 100);
   });
 
-  function togglePlay() {
-    state.value = { ...state.value, is_playing: !state.value.is_playing };
-  }
+  // --- Seek: локально сразу, на сервер — одним запросом после остановки драга
 
-  function toggleShuffle() {
-    state.value = { ...state.value, shuffle_enabled: !state.value.shuffle_enabled };
-  }
+  let seekCommitTimer: ReturnType<typeof setTimeout> | null = null;
+  let pendingSeekSeconds: number | null = null;
 
-  function toggleRepeat() {
-    const index = repeatCycle.indexOf(state.value.repeat_mode);
-    state.value = {
-      ...state.value,
-      repeat_mode: repeatCycle[(index + 1) % repeatCycle.length],
-    };
-  }
-
-  function playSnapshot(snapshot: AnySnapshot) {
-    dropFromQueue(snapshotId(snapshot));
-    state.value = {
-      ...state.value,
-      current_snapshot: snapshot,
-      position_seconds: 0,
-      is_playing: true,
-      play_source: snapshot.type === 'track' ? 'single' : state.value.play_source,
-    };
-  }
-
-  function skipBy(delta: number) {
-    if (delta > 0 && queue.value.length) {
-      const next = queue.value[0]?.snapshot;
-      if (next) playSnapshot(next);
-      return;
+  function cancelPendingSeek() {
+    if (seekCommitTimer) {
+      clearTimeout(seekCommitTimer);
+      seekCommitTimer = null;
     }
-    const tracks = favoriteTracks;
-    if (!tracks.length) return;
-    const sourceId = snapshotId(current.value);
-    const index = tracks.findIndex((track) => track.source_id === sourceId);
-    const from = index < 0 ? 0 : index;
-    const next = tracks[(from + delta + tracks.length) % tracks.length];
-    state.value = {
-      ...state.value,
-      current_snapshot: next,
-      position_seconds: 0,
-      is_playing: true,
-    };
+    pendingSeekSeconds = null;
   }
 
-  function skipNext() {
-    skipBy(1);
-  }
-
-  function skipPrevious() {
-    if (state.value.position_seconds > skipRestartAfter) {
-      state.value = { ...state.value, position_seconds: 0 };
-      return;
-    }
-    skipBy(-1);
+  function commitSeek() {
+    seekCommitTimer = null;
+    if (pendingSeekSeconds == null) return;
+    // Бэк принимает только целые секунды (api.md §5).
+    const seconds = Math.round(pendingSeekSeconds);
+    pendingSeekSeconds = null;
+    if (!canCommand.value) return;
+    const fields = echo();
+    if (!fields) return;
+    void playerApi.seekTo(seconds, fields).catch((cause) => {
+      toast.show(errorText(cause, 'Не удалось перемотать'), '', true);
+    });
   }
 
   function seek(seconds: number) {
@@ -185,11 +586,21 @@ export const usePlayerStore = defineStore('player', () => {
       ...state.value,
       position_seconds: Math.min(max, Math.max(0, seconds)),
     };
+    anchorPosition();
+    // Драг шлёт десятки событий в секунду — на сервер уходит только последняя
+    // позиция, через короткую паузу после отпускания. Пульт тоже шлёт seek —
+    // бэк вещает команду на активное устройство.
+    if (!canCommand.value) return;
+    pendingSeekSeconds = state.value.position_seconds;
+    if (seekCommitTimer) clearTimeout(seekCommitTimer);
+    seekCommitTimer = setTimeout(commitSeek, SEEK_COMMIT_DELAY_MS);
   }
 
   function seekRatio(ratio: number) {
     seek(ratio * durationSeconds.value);
   }
+
+  // --- Прочее UI
 
   function toggleClips() {
     clipMode.value = !clipMode.value;
@@ -197,6 +608,15 @@ export const usePlayerStore = defineStore('player', () => {
 
   function setClipQuality(quality: number) {
     clipQuality.value = quality;
+  }
+
+  /** Потоки видео: фиксит выбор — текущее качество недоступно → максимум из списка. */
+  function setClipStreams(streams: VideoStream[]) {
+    clipStreams.value = streams;
+    const qualities = streams.map((stream) => stream.quality);
+    if (qualities.length && !qualities.includes(clipQuality.value)) {
+      clipQuality.value = Math.max(...qualities);
+    }
   }
 
   function syncClipMode() {
@@ -218,24 +638,58 @@ export const usePlayerStore = defineStore('player', () => {
     volume.value = Math.round(Math.min(100, Math.max(0, percent)));
   }
 
+  // --- Жизненный цикл: старт/реконнект (plan-player.md §5)
+
+  let unbindReconnect: (() => void) | null = null;
+
+  /** Первичная загрузка состояния и рефетч на reconnect (полная подмена зеркала). */
+  function bindServerPlayback() {
+    startPositionTicker();
+    const auth = useAuthStore();
+    watch(
+      () => auth.isAuthed,
+      (authed) => {
+        if (authed) {
+          void refreshQueue();
+          void resync();
+          unbindReconnect ??= onRealtimeReconnect(() => {
+            void refreshQueue();
+            void resync();
+          });
+        } else {
+          unbindReconnect?.();
+          unbindReconnect = null;
+        }
+      },
+      { immediate: true },
+    );
+  }
+
   return {
     state,
     expanded,
     clipMode,
     clipQuality,
     clipQualities,
+    clipStreams,
+    setClipStreams,
     volume,
     queue,
     queueLoaded,
+    isActiveDevice,
     current,
     title,
     artist,
     previewNext,
     previewPrevious,
-    skipRestartAfter,
+    skipRestartAfter: SKIP_RESTART_AFTER,
     album,
     durationSeconds,
     progress,
+    positionSeconds,
+    audioPlaying,
+    setAudioPlaying,
+    anchorFromAudio,
     togglePlay,
     toggleShuffle,
     toggleRepeat,
@@ -245,8 +699,9 @@ export const usePlayerStore = defineStore('player', () => {
     enqueueSnapshot,
     removeQueueItem,
     reorderQueue,
-    skipNext,
+    skipNext: () => skipNext('manual'),
     skipPrevious,
+    handleTrackEnded,
     seek,
     seekRatio,
     toggleClips,
@@ -254,6 +709,11 @@ export const usePlayerStore = defineStore('player', () => {
     openExpanded,
     closeExpanded,
     setVolume,
+    applyServerState,
+    applySocketState,
+    invalidateWave,
+    joinWave,
+    bindServerPlayback,
   };
 });
 
