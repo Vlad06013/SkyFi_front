@@ -149,15 +149,18 @@ function scheduleTtlRefresh(ttlSec: number, snapshot: VideoSnapshot) {
 }
 
 async function refreshStreams(snapshot: VideoSnapshot) {
+  const store = usePlayerStore();
+  store.setEngineLoading(true);
   try {
     const payload = await fetchVideoStreams(snapshot);
-    const store = usePlayerStore();
     if (!store.clipPlaybackVideo || snapshotKey(store.clipPlaybackVideo) !== snapshotKey(snapshot)) return;
     store.setClipStreams(payload.streams);
     reapplyStreams();
     scheduleTtlRefresh(payload.ttl_sec, snapshot);
   } catch {
     // Один тихий пролёт: следующий тогл/смена трека перезапросят, автоповтором не злоупотребляем.
+  } finally {
+    store.setEngineLoading(false);
   }
 }
 
@@ -199,6 +202,7 @@ export function useVideoPlayback() {
     loadAbort?.abort();
     const controller = new AbortController();
     loadAbort = controller;
+    player.setEngineLoading(true);
     try {
       const payload = await fetchVideoStreams(snapshot, controller.signal);
       if (controller.signal.aborted) return;
@@ -218,6 +222,7 @@ export function useVideoPlayback() {
       toast.show(cause instanceof Error ? cause.message : 'Не удалось загрузить видео', '', true);
     } finally {
       if (loadAbort === controller) loadAbort = null;
+      player.setEngineLoading(false);
     }
   }
 
@@ -279,6 +284,13 @@ export function useVideoPlayback() {
     (shouldPlay) => {
       if (!player.isActiveDevice || player.clipPlaybackVideo == null) return;
       const el = ensureVideo();
+      // Мёртвая ссылка (протухший поток): play() не оживит — перезагружаем.
+      if (shouldPlay && el.error) {
+        loadedKey = null;
+        appliedKey = null;
+        void loadVideo(player.clipPlaybackVideo);
+        return;
+      }
       if (shouldPlay) void el.play().catch(() => undefined);
       else el.pause();
     },
@@ -310,7 +322,8 @@ export function useVideoPlayback() {
       const el = video;
       if (!el || !player.isActiveDevice) return;
       const snap = player.clipPlaybackVideo;
-      if (!snap || snapshotKey(snap) !== loadedKey) return;
+      // Гейт по факту (appliedKey): не seek'ать старое видео по позиции нового.
+      if (!snap || snapshotKey(snap) !== appliedKey) return;
       const ended = el.ended;
       if (Number.isFinite(el.duration) && Math.abs(el.currentTime - position) > 2.5) {
         el.currentTime = position;
@@ -374,7 +387,7 @@ export function useVideoPlayback() {
     el.addEventListener('timeupdate', () => {
       const store = usePlayerStore();
       if (!store.isActiveDevice || !store.clipActive || !store.clipPlaybackVideo) return;
-      if (snapshotKey(store.clipPlaybackVideo) !== loadedKey) return;
+      if (snapshotKey(store.clipPlaybackVideo) !== appliedKey) return;
       store.anchorFromAudio(el.currentTime);
     });
   }

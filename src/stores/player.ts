@@ -130,6 +130,7 @@ export const usePlayerStore = defineStore('player', () => {
     queue.value = sortQueue(payload.queue ?? []);
     queueLoaded.value = true;
     anchorPosition();
+    reconcileBoot();
     void syncContextWithSource();
   }
 
@@ -502,6 +503,13 @@ export const usePlayerStore = defineStore('player', () => {
     engineKick.value += 1;
   }
 
+  /** Текущий движок грузит поток/резолвит клип — реконсиляцию-паузу держим, пока грузится. */
+  const engineLoading = ref(false);
+
+  function setEngineLoading(loading: boolean) {
+    engineLoading.value = loading;
+  }
+
   // --- Подмена значка: фактическое воспроизведение против мнения сервера
 
   /**
@@ -535,6 +543,56 @@ export const usePlayerStore = defineStore('player', () => {
       desyncTimer = null;
       desyncGracePassed.value = true;
     }, DESYNC_GRACE_MS);
+  });
+
+  /** Реальная пауза с текущей позицией — реконсиляция рассинхрона. */
+  function pauseToServer() {
+    const fields = echo();
+    if (!fields) return;
+    void playerApi
+      .pausePlayback(fields, Math.round(extrapolatedPosition.value))
+      .then((payload) => applyServerState(payload, { force: true }))
+      .catch(() => {
+        /* следующий виток догонит */
+      });
+  }
+
+  /**
+   * Одноразовая реконсиляция загрузки: свежая страница сама не играет
+   * (автоплей без жеста отклонён — в WebView APK всегда), а сервер присылает
+   * `is_playing=true` с прошлой сессии. Вместо секунд притворства шлём сразу
+   * честную паузу — сервер и пульты сразу знают правду. Одноразово: дальше
+   * застрявший рассинхрон добирает обычная реконсиляция.
+   */
+  let bootPauseSent = false;
+
+  function reconcileBoot() {
+    if (bootPauseSent) return;
+    bootPauseSent = true;
+    if (!isActiveDevice.value || !canCommand.value || !state.value.is_playing) return;
+    pauseToServer();
+  }
+
+  /**
+   * Реконсиляция с сервером: это активное устройство, сервер уверен, что
+   * играем, а элемент молчит и поток не грузится — значит воспроизведения
+   * нет (автоплей отклонён при загрузке, протухший поток). Шлём реальную
+   * паузу, чтобы сервер и пульты узнали правду, а не местную подмену значка.
+   */
+  const DESYNC_CONFIRM_MS = 3_000;
+  let reconcileTimer: ReturnType<typeof setTimeout> | null = null;
+  watch([playbackDesynced, engineLoading], ([desynced, loading]) => {
+    if (reconcileTimer) {
+      clearTimeout(reconcileTimer);
+      reconcileTimer = null;
+    }
+    if (!desynced || loading) return;
+    reconcileTimer = setTimeout(() => {
+      reconcileTimer = null;
+      // К тику всё могло переиграться (медленный буфер, тап) — перепроверяем.
+      if (!playbackDesynced.value || engineLoading.value) return;
+      pauseToServer();
+    }, DESYNC_CONFIRM_MS);
   });
 
   /** Фактическое воспроизведение для UI: иконка плея, эквалайзер, анимации. */
@@ -845,8 +903,10 @@ export const usePlayerStore = defineStore('player', () => {
     positionSeconds,
     audioPlaying,
     engineKick,
+    engineLoading,
     isPlaying,
     setAudioPlaying,
+    setEngineLoading,
     anchorFromAudio,
     togglePlay,
     toggleShuffle,

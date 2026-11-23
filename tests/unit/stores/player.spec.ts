@@ -220,6 +220,12 @@ describe('stores/player: рассинхрон сервера с реальным
     setActivePinia(createPinia());
     pausePlaybackMock.mockReset();
     playSnapshotMock.mockReset();
+    vi.useFakeTimers();
+    vi.clearAllTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   /** Активное автризованное устройство, сервер уверен, что играем трек. */
@@ -260,17 +266,12 @@ describe('stores/player: рассинхрон сервера с реальным
   });
 
   it('isPlaying: грейс, затем честная пауза; элемент заиграл — сразу плей', async () => {
-    vi.useFakeTimers();
-    try {
-      const player = desyncedPlayer();
-      expect(player.isPlaying).toBe(true);
-      await vi.advanceTimersByTimeAsync(1_600);
-      expect(player.isPlaying).toBe(false);
-      player.setAudioPlaying(true);
-      expect(player.isPlaying).toBe(true);
-    } finally {
-      vi.useRealTimers();
-    }
+    const player = desyncedPlayer();
+    expect(player.isPlaying).toBe(true);
+    await vi.advanceTimersByTimeAsync(1_600);
+    expect(player.isPlaying).toBe(false);
+    player.setAudioPlaying(true);
+    expect(player.isPlaying).toBe(true);
   });
 
   it('isPlaying: пульт зеркалит сервер, пауза — сразу false', () => {
@@ -297,5 +298,89 @@ describe('stores/player: рассинхрон сервера с реальным
     await player.playOrToggle(other);
     expect(playSnapshotMock).toHaveBeenCalledTimes(1);
     expect(playSnapshotMock.mock.calls[0]?.[0]).toEqual(other);
+  });
+
+  it('загрузка страницы: активное устройство, сервер играет — сразу честная пауза', async () => {
+    const player = desyncedPlayer();
+    pausePlaybackMock.mockResolvedValue({ state: { ...player.state, is_playing: false }, queue: [] } as never);
+
+    player.applyServerState({ state: { ...player.state, is_playing: true }, queue: [] }, { force: true });
+    await Promise.resolve();
+
+    expect(pausePlaybackMock).toHaveBeenCalledTimes(1);
+    expect(player.state.is_playing).toBe(false);
+    expect(player.isPlaying).toBe(false);
+  });
+
+  it('загрузка страницы: неактивное устройство — паузу не шлём', async () => {
+    const player = desyncedPlayer();
+    player.state = { ...player.state, active_device_id: 'другое-устройство' };
+
+    player.applyServerState({ state: { ...player.state }, queue: [] }, { force: true });
+    await Promise.resolve();
+
+    expect(pausePlaybackMock).not.toHaveBeenCalled();
+  });
+
+  it('загрузка страницы: гость (нет авторизации) — паузу не шлём', async () => {
+    const devices = useDevicesStore();
+    devices.myDeviceUuid = 'uuid-1';
+    const player = usePlayerStore();
+    player.state = {
+      ...player.state,
+      current_snapshot: track,
+      is_playing: true,
+      active_device_id: 'uuid-1',
+    };
+
+    player.applyServerState({ state: { ...player.state }, queue: [] }, { force: true });
+    await Promise.resolve();
+
+    expect(pausePlaybackMock).not.toHaveBeenCalled();
+  });
+
+  it('загрузка страницы: одноразовая — повторные применения стейта молчат', async () => {
+    const player = desyncedPlayer();
+    pausePlaybackMock.mockResolvedValue({ state: { ...player.state, is_playing: false }, queue: [] } as never);
+
+    player.applyServerState({ state: { ...player.state, is_playing: true }, queue: [] }, { force: true });
+    await Promise.resolve();
+    player.applyServerState({ state: { ...player.state, is_playing: true }, queue: [] }, { force: true });
+    await Promise.resolve();
+
+    expect(pausePlaybackMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('реконсиляция: молчание подтверждено — реальная пауза, сервер узнаёт правду', async () => {
+    const player = desyncedPlayer();
+    pausePlaybackMock.mockResolvedValue({ state: { ...player.state, is_playing: false }, queue: [] } as never);
+
+    await vi.advanceTimersByTimeAsync(3_200);
+
+    expect(pausePlaybackMock).toHaveBeenCalledTimes(1);
+    expect(player.state.is_playing).toBe(false);
+    expect(player.isPlaying).toBe(false);
+  });
+
+  it('реконсиляция: поток ещё грузится — паузу не шлём', async () => {
+    const player = desyncedPlayer();
+    player.setEngineLoading(true);
+    pausePlaybackMock.mockResolvedValue({ state: { ...player.state, is_playing: false }, queue: [] } as never);
+
+    await vi.advanceTimersByTimeAsync(6_000);
+
+    expect(pausePlaybackMock).not.toHaveBeenCalled();
+  });
+
+  it('реконсиляция: элемент заиграл до тика — паузу отменили', async () => {
+    const player = desyncedPlayer();
+    pausePlaybackMock.mockResolvedValue({ state: { ...player.state, is_playing: false }, queue: [] } as never);
+
+    await vi.advanceTimersByTimeAsync(1_000);
+    player.setAudioPlaying(true);
+    await vi.advanceTimersByTimeAsync(4_000);
+
+    expect(pausePlaybackMock).not.toHaveBeenCalled();
+    expect(player.isPlaying).toBe(true);
   });
 });

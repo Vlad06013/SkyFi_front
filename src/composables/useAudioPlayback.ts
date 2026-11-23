@@ -57,6 +57,11 @@ export function useAudioPlayback() {
     loadAbort?.abort();
     const controller = new AbortController();
     loadAbort = controller;
+    // Позиция для старта — с момента ТЕКУЩЕГО снапшота: пока летит ссылка,
+    // старый элемент ещё играет и его timeupdate пересаживает якорь стора на
+    // позицию старого трека — читать позицию по окончании fetch нельзя.
+    const startPosition = player.positionSeconds;
+    player.setEngineLoading(true);
     try {
       const { url } = await fetchAudioUrl(snapshot, controller.signal);
       // Пока запрашивали ссылку, эффективный снапшот мог смениться (клип,
@@ -69,7 +74,7 @@ export function useAudioPlayback() {
       el.src = url;
       // Продолжаем с общей позиции: после клипа она ушла вперёд, при обычном
       // старте трека позиция ~0 и seek на 0 — безопасный no-op.
-      resumeAt = player.positionSeconds;
+      resumeAt = startPosition;
       if (player.state.is_playing) void el.play().catch(() => undefined);
     } catch {
       // Отменён следующим запросом — не ошибка, молча выходим.
@@ -78,6 +83,7 @@ export function useAudioPlayback() {
       /* ошибку команды уже показал стор */
     } finally {
       if (loadAbort === controller) loadAbort = null;
+      player.setEngineLoading(false);
     }
   }
 
@@ -98,6 +104,13 @@ export function useAudioPlayback() {
         el.pause();
         return;
       }
+      // Мёртвая ссылка (протухший поток): play() не оживит — перезагружаем.
+      if (shouldPlay && el.error) {
+        loadedKey = null;
+        appliedKey = null;
+        void loadSnapshot(player.effectiveCurrent);
+        return;
+      }
       if (shouldPlay) void el.play().catch(() => undefined);
       else el.pause();
     },
@@ -112,7 +125,9 @@ export function useAudioPlayback() {
     (position) => {
       const el = audio;
       if (!el || !player.isActiveDevice) return;
-      if (!player.effectiveCurrent || snapshotKey(player.effectiveCurrent) !== loadedKey) return;
+      // Гейт по факту (appliedKey): пока летит ссылка, в элементе ещё старый
+      // трек — seek'ать его по позиции нового нельзя.
+      if (!player.effectiveCurrent || snapshotKey(player.effectiveCurrent) !== appliedKey) return;
       const ended = el.ended;
       if (Number.isFinite(el.duration) && Math.abs(el.currentTime - position) > 2.5) {
         el.currentTime = position;
@@ -182,7 +197,9 @@ export function useAudioPlayback() {
     el.addEventListener('timeupdate', () => {
       const store = usePlayerStore();
       if (!store.isActiveDevice || store.effectiveCurrent?.type !== 'track') return;
-      if (snapshotKey(store.effectiveCurrent) !== loadedKey) return;
+      // Гейт по факту (appliedKey): таймапдейты ещё играющего старого трека
+      // во время подгрузки нового не должны пересаживать якорь.
+      if (snapshotKey(store.effectiveCurrent) !== appliedKey) return;
       store.anchorFromAudio(el.currentTime);
     });
   }
