@@ -18,7 +18,35 @@
 }
 
 .mp-pane {
+  /* min-width: auto раздувал слайд по длинному названию — соседний плеер
+     вылезал в центр. Слайд жёстко по ширине вьюпорта, текст режется. */
   flex: 0 0 100%;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.mp-pane .mini-player {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.mp-pane .track-meta {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.mp-pane .track-title,
+.mp-pane .track-artist {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mp-pane .icon-btn,
+.mp-pane .fab {
+  flex-shrink: 0;
 }
 
 .mp-cover {
