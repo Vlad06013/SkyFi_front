@@ -28,6 +28,7 @@
 
     <div class="sec-label">Сервисы</div>
     <YandexCard />
+    <YoutubeCard />
 
     <div class="sec-label">Звук</div>
     <div class="vol-row">

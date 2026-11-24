@@ -6,6 +6,7 @@ import AppSheet from '@/components/AppSheet/AppSheet.vue';
 import SeekBar from '@/components/SeekBar/SeekBar.vue';
 import SettingRow from '@/components/SettingRow/SettingRow.vue';
 import YandexCard from '@/components/YandexCard/YandexCard.vue';
+import YoutubeCard from '@/components/YoutubeCard/YoutubeCard.vue';
 import QrScannerSheet from '@/components/QrScannerSheet/QrScannerSheet.vue';
 import { useAuthStore } from '@/stores/auth';
 import { usePlayerStore } from '@/stores/player';
@@ -13,7 +14,7 @@ import { useToastStore } from '@/stores/toast';
 
 export default defineComponent({
   name: 'SettingsPage',
-  components: { AppBar, AppSheet, SeekBar, SettingRow, YandexCard, QrScannerSheet },
+  components: { AppBar, AppSheet, SeekBar, SettingRow, YandexCard, YoutubeCard, QrScannerSheet },
   setup() {
     const router = useRouter();
     const auth = useAuthStore();

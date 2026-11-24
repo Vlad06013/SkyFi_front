@@ -249,10 +249,17 @@ status: pending|playing_now|played|skipped, snapshot|null}`.
 
 ## 8. Видео (`/videos`)
 
+Источники видео: Дзен и YouTube (потоки — relay-ссылки с нашего
+хоста, VPN клиенту не нужен). Резолв идёт по приоритету
+YouTube → Дзен; get-url диспатчит по `source_type` снапшота.
+
 | Метод/путь | Тело → Ответ |
 |---|---|
-| `POST /resolve` (60/мин) | track-снапшот → `{video: VideoSnapshot, streams: [{quality, url}], ttl_sec}` — режим клипов: матчинг «трек → видео» на бэке. Мок: всегда каталог. |
-| `POST /get-url` (120/мин) | video-снапшот → `{streams, ttl_sec}` — свежие потоки по видео. |
+| `POST /resolve` (60/мин) | track-снапшот → `{video: VideoSnapshot, streams: [{quality, url}], ttl_sec}` — режим клипов: матчинг «трек → видео» на бэке (YouTube → Дзен). |
+| `POST /get-url` (120/мин) | video-снапшот → `{streams, ttl_sec}` — свежие потоки по видео (source-независимый контракт). |
+| `GET /youtube-cookies` | → `{has_cookies: bool, updated_at: string\|null}` — статус привязки персональных cookies YouTube. |
+| `POST /youtube-cookies` (30/мин) | multipart, поле `cookies` (Netscape .txt, «Get cookies.txt LOCALLY» с youtube.com) → 201. Файл хранится зашифрованным и подставляется в YouTube-запросы пользователя (обход «Sign in to confirm you're not a bot»). Добровольно: без него запросы идут без куки (деградация качества/стабильности). Relay-ссылки потоков несут sha256-префикс файла (параметр `ch`) — браузеру заголовок не прикрепить. |
+| `DELETE /youtube-cookies` | → 200 — отвязать файл. |
 
 ## 9. Поиск (`GET /search?q=&limit=&page=`, 30/мин)
 
@@ -278,9 +285,10 @@ status: pending|playing_now|played|skipped, snapshot|null}`.
   best от источника отдаётся как null. При поиске по ссылке
   (q = URL) best — разрешённая сущность. У artist в best поле
   `artists` не приходит — как и в секциях.
-- Сейчас видео-источник — мок: секция `videos` всегда содержит
-  2 ролика на любом запросе (реальные потоки через
-  `/videos/get-url`). Аудио-источники секцию отдают пустой.
+- Видео-источники (Дзен и YouTube) склеивают секцию `videos`
+  вместе (`merge`); пагинации у обоих нет — `has_more` для
+  видео всегда честный `false`, кнопки «ещё» не показываем.
+  Аудио-источники секцию отдают пустой.
 
 ## 10. Избранное (`/favorites`)
 

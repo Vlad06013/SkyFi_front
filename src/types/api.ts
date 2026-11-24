@@ -278,6 +278,15 @@ export interface YandexImportProgressPayload {
   finished_at: string | null;
 }
 
+/* Видео: cookies YouTube (api.md §8). */
+
+/** data ответа GET /videos/youtube-cookies — статус привязки персональных cookies. */
+export interface YoutubeCookiesStatusPayload {
+  has_cookies: boolean;
+  /** ISO 8601; null — файл не загружен. */
+  updated_at: string | null;
+}
+
 /* Друзья (api.md §12, формы — contracts.md). */
 
 export interface FriendshipSide {
