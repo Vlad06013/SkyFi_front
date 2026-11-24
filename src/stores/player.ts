@@ -3,7 +3,8 @@ import { computed, ref, watch } from 'vue';
 import * as playerApi from '@/api/player';
 import * as queueApi from '@/api/queue';
 import * as waveApi from '@/api/wave';
-import type { VideoStream } from '@/api/videos';
+import type { VideoHls, VideoStream } from '@/api/videos';
+import type { ClipAudioTrack } from '@/lib/hls-engine';
 import { fetchFavorites } from '@/api/favorites';
 import { resolveNext, resolvePrevious, snapshotKey, SKIP_RESTART_AFTER, type EngineAction, type EngineContext } from '@/lib/playback-engine';
 import { moveItem } from '@/lib/list-sort';
@@ -39,7 +40,18 @@ export const usePlayerStore = defineStore('player', () => {
   const clipQualityLadder = [360, 720, 1080];
   /** Потоки текущего видео — какие пункты селекта активны (api.md §8). */
   const clipStreams = ref<VideoStream[]>([]);
+  /** HLS-адаптация текущего видео (api.md §8.1): null — прогрессив streams. */
+  const clipHls = ref<VideoHls | null>(null);
+  /** Высоты видео из HLS-манифеста — пункты селекта качества в HLS-режиме. */
+  const clipHlsHeights = ref<number[]>([]);
+  /** HLS: true — ABR с потолком clipQuality; false — фиксированное выбранное качество. */
+  const clipHlsAuto = ref(true);
+  /** Выбранная аудиодорожка (api.md §8.1): id из манифеста; null — default. */
+  const clipAudioId = ref<string | null>(null);
+  /** Дорожки текущего манифеста (присылает hls-движок); пусто — селектор не показываем. */
+  const clipAudioTracks = ref<ClipAudioTrack[]>([]);
   const clipQualities = computed(() => {
+    if (clipHlsHeights.value.length) return [...clipHlsHeights.value].sort((a, b) => b - a);
     const qualities = new Set([...clipQualityLadder, ...clipStreams.value.map((stream) => stream.quality)]);
     return [...qualities].sort((a, b) => b - a);
   });
@@ -780,12 +792,16 @@ export const usePlayerStore = defineStore('player', () => {
     clipStatus.value = 'resolving';
   }
 
-  /** Резолв приехал: клип закрепляется за треком, потоки — в общую лестницу качеств. */
+  /** Резолв приехал: клип закрепляется за треком. hls в resolve нет (api.md §8) —
+   *  стартуем на прогрессиве, манифест добирает движок ближайшим get-url. */
   function setClipResolved(track: TrackSnapshot, video: VideoSnapshot, streams: VideoStream[]) {
     clipTrackKey.value = snapshotKey(track);
     clipVideo.value = video;
     clipStatus.value = 'ready';
+    clipAudioId.value = null;
+    clipHlsAuto.value = true;
     setClipStreams(streams);
+    setClipHls(null);
   }
 
   /** Клипа нет (video: null) или резолв упал — остаёмся на аудио, индикатор в плеере. */
@@ -793,13 +809,23 @@ export const usePlayerStore = defineStore('player', () => {
     clipVideo.value = null;
     clipTrackKey.value = null;
     clipStatus.value = 'unavailable';
+    clearClipPlayback();
   }
 
   function clearClip() {
     clipVideo.value = null;
     clipTrackKey.value = null;
     clipStatus.value = 'idle';
+    clearClipPlayback();
+  }
+
+  /** Общая зачистка локальных потоков клипа: streams/HLS/дорожки/высоты. */
+  function clearClipPlayback() {
     clipStreams.value = [];
+    clipHls.value = null;
+    clipHlsHeights.value = [];
+    clipAudioId.value = null;
+    clipAudioTracks.value = [];
   }
 
   // Смена трека инвалидирует клип: движок резолвит заново, пока режим включён.
@@ -811,7 +837,13 @@ export const usePlayerStore = defineStore('player', () => {
   );
 
   function setClipQuality(quality: number) {
+    clipHlsAuto.value = false;
     clipQuality.value = quality;
+  }
+
+  /** HLS-режим: вернуться к ABR (потолок — clipQuality), выбор ручника отменяется. */
+  function setClipQualityAuto() {
+    clipHlsAuto.value = true;
   }
 
   /** Потоки видео: фиксит выбор — текущее качество недоступно → максимум из списка. */
@@ -821,6 +853,36 @@ export const usePlayerStore = defineStore('player', () => {
     if (qualities.length && !qualities.includes(clipQuality.value)) {
       clipQuality.value = Math.max(...qualities);
     }
+  }
+
+  /** HLS-адаптация: сменился манифест — высоты и дорожки устарели, ждём свежие из него. */
+  function setClipHls(hls: VideoHls | null) {
+    if (clipHls.value?.manifest_url !== hls?.manifest_url) {
+      clipHlsHeights.value = [];
+      clipAudioTracks.value = [];
+      if (clipAudioId.value != null) clipAudioId.value = null;
+    }
+    clipHls.value = hls;
+  }
+
+  /** Высоты из разобранного манифеста: пункты селекта; выбор недоступен → максимум. */
+  function setClipHlsHeights(heights: number[]) {
+    const sorted = [...new Set(heights)].sort((a, b) => b - a);
+    clipHlsHeights.value = sorted;
+    if (sorted.length && !sorted.includes(clipQuality.value)) clipQuality.value = sorted[0];
+  }
+
+  /** Дорожки из разобранного манифеста; выбранная не доехала — сброс на default. */
+  function setClipAudioTracks(tracks: ClipAudioTrack[]) {
+    clipAudioTracks.value = tracks;
+    if (clipAudioId.value != null && !tracks.some((track) => track.id === clipAudioId.value)) {
+      clipAudioId.value = null;
+    }
+  }
+
+  /** Выбор аудиодорожки (дубляж): id из манифеста; null — default. */
+  function setClipAudioId(id: string | null) {
+    clipAudioId.value = id;
   }
 
   function syncClipMode() {
@@ -876,12 +938,22 @@ export const usePlayerStore = defineStore('player', () => {
     clipQuality,
     clipQualities,
     clipStreams,
+    clipHls,
+    clipHlsHeights,
+    clipHlsAuto,
+    clipAudioId,
+    clipAudioTracks,
     clipVideo,
     clipTrackKey,
     clipStatus,
     clipPlaybackVideo,
     clipActive,
     setClipStreams,
+    setClipHls,
+    setClipHlsHeights,
+    setClipAudioTracks,
+    setClipAudioId,
+    setClipQualityAuto,
     setClipResolving,
     setClipResolved,
     setClipUnavailable,

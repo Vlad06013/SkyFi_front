@@ -21,8 +21,17 @@
           </svg>
         </button>
         <div v-if="clipMode" class="clip-top-side">
-          <button class="q-chip" type="button" aria-label="качество клипа" @click.stop="qualityOpen = !qualityOpen">
-            {{ clipQuality }}
+          <button
+            v-if="clipAudioTracks.length > 1"
+            class="q-chip"
+            type="button"
+            aria-label="звуковая дорожка"
+            @click.stop="onAudioChip"
+          >
+            {{ activeAudioLabel }}
+          </button>
+          <button class="q-chip" type="button" aria-label="качество клипа" @click.stop="onQualityChip">
+            {{ clipHlsActive && clipHlsAuto ? 'авто' : clipQuality }}
           </button>
           <button
             class="icon-btn ghost"
@@ -64,17 +73,38 @@
       <div v-if="qualityOpen" class="clip-quality-mask" @pointerdown.stop="qualityOpen = false" />
       <div v-if="qualityOpen" class="select-menu clip-quality">
         <button
+          v-if="clipHlsActive"
+          type="button"
+          class="select-opt"
+          :class="{ 'is-on': clipHlsAuto }"
+          @click="pickQualityAuto"
+        >
+          <span>Авто<span class="osub">{{ clipHlsAuto ? 'активно' : 'выбрать' }}</span></span>
+          <svg
+            v-if="clipHlsAuto"
+            class="tick"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2.2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M5 12.5 9.5 17 19 7.5" />
+          </svg>
+        </button>
+        <button
           v-for="quality in clipQualities"
           :key="quality"
           type="button"
           class="select-opt"
-          :class="{ 'is-on': quality === clipQuality, 'is-disabled': !clipQualityAvailable(quality) }"
+          :class="{ 'is-on': quality === clipQuality && (!clipHlsActive || !clipHlsAuto), 'is-disabled': !clipQualityAvailable(quality) }"
           :disabled="!clipQualityAvailable(quality)"
           @click="pickQuality(quality)"
         >
-          <span>{{ quality }}<span class="osub">{{ quality === clipQuality ? 'активно' : 'выбрать' }}</span></span>
+          <span>{{ quality }}<span class="osub">{{ quality === clipQuality && (!clipHlsActive || !clipHlsAuto) ? 'активно' : 'выбрать' }}</span></span>
           <svg
-            v-if="quality === clipQuality"
+            v-if="quality === clipQuality && (!clipHlsActive || !clipHlsAuto)"
             class="tick"
             viewBox="0 0 24 24"
             fill="none"
@@ -87,6 +117,34 @@
           </svg>
         </button>
       </div>
+
+      <template v-if="clipAudioTracks.length > 1">
+        <div v-if="audioOpen" class="clip-quality-mask" @pointerdown.stop="audioOpen = false" />
+        <div v-if="audioOpen" class="select-menu clip-quality">
+          <button
+            v-for="track in clipAudioTracks"
+            :key="track.id"
+            type="button"
+            class="select-opt"
+            :class="{ 'is-on': track.id === activeAudioId }"
+            @click="pickAudio(track.id)"
+          >
+            <span>{{ track.label }}<span class="osub">{{ track.id === activeAudioId ? 'активно' : 'выбрать' }}</span></span>
+            <svg
+              v-if="track.id === activeAudioId"
+              class="tick"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M5 12.5 9.5 17 19 7.5" />
+            </svg>
+          </button>
+        </div>
+      </template>
 
       <div
         class="now-stage"

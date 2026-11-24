@@ -28,6 +28,7 @@
     "@ionic/vue-router": "^9.0.0",
     "axios": "^1.20.0",
     "dexie": "^4.4.6",
+    "hls.js": "^1.7.4",
     "html5-qrcode": "^2.3.8",
     "ionicons": "^8.1.0",
     "laravel-echo": "^2.6.1",

@@ -6,12 +6,26 @@ export interface VideoStream {
   url: string;
 }
 
+/** HLS-адаптация видео (api.md §8.1): не null — манифест играем через hls.js. */
+export interface VideoHls {
+  manifest_url: string;
+}
+
+/** Ответ /videos/get-url (api.md §8.1, форма проверена curl'ом). */
 export interface VideoStreamsPayload {
   streams: VideoStream[];
   ttl_sec: number;
+  /** null — HLS-адаптации нет (Дзен всегда, YouTube при деградации): играем streams прогрессивно. */
+  hls: VideoHls | null;
+  /** Ответ получен с персональными cookies (анонимный запрос уперся в стену). Информационный флаг. */
+  cookies_used?: boolean;
 }
 
-/** Резолв «трек → видео» (api.md §8): video null — клипа нет, остаёмся на аудио. */
+/**
+ * Резолв «трек → видео» (api.md §8): video null — клипа нет, остаёмся на аудио.
+ * hls здесь нет (проверено curl'ом): streams — для немедленного старта,
+ * полный ответ с hls добираем get-url'ом сразу после старта.
+ */
 export interface ResolveVideoPayload {
   video: VideoSnapshot | null;
   streams: VideoStream[];

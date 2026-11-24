@@ -38,6 +38,10 @@ export default defineComponent({
       clipQuality,
       clipQualities,
       clipStreams,
+      clipHlsHeights,
+      clipHlsAuto,
+      clipAudioId,
+      clipAudioTracks,
       queue,
       queueLoaded,
     } = storeToRefs(player);
@@ -63,6 +67,8 @@ export default defineComponent({
       seekRatio,
       toggleClips,
       setClipQuality,
+      setClipQualityAuto,
+      setClipAudioId,
       ensureQueue,
       removeQueueItem,
       reorderQueue,
@@ -142,19 +148,36 @@ export default defineComponent({
     const sortDrag = ref<ListSortState | null>(null);
     const rootEl = ref<HTMLElement | null>(null);
     const qualityOpen = ref(false);
+    const audioOpen = ref(false);
     const clipIdle = ref(false);
     const isFullscreen = ref(false);
     const clipIdleDelay = 5000;
     let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    /** HLS-манифест жив (высоты приехали) — селекты качества/дорожек работают в HLS-режиме. */
+    const clipHlsActive = computed(() => clipHlsHeights.value.length > 0);
+    /** Активная дорожка: выбранная, иначе default из манифеста, иначе первая. */
+    const activeAudioId = computed(
+      () =>
+        clipAudioId.value ??
+        clipAudioTracks.value.find((track) => track.default)?.id ??
+        clipAudioTracks.value[0]?.id ??
+        null,
+    );
+    const activeAudioLabel = computed(
+      () => clipAudioTracks.value.find((track) => track.id === activeAudioId.value)?.label ?? '',
+    );
 
     /** Хост для видео-элемента клипа: композабл крепит/снимает его по этому ref. */
     const clipHostEl = ref<HTMLElement | null>(null);
     watch(clipHostEl, (el) => setClipHost(el));
     const clipTaps = clipTapHandlers();
 
-    /** Качества, реально приехавшие в потоках /videos/get-url — остальные неактивны. */
+    /** Качества, реально приехавшие в потоках /videos/get-url — остальные неактивны.
+     *  В HLS-режиме пункты — высоты манифеста, все доступны. */
     const clipStreamQualities = computed(() => new Set(clipStreams.value.map((stream) => stream.quality)));
     function clipQualityAvailable(quality: number) {
+      if (clipHlsActive.value) return true;
       return clipStreamQualities.value.has(quality);
     }
 
@@ -164,18 +187,38 @@ export default defineComponent({
         clearTimeout(idleTimer);
         idleTimer = null;
       }
-      // Раскрытые очередь/текст не даём плееру уйти в простой — сначала закрыть слой.
-      if (clipMode.value && expanded.value && !qualityOpen.value && layer.value === 'now') {
+      // Раскрытые очередь/текст/селекты не даём плееру уйти в простой — сначала закрыть слой.
+      if (clipMode.value && expanded.value && !qualityOpen.value && !audioOpen.value && layer.value === 'now') {
         idleTimer = setTimeout(() => {
           clipIdle.value = true;
         }, clipIdleDelay);
       }
     }
 
+    function onQualityChip() {
+      qualityOpen.value = !qualityOpen.value;
+      audioOpen.value = false;
+    }
+
+    function onAudioChip() {
+      audioOpen.value = !audioOpen.value;
+      qualityOpen.value = false;
+    }
+
     function pickQuality(quality: number) {
       if (!clipQualityAvailable(quality)) return;
       setClipQuality(quality);
       qualityOpen.value = false;
+    }
+
+    function pickQualityAuto() {
+      setClipQualityAuto();
+      qualityOpen.value = false;
+    }
+
+    function pickAudio(id: string) {
+      setClipAudioId(id);
+      audioOpen.value = false;
     }
 
     function onFullscreenChange() {
@@ -191,7 +234,7 @@ export default defineComponent({
       void rootEl.value.requestFullscreen();
     }
 
-    watch([clipMode, expanded, qualityOpen, layer], wake);
+    watch([clipMode, expanded, qualityOpen, audioOpen, layer], wake);
 
     onMounted(() => {
       wake();
@@ -396,7 +439,13 @@ export default defineComponent({
       clipQualities,
       clipHostEl,
       clipQualityAvailable,
+      clipHlsActive,
+      clipHlsAuto,
+      clipAudioTracks,
+      activeAudioId,
+      activeAudioLabel,
       qualityOpen,
+      audioOpen,
       clipIdle,
       isFullscreen,
       queue,
@@ -438,7 +487,11 @@ export default defineComponent({
       playFromQueue,
       seekRatio,
       toggleClips,
+      onQualityChip,
+      onAudioChip,
       pickQuality,
+      pickQualityAuto,
+      pickAudio,
       toggleFullscreen,
       onTop,
       openQueue,
