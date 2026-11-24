@@ -10,3 +10,39 @@
 .wave-pill {
   cursor: pointer;
 }
+
+/* Видео под обложкой, пока нет кадра. Элемент крепится императивно. */
+.home-clip-host {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.home-clip-host.is-frame {
+  background: #000;
+}
+
+.home-clip-host :deep(.clip-video) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.home-clip-host :deep(.clip-video:not(.is-ready)) {
+  opacity: 0;
+}
+
+.home-cover {
+  z-index: 2;
+  pointer-events: none;
+}
+
+.home-cover.is-behind {
+  opacity: 0;
+}
+
+.cover :deep(.src),
+.cover > .clip-spinner {
+  z-index: 4;
+}

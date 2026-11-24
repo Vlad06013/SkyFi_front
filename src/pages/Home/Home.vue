@@ -25,7 +25,13 @@
           <span class="wave-flame-tongue wave-flame-tongue-3" />
         </div>
         <div class="cover" :style="{ background: current ? coverVar(current.source_type) : 'var(--gradient-cover-1)' }">
-          <img v-if="current?.type === 'track'" :src="trackCover(current)" alt="">
+          <div
+            v-if="clipActive"
+            :ref="onHomeClipHost"
+            class="home-clip-host"
+            :class="{ 'is-frame': clipFrameReady }"
+          />
+          <img v-if="coverSrc" class="home-cover" :class="{ 'is-behind': clipActive && clipFrameReady }" :src="coverSrc" alt="">
           <SourceBadge v-if="current" :source="current.source_type" />
           <div v-if="audioLoading || clipBuffering" class="clip-spinner" aria-hidden="true">
             <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">

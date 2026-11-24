@@ -62,6 +62,10 @@ let resumeTarget: number | null = null;
 const clipHost = ref<HTMLElement | null>(null);
 /** Хост в мини-плеере: сворачивание перекладывает видео сюда — клип поёт дальше. */
 const miniClipHost = ref<HTMLElement | null>(null);
+/** Хост на диске главной: мини-плеер там не смонтирован. */
+const homeClipHost = ref<HTMLElement | null>(null);
+/** Куда прячем элемент, пока видимого хоста нет: вынутый из документа video браузер ставит на паузу. */
+let playbackPark: HTMLElement | null = null;
 /** Элемент клипа ждёт данные при включённом воспроизведении — спиннер поверх видео. */
 export const clipBuffering = ref(false);
 /**
@@ -161,6 +165,19 @@ export function setClipHost(el: HTMLElement | null) {
 
 export function setMiniClipHost(el: HTMLElement | null) {
   miniClipHost.value = el;
+}
+
+export function setHomeClipHost(el: HTMLElement | null) {
+  homeClipHost.value = el;
+}
+
+function parkEl(): HTMLElement {
+  if (playbackPark?.isConnected) return playbackPark;
+  playbackPark = document.createElement('div');
+  playbackPark.setAttribute('aria-hidden', 'true');
+  playbackPark.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;overflow:hidden;pointer-events:none';
+  document.body.appendChild(playbackPark);
+  return playbackPark;
 }
 
 /** Видео-элемент клипа (singleton) — для чтения buffered в UI (шкала буфера). */
@@ -371,13 +388,17 @@ function activeStream(streams: { quality: number; url: string }[], preferred: nu
 function syncAttachment() {
   const el = ensureVideo();
   const player = usePlayerStore();
-  const host = clipHost.value ?? miniClipHost.value;
+  // Развёрнутый важнее мини, мини важнее диска главной.
+  const host = clipHost.value ?? miniClipHost.value ?? homeClipHost.value;
   const playable = player.clipStreams.length > 0 || player.clipHls != null;
   const show = host != null && player.clipPlaybackVideo != null && playable;
   if (show && host && el.parentElement !== host) host.appendChild(el);
-  // Из DOM убираем только когда играть нечего. Хоста нет (домашняя без
-  // мини-плеера) — элемент остаётся без родителя, воспроизведение продолжается.
-  if (!show && el.parentElement && (player.clipPlaybackVideo == null || !playable)) el.remove();
+  // Хост вот-вот уничтожит Vue (уход на главную снимает мини-плеер).
+  // Элемент без документа браузер ставит на паузу — держим его в парковке.
+  else if (!show && player.clipPlaybackVideo != null && playable) {
+    const holder = parkEl();
+    if (el.parentElement !== holder) holder.appendChild(el);
+  } else if (!show && el.parentElement) el.remove();
 }
 
 /** Перед протуханием ссылок (ttl_sec) догоняем потоки заново — src пересоздаётся с той же позиции. */
@@ -636,7 +657,7 @@ export function useVideoPlayback() {
   // Хосты появляются/исчезают с развёрнутым/мини-плеером, меняются потоки/
   // видео — элемент крепим/снимаем.
   watch(
-    [clipHost, miniClipHost, () => player.clipStreams.length, () => player.clipPlaybackVideo],
+    [clipHost, miniClipHost, homeClipHost, () => player.clipStreams.length, () => player.clipPlaybackVideo],
     () => syncAttachment(),
   );
 

@@ -168,6 +168,8 @@ export default defineComponent({
     });
 
     onBeforeUnmount(() => {
+      // Хост ещё в документе: уводим video до того, как Vue снимет узел и браузер поставит паузу.
+      setMiniClipHost(null);
       if (settleTimer) clearTimeout(settleTimer);
       window.removeEventListener('resize', onResize);
     });

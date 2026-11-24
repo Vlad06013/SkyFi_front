@@ -3,7 +3,7 @@ import { storeToRefs } from 'pinia';
 import { usePlayerStore } from '@/stores/player';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
-import { clipBuffering } from '@/composables/useVideoPlayback';
+import { clipBuffering, clipFrameReady, setHomeClipHost } from '@/composables/useVideoPlayback';
 import { coverVar, trackCover } from '@/lib/cover';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import OfflineBanner from '@/components/OfflineBanner/OfflineBanner.vue';
@@ -13,7 +13,7 @@ export default defineComponent({
   components: { SourceBadge, OfflineBanner },
   setup() {
     const player = usePlayerStore();
-    const { current, title, artist, progress, progressSmooth, audioLoading } = storeToRefs(player);
+    const { current, title, artist, progress, progressSmooth, audioLoading, clipActive } = storeToRefs(player);
     /** Фактическое воспроизведение (не мнение сервера) — для иконки и пламени. */
     const playing = computed(() => player.isPlaying);
     const { togglePlay, openExpanded, skipNext, skipPrevious } = player;
@@ -24,6 +24,16 @@ export default defineComponent({
     // снова её показывает (play_source меняется с 'wave').
     const showJoinWave = computed(() => player.state.play_source !== 'wave');
     const joinWave = player.joinWave;
+
+    const coverSrc = computed(() => {
+      const snap = current.value;
+      if (!snap) return '';
+      if (snap.type === 'track') return trackCover(snap);
+      return snap.cover_url ?? '';
+    });
+    function onHomeClipHost(el: unknown) {
+      setHomeClipHost(el instanceof HTMLElement ? el : null);
+    }
 
     const notifications = useNotificationsStore();
     const { hasUnread } = storeToRefs(notifications);
@@ -38,7 +48,11 @@ export default defineComponent({
       progress,
       progressSmooth,
       audioLoading,
+      clipActive,
       clipBuffering,
+      clipFrameReady,
+      coverSrc,
+      onHomeClipHost,
       showJoinWave,
       joinWave,
       togglePlay,
@@ -49,7 +63,6 @@ export default defineComponent({
       hasUnread,
       toggleBell,
       coverVar,
-      trackCover,
     };
   },
 });

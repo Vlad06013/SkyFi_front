@@ -143,7 +143,8 @@ export const usePlayerStore = defineStore('player', () => {
     queue.value = sortQueue(payload.queue ?? []);
     queueLoaded.value = true;
     anchorPosition();
-    reconcileBoot();
+    // Автопауза выключена: код на месте, вызов не стартует.
+    // reconcileBoot();
     void syncContextWithSource();
   }
 
@@ -629,7 +630,8 @@ export const usePlayerStore = defineStore('player', () => {
       reconcileTimer = null;
       // К тику всё могло переиграться (медленный буфер, тап) — перепроверяем.
       if (!playbackDesynced.value || engineLoading.value || streamWarming.value) return;
-      pauseToServer();
+      // Автопауза выключена: код на месте, вызов не стартует.
+      // pauseToServer();
     }, DESYNC_CONFIRM_MS);
   });
 

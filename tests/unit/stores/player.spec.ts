@@ -338,16 +338,15 @@ describe('stores/player: рассинхрон сервера с реальным
     expect(playSnapshotMock.mock.calls[0]?.[0]).toEqual(other);
   });
 
-  it('загрузка страницы: активное устройство, сервер играет — сразу честная пауза', async () => {
+  it('загрузка страницы: автопауза выключена — паузу не шлём', async () => {
     const player = desyncedPlayer();
     pausePlaybackMock.mockResolvedValue({ state: { ...player.state, is_playing: false }, queue: [] } as never);
 
     player.applyServerState({ state: { ...player.state, is_playing: true }, queue: [] }, { force: true });
     await Promise.resolve();
 
-    expect(pausePlaybackMock).toHaveBeenCalledTimes(1);
-    expect(player.state.is_playing).toBe(false);
-    expect(player.isPlaying).toBe(false);
+    expect(pausePlaybackMock).not.toHaveBeenCalled();
+    expect(player.state.is_playing).toBe(true);
   });
 
   it('загрузка страницы: неактивное устройство — паузу не шлём', async () => {
@@ -386,18 +385,17 @@ describe('stores/player: рассинхрон сервера с реальным
     player.applyServerState({ state: { ...player.state, is_playing: true }, queue: [] }, { force: true });
     await Promise.resolve();
 
-    expect(pausePlaybackMock).toHaveBeenCalledTimes(1);
+    expect(pausePlaybackMock).not.toHaveBeenCalled();
   });
 
-  it('реконсиляция: молчание подтверждено — реальная пауза, сервер узнаёт правду', async () => {
+  it('реконсиляция: автопауза выключена — молчание паузу не шлёт', async () => {
     const player = desyncedPlayer();
     pausePlaybackMock.mockResolvedValue({ state: { ...player.state, is_playing: false }, queue: [] } as never);
 
     await vi.advanceTimersByTimeAsync(3_200);
 
-    expect(pausePlaybackMock).toHaveBeenCalledTimes(1);
-    expect(player.state.is_playing).toBe(false);
-    expect(player.isPlaying).toBe(false);
+    expect(pausePlaybackMock).not.toHaveBeenCalled();
+    expect(player.state.is_playing).toBe(true);
   });
 
   it('реконсиляция: поток ещё грузится — паузу не шлём', async () => {
