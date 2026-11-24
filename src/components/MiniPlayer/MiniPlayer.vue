@@ -21,6 +21,13 @@
               :class="{ 'is-frame': clipFrameReady }"
               @dblclick="onClipDblTap"
             />
+            <img
+              v-if="index === 1 && clipActive && clipCover && pane.snapshot.type !== 'video'"
+              class="mp-cover"
+              :class="{ 'is-behind': clipFrameReady }"
+              :src="clipCover"
+              alt=""
+            >
             <template v-if="pane.snapshot.type === 'video'">
               <img
                 v-if="pane.snapshot.cover_url"

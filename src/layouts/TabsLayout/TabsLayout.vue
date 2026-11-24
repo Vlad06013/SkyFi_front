@@ -1,6 +1,6 @@
 <template>
   <div class="sky-shell" :class="{ 'is-wave': isHome }">
-    <div class="sky-body">
+    <div ref="bodyEl" class="sky-body">
       <router-view v-slot="{ Component }">
         <keep-alive>
           <component :is="Component" />

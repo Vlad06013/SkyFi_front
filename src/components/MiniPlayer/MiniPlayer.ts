@@ -18,8 +18,10 @@ export default defineComponent({
   components: { SourceBadge },
   setup() {
     const player = usePlayerStore();
-    const { current, previewNext, previewPrevious, progress, progressSmooth, clipActive, audioLoading } =
+    const { current, previewNext, previewPrevious, progress, progressSmooth, clipActive, clipPlaybackVideo, audioLoading } =
       storeToRefs(player);
+    /** Превью клипа на треке: обложка видео-снапшота, пока нет кадра. */
+    const clipCover = computed(() => clipPlaybackVideo.value?.cover_url ?? '');
     /** Фактическое воспроизведение (не мнение сервера) — для иконки плеера. */
     const playing = computed(() => player.isPlaying);
     const { togglePlay, openExpanded, skipRestartAfter } = player;
@@ -179,6 +181,7 @@ export default defineComponent({
       progress,
       progressSmooth,
       clipActive,
+      clipCover,
       clipHostEl,
       clipBuffering,
       audioLoading,

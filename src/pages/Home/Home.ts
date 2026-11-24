@@ -13,7 +13,8 @@ export default defineComponent({
   components: { SourceBadge, OfflineBanner },
   setup() {
     const player = usePlayerStore();
-    const { current, title, artist, progress, progressSmooth, audioLoading, clipActive } = storeToRefs(player);
+    const { current, title, artist, progress, progressSmooth, audioLoading, clipActive, clipPlaybackVideo } =
+      storeToRefs(player);
     /** Фактическое воспроизведение (не мнение сервера) — для иконки и пламени. */
     const playing = computed(() => player.isPlaying);
     const { togglePlay, openExpanded, skipNext, skipPrevious } = player;
@@ -26,6 +27,8 @@ export default defineComponent({
     const joinWave = player.joinWave;
 
     const coverSrc = computed(() => {
+      const videoCover = clipPlaybackVideo.value?.cover_url;
+      if (videoCover) return videoCover;
       const snap = current.value;
       if (!snap) return '';
       if (snap.type === 'track') return trackCover(snap);

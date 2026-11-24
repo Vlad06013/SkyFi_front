@@ -9,6 +9,7 @@ import { fetchFavorites } from '@/api/favorites';
 import { resolveNext, resolvePrevious, snapshotKey, SKIP_RESTART_AFTER, type EngineAction, type EngineContext } from '@/lib/playback-engine';
 import { moveItem } from '@/lib/list-sort';
 import { unlockMediaPlayback } from '@/lib/media-unlock';
+import { readPlayerDevicePrefs, writePlayerDevicePrefs } from '@/lib/player-prefs';
 import { favoriteTracks } from '@/mocks/catalog';
 import { mockPlayerState } from '@/mocks/player';
 import { onRealtimeReconnect } from '@/realtime';
@@ -737,6 +738,32 @@ export const usePlayerStore = defineStore('player', () => {
   // --- Производные для UI
 
   const current = computed(() => state.value.current_snapshot);
+
+  // Громкость и режим клипов живут в Preferences, как история поиска.
+  // Пока читаем сохранённое, жест пользователя важнее позднего ответа.
+  let prefsHydrating = true;
+  let volumeTouched = false;
+  let clipTouched = false;
+  let prefsTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function rememberPlayerPrefs() {
+    if (prefsHydrating) return;
+    if (prefsTimer) clearTimeout(prefsTimer);
+    prefsTimer = setTimeout(() => {
+      prefsTimer = null;
+      void writePlayerDevicePrefs({ volume: volume.value, clipMode: clipMode.value });
+    }, 200);
+  }
+
+  watch([volume, clipMode], rememberPlayerPrefs);
+
+  void readPlayerDevicePrefs().then((saved) => {
+    if (saved && !volumeTouched) volume.value = saved.volume;
+    if (saved && !clipTouched && current.value?.type !== 'video') clipMode.value = saved.clipMode;
+    const touched = volumeTouched || clipTouched;
+    prefsHydrating = false;
+    if (touched) rememberPlayerPrefs();
+  });
   const title = computed(() => current.value?.title ?? '');
   const artist = computed(() =>
     current.value?.artists.map((a) => a.name).join(', ') ?? '',
@@ -832,6 +859,7 @@ export const usePlayerStore = defineStore('player', () => {
   // --- Режим клипов (api.md §8): тогл — локальное UI-состояние, резолв — в useVideoPlayback
 
   function toggleClips() {
+    clipTouched = true;
     if (clipMode.value) {
       clipMode.value = false;
       clearClip();
@@ -958,6 +986,7 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   function setVolume(percent: number) {
+    volumeTouched = true;
     volume.value = Math.round(Math.min(100, Math.max(0, percent)));
   }
 

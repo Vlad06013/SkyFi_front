@@ -38,6 +38,7 @@ export default defineComponent({
       state,
       clipMode,
       clipActive,
+      clipPlaybackVideo,
       audioLoading,
       clipQuality,
       clipQualities,
@@ -51,10 +52,15 @@ export default defineComponent({
     } = storeToRefs(player);
     /** Фактическое воспроизведение (не мнение сервера) — для иконки и эквалайзера. */
     const playing = computed(() => player.isPlaying);
-    /** Фон клип-режима — превью текущего видео; пока нет видео/превью — чёрный фон. */
-    const clipPoster = computed(() =>
-      current.value && current.value.type === 'video' ? (current.value.cover_url ?? '') : '',
-    );
+    /** Фон клип-режима — обложка видео-снапшота. У трека это резолвнутый клип, не обложка аудио. */
+    const clipPoster = computed(() => {
+      const videoCover = clipPlaybackVideo.value?.cover_url;
+      if (videoCover) return videoCover;
+      const snap = current.value;
+      if (!snap) return '';
+      if (snap.type === 'track') return trackCover(snap);
+      return snap.cover_url ?? '';
+    });
     const { liked, toggleLike } = useSnapshotLike(() => player.current);
     const repeatLabel = computed(() => {
       if (state.value.repeat_mode === 'one') return 'повтор одного';

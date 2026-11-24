@@ -83,7 +83,7 @@ function mountPage() {
 
 async function typeAndSearch(wrapper: VueWrapper, value: string) {
   await wrapper.find('input').setValue(value);
-  await vi.advanceTimersByTimeAsync(400);
+  await vi.advanceTimersByTimeAsync(1000);
   await flushPromises();
 }
 
@@ -130,11 +130,11 @@ describe('pages/Search', () => {
     expect(fetchMock).not.toHaveBeenCalled();
 
     await wrapper.find('input').setValue('sum 41');
-    await vi.advanceTimersByTimeAsync(400);
+    await vi.advanceTimersByTimeAsync(1000);
     await flushPromises();
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith({ q: 'sum 41', limit: 20, page: 1 });
+    expect(fetchMock).toHaveBeenCalledWith({ q: 'sum 41', limit: 20, page: 1 }, expect.any(AbortSignal));
   });
 
   it('выдача: лучшее совпадение (название, обложка, is_favorite) и треки', async () => {
@@ -219,7 +219,7 @@ describe('pages/Search', () => {
     vmLoadMore(wrapper);
     await flushPromises();
 
-    expect(fetchMock).toHaveBeenLastCalledWith({ q: 'sum 41', limit: 20, page: 2 });
+    expect(fetchMock).toHaveBeenLastCalledWith({ q: 'sum 41', limit: 20, page: 2 }, expect.any(AbortSignal));
     expect(wrapper.findAll('.track-row')).toHaveLength(4);
     expect(wrapper.find('.more-sentinel').exists()).toBe(false);
   });
@@ -293,10 +293,10 @@ describe('pages/Search', () => {
     const chip = wrapper.findAll('.chip').find((c) => c.text() === 'би-2');
     expect(chip).toBeDefined();
     await chip!.trigger('click');
-    await vi.advanceTimersByTimeAsync(400);
+    await vi.advanceTimersByTimeAsync(1000);
     await flushPromises();
 
-    expect(fetchMock).toHaveBeenCalledWith({ q: 'би-2', limit: 20, page: 1 });
+    expect(fetchMock).toHaveBeenCalledWith({ q: 'би-2', limit: 20, page: 1 }, expect.any(AbortSignal));
   });
 
   it('крестик в поле очищает запрос и убирает выдачу', async () => {
@@ -306,7 +306,7 @@ describe('pages/Search', () => {
     expect(wrapper.find('.field-clear').exists()).toBe(true);
 
     await wrapper.find('.field-clear').trigger('click');
-    await vi.advanceTimersByTimeAsync(400);
+    await vi.advanceTimersByTimeAsync(1000);
     await flushPromises();
 
     expect((wrapper.find('input').element as HTMLInputElement).value).toBe('');

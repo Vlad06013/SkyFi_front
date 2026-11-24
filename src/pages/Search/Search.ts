@@ -23,7 +23,7 @@ type Section = 'best' | 'tracks' | 'albums' | 'artists' | 'playlists' | 'videos'
 type SearchSections = Omit<SearchPagePayload, 'query' | 'page' | 'best'>;
 
 const SEARCH_MIN_LENGTH = 2;
-const SEARCH_DEBOUNCE_MS = 350;
+const SEARCH_DEBOUNCE_MS = 1000;
 const TRACKS_PER_PAGE = 20;
 
 /** Догрузка страницы: секции дописываются (design/phone/search.html — «прокрутка вниз берёт page++»). */
@@ -80,6 +80,12 @@ export default defineComponent({
 
     let generation = 0;
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    let searchAbort: AbortController | null = null;
+
+    function abortSearch() {
+      searchAbort?.abort();
+      searchAbort = null;
+    }
 
     const trackResults = computed(() => result.value?.tracks.items ?? []);
     const albumResults = computed(() => result.value?.albums.items ?? []);
@@ -128,6 +134,9 @@ export default defineComponent({
     }
 
     async function search(page: number) {
+      abortSearch();
+      const controller = new AbortController();
+      searchAbort = controller;
       const gen = ++generation;
       lastRequestedPage.value = page;
       error.value = null;
@@ -138,8 +147,8 @@ export default defineComponent({
         loadingMore.value = true;
       }
       try {
-        const payload = await fetchSearch({ q: q.value, limit: TRACKS_PER_PAGE, page });
-        if (gen !== generation) return;
+        const payload = await fetchSearch({ q: q.value, limit: TRACKS_PER_PAGE, page }, controller.signal);
+        if (gen !== generation || controller.signal.aborted) return;
         result.value =
           page > 1 && result.value
             ? { ...payload, ...mergeSections(result.value, payload) }
@@ -152,7 +161,7 @@ export default defineComponent({
             .catch(() => undefined);
         }
       } catch (cause) {
-        if (gen !== generation) return;
+        if (gen !== generation || controller.signal.aborted) return;
         error.value = cause instanceof Error ? cause.message : 'Не удалось выполнить поиск.';
       } finally {
         if (gen === generation) {
@@ -174,9 +183,10 @@ export default defineComponent({
     watch(query, () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       error.value = null;
+      // Следующий символ делает летящий ответ неактуальным — обрываем его сразу.
+      abortSearch();
+      generation++;
       if (offline.value || q.value.length < SEARCH_MIN_LENGTH) {
-        // Гасим летящий запрос: его finally не тронет флаги (gen устарел).
-        generation++;
         loading.value = false;
         loadingMore.value = false;
         result.value = null;
@@ -212,7 +222,11 @@ export default defineComponent({
       observer.observe(el);
     });
 
-    onBeforeUnmount(() => observer?.disconnect());
+    onBeforeUnmount(() => {
+      observer?.disconnect();
+      if (debounceTimer) clearTimeout(debounceTimer);
+      abortSearch();
+    });
 
     onMounted(() => {
       void getSearchHistory()

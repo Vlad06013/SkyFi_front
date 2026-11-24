@@ -8,6 +8,6 @@ export interface SearchParams {
 }
 
 /** Поиск по каталогам (api.md §9). q 2–100 символов, может быть ссылкой на сущность Яндекса. */
-export function fetchSearch(params: SearchParams) {
-  return http.get<SearchPagePayload>('search', { params });
+export function fetchSearch(params: SearchParams, signal?: AbortSignal) {
+  return http.get<SearchPagePayload>('search', signal ? { params, signal } : { params });
 }
