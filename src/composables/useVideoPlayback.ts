@@ -89,6 +89,24 @@ function beginOpening() {
 /** Источник этого ролика уже в элементе — следующий playing можно показывать. */
 function armOpening() {
   armedGen = openGen;
+  const el = video;
+  if (el) revealPausedFrame(el);
+}
+
+/**
+ * Пауза после обновления страницы: playing не приходит, буфер уже есть,
+ * но обложка поиска остаётся вместо кадра на сохранённой позиции.
+ * Пока currentTime не на цели — не показываем чужой кадр.
+ */
+function revealPausedFrame(el: HTMLVideoElement) {
+  if (!openingArmed()) return;
+  if (!usePlayerStore().clipActive) return;
+  if (!el.paused && !el.ended) return;
+  if (resumeAt != null) return;
+  if (resumeTarget != null && Math.abs(el.currentTime - resumeTarget) > 1) return;
+  if (el.readyState < 2) return;
+  clipBuffering.value = false;
+  setClipFrameReady(true);
 }
 
 function openingArmed(): boolean {
@@ -634,14 +652,23 @@ export function useVideoPlayback() {
     });
     el.addEventListener('loadedmetadata', () => {
       if (resumeAt != null) {
-        el.currentTime = resumeAt;
+        const target = resumeAt;
         resumeAt = null;
+        if (Math.abs(el.currentTime - target) > 0.25) el.currentTime = target;
       }
+      revealPausedFrame(el);
+    });
+    el.addEventListener('seeked', () => {
+      revealPausedFrame(el);
+    });
+    el.addEventListener('loadeddata', () => {
+      revealPausedFrame(el);
     });
     el.addEventListener('canplay', () => {
       // Данные доехали — если play() после get-url отбраковали, пробуем ещё раз.
       // Прогрев здесь не снимаем: canplay ≠ кадр и ≠ playing.
       tryPlay(el);
+      revealPausedFrame(el);
     });
     el.addEventListener('waiting', () => {
       // Сталл при включённом воспроизведении — показываем спиннер; на паузе
@@ -662,8 +689,10 @@ export function useVideoPlayback() {
     el.addEventListener('pause', () => {
       const store = usePlayerStore();
       if (store.clipActive) store.setAudioPlaying(false);
-      // Пауза элемента на смене src не снимает спиннер с новой обложки.
-      if (openingArmed()) clipBuffering.value = false;
+      // Сервер уже на паузе — крутить нечего, даже если playing так и не было
+      // (обновление страницы в play: автоплей не стартовал, буфер на месте).
+      if (!store.state.is_playing) clipBuffering.value = false;
+      revealPausedFrame(el);
     });
     el.addEventListener('error', () => handleStreamError());
     el.addEventListener('timeupdate', () => {
