@@ -1056,7 +1056,10 @@
   width: 0;
   background: linear-gradient(90deg, rgba(30,215,96,.16), rgba(30,215,96,.38));
   pointer-events: none;
-  /* Та же тиковая позиция, что и в мини-плеере — заполняем плавно, а не рывками. */
+  transition: none;
+}
+/* Как у нижнего плеера: плавно только между тиками воспроизведения. */
+.wave-pill-fill.is-smooth {
   transition: width 1s linear;
 }
 .wave-pill-text {

@@ -27,10 +27,16 @@
         <div class="cover" :style="{ background: current ? coverVar(current.source_type) : 'var(--gradient-cover-1)' }">
           <img v-if="current?.type === 'track'" :src="trackCover(current)" alt="">
           <SourceBadge v-if="current" :source="current.source_type" />
+          <div v-if="audioLoading || clipBuffering" class="clip-spinner" aria-hidden="true">
+            <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <circle cx="12" cy="12" r="8" opacity=".25" />
+              <path d="M12 4a8 8 0 0 1 8 8" stroke-linecap="round" />
+            </svg>
+          </div>
         </div>
       </div>
       <div class="wave-pill" role="button" tabindex="0" aria-label="развернуть плеер" @click="openExpanded">
-        <span class="wave-pill-fill" :style="{ width: progress + '%' }" />
+        <span class="wave-pill-fill" :class="{ 'is-smooth': progressSmooth }" :style="{ width: progress + '%' }" />
         <span class="wave-pill-text">{{ artist }} — {{ title }}</span>
         <button class="icon-btn" :class="{ liked }" type="button" aria-label="в избранном" @click.stop="toggleLike">
           <svg viewBox="0 0 24 24" fill="currentColor">

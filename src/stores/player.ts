@@ -539,6 +539,15 @@ export const usePlayerStore = defineStore('player', () => {
     streamWarming.value = warming;
   }
 
+  /** Трек ещё без звука: качается ссылка или поток. Клип сюда не входит. */
+  const audioLoading = computed(
+    () =>
+      !clipActive.value &&
+      current.value?.type === 'track' &&
+      state.value.is_playing &&
+      (engineLoading.value || streamWarming.value),
+  );
+
   // --- Подмена значка: фактическое воспроизведение против мнения сервера
 
   /**
@@ -750,6 +759,18 @@ export const usePlayerStore = defineStore('player', () => {
     const duration = durationSeconds.value;
     if (!duration) return 0;
     return Math.min(100, (extrapolatedPosition.value / duration) * 100);
+  });
+  /**
+   * Плавное заполнение только на тике воспроизведения (~1 с).
+   * Сброс в 0, старт с позиции и seek — сразу, без доезда.
+   */
+  const progressSmooth = ref(false);
+  watch(progress, (next, prev) => {
+    const step = next - (prev ?? 0);
+    const duration = durationSeconds.value;
+    const tickPct = duration > 0 ? (1.5 / duration) * 100 : 0;
+    const flowing = isPlaying.value && audioPlaying.value && !engineLoading.value && !streamWarming.value;
+    progressSmooth.value = flowing && step > 0 && step <= tickPct;
   });
 
   // --- Seek: локально сразу, на сервер — одним запросом после остановки драга
@@ -1001,11 +1022,13 @@ export const usePlayerStore = defineStore('player', () => {
     album,
     durationSeconds,
     progress,
+    progressSmooth,
     positionSeconds,
     audioPlaying,
     engineKick,
     engineLoading,
     streamWarming,
+    audioLoading,
     isPlaying,
     setAudioPlaying,
     setEngineLoading,

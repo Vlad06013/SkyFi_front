@@ -3,6 +3,7 @@ import { storeToRefs } from 'pinia';
 import { usePlayerStore } from '@/stores/player';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
+import { clipBuffering } from '@/composables/useVideoPlayback';
 import { coverVar, trackCover } from '@/lib/cover';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import OfflineBanner from '@/components/OfflineBanner/OfflineBanner.vue';
@@ -12,7 +13,7 @@ export default defineComponent({
   components: { SourceBadge, OfflineBanner },
   setup() {
     const player = usePlayerStore();
-    const { current, title, artist, progress } = storeToRefs(player);
+    const { current, title, artist, progress, progressSmooth, audioLoading } = storeToRefs(player);
     /** Фактическое воспроизведение (не мнение сервера) — для иконки и пламени. */
     const playing = computed(() => player.isPlaying);
     const { togglePlay, openExpanded, skipNext, skipPrevious } = player;
@@ -35,6 +36,9 @@ export default defineComponent({
       liked,
       playing,
       progress,
+      progressSmooth,
+      audioLoading,
+      clipBuffering,
       showJoinWave,
       joinWave,
       togglePlay,

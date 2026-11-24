@@ -18,19 +18,8 @@ export default defineComponent({
   components: { SourceBadge },
   setup() {
     const player = usePlayerStore();
-    const { current, previewNext, previewPrevious, progress, clipActive } = storeToRefs(player);
-    /**
-     * Плавное заполнение только на тике воспроизведения (~1 с).
-     * Сброс в 0, старт с позиции и seek ставят ширину сразу.
-     */
-    const barSmooth = ref(false);
-    watch(progress, (next, prev) => {
-      const step = next - (prev ?? 0);
-      const duration = player.durationSeconds;
-      const tickPct = duration > 0 ? (1.5 / duration) * 100 : 0;
-      const flowing = player.isPlaying && player.audioPlaying && !player.engineLoading && !player.streamWarming;
-      barSmooth.value = flowing && step > 0 && step <= tickPct;
-    });
+    const { current, previewNext, previewPrevious, progress, progressSmooth, clipActive, audioLoading } =
+      storeToRefs(player);
     /** Фактическое воспроизведение (не мнение сервера) — для иконки плеера. */
     const playing = computed(() => player.isPlaying);
     const { togglePlay, openExpanded, skipRestartAfter } = player;
@@ -189,10 +178,11 @@ export default defineComponent({
       playing,
       panes,
       progress,
-      barSmooth,
+      progressSmooth,
       clipActive,
       clipHostEl,
       clipBuffering,
+      audioLoading,
       clipFrameReady,
       onClipHost,
       onClipTap,
