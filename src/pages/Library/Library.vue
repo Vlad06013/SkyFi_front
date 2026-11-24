@@ -69,6 +69,7 @@
         :cover="trackCover(track)"
         :playing="isPlaying(track)"
         :downloaded="isDownloaded(track)"
+        :duration-ms="track.duration_ms"
         sortable
         :dragging="sortDrag?.from === index"
         :drag-style="sortRowStyle(index, sortDrag)"
@@ -131,6 +132,7 @@
         :source="video.source_type"
         :cover="video.cover_url ?? ''"
         :playing="isPlayingVideo(video)"
+        :duration-ms="video.duration_ms"
         @open="player.playOrToggle(video, playSourceFavorites, { contextItems: videos })"
         @menu="openSnapshotMenu($event, video, 'my-videos')"
       />
@@ -145,6 +147,7 @@
         :source="track.source_type"
         :cover="trackCover(track)"
         :playing="isPlaying(track)"
+        :duration-ms="track.duration_ms"
         @open="player.playOrToggle(track, playSourceUploads, { contextItems: uploads })"
         @menu="openSnapshotMenu($event, track, 'my-uploads')"
       />
@@ -160,6 +163,7 @@
         :cover="trackCover(track)"
         :playing="isPlaying(track)"
         :downloaded="true"
+        :duration-ms="track.duration_ms"
         @open="player.playOrToggle(track, playSourceSingle, { contextItems: downloaded })"
         @menu="openSnapshotMenu($event, track, 'my-downloaded')"
       />

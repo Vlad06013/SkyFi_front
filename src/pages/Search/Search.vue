@@ -84,6 +84,7 @@
           :round="best.type === 'artist'"
           :liked="best.is_favorite"
           :playing="isPlaying(best)"
+          :duration-ms="best.type === 'track' || best.type === 'video' ? best.duration_ms : null"
           @open="openResult(best, { playbackSource: playSourceSearch, contextItems: trackResults, contextRef: q })"
           @menu="openSnapshotMenu($event, best, snapshotMenuContext(best))"
         />
@@ -99,6 +100,7 @@
             :liked="track.is_favorite"
             :downloaded="downloads.isDownloaded(track)"
             :playing="isPlaying(track)"
+            :duration-ms="track.duration_ms"
             @open="openResult(track, { playbackSource: playSourceSearch, contextItems: trackResults, contextRef: q })"
             @menu="openSnapshotMenu($event, track, 'my-tracks')"
           />
@@ -161,6 +163,7 @@
             :cover="video.cover_url ?? ''"
             :liked="video.is_favorite"
             :playing="isPlaying(video)"
+            :duration-ms="video.duration_ms"
             @open="openResult(video, { playbackSource: playSourceSearch, contextItems: videoResults, contextRef: q })"
             @menu="openSnapshotMenu($event, video, 'my-videos')"
           />

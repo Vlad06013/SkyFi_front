@@ -77,6 +77,7 @@
       </svg>
     </button>
 
+    <span v-if="durationLabel" class="track-dur">{{ durationLabel }}</span>
     <button
       v-if="menuable"
       class="icon-btn more"

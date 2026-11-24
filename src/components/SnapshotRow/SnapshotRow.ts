@@ -1,6 +1,7 @@
 import { computed, defineComponent, type PropType } from 'vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { coverVar } from '@/lib/cover';
+import { formatTime } from '@/lib/time';
 import type { SnapshotSource } from '@/types';
 
 export type SnapshotRowKind = 'track' | 'video' | 'media';
@@ -28,6 +29,8 @@ export default defineComponent({
     sortable: { type: Boolean, default: false },
     removable: { type: Boolean, default: false },
     menuable: { type: Boolean, default: true },
+    /** Длительность трека/видео, мс. null — не показываем. */
+    durationMs: { type: Number as PropType<number | null>, default: null },
     dragging: { type: Boolean, default: false },
     dragStyle: { type: Object as PropType<Record<string, string> | undefined>, default: undefined },
   },
@@ -41,7 +44,12 @@ export default defineComponent({
 
     const isVideo = computed(() => props.kind === 'video');
     const isPlayable = computed(() => props.kind !== 'media');
+    const durationLabel = computed(() => {
+      const ms = props.durationMs;
+      if (ms == null || !Number.isFinite(ms) || ms < 0) return '';
+      return formatTime(ms / 1000);
+    });
 
-    return { emit, rootClass, isVideo, isPlayable, coverVar };
+    return { emit, rootClass, isVideo, isPlayable, coverVar, durationLabel };
   },
 });
