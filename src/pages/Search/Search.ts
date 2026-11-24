@@ -19,6 +19,7 @@ import { useToastStore } from '@/stores/toast';
 import type { AlbumSnapshot, AnySnapshot, SearchPagePayload, SearchSection, WithFavorite } from '@/types';
 
 type Section = 'best' | 'tracks' | 'albums' | 'artists' | 'playlists' | 'videos';
+type PagedSection = Exclude<Section, 'best'>;
 
 type SearchSections = Omit<SearchPagePayload, 'query' | 'page' | 'best'>;
 
@@ -73,6 +74,14 @@ export default defineComponent({
     const offline = computed(() => online.isOnline === false);
 
     const result = ref<SearchPagePayload | null>(null);
+    /** Секция ещё не кончилась: последняя страница принесла элементы. has_more не смотрим. */
+    const sectionContinues = ref<Record<PagedSection, boolean>>({
+      tracks: false,
+      albums: false,
+      artists: false,
+      playlists: false,
+      videos: false,
+    });
     const loading = ref(false);
     const loadingMore = ref(false);
     const error = ref<string | null>(null);
@@ -106,9 +115,18 @@ export default defineComponent({
     const sectionHasMore = computed(() => {
       if (!result.value || section.value === 'best') return false;
       if (loading.value || loadingMore.value || error.value) return false;
-      const sections: SearchSections = result.value;
-      return sections[section.value].has_more;
+      return sectionContinues.value[section.value];
     });
+
+    function rememberPage(payload: SearchPagePayload) {
+      sectionContinues.value = {
+        tracks: payload.tracks.items.length > 0,
+        albums: payload.albums.items.length > 0,
+        artists: payload.artists.items.length > 0,
+        playlists: payload.playlists.items.length > 0,
+        videos: payload.videos.items.length > 0,
+      };
+    }
 
     const bestTitle = computed(() => best.value?.title ?? '');
 
@@ -149,6 +167,7 @@ export default defineComponent({
       try {
         const payload = await fetchSearch({ q: q.value, limit: TRACKS_PER_PAGE, page }, controller.signal);
         if (gen !== generation || controller.signal.aborted) return;
+        rememberPage(payload);
         result.value =
           page > 1 && result.value
             ? { ...payload, ...mergeSections(result.value, payload) }

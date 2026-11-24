@@ -232,28 +232,41 @@ function ensureVideo(): HTMLVideoElement {
   return video;
 }
 
-/** Потоки текущего эффективного видео обновились — переприменить с сохранением позиции. */
+/**
+ * Позиция, с которой надо открыть поток. Пока seek на элемент не встал,
+ * currentTime ещё 0 — брать его нельзя, иначе get-url/HLS стартует клип
+ * сначала и тут же прячет обложку кадром с нуля.
+ */
+function resumeSeconds(explicit?: number): number {
+  if (explicit != null) return explicit;
+  if (resumeAt != null) return resumeAt;
+  const played = video && Number.isFinite(video.currentTime) ? video.currentTime : 0;
+  if (resumeTarget != null && played === 0 && Math.abs(played - resumeTarget) > 1) return resumeTarget;
+  if (played > 0) return played;
+  if (resumeTarget != null) return resumeTarget;
+  return usePlayerStore().state.position_seconds;
+}
+
+/** Потоки текущего эффективного видео обновились — переприменить с той же позицией. */
 function reapplyStreams() {
   if (!usePlayerStore().isActiveDevice) return;
-  applyStream();
+  applyStream(resumeSeconds());
 }
 
 function applyStream(resumePosition?: number) {
   const el = ensureVideo();
   const player = usePlayerStore();
+  const resume = resumeSeconds(resumePosition);
   // HLS сдался на этом видео (повторная ошибка) — доигрываем прогрессивом.
   const hls = progressiveOnlyKey === appliedKey ? null : player.clipHls;
   if (hls) {
-    applyHls(el, hls, resumePosition);
+    applyHls(el, hls, resume);
     syncAttachment();
     return;
   }
   // Позицию снимаем до detach: он пересоздаёт элемент и обнуляет currentTime.
-  // Без явной позиции (TTL, качество) остаёмся где играли. Новый ролик
-  // передаёт серверную позицию: currentTime элемента — это ещё прошлый ролик.
-  const resume =
-    resumePosition ??
-    (Number.isFinite(el.currentTime) && el.currentTime > 0 ? el.currentTime : 0);
+  // Новый ролик передаёт серверную позицию: currentTime элемента — это ещё
+  // прошлый ролик или ноль, пока seek не отыграл.
   if (hlsAttached) {
     hlsDetach();
     hlsAttached = false;

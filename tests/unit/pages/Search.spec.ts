@@ -182,7 +182,7 @@ describe('pages/Search', () => {
     expect(wrapper.text()).toContain('Ничего не найдено');
   });
 
-  it('догрузка по прокрутке: page++, треки дописываются, сентинел живёт при has_more', async () => {
+  it('догрузка по прокрутке: page++, пока страница не пустая, has_more не смотрим', async () => {
     fetchMock
       .mockResolvedValueOnce(
         makePayload({
@@ -193,7 +193,7 @@ describe('pages/Search', () => {
               { ...makeTrack('t2'), is_favorite: false },
             ],
             total: 4,
-            has_more: true,
+            has_more: false,
           },
         }),
       )
@@ -209,6 +209,12 @@ describe('pages/Search', () => {
             has_more: false,
           },
         }),
+      )
+      .mockResolvedValueOnce(
+        makePayload({
+          page: 3,
+          tracks: { items: [], total: 4, has_more: false },
+        }),
       );
     const wrapper = mountPage();
     await typeAndSearch(wrapper, 'sum 41');
@@ -220,6 +226,13 @@ describe('pages/Search', () => {
     await flushPromises();
 
     expect(fetchMock).toHaveBeenLastCalledWith({ q: 'sum 41', limit: 20, page: 2 }, expect.any(AbortSignal));
+    expect(wrapper.findAll('.track-row')).toHaveLength(4);
+    expect(wrapper.find('.more-sentinel').exists()).toBe(true);
+
+    vmLoadMore(wrapper);
+    await flushPromises();
+
+    expect(fetchMock).toHaveBeenLastCalledWith({ q: 'sum 41', limit: 20, page: 3 }, expect.any(AbortSignal));
     expect(wrapper.findAll('.track-row')).toHaveLength(4);
     expect(wrapper.find('.more-sentinel').exists()).toBe(false);
   });
