@@ -387,7 +387,13 @@ export const usePlayerStore = defineStore('player', () => {
     await playSnapshot(snapshot, playbackSource, opts);
   }
 
+  /** Второй toggle в тот же клик (кнопка паузы в клипе сносит иконку, клик проваливается на экран). */
+  let lastToggleAt = 0;
+
   async function togglePlay() {
+    const now = Date.now();
+    if (now - lastToggleAt < 400) return;
+    lastToggleAt = now;
     if (!canCommand.value) {
       state.value = { ...state.value, is_playing: !state.value.is_playing };
       anchorPosition();

@@ -36,6 +36,17 @@
   min-height: 36px;
 }
 
+/* Тот же тёмный фон, что у чипа «авто»: на светлом кадре голые иконки пропадают. */
+.now-top .icon-btn.ghost {
+  background: rgba(0,0,0,.55);
+  color: #fff;
+  border-radius: 999px;
+}
+
+.now-top .icon-btn.ghost:hover {
+  background: rgba(0,0,0,.72);
+}
+
 .now-stage {
   flex: 1;
   min-height: 0;

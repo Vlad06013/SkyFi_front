@@ -169,7 +169,7 @@
               <div class="track-artist">{{ artist }}</div>
             </div>
             <span v-if="playing" class="eq" aria-hidden="true"><i /><i /><i /></span>
-            <button class="fab small" type="button" :aria-label="playing ? 'пауза' : 'играть'" @click="togglePlay">
+            <button class="fab small" type="button" :aria-label="playing ? 'пауза' : 'играть'" @click.stop="togglePlay">
               <svg v-if="playing" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" />
               </svg>
@@ -269,7 +269,7 @@
         <span>{{ formatTime(durationSeconds) }}</span>
       </div>
 
-      <div class="p-controls">
+      <div class="p-controls" @click.stop>
         <div class="side">
           <button
             class="plain"
@@ -286,11 +286,11 @@
         <button class="plain" type="button" aria-label="назад" @click="skipPrevious">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 6.5 10 12l8 5.5zM6 6.5h2.5v11H6z" /></svg>
         </button>
-        <button class="fab" type="button" :aria-label="playing ? 'пауза' : 'играть'" @click="togglePlay">
-          <svg v-if="playing" viewBox="0 0 24 24" fill="currentColor">
+        <button class="fab" type="button" :aria-label="playing ? 'пауза' : 'играть'" @click.stop="togglePlay">
+          <svg v-show="playing" viewBox="0 0 24 24" fill="currentColor">
             <path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" />
           </svg>
-          <svg v-else viewBox="0 0 24 24" fill="currentColor">
+          <svg v-show="!playing" viewBox="0 0 24 24" fill="currentColor">
             <path d="M8 5.5v13l11-6.5z" />
           </svg>
         </button>
