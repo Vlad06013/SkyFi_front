@@ -19,7 +19,6 @@
               :ref="onClipHost"
               class="mp-clip-host"
               :class="{ 'is-frame': clipFrameReady }"
-              @click="onClipTap"
               @dblclick="onClipDblTap"
             />
             <template v-if="pane.snapshot.type === 'video'">

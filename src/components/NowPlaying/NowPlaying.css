@@ -166,6 +166,8 @@
 
 .now-playing.is-clip .now-playing-inner {
   transition: opacity .3s ease;
+  /* Превью и спиннер до кадра выше видео (z-index 2 и 4). Кнопки должны быть над ними. */
+  z-index: 5;
 }
 
 .now-playing.is-clip.is-clip-idle .now-playing-inner {

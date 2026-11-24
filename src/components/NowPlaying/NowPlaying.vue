@@ -6,6 +6,7 @@
     :class="{ 'is-dragging': playerDragging, 'is-clip': clipMode, 'is-clip-idle': clipIdle, 'has-frame': clipFrameReady }"
     :style="playerDragStyle"
     @pointerdown="onPlayerDragStart"
+    @pointermove="onClipPointerMove"
     @click="onClipTap"
     @dblclick="onClipDblTap"
   >

@@ -32,10 +32,7 @@ export default defineComponent({
       clipHostEl.value = el instanceof HTMLElement ? el : null;
     }
     const clipTaps = clipTapHandlers();
-    /** Тап по клипу в мини-плеере: одинарный — пауза/плей, двойной — полный экран. */
-    function onClipTap() {
-      clipTaps.click();
-    }
+    /** Двойной тап по клипу в мини-плеере — полный экран. Одинарный разворачивает плеер. */
     function onClipDblTap() {
       clipTaps.dblclick();
     }
@@ -119,9 +116,9 @@ export default defineComponent({
 
     function onDragStart(event: PointerEvent) {
       if (event.pointerType === 'mouse' && event.button !== 0) return;
-      // По клипу тап = пауза/плей, двойной — полный экран (см. useVideoPlayback) —
-      // не конфликтуем с жестом «тап разворачивает плеер».
-      if (event.target instanceof Element && event.target.closest('.icon-btn, .fab, .clip-video')) return;
+      // Лайк и play — свои кнопки. Картинка клипа тоже разворачивает плеер,
+      // а не ставит паузу: иначе тап по нижнему плееру в видео — ещё и тогл.
+      if (event.target instanceof Element && event.target.closest('.icon-btn, .fab')) return;
       const el = trackEl.value;
       if (!el) return;
       startClientX = event.clientX;
@@ -187,7 +184,6 @@ export default defineComponent({
       audioLoading,
       clipFrameReady,
       onClipHost,
-      onClipTap,
       onClipDblTap,
       trackEl,
       coverVar,

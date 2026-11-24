@@ -157,6 +157,10 @@ export default defineComponent({
     const isFullscreen = ref(false);
     const clipIdleDelay = 5000;
     let idleTimer: ReturnType<typeof setTimeout> | null = null;
+    /** pointerdown уже снял простой — клик не должен в ту же жесту ставить паузу. */
+    let revealOnly = false;
+    /** Тап по нижнему плееру открывает этот слой и тот же click долетает сюда. */
+    let openedAt = 0;
 
     /** HLS-манифест жив (высоты приехали) — селекты качества/дорожек работают в HLS-режиме. */
     const clipHlsActive = computed(() => clipHlsHeights.value.length > 0);
@@ -227,9 +231,12 @@ export default defineComponent({
         clearTimeout(idleTimer);
         idleTimer = null;
       }
+      // Спиннер и пауза: кнопки остаются. Простое только пока видео реально играет.
+      if (clipBuffering.value || !playing.value) return;
       // Раскрытые очередь/текст/селекты не даём плееру уйти в простой — сначала закрыть слой.
       if (clipMode.value && expanded.value && !qualityOpen.value && !audioOpen.value && layer.value === 'now') {
         idleTimer = setTimeout(() => {
+          if (clipBuffering.value || !playing.value) return;
           clipIdle.value = true;
         }, clipIdleDelay);
       }
@@ -273,6 +280,12 @@ export default defineComponent({
       }
       void rootEl.value.requestFullscreen();
     }
+
+    watch(expanded, (open) => {
+      if (open) openedAt = Date.now();
+    });
+
+    watch([clipBuffering, playing], wake);
 
     watch([clipMode, expanded, qualityOpen, audioOpen, layer], wake);
 
@@ -375,25 +388,44 @@ export default defineComponent({
 
     /**
      * Тап по области клипа: одинарный — пауза/плей, двойной — полный экран.
-     * Вешается на корень: в развёрнутом плеере до самого видео тап не доходит
-     * (слоёный UI поверх), а в простое (is-clip-idle) клики идут через
-     * pointer-events:none слоя — в обоих случаях событие всплывает сюда.
+     * Скрытый плеер клик только показывает: пауза была бы на том же жесте,
+     * потому что pointerdown уже снял простой. Вешается на корень: в
+     * развёрнутом плеере до самого видео тап не доходит (слоёный UI поверх),
+     * а в простое клики идут через pointer-events:none слоя.
      */
     function onClipTap(event: MouseEvent) {
       if (!clipMode.value || layer.value !== 'now') return;
       if (isNoDragTarget(event.target)) return;
+      if (Date.now() - openedAt < 400) {
+        revealOnly = false;
+        return;
+      }
+      const onlyReveal = revealOnly || clipIdle.value;
+      revealOnly = false;
       wake();
+      if (onlyReveal) return;
       clipTaps.click();
     }
 
     function onClipDblTap(event: MouseEvent) {
       if (!clipMode.value || layer.value !== 'now') return;
       if (isNoDragTarget(event.target)) return;
+      if (revealOnly) {
+        revealOnly = false;
+        wake();
+        return;
+      }
       wake();
       clipTaps.dblclick();
     }
 
+    function onClipPointerMove(event: PointerEvent) {
+      if (!clipMode.value || event.pointerType !== 'mouse') return;
+      wake();
+    }
+
     function onPlayerDragStart(event: PointerEvent) {
+      revealOnly = clipIdle.value;
       wake();
       if (sheet.value) return;
       if (event.pointerType === 'mouse' && event.button !== 0) return;
@@ -543,6 +575,7 @@ export default defineComponent({
       openNowMenu,
       onClipTap,
       onClipDblTap,
+      onClipPointerMove,
       onPlayerDragStart,
       onSortStart,
       onQueueDragStart,
