@@ -33,6 +33,8 @@ export default defineComponent({
       { id: 'linux', title: 'Linux', idle: 'AppImage' },
       { id: 'windows', title: 'Windows', idle: 'установщик' },
     ] as const;
+    // /tree/ открывает страницу GitHub, raw отдаёт сам файл skyFy.apk из dev_v2.
+    const APK_URL = 'https://github.com/Vlad06013/SkyFi_front/raw/dev_v2/skyFy.apk';
 
     function openName() {
       draft.value = user.value?.name ?? '';
@@ -75,9 +77,13 @@ export default defineComponent({
       toast.show('SkyFi 1.5.0', 'обновлено');
     }
 
-    function downloadBuild(title: string) {
+    function downloadBuild(build: { id: string; title: string }) {
       sheet.value = null;
-      toast.show(title, 'скачиваем');
+      if (build.id === 'apk') {
+        window.open(APK_URL, '_blank', 'noopener');
+        return;
+      }
+      toast.show(build.title, 'сборки пока нет');
     }
 
     function clearDownloads() {

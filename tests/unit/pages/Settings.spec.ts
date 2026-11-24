@@ -132,4 +132,29 @@ describe('pages/Settings', () => {
     await qrRow!.trigger('click');
     expect(wrapper.findComponent(QrScannerSheet).props('open')).toBe(true);
   });
+
+  it('Android · APK скачивается файлом из ветки dev_v2', async () => {
+    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const wrapper = mount(Settings, {
+      global: {
+        plugins: [pinia],
+        stubs: {
+          AppBar: true,
+          AppSheet: { template: '<div><slot /></div>' },
+          SeekBar: true,
+          YandexCard: true,
+        },
+      },
+    });
+
+    const apkRow = wrapper.findAllComponents(SettingRow).find((row) => row.props('title') === 'Android · APK');
+    expect(apkRow).toBeDefined();
+    await apkRow!.trigger('click');
+
+    expect(open).toHaveBeenCalledWith(
+      'https://github.com/Vlad06013/SkyFi_front/raw/dev_v2/skyFy.apk',
+      '_blank',
+      'noopener',
+    );
+  });
 });

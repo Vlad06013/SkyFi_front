@@ -132,7 +132,7 @@
           :title="build.title"
           :idle="build.idle"
           clickable
-          @open="downloadBuild(build.title)"
+          @open="downloadBuild(build)"
         >
           <template #icon>
             <svg v-if="build.id === 'apk'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
