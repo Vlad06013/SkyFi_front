@@ -18,18 +18,24 @@
               v-if="index === 1 && clipActive"
               :ref="onClipHost"
               class="mp-clip-host"
+              :class="{ 'is-frame': clipFrameReady }"
               @click="onClipTap"
               @dblclick="onClipDblTap"
-            >
-              <div v-if="clipBuffering" class="clip-spinner" aria-hidden="true">
+            />
+            <template v-if="pane.snapshot.type === 'video'">
+              <img
+                v-if="pane.snapshot.cover_url"
+                class="mp-cover"
+                :class="{ 'is-behind': index === 1 && clipFrameReady }"
+                :src="pane.snapshot.cover_url"
+                alt=""
+              >
+              <div v-if="index === 1 && clipBuffering" class="clip-spinner" aria-hidden="true">
                 <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                   <circle cx="12" cy="12" r="8" opacity=".25" />
                   <path d="M12 4a8 8 0 0 1 8 8" stroke-linecap="round" />
                 </svg>
               </div>
-            </div>
-            <template v-if="pane.snapshot.type === 'video'">
-              <img v-if="pane.snapshot.cover_url" class="mp-cover" :src="pane.snapshot.cover_url" alt="">
               <span class="vid-badge" aria-hidden="true">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                   <rect x="3" y="6" width="18" height="12" rx="2" />
@@ -65,7 +71,7 @@
               <path d="M8 5.5v13l11-6.5z" />
             </svg>
           </span>
-          <div class="bar"><i :style="{ width: progress + '%' }" /></div>
+          <div class="bar" :class="{ 'is-smooth': barSmooth }"><i :style="{ width: progress + '%' }" /></div>
         </div>
       </div>
     </div>

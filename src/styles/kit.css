@@ -170,7 +170,10 @@
 .mini-player .bar i {
   display: block; height: 100%; width: 38%;
   background: linear-gradient(90deg, rgba(30,215,96,.16), rgba(30,215,96,.38));
-  /* Позиция прилетает тиками ~1 раз/сек — линейный переход превращает их в плавное заполнение. */
+  transition: none;
+}
+/* Плавность только между тиками реального воспроизведения. Сброс и seek — мгновенно. */
+.mini-player .bar.is-smooth i {
   transition: width 1s linear;
 }
 
@@ -220,6 +223,10 @@
   width: 100%; height: 100%;
   object-fit: cover; display: block;
 }
+/* Пока нет кадра нового ролика, превью выше видео: смена не вспыхивает чёрным. */
+.is-clip:not(.has-frame) .clip-bg { z-index: 2; pointer-events: none; }
+.is-clip:not(.has-frame) .clip-video { z-index: 1; }
+.is-clip:not(.has-frame) .clip-spinner { z-index: 4; }
 .is-clip .clip-scrim {
   position: absolute; inset: 0; pointer-events: none;
   background: linear-gradient(180deg, rgba(0,0,0,.42) 0%, rgba(0,0,0,.08) 30%, rgba(0,0,0,.4) 58%, rgba(0,0,0,.88) 100%);
@@ -229,6 +236,10 @@
   width: 100%; height: 100%;
   object-fit: cover; display: block;
   background: #000;
+}
+/* До первого кадра элемент не рисуем: под ним остаётся обложка (.clip-bg). */
+.is-clip .clip-video:not(.is-ready) {
+  opacity: 0;
 }
 /* Спиннер буферизации поверх клипа: элемент ждёт данные при включённом
    воспроизведении (waiting). Указатель прозрачен — тапы идут в видео. */

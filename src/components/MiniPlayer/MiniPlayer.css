@@ -22,19 +22,35 @@
 }
 
 .mp-cover {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+  z-index: 2;
+  pointer-events: none;
 }
 
-/* Клип в мини-плеере: хост лежит поверх обложки, thumb сам его обрезает
+/* Кадр готов — обложка уходит под видео, а не остаётся сверху. */
+.mp-cover.is-behind {
+  opacity: 0;
+}
+
+.thumb .vid-badge {
+  z-index: 2;
+}
+
+/* Хост под обложкой, пока нет кадра (обложка z-index выше). Thumb обрезает
    по скруглению. Видео-элемент создаётся императивно — стиль через :deep. */
 .mp-clip-host {
   position: absolute;
   inset: 0;
-  background: #000;
   z-index: 1;
+}
+
+.mp-clip-host.is-frame {
+  background: #000;
 }
 
 .mp-clip-host :deep(.clip-video) {
@@ -44,8 +60,18 @@
   display: block;
 }
 
+.mp-clip-host :deep(.clip-video:not(.is-ready)) {
+  opacity: 0;
+}
+
+/* Спиннер выше обложки: хост под ней, пока нет кадра. */
+.thumb > .clip-spinner {
+  z-index: 3;
+}
+
 /* В мини-плеере спиннер компактнее — thumb маленький. */
-.mp-clip-host .clip-spinner .spin {
+.mp-clip-host .clip-spinner .spin,
+.thumb > .clip-spinner .spin {
   width: 20px;
   height: 20px;
   padding: 5px;

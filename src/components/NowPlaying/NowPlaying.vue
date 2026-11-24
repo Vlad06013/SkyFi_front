@@ -3,7 +3,7 @@
     v-if="expanded && current"
     ref="rootEl"
     class="now-playing"
-    :class="{ 'is-dragging': playerDragging, 'is-clip': clipMode, 'is-clip-idle': clipIdle }"
+    :class="{ 'is-dragging': playerDragging, 'is-clip': clipMode, 'is-clip-idle': clipIdle, 'has-frame': clipFrameReady }"
     :style="playerDragStyle"
     @pointerdown="onPlayerDragStart"
     @click="onClipTap"

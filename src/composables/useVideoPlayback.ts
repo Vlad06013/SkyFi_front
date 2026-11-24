@@ -3,6 +3,7 @@ import { fetchVideoStreams, resolveVideo } from '@/api/videos';
 import type { VideoHls } from '@/api/videos';
 import { ApiError } from '@/api/http';
 import { hlsDetach, hlsLoad, hlsResume, hlsSetAudioTrack, hlsSetQuality, hlsSupported, setHlsHooks } from '@/lib/hls-engine';
+import { afterMediaUnlock } from '@/lib/media-unlock';
 import { snapshotKey } from '@/lib/playback-engine';
 import { useOnlineStore } from '@/stores/online';
 import { usePlayerStore } from '@/stores/player';
@@ -51,6 +52,11 @@ let resolveAbort: AbortController | null = null;
 let ttlTimer: ReturnType<typeof setTimeout> | null = null;
 /** Позиция для восстановления после смены качества/продления: src пересоздаёт поток. */
 let resumeAt: number | null = null;
+/**
+ * Куда должен встать новый источник. timeupdate прошлого currentTime
+ * (элемент ещё на старой секунде) в якорь не берём, пока не окажемся рядом.
+ */
+let resumeTarget: number | null = null;
 
 /** Хост в развёрнутом плеере: сюда крепится видео-элемент (null — свёрнут/не клип). */
 const clipHost = ref<HTMLElement | null>(null);
@@ -58,6 +64,72 @@ const clipHost = ref<HTMLElement | null>(null);
 const miniClipHost = ref<HTMLElement | null>(null);
 /** Элемент клипа ждёт данные при включённом воспроизведении — спиннер поверх видео. */
 export const clipBuffering = ref(false);
+/**
+ * Первый кадр уже показан. До этого видео скрыто: чёрный кадр MSE не должен
+ * закрывать обложку. Обложка стоит, пока не придёт реальный кадр.
+ */
+export const clipFrameReady = ref(false);
+/** Смена потока отменяет опоздавший колбэк кадра предыдущего ролика. */
+let frameToken = 0;
+/**
+ * Поколение открытия ролика. Пока новый источник не встал в элемент,
+ * playing/pause старого кадра не должны вернуть чёрный кадр и снять спиннер.
+ */
+let openGen = 0;
+let armedGen = 0;
+
+/** Новое видео: обложка сразу, спиннер на ней, прошлый кадр спрятан. */
+function beginOpening() {
+  openGen += 1;
+  armedGen = 0;
+  setClipFrameReady(false);
+  if (usePlayerStore().state.is_playing) clipBuffering.value = true;
+}
+
+/** Источник этого ролика уже в элементе — следующий playing можно показывать. */
+function armOpening() {
+  armedGen = openGen;
+}
+
+function openingArmed(): boolean {
+  return armedGen !== 0 && armedGen === openGen;
+}
+
+function setClipFrameReady(ready: boolean) {
+  if (!ready) frameToken += 1;
+  clipFrameReady.value = ready;
+  video?.classList.toggle('is-ready', ready);
+}
+
+/** Кадр на экране, не просто canplay: MSE часто отдаёт чёрный буфер раньше картинки. */
+function armFirstFrame(el: HTMLVideoElement) {
+  const token = ++frameToken;
+  const mark = () => {
+    if (token !== frameToken) return;
+    clipFrameReady.value = true;
+    el.classList.add('is-ready');
+  };
+  if (typeof el.requestVideoFrameCallback === 'function') el.requestVideoFrameCallback(() => mark());
+  else mark();
+}
+
+/**
+ * Старт или повтор play(). Прогрев держим до события playing: canplay на
+ * холодном HLS приходит задолго до картинки, и реконсиляция успевает
+ * поставить паузу. Жест тапа к этому моменту уже истёк — ждём разлочку.
+ */
+function tryPlay(el: HTMLVideoElement) {
+  const player = usePlayerStore();
+  if (!player.isActiveDevice || !player.state.is_playing || player.clipPlaybackVideo == null) return;
+  if (!el.paused && !el.ended) return;
+  player.setStreamWarming(true);
+  afterMediaUnlock(() => {
+    const store = usePlayerStore();
+    if (!store.isActiveDevice || !store.state.is_playing || el.ended) return;
+    if (!el.paused) return;
+    void el.play().catch(() => undefined);
+  });
+}
 
 setHlsHooks({
   onError: () => handleStreamError(),
@@ -142,9 +214,11 @@ function applyStream(resumePosition?: number) {
     return;
   }
   // Позицию снимаем до detach: он пересоздаёт элемент и обнуляет currentTime.
+  // Без явной позиции (TTL, качество) остаёмся где играли. Новый ролик
+  // передаёт серверную позицию: currentTime элемента — это ещё прошлый ролик.
   const resume =
     resumePosition ??
-    (Number.isFinite(el.currentTime) && el.currentTime > 0 ? el.currentTime : null);
+    (Number.isFinite(el.currentTime) && el.currentTime > 0 ? el.currentTime : 0);
   if (hlsAttached) {
     hlsDetach();
     hlsAttached = false;
@@ -155,8 +229,13 @@ function applyStream(resumePosition?: number) {
   // Свежий клип на треке стартует с серверной позиции трека; смена качества
   // и продление TTL — с текущей позиции элемента.
   resumeAt = resume;
+  resumeTarget = resume;
   el.src = stream.url;
-  if (player.isActiveDevice && player.state.is_playing) void el.play().catch(() => undefined);
+  // Новый источник — обложка снова вместо кадра, пока playing не наступит.
+  setClipFrameReady(false);
+  armOpening();
+  player.setStreamWarming(true);
+  tryPlay(el);
   syncAttachment();
 }
 
@@ -165,12 +244,23 @@ function applyHls(el: HTMLVideoElement, hls: VideoHls, resumePosition?: number) 
   const player = usePlayerStore();
   hlsSetAudioTrack(player.clipAudioId);
   hlsSetQuality({ auto: player.clipHlsAuto, height: player.clipQuality });
+  // Новый манифест или ещё не играем — ждём playing. Повтор того же
+  // манифеста на живом кадре прогрев не трогает.
   const switching = appliedManifest !== hls.manifest_url;
+  if (switching) setClipFrameReady(false);
+  if (switching || el.paused) player.setStreamWarming(true);
+  // Явная позиция (новый ролик — серверные секунды, часто 0) важнее currentTime:
+  // на том же элементе там ещё хвост предыдущего видео.
+  const resume =
+    resumePosition != null
+      ? resumePosition
+      : Number.isFinite(el.currentTime) && el.currentTime > 0
+        ? el.currentTime
+        : 0;
   if (switching) {
     // Аттач/смена манифеста рестартуют поток: позицию ловит loadedmetadata (resumeAt).
-    resumeAt =
-      resumePosition ??
-      (Number.isFinite(el.currentTime) && el.currentTime > 0 ? el.currentTime : null);
+    resumeAt = resume;
+    resumeTarget = resume;
   }
   void (async () => {
     // MSE нет (старый WebView) — манифест не поднять, честный фолбэк на прогрессив.
@@ -178,17 +268,16 @@ function applyHls(el: HTMLVideoElement, hls: VideoHls, resumePosition?: number) 
       handleStreamError();
       return;
     }
-    const attached = await hlsLoad(el, hls.manifest_url);
+    const attached = await hlsLoad(el, hls.manifest_url, switching ? resume : undefined);
     appliedManifest = hls.manifest_url;
     hlsAttached = true;
     // Манифест тот же (ретрай get-url после фатальной ошибки): источник не
     // пересоздаётся — будим остановленную hls.js загрузку.
     if (!attached) hlsResume();
+    // События до этой точки — ещё прошлый ролик (чёрный кадр / его playing).
+    armOpening();
     // Аттач асинхронный (ленивый hls.js): вотчер is_playing уже отстрелил — догоняем плей.
-    const store = usePlayerStore();
-    if (attached && store.isActiveDevice && store.state.is_playing) {
-      void el.play().catch(() => undefined);
-    }
+    tryPlay(el);
   })().catch(() => handleStreamError());
 }
 
@@ -199,6 +288,8 @@ function applyHls(el: HTMLVideoElement, hls: VideoHls, resumePosition?: number) 
  */
 function handleStreamError() {
   const store = usePlayerStore();
+  // Попытка закончилась ошибкой: прогрев снят, ретрай/фолбэк выставит заново.
+  store.setStreamWarming(false);
   if (store.current?.type === 'video') {
     // Чистое видео из выдачи: аудио-фолбэка нет — только глушим флаг звучания.
     store.setAudioPlaying(false);
@@ -319,6 +410,8 @@ export function useVideoPlayback() {
     if (!player.isActiveDevice || !snapshot) {
       el.pause();
       clipBuffering.value = false;
+      setClipFrameReady(false);
+      player.setStreamWarming(false);
       if (hlsAttached) {
         hlsDetach();
         hlsAttached = false;
@@ -343,11 +436,15 @@ export function useVideoPlayback() {
     if (player.clipVideo && snapshotKey(player.clipVideo) === key) {
       loadedKey = key;
       appliedKey = key;
+      beginOpening();
       applyStream(player.positionSeconds);
       syncAttachment();
       return;
     }
     loadedKey = key;
+    // До get-url: прошлый is-ready кадр иначе лежит чёрным поверх новой обложки,
+    // а спиннер ждёт waiting и появляется уже на чёрном.
+    beginOpening();
     loadAbort?.abort();
     const controller = new AbortController();
     loadAbort = controller;
@@ -364,12 +461,16 @@ export function useVideoPlayback() {
       player.setClipStreams(payload.streams);
       player.setClipHls(payload.hls);
       if (!payload.hls) player.clampClipQualityToStreams();
-      applyStream();
+      // Сервер на play уже прислал 0. currentTime элемента — минута прошлого ролика.
+      applyStream(player.state.position_seconds);
       scheduleTtlRefresh(payload.ttl_sec, snapshot);
     } catch (cause) {
       // Отменён следующим запросом — не ошибка, молча выходим.
       if (controller.signal.aborted) return;
-      if (loadedKey === key) loadedKey = null;
+      if (loadedKey === key) {
+        loadedKey = null;
+        clipBuffering.value = false;
+      }
       if (!(await maybeHintCookies(cause, key))) {
         toast.show(cause instanceof Error ? cause.message : 'Не удалось загрузить видео', '', true);
       }
@@ -450,7 +551,7 @@ export function useVideoPlayback() {
         void loadVideo(player.clipPlaybackVideo);
         return;
       }
-      if (shouldPlay) void el.play().catch(() => undefined);
+      if (shouldPlay) tryPlay(el);
       else el.pause();
     },
   );
@@ -461,7 +562,7 @@ export function useVideoPlayback() {
     () => player.engineKick,
     () => {
       if (!player.isActiveDevice || !player.state.is_playing || !player.clipActive) return;
-      void ensureVideo().play().catch(() => undefined);
+      tryPlay(ensureVideo());
     },
   );
 
@@ -537,6 +638,11 @@ export function useVideoPlayback() {
         resumeAt = null;
       }
     });
+    el.addEventListener('canplay', () => {
+      // Данные доехали — если play() после get-url отбраковали, пробуем ещё раз.
+      // Прогрев здесь не снимаем: canplay ≠ кадр и ≠ playing.
+      tryPlay(el);
+    });
     el.addEventListener('waiting', () => {
       // Сталл при включённом воспроизведении — показываем спиннер; на паузе
       // (в т.ч. перемотка на паузе) спиннер не нужен — там индикатор паузы.
@@ -544,20 +650,30 @@ export function useVideoPlayback() {
       if (store.isActiveDevice && store.state.is_playing) clipBuffering.value = true;
     });
     el.addEventListener('playing', () => {
-      clipBuffering.value = false;
       const store = usePlayerStore();
-      if (store.clipActive) store.setAudioPlaying(true);
+      if (!store.clipActive) return;
+      store.setAudioPlaying(true);
+      // playing прошлого ролика приходит уже после смены снапшота — кадр не возвращаем.
+      if (!openingArmed()) return;
+      clipBuffering.value = false;
+      store.setStreamWarming(false);
+      armFirstFrame(el);
     });
     el.addEventListener('pause', () => {
-      clipBuffering.value = false;
       const store = usePlayerStore();
       if (store.clipActive) store.setAudioPlaying(false);
+      // Пауза элемента на смене src не снимает спиннер с новой обложки.
+      if (openingArmed()) clipBuffering.value = false;
     });
     el.addEventListener('error', () => handleStreamError());
     el.addEventListener('timeupdate', () => {
       const store = usePlayerStore();
       if (!store.isActiveDevice || !store.clipActive || !store.clipPlaybackVideo) return;
       if (snapshotKey(store.clipPlaybackVideo) !== appliedKey) return;
+      if (!openingArmed()) return;
+      // Пока элемент не ушёл со старой секунды — не пинговать её как позицию нового ролика.
+      if (resumeTarget != null && Math.abs(el.currentTime - resumeTarget) > 2.5) return;
+      resumeTarget = null;
       store.anchorFromAudio(el.currentTime);
     });
   }

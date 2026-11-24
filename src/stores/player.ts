@@ -8,6 +8,7 @@ import type { ClipAudioTrack } from '@/lib/hls-engine';
 import { fetchFavorites } from '@/api/favorites';
 import { resolveNext, resolvePrevious, snapshotKey, SKIP_RESTART_AFTER, type EngineAction, type EngineContext } from '@/lib/playback-engine';
 import { moveItem } from '@/lib/list-sort';
+import { unlockMediaPlayback } from '@/lib/media-unlock';
 import { favoriteTracks } from '@/mocks/catalog';
 import { mockPlayerState } from '@/mocks/player';
 import { onRealtimeReconnect } from '@/realtime';
@@ -327,6 +328,8 @@ export const usePlayerStore = defineStore('player', () => {
     playbackSource: PlaySource = 'single',
     opts: { rollSeed?: boolean; contextItems?: AnySnapshot[]; contextRef?: string | null } = {},
   ) {
+    // До await: жест тапа ещё жив, иначе play() после get-url браузер глушит.
+    unlockMediaPlayback();
     cancelPendingSeek();
     dropFromQueue(snapshotId(snapshot));
     if (opts.contextItems) {
@@ -401,9 +404,11 @@ export const usePlayerStore = defineStore('player', () => {
     // не помог бы: is_playing не меняется, вотчеры элемент не пинают.
     // Пинаем движок напрямую, сервер не трогаем.
     if (wasPlaying && isActiveDevice.value && !audioPlaying.value) {
+      unlockMediaPlayback();
       kickEngine();
       return;
     }
+    if (!wasPlaying) unlockMediaPlayback();
     // Оптимистично, с откатом по ошибке (plan-player.md §5). Пауза сама
     // увозит позицию — висящий seek отменяем, чтобы не дёргать бэк дважды.
     if (wasPlaying) cancelPendingSeek();
@@ -522,6 +527,18 @@ export const usePlayerStore = defineStore('player', () => {
     engineLoading.value = loading;
   }
 
+  /**
+   * Движок применил поток и ждёт, пока элемент реально заиграет (`playing`).
+   * canplay для холодного HLS врёт: буфер на один кадр есть, а сегмент с
+   * origin ещё десятки секунд — это ожидание, не рассинхрон. Пока греемся,
+   * реконсиляция «честной паузы» молчит, иначе resume тут же добивается паузой.
+   */
+  const streamWarming = ref(false);
+
+  function setStreamWarming(warming: boolean) {
+    streamWarming.value = warming;
+  }
+
   // --- Подмена значка: фактическое воспроизведение против мнения сервера
 
   /**
@@ -593,16 +610,16 @@ export const usePlayerStore = defineStore('player', () => {
    */
   const DESYNC_CONFIRM_MS = 3_000;
   let reconcileTimer: ReturnType<typeof setTimeout> | null = null;
-  watch([playbackDesynced, engineLoading], ([desynced, loading]) => {
+  watch([playbackDesynced, engineLoading, streamWarming], ([desynced, loading, warming]) => {
     if (reconcileTimer) {
       clearTimeout(reconcileTimer);
       reconcileTimer = null;
     }
-    if (!desynced || loading) return;
+    if (!desynced || loading || warming) return;
     reconcileTimer = setTimeout(() => {
       reconcileTimer = null;
       // К тику всё могло переиграться (медленный буфер, тап) — перепроверяем.
-      if (!playbackDesynced.value || engineLoading.value) return;
+      if (!playbackDesynced.value || engineLoading.value || streamWarming.value) return;
       pauseToServer();
     }, DESYNC_CONFIRM_MS);
   });
@@ -616,9 +633,15 @@ export const usePlayerStore = defineStore('player', () => {
 
   const extrapolatedPosition = computed(() => {
     if (!state.value.is_playing) return anchor.value;
-    // Активное устройство: позиция идёт только когда аудио реально звучит —
-    // иначе пока догружается ссылка/буфер, ползунок бежит вперёд звука.
-    if (isActiveDevice.value && !audioPlaying.value) return anchor.value;
+    // Активное устройство: позиция идёт только когда звук реально идёт.
+    // Пока качается ссылка или ждём первый кадр, ползунок стоит — иначе
+    // полоска растёт на обложке со спиннером.
+    if (
+      isActiveDevice.value &&
+      (!audioPlaying.value || engineLoading.value || streamWarming.value)
+    ) {
+      return anchor.value;
+    }
     return anchor.value + (nowTick.value - anchorAt) / 1000;
   });
 
@@ -982,9 +1005,11 @@ export const usePlayerStore = defineStore('player', () => {
     audioPlaying,
     engineKick,
     engineLoading,
+    streamWarming,
     isPlaying,
     setAudioPlaying,
     setEngineLoading,
+    setStreamWarming,
     anchorFromAudio,
     togglePlay,
     toggleShuffle,

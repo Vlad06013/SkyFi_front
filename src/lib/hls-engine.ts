@@ -132,7 +132,11 @@ async function createHls(): Promise<Hls> {
  * снаружи по этому флагу фиксируют позицию для resume (loadedmetadata
  * придёт после и отыграет её).
  */
-export async function hlsLoad(el: HTMLVideoElement, manifestUrl: string): Promise<boolean> {
+export async function hlsLoad(
+  el: HTMLVideoElement,
+  manifestUrl: string,
+  startPosition?: number,
+): Promise<boolean> {
   const instance = await ensureHls();
   if (attachedEl === el && activeManifest === manifestUrl) return false;
   if (attachedEl !== el) {
@@ -140,6 +144,9 @@ export async function hlsLoad(el: HTMLVideoElement, manifestUrl: string): Promis
     attachedEl = el;
   }
   instance.loadSource(manifestUrl);
+  // loadSource зовёт startLoad(-1), а hls.js подставляет lastCurrentTime
+  // прошлого ролика на том же элементе. Явная позиция это перекрывает.
+  if (startPosition != null) instance.startLoad(startPosition);
   activeManifest = manifestUrl;
   // Новый манифест — качество применяем заново на MANIFEST_PARSED.
   appliedQualityKey = null;

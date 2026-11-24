@@ -1,7 +1,7 @@
 import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { usePlayerStore } from '@/stores/player';
-import { clipBuffering, clipTapHandlers, setMiniClipHost } from '@/composables/useVideoPlayback';
+import { clipBuffering, clipFrameReady, clipTapHandlers, setMiniClipHost } from '@/composables/useVideoPlayback';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { trackPointer } from '@/lib/pointer-drag';
 import { artistsLine, coverVar, trackCover } from '@/lib/cover';
@@ -19,6 +19,18 @@ export default defineComponent({
   setup() {
     const player = usePlayerStore();
     const { current, previewNext, previewPrevious, progress, clipActive } = storeToRefs(player);
+    /**
+     * Плавное заполнение только на тике воспроизведения (~1 с).
+     * Сброс в 0, старт с позиции и seek ставят ширину сразу.
+     */
+    const barSmooth = ref(false);
+    watch(progress, (next, prev) => {
+      const step = next - (prev ?? 0);
+      const duration = player.durationSeconds;
+      const tickPct = duration > 0 ? (1.5 / duration) * 100 : 0;
+      const flowing = player.isPlaying && player.audioPlaying && !player.engineLoading && !player.streamWarming;
+      barSmooth.value = flowing && step > 0 && step <= tickPct;
+    });
     /** Фактическое воспроизведение (не мнение сервера) — для иконки плеера. */
     const playing = computed(() => player.isPlaying);
     const { togglePlay, openExpanded, skipRestartAfter } = player;
@@ -177,9 +189,11 @@ export default defineComponent({
       playing,
       panes,
       progress,
+      barSmooth,
       clipActive,
       clipHostEl,
       clipBuffering,
+      clipFrameReady,
       onClipHost,
       onClipTap,
       onClipDblTap,

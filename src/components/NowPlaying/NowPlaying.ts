@@ -8,7 +8,7 @@ import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { getAudioElement } from '@/composables/useAudioPlayback';
 import { useLyrics } from '@/composables/useLyrics';
 import { useMediaMenu } from '@/composables/useMediaMenu';
-import { clipBuffering, clipTapHandlers, getClipVideoElement, setClipHost } from '@/composables/useVideoPlayback';
+import { clipBuffering, clipFrameReady, clipTapHandlers, getClipVideoElement, setClipHost } from '@/composables/useVideoPlayback';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { coverVar, artistsLine, trackCover } from '@/lib/cover';
 import { sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
@@ -478,6 +478,7 @@ export default defineComponent({
       clipQualities,
       clipHostEl,
       clipBuffering,
+      clipFrameReady,
       bufferedRanges,
       clipQualityAvailable,
       clipHlsActive,

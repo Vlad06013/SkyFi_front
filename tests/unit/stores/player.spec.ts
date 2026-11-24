@@ -410,6 +410,16 @@ describe('stores/player: рассинхрон сервера с реальным
     expect(pausePlaybackMock).not.toHaveBeenCalled();
   });
 
+  it('реконсиляция: поток греется до playing — паузу не шлём', async () => {
+    const player = desyncedPlayer();
+    player.setStreamWarming(true);
+    pausePlaybackMock.mockResolvedValue({ state: { ...player.state, is_playing: false }, queue: [] } as never);
+
+    await vi.advanceTimersByTimeAsync(6_000);
+
+    expect(pausePlaybackMock).not.toHaveBeenCalled();
+  });
+
   it('реконсиляция: элемент заиграл до тика — паузу отменили', async () => {
     const player = desyncedPlayer();
     pausePlaybackMock.mockResolvedValue({ state: { ...player.state, is_playing: false }, queue: [] } as never);

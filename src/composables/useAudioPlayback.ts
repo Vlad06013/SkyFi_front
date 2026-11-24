@@ -1,5 +1,6 @@
 import { watch } from 'vue';
 import { fetchAudioUrl } from '@/api/audio';
+import { afterMediaUnlock } from '@/lib/media-unlock';
 import { snapshotKey } from '@/lib/playback-engine';
 import { usePlayerStore } from '@/stores/player';
 import type { AnySnapshot } from '@/types';
@@ -22,6 +23,21 @@ let appliedKey: string | null = null;
 let loadAbort: AbortController | null = null;
 /** Позиция для восстановления после подмены клипом: src пересоздаёт поток. */
 let resumeAt: number | null = null;
+
+/** Прогрев до playing: canplay на медленной ссылке раньше звука, паузу не шлём. */
+function tryPlay(el: HTMLAudioElement) {
+  const player = usePlayerStore();
+  if (!player.isActiveDevice || !player.state.is_playing) return;
+  if (player.effectiveCurrent?.type !== 'track') return;
+  if (!el.paused && !el.ended) return;
+  player.setStreamWarming(true);
+  afterMediaUnlock(() => {
+    const store = usePlayerStore();
+    if (!store.isActiveDevice || !store.state.is_playing || el.ended) return;
+    if (store.effectiveCurrent?.type !== 'track' || !el.paused) return;
+    void el.play().catch(() => undefined);
+  });
+}
 
 function ensureAudio(): HTMLAudioElement {
   if (!audio) {
@@ -80,7 +96,7 @@ export function useAudioPlayback() {
       // Продолжаем с общей позиции: после клипа она ушла вперёд, при обычном
       // старте трека позиция ~0 и seek на 0 — безопасный no-op.
       resumeAt = startPosition;
-      if (player.state.is_playing) void el.play().catch(() => undefined);
+      tryPlay(el);
     } catch {
       // Отменён следующим запросом — не ошибка, молча выходим.
       if (controller.signal.aborted) return;
@@ -116,7 +132,7 @@ export function useAudioPlayback() {
         void loadSnapshot(player.effectiveCurrent);
         return;
       }
-      if (shouldPlay) void el.play().catch(() => undefined);
+      if (shouldPlay) tryPlay(el);
       else el.pause();
     },
   );
@@ -139,7 +155,7 @@ export function useAudioPlayback() {
       }
       // repeat=one: бэк отвечает seek(0) без смены is_playing — элемент после
       // 'ended' остался на паузе, автоповтор должен его возобновить.
-      if (ended && player.state.is_playing) void el.play().catch(() => undefined);
+      if (ended && player.state.is_playing) tryPlay(el);
     },
   );
 
@@ -157,7 +173,7 @@ export function useAudioPlayback() {
         void loadSnapshot(player.effectiveCurrent);
         return;
       }
-      void el.play().catch(() => undefined);
+      tryPlay(el);
     },
   );
 
@@ -186,9 +202,15 @@ export function useAudioPlayback() {
         resumeAt = null;
       }
     });
+    el.addEventListener('canplay', () => {
+      // Ссылка доехала — play() после get-url мог быть отбракован, пробуем снова.
+      tryPlay(el);
+    });
     el.addEventListener('playing', () => {
       const store = usePlayerStore();
-      if (store.effectiveCurrent?.type === 'track') store.setAudioPlaying(true);
+      if (store.effectiveCurrent?.type !== 'track') return;
+      store.setAudioPlaying(true);
+      store.setStreamWarming(false);
     });
     el.addEventListener('pause', () => {
       const store = usePlayerStore();
