@@ -1,7 +1,7 @@
 import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { usePlayerStore } from '@/stores/player';
-import { clipTapHandlers, setMiniClipHost } from '@/composables/useVideoPlayback';
+import { clipBuffering, clipTapHandlers, setMiniClipHost } from '@/composables/useVideoPlayback';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { trackPointer } from '@/lib/pointer-drag';
 import { artistsLine, coverVar, trackCover } from '@/lib/cover';
@@ -179,6 +179,7 @@ export default defineComponent({
       progress,
       clipActive,
       clipHostEl,
+      clipBuffering,
       onClipHost,
       onClipTap,
       onClipDblTap,

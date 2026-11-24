@@ -7,7 +7,7 @@ import router from './router';
 import { onUnauthorized } from '@/api/http';
 import { bindSessionRealtime } from '@/realtime';
 import { useAudioPlayback } from '@/composables/useAudioPlayback';
-import { useVideoPlayback } from '@/composables/useVideoPlayback';
+import { getClipVideoElement, useVideoPlayback } from '@/composables/useVideoPlayback';
 import { useAuthStore } from '@/stores/auth';
 import { useAppStore } from '@/stores/app';
 import { useDevicesStore } from '@/stores/devices';
@@ -48,4 +48,11 @@ void appStore.bootstrap().finally(() => {
   usePlayerStore(pinia).bindServerPlayback();
   useAudioPlayback();
   useVideoPlayback();
+  // DEV-диагностика: доступ из консоли (window.__player/__devices/__clipVideo).
+  if (import.meta.env.DEV) {
+    (window as unknown as { __player: ReturnType<typeof usePlayerStore> }).__player = usePlayerStore(pinia);
+    (window as unknown as { __devices: ReturnType<typeof useDevicesStore> }).__devices = useDevicesStore(pinia);
+    (window as unknown as { __clipVideo: () => HTMLVideoElement | null }).__clipVideo = () =>
+      getClipVideoElement();
+  }
 });

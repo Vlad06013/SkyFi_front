@@ -2,7 +2,7 @@ import { ref, watch } from 'vue';
 import { fetchVideoStreams, resolveVideo } from '@/api/videos';
 import type { VideoHls } from '@/api/videos';
 import { ApiError } from '@/api/http';
-import { hlsDetach, hlsLoad, hlsSetAudioTrack, hlsSetQuality, hlsSupported, setHlsHooks } from '@/lib/hls-engine';
+import { hlsDetach, hlsLoad, hlsResume, hlsSetAudioTrack, hlsSetQuality, hlsSupported, setHlsHooks } from '@/lib/hls-engine';
 import { snapshotKey } from '@/lib/playback-engine';
 import { useOnlineStore } from '@/stores/online';
 import { usePlayerStore } from '@/stores/player';
@@ -56,6 +56,8 @@ let resumeAt: number | null = null;
 const clipHost = ref<HTMLElement | null>(null);
 /** Хост в мини-плеере: сворачивание перекладывает видео сюда — клип поёт дальше. */
 const miniClipHost = ref<HTMLElement | null>(null);
+/** Элемент клипа ждёт данные при включённом воспроизведении — спиннер поверх видео. */
+export const clipBuffering = ref(false);
 
 setHlsHooks({
   onError: () => handleStreamError(),
@@ -69,6 +71,11 @@ export function setClipHost(el: HTMLElement | null) {
 
 export function setMiniClipHost(el: HTMLElement | null) {
   miniClipHost.value = el;
+}
+
+/** Видео-элемент клипа (singleton) — для чтения buffered в UI (шкала буфера). */
+export function getClipVideoElement(): HTMLVideoElement | null {
+  return video;
 }
 
 /** Полный экран по двойному тапу — на сам элемент, чтобы работало из мини-плеера. */
@@ -174,6 +181,9 @@ function applyHls(el: HTMLVideoElement, hls: VideoHls, resumePosition?: number) 
     const attached = await hlsLoad(el, hls.manifest_url);
     appliedManifest = hls.manifest_url;
     hlsAttached = true;
+    // Манифест тот же (ретрай get-url после фатальной ошибки): источник не
+    // пересоздаётся — будим остановленную hls.js загрузку.
+    if (!attached) hlsResume();
     // Аттач асинхронный (ленивый hls.js): вотчер is_playing уже отстрелил — догоняем плей.
     const store = usePlayerStore();
     if (attached && store.isActiveDevice && store.state.is_playing) {
@@ -283,6 +293,8 @@ async function refreshStreams(snapshot: VideoSnapshot) {
     if (!store.clipPlaybackVideo || snapshotKey(store.clipPlaybackVideo) !== snapshotKey(snapshot)) return;
     store.setClipStreams(payload.streams);
     store.setClipHls(payload.hls);
+    // Прогрессив-режим: выбор качества клампим по списку потоков; в HLS — по высотам манифеста.
+    if (!payload.hls) store.clampClipQualityToStreams();
     reapplyStreams();
     scheduleTtlRefresh(payload.ttl_sec, snapshot);
   } catch (cause) {
@@ -306,6 +318,7 @@ export function useVideoPlayback() {
     }
     if (!player.isActiveDevice || !snapshot) {
       el.pause();
+      clipBuffering.value = false;
       if (hlsAttached) {
         hlsDetach();
         hlsAttached = false;
@@ -350,6 +363,7 @@ export function useVideoPlayback() {
       appliedKey = key;
       player.setClipStreams(payload.streams);
       player.setClipHls(payload.hls);
+      if (!payload.hls) player.clampClipQualityToStreams();
       applyStream();
       scheduleTtlRefresh(payload.ttl_sec, snapshot);
     } catch (cause) {
@@ -451,12 +465,14 @@ export function useVideoPlayback() {
     },
   );
 
-  // Качество: в HLS — потолок ABR или фикс через hls.js; прогрессив — смена потока с позиции.
+  // Качество: желаемое регистрируем в движке всегда — если HLS ещё не аттачнут,
+  // применится на MANIFEST_PARSED, аттачнут — сразу (hlsSetQuality внутри решает).
+  // Прогрессив — смена потока с позиции.
   watch(
     () => [player.clipQuality, player.clipHlsAuto] as const,
     () => {
-      if (hlsAttached) hlsSetQuality({ auto: player.clipHlsAuto, height: player.clipQuality });
-      else applyStream();
+      hlsSetQuality({ auto: player.clipHlsAuto, height: player.clipQuality });
+      if (!hlsAttached) applyStream();
     },
   );
 
@@ -511,6 +527,7 @@ export function useVideoPlayback() {
     bound = true;
     const el = ensureVideo();
     el.addEventListener('ended', () => {
+      clipBuffering.value = false;
       const store = usePlayerStore();
       if (store.isActiveDevice && store.clipActive) store.handleTrackEnded();
     });
@@ -520,11 +537,19 @@ export function useVideoPlayback() {
         resumeAt = null;
       }
     });
+    el.addEventListener('waiting', () => {
+      // Сталл при включённом воспроизведении — показываем спиннер; на паузе
+      // (в т.ч. перемотка на паузе) спиннер не нужен — там индикатор паузы.
+      const store = usePlayerStore();
+      if (store.isActiveDevice && store.state.is_playing) clipBuffering.value = true;
+    });
     el.addEventListener('playing', () => {
+      clipBuffering.value = false;
       const store = usePlayerStore();
       if (store.clipActive) store.setAudioPlaying(true);
     });
     el.addEventListener('pause', () => {
+      clipBuffering.value = false;
       const store = usePlayerStore();
       if (store.clipActive) store.setAudioPlaying(false);
     });

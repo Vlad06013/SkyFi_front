@@ -215,6 +215,44 @@ describe('stores/player: подмена снапшота клипом', () => {
   });
 });
 
+describe('stores/player: качество клипа', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+  });
+
+  it('прогрессив-список YouTube (один 360p) не сбрасывает выбор в HLS-режиме', () => {
+    const player = usePlayerStore();
+    player.setClipQuality(1080);
+
+    player.setClipStreams([{ quality: 360, url: 'https://cdn.test/360.mp4' }]);
+
+    expect(player.clipQuality).toBe(1080);
+  });
+
+  it('кламп по потокам — только явный (прогрессив-режим): выбор вне списка → максимум', () => {
+    const player = usePlayerStore();
+    player.setClipQuality(1080);
+    player.setClipStreams([{ quality: 360, url: 'https://cdn.test/360.mp4' }]);
+
+    player.clampClipQualityToStreams();
+
+    expect(player.clipQuality).toBe(360);
+  });
+
+  it('кламп не трогает выбор, который есть в списке', () => {
+    const player = usePlayerStore();
+    player.setClipQuality(480);
+    player.setClipStreams([
+      { quality: 360, url: 'https://cdn.test/360.mp4' },
+      { quality: 480, url: 'https://cdn.test/480.mp4' },
+    ]);
+
+    player.clampClipQualityToStreams();
+
+    expect(player.clipQuality).toBe(480);
+  });
+});
+
 describe('stores/player: рассинхрон сервера с реальным воспроизведением', () => {
   beforeEach(() => {
     setActivePinia(createPinia());

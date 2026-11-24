@@ -43,3 +43,10 @@
   object-fit: cover;
   display: block;
 }
+
+/* В мини-плеере спиннер компактнее — thumb маленький. */
+.mp-clip-host .clip-spinner .spin {
+  width: 20px;
+  height: 20px;
+  padding: 5px;
+}

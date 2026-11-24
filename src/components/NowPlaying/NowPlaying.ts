@@ -2,11 +2,13 @@ import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } fro
 import { storeToRefs } from 'pinia';
 import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
 import SeekBar from '@/components/SeekBar/SeekBar.vue';
+import type { BufferedRange } from '@/components/SeekBar/SeekBar';
 import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
+import { getAudioElement } from '@/composables/useAudioPlayback';
 import { useLyrics } from '@/composables/useLyrics';
 import { useMediaMenu } from '@/composables/useMediaMenu';
-import { clipTapHandlers, setClipHost } from '@/composables/useVideoPlayback';
+import { clipBuffering, clipTapHandlers, getClipVideoElement, setClipHost } from '@/composables/useVideoPlayback';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { coverVar, artistsLine, trackCover } from '@/lib/cover';
 import { sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
@@ -35,6 +37,7 @@ export default defineComponent({
       positionSeconds,
       state,
       clipMode,
+      clipActive,
       clipQuality,
       clipQualities,
       clipStreams,
@@ -172,6 +175,42 @@ export default defineComponent({
     const clipHostEl = ref<HTMLElement | null>(null);
     watch(clipHostEl, (el) => setClipHost(el));
     const clipTaps = clipTapHandlers();
+
+    /** Буферизованные диапазоны активного элемента (клип — video, трек — audio)
+     *  в долях длительности — полупрозрачная заливка на сикбаре. Опрос раз в
+     *  500 мс: события buffered не покрывают flush, а так сброс виден сразу. */
+    const bufferedRanges = ref<BufferedRange[]>([]);
+    let bufferedKey = '';
+    let bufferedTimer: ReturnType<typeof setInterval> | null = null;
+    function pollBuffered() {
+      const el = clipActive.value ? getClipVideoElement() : getAudioElement();
+      const duration = el && Number.isFinite(el.duration) && el.duration > 0 ? el.duration : 0;
+      if (!el || !duration) {
+        if (bufferedKey) {
+          bufferedKey = '';
+          bufferedRanges.value = [];
+        }
+        return;
+      }
+      const ranges: BufferedRange[] = [];
+      for (let index = 0; index < el.buffered.length; index += 1) {
+        ranges.push({
+          start: Math.min(1, el.buffered.start(index) / duration),
+          end: Math.min(1, el.buffered.end(index) / duration),
+        });
+      }
+      const key = ranges.map((range) => `${range.start.toFixed(3)}-${range.end.toFixed(3)}`).join('|');
+      if (key === bufferedKey) return;
+      bufferedKey = key;
+      bufferedRanges.value = ranges;
+    }
+    onMounted(() => {
+      pollBuffered();
+      bufferedTimer = setInterval(pollBuffered, 500);
+    });
+    onBeforeUnmount(() => {
+      if (bufferedTimer) clearInterval(bufferedTimer);
+    });
 
     /** Качества, реально приехавшие в потоках /videos/get-url — остальные неактивны.
      *  В HLS-режиме пункты — высоты манифеста, все доступны. */
@@ -438,6 +477,8 @@ export default defineComponent({
       clipQuality,
       clipQualities,
       clipHostEl,
+      clipBuffering,
+      bufferedRanges,
       clipQualityAvailable,
       clipHlsActive,
       clipHlsAuto,

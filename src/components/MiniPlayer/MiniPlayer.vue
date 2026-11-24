@@ -20,7 +20,14 @@
               class="mp-clip-host"
               @click="onClipTap"
               @dblclick="onClipDblTap"
-            />
+            >
+              <div v-if="clipBuffering" class="clip-spinner" aria-hidden="true">
+                <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <circle cx="12" cy="12" r="8" opacity=".25" />
+                  <path d="M12 4a8 8 0 0 1 8 8" stroke-linecap="round" />
+                </svg>
+              </div>
+            </div>
             <template v-if="pane.snapshot.type === 'video'">
               <img v-if="pane.snapshot.cover_url" class="mp-cover" :src="pane.snapshot.cover_url" alt="">
               <span class="vid-badge" aria-hidden="true">

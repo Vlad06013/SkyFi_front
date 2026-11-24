@@ -9,6 +9,14 @@
     @pointerdown="onPointerDown"
   >
     <div class="progress">
+      <div class="buffer" aria-hidden="true">
+        <div
+          v-for="(range, index) in buffered"
+          :key="index"
+          class="seg"
+          :style="{ left: range.start * 100 + '%', width: (range.end - range.start) * 100 + '%' }"
+        />
+      </div>
       <div class="fill" :style="{ width: modelValue + '%' }" />
       <div class="knob" :style="{ left: modelValue + '%' }" />
     </div>

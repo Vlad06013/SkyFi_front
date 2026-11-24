@@ -12,6 +12,12 @@
     <img v-if="clipMode && clipPoster" class="clip-bg" :src="clipPoster" alt="">
     <div v-if="clipMode" class="clip-scrim" />
     <div v-if="clipMode" ref="clipHostEl" class="clip-host" />
+    <div v-if="clipMode && clipBuffering" class="clip-spinner" aria-hidden="true">
+      <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <circle cx="12" cy="12" r="8" opacity=".25" />
+        <path d="M12 4a8 8 0 0 1 8 8" stroke-linecap="round" />
+      </svg>
+    </div>
 
     <div class="now-playing-inner">
       <div class="now-top">
@@ -247,6 +253,7 @@
       <SeekBar
         class="seek"
         :model-value="progress"
+        :buffered="bufferedRanges"
         label="позиция"
         @update:model-value="seekRatio($event / 100)"
       />

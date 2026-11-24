@@ -8,3 +8,17 @@
   max-width: none;
   pointer-events: none;
 }
+
+/* Буферизованные диапазоны — полупрозрачная заливка под полосой прогресса. */
+.buffer {
+  position: absolute;
+  inset: 0;
+}
+
+.buffer .seg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.25);
+}

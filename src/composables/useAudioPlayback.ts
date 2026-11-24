@@ -31,6 +31,11 @@ function ensureAudio(): HTMLAudioElement {
   return audio;
 }
 
+/** Аудио-элемент (singleton) — для чтения buffered в UI (шкала буфера). */
+export function getAudioElement(): HTMLAudioElement | null {
+  return audio;
+}
+
 export function useAudioPlayback() {
   const player = usePlayerStore();
 

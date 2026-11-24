@@ -230,6 +230,22 @@
   object-fit: cover; display: block;
   background: #000;
 }
+/* Спиннер буферизации поверх клипа: элемент ждёт данные при включённом
+   воспроизведении (waiting). Указатель прозрачен — тапы идут в видео. */
+.clip-spinner {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+  color: #fff;
+  z-index: 2;
+}
+.clip-spinner .spin {
+  width: 44px; height: 44px;
+  padding: 10px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, .45);
+  box-sizing: content-box;
+}
 /* Полный экран (двойной тап): обложечный cover кадрирует слишком сильно —
    на весь экран растягиваем contain'ом. */
 .clip-video:fullscreen {

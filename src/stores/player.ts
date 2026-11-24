@@ -846,10 +846,15 @@ export const usePlayerStore = defineStore('player', () => {
     clipHlsAuto.value = true;
   }
 
-  /** Потоки видео: фиксит выбор — текущее качество недоступно → максимум из списка. */
+  /** Потоки видео. Выбор качества здесь не трогаем: у YouTube прогрессив-список —
+   *  один 360p и не описывает HLS-лесенку (кламп по списку — clampClipQualityToStreams). */
   function setClipStreams(streams: VideoStream[]) {
     clipStreams.value = streams;
-    const qualities = streams.map((stream) => stream.quality);
+  }
+
+  /** Прогрессив-режим (get-url без hls): выбранное качество вне списка потоков → максимум из списка. */
+  function clampClipQualityToStreams() {
+    const qualities = clipStreams.value.map((stream) => stream.quality);
     if (qualities.length && !qualities.includes(clipQuality.value)) {
       clipQuality.value = Math.max(...qualities);
     }
@@ -949,6 +954,7 @@ export const usePlayerStore = defineStore('player', () => {
     clipPlaybackVideo,
     clipActive,
     setClipStreams,
+    clampClipQualityToStreams,
     setClipHls,
     setClipHlsHeights,
     setClipAudioTracks,

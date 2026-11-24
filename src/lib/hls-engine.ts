@@ -34,6 +34,11 @@ const noopHooks: HlsEngineHooks = {
 };
 
 let hls: Hls | null = null;
+/** Промис создания инстанса: без него параллельные hlsLoad (applyHls зовётся
+ *  и из loadVideo, и из вотчера clipStreams) до резолва import создавали два
+ *  инстанса — второй перезаписывал singleton, не будучи аттачнутым, и вся
+ *  настройка (качество/дорожки) уходила в пустышку с пустым levels. */
+let hlsPromise: Promise<Hls> | null = null;
 let hooks = noopHooks;
 let attachedEl: HTMLVideoElement | null = null;
 let activeManifest: string | null = null;
@@ -42,6 +47,13 @@ let desiredAudioId: string | null = null;
 /** null — ABR (потолок capHeight); иначе фиксированная высота. */
 let fixedHeight: number | null = null;
 let capHeight = 720;
+/**
+ * Комбинация качества, уже применённая к живой сессии. Повторное применение
+ * того же значения пропускаем: currentLevel дёргает flush+перезагрузку буфера,
+ * и фоновые reapply (TTL, ретрай get-url) иначе роняли бы воспроизведение,
+ * а в auto — сбрасывали бы подъём ABR на низкое качество.
+ */
+let appliedQualityKey: string | null = null;
 
 export function setHlsHooks(value: HlsEngineHooks): void {
   hooks = value;
@@ -55,8 +67,25 @@ export async function hlsSupported(): Promise<boolean> {
 
 async function ensureHls(): Promise<Hls> {
   if (hls) return hls;
+  if (!hlsPromise) {
+    hlsPromise = createHls();
+    // Сбой создания (import/инициализация) не кешируем — следующий вызов повторит.
+    hlsPromise.catch(() => {
+      hlsPromise = null;
+    });
+  }
+  return hlsPromise;
+}
+
+async function createHls(): Promise<Hls> {
   const { default: HlsCtor } = await import('hls.js');
-  const created = new HlsCtor();
+  const created = new HlsCtor({
+    // Цель форвард-буфера у hls.js — max(8 * maxBufferSize / битрейт, maxBufferLength),
+    // ограниченная maxMaxBufferLength: с дефолтными 60 МБ для низкобитрейтных
+    // ступеней YouTube это 600 с — клип скачивался целиком одним залпом.
+    maxBufferLength: 30,
+    maxMaxBufferLength: 60,
+  });
   created.on(HlsCtor.Events.ERROR, (_event, data: ErrorData) => {
     // Нефатальные hls.js переживает сам (свои ретраи сегментов/плейлистов).
     if (data.fatal) hooks.onError();
@@ -70,6 +99,10 @@ async function ensureHls(): Promise<Hls> {
     applyAudioTrack(created);
   });
   hls = created;
+  // DEV-диагностика: доступ к инстансу из консоли (window.__hls).
+  if (import.meta.env.DEV && typeof window !== 'undefined') {
+    (window as unknown as { __hls: Hls }).__hls = created;
+  }
   return created;
 }
 
@@ -87,6 +120,8 @@ export async function hlsLoad(el: HTMLVideoElement, manifestUrl: string): Promis
   }
   instance.loadSource(manifestUrl);
   activeManifest = manifestUrl;
+  // Новый манифест — качество применяем заново на MANIFEST_PARSED.
+  appliedQualityKey = null;
   return true;
 }
 
@@ -100,6 +135,12 @@ export function hlsDetach(): void {
   }
   attachedEl = null;
   activeManifest = null;
+  appliedQualityKey = null;
+}
+
+/** Фатальная сетевая ошибка останавливает загрузку hls.js — будим после ретрая get-url. */
+export function hlsResume(): void {
+  if (hls && attachedEl) hls.startLoad();
 }
 
 /** Желание дорожки (id из ClipAudioTrack): запоминаем и применяем к живой сессии. */
@@ -119,19 +160,42 @@ function applyAudioTrack(instance: Hls): void {
 export function hlsSetQuality(options: { auto: boolean; height: number }): void {
   capHeight = options.height;
   fixedHeight = options.auto ? null : options.height;
+  if (import.meta.env.DEV) console.log('[hls] setQuality', JSON.stringify(options), 'attached=', !!attachedEl);
   if (hls && attachedEl) applyQuality(hls);
 }
 
 function applyQuality(instance: Hls): void {
   const levels = instance.levels;
-  if (!levels.length) return;
+  if (!levels.length) {
+    // Манифест ещё не разобран — применится на MANIFEST_PARSED.
+    if (import.meta.env.DEV) console.log('[hls] applyQuality SKIP: уровней нет');
+    return;
+  }
+  const key = fixedHeight == null ? `auto:${capHeight}` : `fixed:${fixedHeight}`;
+  if (key === appliedQualityKey) {
+    if (import.meta.env.DEV) console.log('[hls] applyQuality SKIP', key);
+    return;
+  }
+  const wasAuto = appliedQualityKey != null && appliedQualityKey.startsWith('auto:');
+  appliedQualityKey = key;
   if (fixedHeight == null) {
-    instance.currentLevel = -1;
+    // Уже в auto — меняем только потолок, без сброса буфера (ABR подстроится сам).
+    if (!wasAuto) instance.currentLevel = -1;
     // autoLevelCapping — индекс в hls.levels (они отсортированы по высоте).
     instance.autoLevelCapping = pickLevelIndex(levels, capHeight);
+    if (import.meta.env.DEV) {
+      console.log('[hls] applyQuality', key, '-> capping', instance.autoLevelCapping,
+        'height', levels[instance.autoLevelCapping]?.height);
+    }
   } else {
+    const picked = pickLevelIndex(levels, fixedHeight);
     instance.autoLevelCapping = -1;
-    instance.currentLevel = pickLevelIndex(levels, fixedHeight);
+    instance.currentLevel = picked;
+    // NB: геттер currentLevel возвращает уровень играющего фрагмента (лагает) —
+    // логируем установленный индекс, а не геттер.
+    if (import.meta.env.DEV) {
+      console.log('[hls] applyQuality', key, '-> set currentLevel', picked, 'height', levels[picked]?.height);
+    }
   }
 }
 
