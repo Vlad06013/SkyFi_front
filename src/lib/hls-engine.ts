@@ -85,6 +85,27 @@ async function createHls(): Promise<Hls> {
     // ступеней YouTube это 600 с — клип скачивался целиком одним залпом.
     maxBufferLength: 30,
     maxMaxBufferLength: 60,
+    fragLoadPolicy: {
+      default: {
+        // Холодный высокобитрейтный сегмент relay тянет с YouTube 10–20+ с
+        // (апстрим задушен, бэк буферизует целиком): дефолтные 10 с TTFB
+        // обрывали запрос до первого байта — сегмент не докачивался, кеш
+        // не прогревался, ретраи крутили тот же canceled по кругу. Ждём
+        // дольше: сегмент докачивается, бэк его кеширует, повторы мгновенны.
+        maxTimeToFirstByteMs: 30000,
+        maxLoadTimeMs: 120000,
+        timeoutRetry: {
+          maxNumRetry: 4,
+          retryDelayMs: 0,
+          maxRetryDelayMs: 0,
+        },
+        errorRetry: {
+          maxNumRetry: 6,
+          retryDelayMs: 1000,
+          maxRetryDelayMs: 8000,
+        },
+      },
+    },
   });
   created.on(HlsCtor.Events.ERROR, (_event, data: ErrorData) => {
     // Нефатальные hls.js переживает сам (свои ретраи сегментов/плейлистов).
