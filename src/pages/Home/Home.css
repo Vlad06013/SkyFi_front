@@ -46,3 +46,37 @@
 .cover > .clip-spinner {
   z-index: 4;
 }
+
+/* Видео крупное, но не в край: оболочка волны режет overflow, а яркое
+   кольцо ауры живёт снаружи обложки. Иначе на экране один чёрный прямоугольник.
+   Специфичность выше правила position из adaptive.css — иначе диск остаётся в потоке. */
+.sky-shell.is-wave .wave-stage.is-video > .wave-disc {
+  --wave-aura-scale: 1.18;
+  position: absolute;
+  z-index: 1;
+  inset: 36px 22px 28px;
+  width: auto;
+  height: auto;
+}
+
+.wave-stage.is-video {
+  justify-content: flex-start;
+}
+
+.wave-stage.is-video .wave-return {
+  margin-bottom: 0;
+}
+
+.wave-stage.is-video .wave-pill {
+  margin-top: auto;
+}
+
+.wave-stage.is-video .wave-controls {
+  margin-bottom: 8px;
+}
+
+.sky-shell.is-wave .wave-stage.is-video > .wave-return,
+.sky-shell.is-wave .wave-stage.is-video > .wave-pill,
+.sky-shell.is-wave .wave-stage.is-video > .wave-controls {
+  z-index: 2;
+}

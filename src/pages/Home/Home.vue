@@ -10,7 +10,7 @@
         <i v-if="hasUnread" class="badge-dot" />
       </button>
     </div>
-    <div class="wave-stage">
+    <div class="wave-stage" :class="{ 'is-video': clipActive }">
       <div class="wave-blobs" aria-hidden="true">
         <span class="wave-blob wave-blob-a" />
         <span class="wave-blob wave-blob-b" />
