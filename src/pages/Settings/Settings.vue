@@ -62,15 +62,16 @@
         </svg>
       </span>
     </SettingRow>
-    <SettingRow v-if="inApk" :title="updateAvailable ? 'Обновить приложение' : 'Приложение'" :idle="updateIdle">
+    <SettingRow v-if="inApk" :title="updateReady ? 'Обновить приложение' : 'Приложение'" :idle="updateIdle">
       <template #icon>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M20 12a8 8 0 1 1-2.3-5.7" />
           <path d="M20 4v5h-5" />
         </svg>
       </template>
-      <button v-if="updateAvailable" class="btn btn-ghost sm" type="button" @click="downloadApk">Обновить</button>
-      <button v-else class="btn btn-ghost sm" type="button" :disabled="apkChecking" @click="checkApk">Проверить обновления</button>
+      <button class="btn btn-ghost sm" type="button" :disabled="updateBusy" @click="checkUpdate">
+        {{ updateReady ? 'Обновить' : 'Проверить обновления' }}
+      </button>
     </SettingRow>
     <SettingRow v-else title="Скачать приложение" idle="APK" clickable @open="sheet = 'download'">
       <template #icon>

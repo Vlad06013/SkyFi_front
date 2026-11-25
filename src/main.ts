@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import { IonicVue } from '@ionic/vue';
@@ -29,6 +30,12 @@ import './styles/kit.css';
 import './styles/base.css';
 import './styles/app.css';
 import './styles/adaptive.css';
+
+if (Capacitor.isNativePlatform()) {
+  // Битый бандл без этого отката плагин откатит сам. Звать до сети:
+  // таймаут плагина короткий, bootstrap его не ждёт.
+  void CapacitorUpdater.notifyAppReady();
+}
 
 if (Capacitor.getPlatform() === 'android') {
   // Пока нативный инсет не доехал, колокольчик не должен сидеть на батарее.

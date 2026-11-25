@@ -13,6 +13,7 @@ import YandexCard from '@/components/YandexCard/YandexCard.vue';
 import YoutubeCard from '@/components/YoutubeCard/YoutubeCard.vue';
 import QrScannerSheet from '@/components/QrScannerSheet/QrScannerSheet.vue';
 import { useApkBuildStore } from '@/stores/apk-build';
+import { useAppUpdateStore } from '@/stores/app-update';
 import { useAuthStore } from '@/stores/auth';
 import { useDownloadsStore } from '@/stores/downloads';
 import { usePlayerStore } from '@/stores/player';
@@ -44,10 +45,11 @@ export default defineComponent({
     );
 
     const apk = useApkBuildStore();
-    const { updateIdle, updateAvailable, checking: apkChecking } = storeToRefs(apk);
+    const updates = useAppUpdateStore();
+    const { idle: updateIdle, ready: updateReady, checking: updateChecking, downloading: updateDownloading } = storeToRefs(updates);
     // Вкладка живёт в keep-alive: onActivated — каждый заход, не только первый.
     onActivated(() => {
-      void apk.refresh(false, true);
+      void updates.check();
     });
     const downloads = useDownloadsStore();
     const { items: downloadedItems, downloadedBytes } = storeToRefs(downloads);
@@ -138,12 +140,11 @@ export default defineComponent({
       avatarInput,
       avatarBusy,
       confirmClear,
-      inApk: apk.inApk,
+      inApk: updates.inApk,
       updateIdle,
-      updateAvailable,
-      apkChecking,
-      downloadApk: apk.downloadApk,
-      checkApk: () => void apk.refresh(true),
+      updateReady,
+      updateBusy: computed(() => updateChecking.value || updateDownloading.value),
+      checkUpdate: () => void updates.check(true),
       hasDownloads,
       downloadedSize,
       builds,

@@ -24,6 +24,7 @@
     "@capacitor/preferences": "^8.0.1",
     "@capacitor/status-bar": "8.0.4",
     "@capgo/capacitor-media-session": "^8.1.8",
+    "@capgo/capacitor-updater": "^8.54.2",
     "@ionic/vue": "^9.0.0",
     "@ionic/vue-router": "^9.0.0",
     "axios": "^1.20.0",

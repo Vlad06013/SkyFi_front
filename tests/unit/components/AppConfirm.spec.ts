@@ -52,6 +52,17 @@ describe('components/AppConfirm', () => {
     expect(esc.emitted('close')).toHaveLength(1);
   });
 
+  it('обязательный диалог не закрывается и прячет отмену', async () => {
+    const wrapper = mountConfirm({ locked: true, confirmDisabled: true });
+    expect(wrapper.findAll('.confirm-btn')).toHaveLength(1);
+
+    await wrapper.find('.confirm-mask').trigger('click');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    await wrapper.find('.confirm-btn').trigger('click');
+    expect(wrapper.emitted('close')).toBeUndefined();
+    expect(wrapper.emitted('confirm')).toBeUndefined();
+  });
+
   it('закрыт — не рендерится', () => {
     const wrapper = mountConfirm({ open: false });
     expect(wrapper.find('.confirm-sheet').exists()).toBe(false);

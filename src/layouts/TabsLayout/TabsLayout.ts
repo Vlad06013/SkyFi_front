@@ -5,6 +5,7 @@ import TabBar from '@/components/TabBar/TabBar.vue';
 import NotificationPanel from '@/components/NotificationPanel/NotificationPanel.vue';
 import NowPlaying from '@/components/NowPlaying/NowPlaying.vue';
 import { refreshActivePage } from '@/composables/usePageRefresh';
+import { useAppUpdateStore } from '@/stores/app-update';
 
 export default defineComponent({
   name: 'TabsLayout',
@@ -74,6 +75,7 @@ export default defineComponent({
       }
       pull.value = 56;
       refreshing.value = true;
+      void useAppUpdateStore().check();
       const started = Date.now();
       void refreshActivePage(route.name).finally(async () => {
         const wait = 450 - (Date.now() - started);

@@ -10,11 +10,12 @@
             class="btn confirm-btn"
             :class="danger ? 'btn-danger' : 'btn-primary'"
             type="button"
+            :disabled="confirmDisabled"
             @click="onConfirm"
           >
             {{ confirmLabel }}
           </button>
-          <button class="btn btn-secondary confirm-btn" type="button" @click="close">
+          <button v-if="!locked" class="btn btn-secondary confirm-btn" type="button" @click="close">
             {{ cancelLabel }}
           </button>
         </div>
