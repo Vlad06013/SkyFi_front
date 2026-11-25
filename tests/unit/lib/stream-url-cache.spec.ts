@@ -1,9 +1,47 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const rows = vi.hoisted(() => new Map<string, { key: string; entry: { expiresAt: number } }>());
+
+vi.mock('dexie', () => {
+  class Table {
+    put(row: { key: string; entry: { expiresAt: number } }) {
+      rows.set(row.key, row);
+      return Promise.resolve();
+    }
+    delete(key: string) {
+      rows.delete(key);
+      return Promise.resolve();
+    }
+    clear() {
+      rows.clear();
+      return Promise.resolve();
+    }
+    bulkDelete(keys: string[]) {
+      for (const key of keys) rows.delete(key);
+      return Promise.resolve();
+    }
+    toArray() {
+      return Promise.resolve([...rows.values()]);
+    }
+  }
+  class Dexie {
+    version() {
+      return {
+        stores: () => {
+          this.urls = new Table();
+        },
+      };
+    }
+  }
+  return { default: Dexie };
+});
+
 import {
   cacheAudioUrl,
   cacheVideoStreams,
   clearStreamCache,
   getCachedStream,
+  hydrateStreamCache,
   invalidateStream,
 } from '@/lib/stream-url-cache';
 import type { AnySnapshot } from '@/types';
@@ -70,5 +108,22 @@ describe('lib/stream-url-cache', () => {
 
   it('несуществующий ключ — null', () => {
     expect(getCachedStream(track('missing'))).toBeNull();
+  });
+
+  it('после загрузки базы свежая ссылка жива, протухшая выметается', async () => {
+    rows.set('yandex_music:live', {
+      key: 'yandex_music:live',
+      entry: { expiresAt: 1_000_000 + 300_000 },
+    });
+    rows.set('yandex_music:dead', {
+      key: 'yandex_music:dead',
+      entry: { expiresAt: 1_000_000 },
+    });
+
+    await hydrateStreamCache();
+
+    expect(getCachedStream(track('live'))).not.toBeNull();
+    expect(getCachedStream(track('dead'))).toBeNull();
+    expect(rows.has('yandex_music:dead')).toBe(false);
   });
 });

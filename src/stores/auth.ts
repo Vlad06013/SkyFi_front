@@ -4,6 +4,7 @@ import type { AuthPayload, AuthUser } from '@/types';
 import { ApiError } from '@/api/http';
 import * as authApi from '@/api/auth';
 import * as session from '@/lib/session';
+import { clearStreamCache } from '@/lib/stream-url-cache';
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<AuthUser | null>(null);
@@ -93,6 +94,7 @@ export const useAuthStore = defineStore('auth', () => {
   async function reset() {
     token.value = null;
     user.value = null;
+    clearStreamCache();
     await session.clearSession();
   }
 

@@ -13,6 +13,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useAppStore } from '@/stores/app';
 import { useDevicesStore } from '@/stores/devices';
 import { useOnlineStore } from '@/stores/online';
+import { hydrateStreamCache } from '@/lib/stream-url-cache';
 import { usePlayerStore } from '@/stores/player';
 
 import '@ionic/vue/css/core.css';
@@ -40,11 +41,13 @@ onUnauthorized(() => {
 app.mount('#app');
 
 const appStore = useAppStore(pinia);
-void appStore.bootstrap().finally(() => {
+void appStore.bootstrap().finally(async () => {
   void useOnlineStore(pinia).startPolling();
   // Session-scoped сервисы: presence устройства + сокеты (docs/plan-sockets.md).
   useDevicesStore(pinia).bindPresence();
   bindSessionRealtime();
+  // Ссылки get-url из прошлой сессии — до движка, иначе он запросит текущий трек заново.
+  await hydrateStreamCache();
   // Плеер: серверное состояние + реконнект-рефетч + аудио-движок (docs/plan-player.md).
   usePlayerStore(pinia).bindServerPlayback();
   useAudioPlayback();
