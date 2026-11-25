@@ -172,11 +172,14 @@ avatar_url}`. QR-поллинг при confirmed отдаёт полную мо�
 `device_uuid`, int-id устройств на провод не уходит. Presence:
 устройство «живо», пока шлёт heartbeat чаще порога онлайна;
 активное устройство плеера (`active_device_id`) обнуляется,
-если оно перестало отмечаться.
+если оно перестало отмечаться (планировщик раз в минуту,
+клиенты получают `playback.state.updated` с null и свежей
+`version`). Признака «активности» у самого устройства нет —
+активное определяется только `active_device_id` состояния.
 
 | Метод/путь | Тело → Ответ |
 |---|---|
-| `GET /` | → `{devices: [{device_uuid, name, type, is_active, last_seen_at}]}` (только онлайн; presence-модель) |
+| `GET /` | → `{devices: [{device_uuid, name, type, last_seen_at}]}` (только онлайн; presence-модель) |
 | `POST /` (30/мин) | `{name, type: phone\|computer\|car\|tv, origin_device_id: uuid, command_id}` → устройство; повторная регистрация по тому же uuid обновляет профиль |
 | `PATCH /{device}/activate` (30/мин) | `{origin_device_id, command_id}` → это устройство — активное (играет); `{device}` в пути — `device_uuid` |
 | `POST /player/devices/heartbeat` (120/мин) | `{origin_device_id: uuid}` → `{message: "ok"}` — продлить presence; неизвестный uuid — 404 |
@@ -199,14 +202,15 @@ null (ISO 8601, свежесть замера позиции), active_device_id|
 `QueueItem`: `{id, player_state_id, added_by_user_id, position,
 status: pending|playing_now|played|skipped, snapshot|null}`.
 
-`version` растёт с каждым изменением: устройство применяет
-апдейт только если `version` новее локального — отсекает
-устаревшие/дубли (в дополнение к `command_id`).
+`version` растёт с каждым изменением состояния (команды плеера,
+регистрация устройства — состав `devices[]` тоже часть состояния):
+устройство применяет апдейт только если `version` новее локального —
+отсекает устаревшие/дубли (в дополнение к `command_id`).
 
 | Метод/путь | Тело → Ответ |
 |---|---|
 | `POST /play` | `{snapshot: {<конверт любого типа>}, playback_source: single\|queue\|favorites\|search\|playlist\|uploads\|wave, origin_device_id, command_id, context_ref?, shuffle_seed?}` → новое состояние; позиция 0, is_playing=true |
-| `POST /pause` | `{origin_device_id, command_id}` |
+| `POST /pause` | `{origin_device_id, command_id, position_seconds?}` — `position_seconds`: точная позиция на момент паузы (её знает паузящее устройство); без поля позиция остаётся последней замеренной, штамп `position_updated_at` не меняется |
 | `POST /resume` | `{origin_device_id, command_id}` |
 | `POST /seek` | `{position_seconds, origin_device_id, command_id}` |
 | `PATCH /options` | `{options: {repeat_mode?, shuffle_enabled?}, origin_device_id, command_id, shuffle_seed?}` |
@@ -509,7 +513,7 @@ handshake `POST /broadcasting/auth` — путь на корне origin, вне
 
 | Ивент | Каналы | Payload | Когда |
 |---|---|---|---|
-| `playback.state.updated` | User.{id}, friends.{id} | `{state, origin_device_id, command_id}` | любая команда плеера; `state` — тот же JSON, что `GET /player` |
+| `playback.state.updated` | User.{id}, friends.{id} | `{state, queue, origin_device_id, command_id}` | любая команда плеера, регистрация устройства, обнуление presence; `state`/`queue` — тот же JSON, что `GET /player` |
 | `playback.queue.updated` | User.{id}, friends.{id} | `{item: {title, artists}\|null, origin_device_id, command_id}` | add (item заполнен — тост «добавлено»), remove/reorder (null) |
 | `playback.wave.updated` | User.{id} | `{origin_device_id, command_id}` | окно волны изменилось (холодный старт, догрузка): клиент инвалидирует локальную копию и делает `GET /wave` |
 | `friend.queue.item.added` | User.{id} очередника | `{added_by: {id, name}, item: {source_id, title, artists}}` | друг добавил в мою очередь |

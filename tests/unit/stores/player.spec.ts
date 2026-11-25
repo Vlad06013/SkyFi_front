@@ -1,18 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
+import * as devicesApi from '@/api/devices';
 import * as playerApi from '@/api/player';
 import * as queueApi from '@/api/queue';
+import * as searchApi from '@/api/search';
 import { useAuthStore } from '@/stores/auth';
 import { useDevicesStore } from '@/stores/devices';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
-import type { QueueItem, TrackSnapshot, VideoSnapshot } from '@/types';
+import type { PlayerDevice, QueueItem, SearchPagePayload, TrackSnapshot, VideoSnapshot } from '@/types';
 
 vi.mock('@/api/queue', () => ({
   fetchQueue: vi.fn(),
   addToQueue: vi.fn(),
   removeFromQueue: vi.fn(),
   reorderPending: vi.fn(),
+}));
+
+vi.mock('@/api/search', () => ({
+  fetchSearch: vi.fn(),
 }));
 
 vi.mock('@/api/player', () => ({
@@ -24,12 +30,24 @@ vi.mock('@/api/player', () => ({
   patchPlaybackOptions: vi.fn(),
 }));
 
+vi.mock('@/api/devices', () => ({
+  fetchDevices: vi.fn(),
+  registerDevice: vi.fn(),
+  activateDevice: vi.fn(),
+  removeDevice: vi.fn(),
+  sendHeartbeat: vi.fn(),
+}));
+
 const fetchQueueMock = vi.mocked(queueApi.fetchQueue);
 const addToQueueMock = vi.mocked(queueApi.addToQueue);
 const removeFromQueueMock = vi.mocked(queueApi.removeFromQueue);
 const reorderPendingMock = vi.mocked(queueApi.reorderPending);
+const fetchSearchMock = vi.mocked(searchApi.fetchSearch);
+const fetchPlayerStateMock = vi.mocked(playerApi.fetchPlayerState);
 const pausePlaybackMock = vi.mocked(playerApi.pausePlayback);
 const playSnapshotMock = vi.mocked(playerApi.playSnapshot);
+const resumePlaybackMock = vi.mocked(playerApi.resumePlayback);
+const activateDeviceMock = vi.mocked(devicesApi.activateDevice);
 
 const track: TrackSnapshot = {
   type: 'track',
@@ -428,5 +446,624 @@ describe('stores/player: рассинхрон сервера с реальным
 
     expect(pausePlaybackMock).not.toHaveBeenCalled();
     expect(player.isPlaying).toBe(true);
+  });
+});
+
+
+describe('stores/player: активация устройства', () => {
+  const me: PlayerDevice = {
+    device_uuid: 'uuid-1',
+    name: 'Мой телефон',
+    type: 'phone',
+    last_seen_at: null,
+  };
+  const other: PlayerDevice = { ...me, device_uuid: 'uuid-2', name: 'Планшет' };
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    const auth = useAuthStore();
+    auth.user = { id: 1 } as never;
+    const devices = useDevicesStore();
+    devices.myDeviceUuid = 'uuid-1';
+  });
+
+  /** Авторизованный стор с треком; активное устройство задаёт тест. */
+  function playerWith(activeUuid: string | null, online: PlayerDevice[] = []) {
+    const player = usePlayerStore();
+    player.state = {
+      ...player.state,
+      current_snapshot: track,
+      is_playing: false,
+      active_device_id: activeUuid,
+      devices: online,
+    };
+    return player;
+  }
+
+  it('activateDevice: ответ применяется к стейту плеера', async () => {
+    const player = playerWith('uuid-1', [me, other]);
+    activateDeviceMock.mockResolvedValue({
+      state: { ...player.state, active_device_id: 'uuid-2' },
+      queue: [],
+    } as never);
+
+    await expect(player.activateDevice('uuid-2')).resolves.toBe(true);
+
+    expect(activateDeviceMock).toHaveBeenCalledWith('uuid-2', {
+      origin_device_id: 'uuid-1',
+      command_id: expect.any(String),
+    });
+    expect(player.state.active_device_id).toBe('uuid-2');
+  });
+
+  it('activateDevice: ошибка — откат активного в стейте, тост, false', async () => {
+    const player = playerWith('uuid-1', [me, other]);
+    activateDeviceMock.mockRejectedValue(new Error('бэк упал'));
+
+    await expect(player.activateDevice('uuid-2')).resolves.toBe(false);
+
+    expect(player.state.active_device_id).toBe('uuid-1');
+    expect(useToastStore().toast?.error).toBe(true);
+  });
+
+  it('activateDevice: мой uuid неизвестен — API не зовём', async () => {
+    useDevicesStore().myDeviceUuid = null;
+    const player = playerWith(null);
+
+    await expect(player.activateDevice('uuid-2')).resolves.toBe(false);
+    expect(activateDeviceMock).not.toHaveBeenCalled();
+  });
+
+  it('playSnapshot: я активен — ни resync, ни активации', async () => {
+    const player = playerWith('uuid-1', [me]);
+    playSnapshotMock.mockResolvedValue({ state: { ...player.state }, queue: [] } as never);
+
+    await player.playSnapshot(track, 'favorites');
+
+    expect(fetchPlayerStateMock).not.toHaveBeenCalled();
+    expect(activateDeviceMock).not.toHaveBeenCalled();
+    expect(playSnapshotMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('playSnapshot: онлайн-активного нет — сначала активация, потом /play', async () => {
+    const player = playerWith(null);
+    fetchPlayerStateMock.mockResolvedValue({
+      state: { ...player.state, active_device_id: null, devices: [] },
+      queue: [],
+    } as never);
+    activateDeviceMock.mockResolvedValue({
+      state: { ...player.state, active_device_id: 'uuid-1', devices: [me] },
+      queue: [],
+    } as never);
+    playSnapshotMock.mockResolvedValue({ state: { ...player.state }, queue: [] } as never);
+
+    await player.playSnapshot(track, 'favorites');
+
+    expect(activateDeviceMock).toHaveBeenCalledWith('uuid-1', expect.anything());
+    expect(playSnapshotMock).toHaveBeenCalledTimes(1);
+    expect(activateDeviceMock.mock.invocationCallOrder[0]).toBeLessThan(
+      playSnapshotMock.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('playSnapshot: активно другое онлайн-устройство — остаёмся пультом', async () => {
+    const player = playerWith('uuid-2', [other]);
+    fetchPlayerStateMock.mockResolvedValue({
+      state: { ...player.state, active_device_id: 'uuid-2', devices: [other] },
+      queue: [],
+    } as never);
+    playSnapshotMock.mockResolvedValue({ state: { ...player.state }, queue: [] } as never);
+
+    await player.playSnapshot(track, 'favorites');
+
+    expect(activateDeviceMock).not.toHaveBeenCalled();
+    expect(playSnapshotMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('togglePlay (resume): активного нет — активация + resume', async () => {
+    const player = playerWith(null);
+    fetchPlayerStateMock.mockResolvedValue({
+      state: { ...player.state, active_device_id: null, devices: [] },
+      queue: [],
+    } as never);
+    activateDeviceMock.mockResolvedValue({
+      state: { ...player.state, active_device_id: 'uuid-1', devices: [me] },
+      queue: [],
+    } as never);
+    resumePlaybackMock.mockResolvedValue({
+      state: { ...player.state, is_playing: true, active_device_id: 'uuid-1', devices: [me] },
+      queue: [],
+    } as never);
+
+    await player.togglePlay();
+
+    expect(activateDeviceMock).toHaveBeenCalledWith('uuid-1', expect.anything());
+    expect(resumePlaybackMock).toHaveBeenCalledTimes(1);
+    expect(player.state.is_playing).toBe(true);
+  });
+
+  it('togglePlay (пауза): чужое активное — пауза без активации и resync', async () => {
+    const player = playerWith('uuid-2', [other]);
+    player.state = { ...player.state, is_playing: true };
+    pausePlaybackMock.mockResolvedValue({
+      state: { ...player.state, is_playing: false },
+      queue: [],
+    } as never);
+
+    await player.togglePlay();
+
+    expect(pausePlaybackMock).toHaveBeenCalledTimes(1);
+    expect(activateDeviceMock).not.toHaveBeenCalled();
+    expect(fetchPlayerStateMock).not.toHaveBeenCalled();
+  });
+
+  it('applyActiveDevice: патчит стейт; повтор тем же uuid — без изменений', () => {
+    const player = playerWith('uuid-1', [me]);
+
+    player.applyActiveDevice('uuid-2');
+    expect(player.state.active_device_id).toBe('uuid-2');
+
+    player.applyActiveDevice(null);
+    expect(player.state.active_device_id).toBeNull();
+  });
+});
+
+
+describe('stores/player: realtime-синхронизация', () => {
+  const me: PlayerDevice = {
+    device_uuid: 'uuid-1',
+    name: 'Мой телефон',
+    type: 'phone',
+    last_seen_at: null,
+  };
+  const other: PlayerDevice = { ...me, device_uuid: 'uuid-2', name: 'Планшет' };
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    const auth = useAuthStore();
+    auth.user = { id: 1 } as never;
+    const devices = useDevicesStore();
+    devices.myDeviceUuid = 'uuid-1';
+    vi.mocked(playerApi.seekTo).mockResolvedValue({ state: null as never, queue: [] } as never);
+  });
+
+  describe('экстраполяция позиции по position_updated_at', () => {
+    /** Зеркало пульта: играет чужое устройство, замер позиции 5 с назад. */
+    function remoteMirror(over: Record<string, unknown> = {}) {
+      const player = usePlayerStore();
+      player.applyServerState(
+        {
+          state: {
+            ...player.state,
+            current_snapshot: track,
+            is_playing: true,
+            position_seconds: 100,
+            position_updated_at: new Date(Date.now() - 5_000).toISOString(),
+            active_device_id: 'uuid-2',
+            devices: [other],
+            ...over,
+          },
+          queue: [],
+        } as never,
+        { force: true },
+      );
+      return player;
+    }
+
+    it('свежий штамп: якорь докидывает время с момента замера', () => {
+      const player = remoteMirror();
+      // Докид ≈5 с; нижняя граница с запасом на мс между созданием стора
+      // (nowTick) и применением стейта — они вычитаются из экстраполяции.
+      expect(player.positionSeconds).toBeGreaterThan(104);
+      expect(player.positionSeconds).toBeLessThan(107);
+    });
+
+    it('пауза: докида нет', () => {
+      const player = remoteMirror({ is_playing: false });
+      expect(player.positionSeconds).toBe(100);
+    });
+
+    it('протухший штамп: докид 0 — страховка от кривых часов и resume без штампа', () => {
+      const player = remoteMirror({
+        position_updated_at: new Date(Date.now() - 300_000).toISOString(),
+      });
+      expect(player.positionSeconds).toBeLessThan(101);
+    });
+
+    it('позиционный репорт не двигает экстраполяцию рывком', () => {
+      const player = remoteMirror();
+      const before = player.positionSeconds;
+
+      // Репорт активного: позиция догнала экстраполяцию, штамп свежий.
+      player.applySocketState({
+        state: {
+          ...player.state,
+          position_seconds: Math.round(before),
+          position_updated_at: new Date().toISOString(),
+          version: player.state.version + 1,
+        },
+        queue: [],
+      });
+
+      expect(Math.abs(player.positionSeconds - before)).toBeLessThan(1.5);
+    });
+
+    it('сокет-репорт с той же очередью не пересоздаёт список (новые объекты, то же содержимое)', () => {
+      const player = remoteMirror();
+      const items = [makeItem(1, 1)];
+      player.applyServerState(
+        { state: { ...player.state, version: player.state.version + 1 }, queue: items } as never,
+        { force: true },
+      );
+      const queueRef = player.queue;
+
+      player.applySocketState({
+        state: { ...player.state, position_seconds: 101, version: player.state.version + 1 },
+        queue: items.map((item) => ({ ...item })),
+      });
+
+      expect(player.queue).toBe(queueRef);
+    });
+
+    it('изменившаяся очередь из сокет-стейта применяется', () => {
+      const player = remoteMirror();
+      player.applyServerState(
+        { state: { ...player.state, version: player.state.version + 1 }, queue: [makeItem(1, 1)] } as never,
+        { force: true },
+      );
+
+      player.applySocketState({
+        state: { ...player.state, version: player.state.version + 1 },
+        queue: [makeItem(1, 1), makeItem(2, 2)],
+      });
+
+      expect(player.queue.map((item) => item.id)).toEqual([1, 2]);
+    });
+
+    it('локальный seek обновляет штамп — старый elapsed не прилипает', () => {
+      vi.useFakeTimers();
+      try {
+        const player = usePlayerStore();
+        // Я активен, играю; штамп 20-секундной давности (в пределах доверия).
+        player.applyServerState(
+          {
+            state: {
+              ...player.state,
+              current_snapshot: track,
+              is_playing: true,
+              position_seconds: 30,
+              position_updated_at: new Date(Date.now() - 20_000).toISOString(),
+              active_device_id: 'uuid-1',
+              devices: [me],
+            },
+            queue: [],
+          } as never,
+          { force: true },
+        );
+
+        player.seek(60);
+
+        // Без свежего штампа к 60 прилипло бы +20 докида.
+        expect(player.positionSeconds).toBeGreaterThanOrEqual(60);
+        expect(player.positionSeconds).toBeLessThan(62);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+  });
+
+  describe('reconnect: слияние по владению', () => {
+    it('активное устройство: воспроизведение локальное, координация серверная', async () => {
+      const player = usePlayerStore();
+      // Холодный старт — первая загрузка всегда полной подменой.
+      fetchPlayerStateMock.mockResolvedValue({
+        state: {
+          ...player.state,
+          current_snapshot: track,
+          is_playing: true,
+          position_seconds: 10,
+          active_device_id: 'uuid-1',
+          devices: [me],
+          version: 8,
+        },
+        queue: [],
+      } as never);
+      await player.resync();
+      expect(player.state.position_seconds).toBe(10);
+
+      // Локальная жизнь: играем дальше, позиция ушла вперёд.
+      player.state = { ...player.state, position_seconds: 77 };
+
+      // Reconnect: сервер отстал (последний репорт — 20), version вырос.
+      fetchPlayerStateMock.mockResolvedValue({
+        state: {
+          ...player.state,
+          position_seconds: 20,
+          version: 11,
+          active_device_id: 'uuid-1',
+          devices: [me],
+        },
+        queue: [makeItem(5, 1)],
+      } as never);
+      await player.resync();
+
+      expect(player.state.position_seconds).toBe(77);
+      expect(player.state.is_playing).toBe(true);
+      expect(player.state.current_snapshot?.source_id).toBe(track.source_id);
+      expect(player.state.version).toBe(11);
+      expect(player.queue.map((item) => item.id)).toEqual([5]);
+    });
+
+    it('пульт: reconnect — полная подмена зеркала', async () => {
+      const player = usePlayerStore();
+      fetchPlayerStateMock.mockResolvedValue({
+        state: {
+          ...player.state,
+          current_snapshot: track,
+          is_playing: true,
+          position_seconds: 10,
+          active_device_id: 'uuid-2',
+          devices: [other],
+          version: 8,
+        },
+        queue: [],
+      } as never);
+      await player.resync();
+
+      player.state = { ...player.state, position_seconds: 77 };
+      fetchPlayerStateMock.mockResolvedValue({
+        state: { ...player.state, position_seconds: 20, version: 11 },
+        queue: [],
+      } as never);
+      await player.resync();
+
+      expect(player.state.position_seconds).toBe(20);
+    });
+
+    it('холодный старт активного устройства: подмена, не слияние', async () => {
+      const player = usePlayerStore();
+      fetchPlayerStateMock.mockResolvedValue({
+        state: {
+          ...player.state,
+          current_snapshot: { ...track, source_id: 'srv-track' },
+          is_playing: true,
+          position_seconds: 55,
+          active_device_id: 'uuid-1',
+          devices: [me],
+          version: 9,
+        },
+        queue: [],
+      } as never);
+      await player.resync();
+
+      expect(player.state.current_snapshot?.source_id).toBe('srv-track');
+      expect(player.state.position_seconds).toBe(55);
+    });
+  });
+});
+
+
+describe('stores/player: version-gate сокет-стейтов', () => {
+  const other: PlayerDevice = {
+    device_uuid: 'uuid-2',
+    name: 'Планшет',
+    type: 'phone',
+    last_seen_at: null,
+  };
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    const auth = useAuthStore();
+    auth.user = { id: 1 } as never;
+    useDevicesStore().myDeviceUuid = 'uuid-1';
+  });
+
+  function applied(version: number) {
+    const player = usePlayerStore();
+    player.applyServerState(
+      {
+        state: { ...player.state, version, position_seconds: 10, active_device_id: 'uuid-2', devices: [other] },
+        queue: [],
+      } as never,
+      { force: true },
+    );
+    return player;
+  }
+
+  it('тот же version — дубль, отбрасывается', () => {
+    const player = applied(5);
+
+    player.applySocketState({
+      state: { ...player.state, position_seconds: 55, version: 5 },
+      queue: [],
+    });
+
+    expect(player.state.position_seconds).toBe(10);
+  });
+
+  it('старший version отбрасывается', () => {
+    const player = applied(5);
+
+    player.applySocketState({
+      state: { ...player.state, position_seconds: 99, version: 4 },
+      queue: [],
+    });
+
+    expect(player.state.position_seconds).toBe(10);
+  });
+
+  it('свежий version применяется вместе с очередью из пейлоада', () => {
+    const player = applied(5);
+
+    player.applySocketState({
+      state: { ...player.state, position_seconds: 55, version: 6 },
+      queue: [makeItem(7, 1)],
+    });
+
+    expect(player.state.position_seconds).toBe(55);
+    expect(player.queue.map((item) => item.id)).toEqual([7]);
+  });
+});
+
+
+describe('stores/player: context_ref команды /play', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    const auth = useAuthStore();
+    auth.user = { id: 1 } as never;
+    useDevicesStore().myDeviceUuid = 'uuid-1';
+  });
+
+  /** Активное авторизованное устройство, играет плейлист с серверным ref. */
+  function playlistPlayer() {
+    const player = usePlayerStore();
+    player.state = {
+      ...player.state,
+      current_snapshot: track,
+      is_playing: true,
+      active_device_id: 'uuid-1',
+      play_source: 'playlist',
+      context_ref: 'skyfi:pl-1',
+    };
+    playSnapshotMock.mockResolvedValue({ state: { ...player.state }, queue: [] } as never);
+    return player;
+  }
+
+  function extraOf() {
+    return playSnapshotMock.mock.calls.at(-1)?.[3] as { context_ref?: string | null } | undefined;
+  }
+
+  it('переход движка внутри плейлиста сохраняет серверный ref', async () => {
+    const player = playlistPlayer();
+
+    await player.playSnapshot(track, 'playlist', { rollSeed: false });
+
+    expect(extraOf()?.context_ref).toBe('skyfi:pl-1');
+  });
+
+  it('явный contextRef из вызова побеждает над серверным', async () => {
+    const player = playlistPlayer();
+
+    await player.playSnapshot(track, 'playlist', { contextRef: 'skyfi:pl-2', rollSeed: false });
+
+    expect(extraOf()?.context_ref).toBe('skyfi:pl-2');
+  });
+
+  it('queue ref не трогает — в очереди живёт прежний контекст возврата', async () => {
+    const player = playlistPlayer();
+
+    await player.playSnapshot(track, 'queue', { rollSeed: false });
+
+    expect(extraOf()).not.toHaveProperty('context_ref');
+  });
+
+  it('single/favorites/uploads шлют null — их ref всегда null', async () => {
+    const player = playlistPlayer();
+
+    await player.playSnapshot(track, 'single', { rollSeed: false });
+    expect(extraOf()?.context_ref).toBeNull();
+    await player.playSnapshot(track, 'favorites', { rollSeed: false });
+    expect(extraOf()?.context_ref).toBeNull();
+    await player.playSnapshot(track, 'uploads', { rollSeed: false });
+    expect(extraOf()?.context_ref).toBeNull();
+  });
+});
+
+describe('stores/player: резолвер контекста по паре источник+ref', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    const auth = useAuthStore();
+    auth.user = { id: 1 } as never;
+    useDevicesStore().myDeviceUuid = 'uuid-1';
+  });
+
+  function searchPage(query: string, page: number, tracks: TrackSnapshot[]): SearchPagePayload {
+    const empty = { items: [], total: 0, has_more: false };
+    return {
+      query,
+      page,
+      best: null,
+      tracks: { items: tracks, total: tracks.length, has_more: false },
+      albums: empty,
+      artists: empty,
+      playlists: empty,
+      videos: empty,
+    };
+  }
+
+  function trackOf(id: string): TrackSnapshot {
+    return { ...track, source_id: id };
+  }
+
+  const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+  it('смена context_ref перечитывает контекст (плейлист А → плейлист Б)', async () => {
+    const player = usePlayerStore();
+    fetchSearchMock
+      .mockResolvedValueOnce(searchPage('рок', 1, [trackOf('s1'), trackOf('s2')]) as never)
+      .mockResolvedValueOnce(searchPage('джаз', 1, [trackOf('j1')]) as never);
+
+    player.applyServerState(
+      {
+        state: {
+          ...player.state,
+          current_snapshot: trackOf('s1'),
+          play_source: 'search',
+          context_ref: 'рок',
+          version: 8,
+        },
+        queue: [],
+      } as never,
+      { force: true },
+    );
+    await flush();
+
+    expect(fetchSearchMock).toHaveBeenCalledWith(expect.objectContaining({ q: 'рок' }));
+    expect(player.previewNext?.source_id).toBe('s2');
+
+    player.applyServerState(
+      {
+        state: {
+          ...player.state,
+          current_snapshot: trackOf('j1'),
+          play_source: 'search',
+          context_ref: 'джаз',
+          version: 9,
+        },
+        queue: [],
+      } as never,
+      { force: true },
+    );
+    await flush();
+
+    expect(fetchSearchMock).toHaveBeenCalledTimes(2);
+    expect(fetchSearchMock).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'джаз' }));
+    // Контекст сменился (repeat=all): превью циклится по новому одноэлементному списку.
+    expect(player.previewNext?.source_id).toBe('j1');
+  });
+
+  it('тот же источник и тот же ref — повторного запроса нет', async () => {
+    const player = usePlayerStore();
+    fetchSearchMock.mockResolvedValue(searchPage('рок', 1, [trackOf('s1')]) as never);
+
+    const state = {
+      ...player.state,
+      current_snapshot: trackOf('s1'),
+      play_source: 'search',
+      context_ref: 'рок',
+    };
+    player.applyServerState({ state: { ...state, version: 8 }, queue: [] } as never, { force: true });
+    await flush();
+    player.applyServerState({ state: { ...state, version: 9, position_seconds: 5 }, queue: [] } as never, {
+      force: true,
+    });
+    await flush();
+
+    expect(fetchSearchMock).toHaveBeenCalledTimes(1);
   });
 });

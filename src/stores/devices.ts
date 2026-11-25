@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { computed, ref, watch } from 'vue';
+import { ref, watch } from 'vue';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { Device } from '@capacitor/device';
@@ -7,7 +7,6 @@ import * as devicesApi from '@/api/devices';
 import * as identity from '@/lib/device';
 import { useAuthStore } from '@/stores/auth';
 import { useOnlineStore } from '@/stores/online';
-import { useToastStore } from '@/stores/toast';
 import type { PlayerDevice } from '@/types';
 
 /** Ритм heartbeat: заметно реже троттлинга роута (120/мин, api.md §4). */
@@ -28,30 +27,37 @@ function deviceType(): PlayerDevice['type'] {
 }
 
 export const useDevicesStore = defineStore('devices', () => {
-  const toast = useToastStore();
-
   /** Presence-список: только онлайн-устройства пользователя (api.md §4). */
   const devices = ref<PlayerDevice[]>([]);
-  /** Первичный GET прошёл (неудача сбрасывает флажок — повторим при следующем открытии шита). */
+  /** Presence-список хоть раз успешно загружен (сид/шит) — до этого «новое устройство» по сокету не отличить. */
   const loaded = ref(false);
   /** Постоянный uuid этого устройства — единственный его идентификатор на проводе:
    *  подпись команд (origin_device_id) и эхо-глушение (api.md §1.6). */
   const myDeviceUuid = ref<string | null>(null);
 
-  const activeUuid = computed(() => devices.value.find((device) => device.is_active)?.device_uuid ?? null);
-
   /** Ленивый первичный GET списка для шита устройств. */
   async function ensure() {
     if (loaded.value) return;
+    await refresh();
+  }
+
+  /**
+   * Форс-рефетч presence-списка: открытие шита устройств, сид после
+   * регистрации. Потеря presence сокетом не вещается (api.md §17),
+   * поэтому свежесть — только GET'ом.
+   */
+  async function refresh() {
     try {
       devices.value = await devicesApi.fetchDevices();
       loaded.value = true;
     } catch {
-      loaded.value = false;
+      /* список догрузится при следующем открытии шита */
     }
   }
 
   // --- Мутации списка: общие для ответов API и сокет-ивентов playback.device.*
+  // Признака «активности» у устройства нет (api.md §4): активное определяется
+  // только state.active_device_id плеера (stores/player.applyActiveDevice).
 
   function applyConnected(device: PlayerDevice) {
     const index = devices.value.findIndex((item) => item.device_uuid === device.device_uuid);
@@ -59,34 +65,8 @@ export const useDevicesStore = defineStore('devices', () => {
     else devices.value = [...devices.value, device];
   }
 
-  function applyChanged(deviceUuid: string) {
-    devices.value = devices.value.map((device) => ({
-      ...device,
-      is_active: device.device_uuid === deviceUuid,
-    }));
-  }
-
   function applyDisconnected(deviceUuid: string) {
     devices.value = devices.value.filter((device) => device.device_uuid !== deviceUuid);
-  }
-
-  /** Активация устройства (api.md §4): оптимистично, откат при ошибке. */
-  async function activate(deviceUuid: string): Promise<boolean> {
-    if (!myDeviceUuid.value) {
-      toast.show('Устройство ещё не зарегистрировано', '', true);
-      return false;
-    }
-    const prevActive = activeUuid.value;
-    applyChanged(deviceUuid);
-    const echo = { origin_device_id: myDeviceUuid.value, command_id: crypto.randomUUID() };
-    try {
-      await devicesApi.activateDevice(deviceUuid, echo);
-      return true;
-    } catch (cause) {
-      if (prevActive) applyChanged(prevActive);
-      toast.show(cause instanceof Error ? cause.message : 'Не удалось переключить устройство', '', true);
-      return false;
-    }
   }
 
   // --- Presence: регистрация + heartbeat
@@ -125,6 +105,9 @@ export const useDevicesStore = defineStore('devices', () => {
           command_id: crypto.randomUUID(),
         });
         applyConnected(device);
+        // Сид presence-списка: без него «новое устройство» по сокету не
+        // отличить от известного, а шит открывался бы со старым снимком.
+        void refresh();
         return true;
       } catch {
         /* офлайн/бэк недоступен — heartbeat не нужен */
@@ -188,11 +171,9 @@ export const useDevicesStore = defineStore('devices', () => {
     devices,
     loaded,
     myDeviceUuid,
-    activeUuid,
     ensure,
-    activate,
+    refresh,
     applyConnected,
-    applyChanged,
     applyDisconnected,
     registerPresence,
     stopPresence,

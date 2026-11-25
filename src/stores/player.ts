@@ -1,12 +1,22 @@
 import { acceptHMRUpdate, defineStore } from 'pinia';
 import { computed, ref, watch } from 'vue';
+import * as devicesApi from '@/api/devices';
 import * as playerApi from '@/api/player';
 import * as queueApi from '@/api/queue';
 import * as waveApi from '@/api/wave';
 import type { VideoHls, VideoStream } from '@/api/videos';
 import type { ClipAudioTrack } from '@/lib/hls-engine';
 import { fetchFavorites } from '@/api/favorites';
-import { resolveNext, resolvePrevious, snapshotKey, SKIP_RESTART_AFTER, type EngineAction, type EngineContext } from '@/lib/playback-engine';
+import { fetchContextPage, resolveContext } from '@/lib/context-resolver';
+import {
+  resolveNext,
+  resolvePrevious,
+  snapshotKey,
+  SKIP_RESTART_AFTER,
+  type EngineAction,
+  type EngineContext,
+  type NextReason,
+} from '@/lib/playback-engine';
 import { moveItem } from '@/lib/list-sort';
 import { unlockMediaPlayback } from '@/lib/media-unlock';
 import { readPlayerDevicePrefs, writePlayerDevicePrefs } from '@/lib/player-prefs';
@@ -92,8 +102,15 @@ export const usePlayerStore = defineStore('player', () => {
 
   /** Материализованный контекст (plan-player.md §2); для волны — серверное окно. */
   const contextItems = ref<AnySnapshot[]>([...favoriteTracks]);
-  /** Для какого play_source загружен contextItems (null — мок-начальник). */
-  let contextSource: PlaySource | null = null;
+  /**
+   * Ключ загруженного контекста: источник + ref. Смена плейлиста без смены
+   * источника — тоже перезагрузка (null — мок-начальник, ещё ни разу не резолвился).
+   */
+  let contextKeyLoaded: string | null = null;
+  /** У пагинированного источника (поиск/плейлист) за краем загруженного есть ещё. */
+  let contextHasMore = false;
+  /** Следующая страница за краем контекста (номер с 1). */
+  let contextNextPage = 2;
   /** Токен гонок контекста: применяет результат только последний запрос. */
   let contextToken = 0;
 
@@ -119,29 +136,130 @@ export const usePlayerStore = defineStore('player', () => {
 
   async function resync() {
     try {
-      applyServerState(await playerApi.fetchPlayerState(), { force: true });
+      const payload = await playerApi.fetchPlayerState();
+      // Слияние по владению (frontend.md §5): reconnect АКТИВНОГО устройства —
+      // воспроизведение остаётся локальным, иначе позиция откатывалась бы к
+      // последнему репорту. Пульт и холодный старт — полная подмена зеркала.
+      const mine = useDevicesStore().myDeviceUuid;
+      const stillActive = serverStateApplied && mine != null && payload.state?.active_device_id === mine;
+      if (stillActive) applyServerStateMerged(payload);
+      else applyServerState(payload, { force: true });
     } catch {
       /* resync — лучшее, что могли */
     }
   }
 
-  // --- Применение состояния: ответ команды (force) → сокет (version-gate) → GET на reconnect (force)
+  /**
+   * Reconnect активного устройства: координация (version, active_device_id,
+   * очередь, контекст-указатели, presence) — из сервера; трек, позиция и
+   * is_playing — локальные (мы истина воспроизведения, сервер отстаёт на
+   * интервал репорта; команды пульта из мёртвой зоны догонятся следующими
+   * ивентами — «последняя команда побеждает»).
+   */
+  function applyServerStateMerged(payload: PlayerStatePayload) {
+    if (!payload?.state) return;
+    state.value = {
+      ...payload.state,
+      current_snapshot: state.value.current_snapshot,
+      position_seconds: state.value.position_seconds,
+      position_updated_at: state.value.position_updated_at,
+      is_playing: state.value.is_playing,
+    };
+    queue.value = sortQueue(payload.queue ?? []);
+    queueLoaded.value = true;
+    anchorPosition();
+    void syncContextWithSource();
+  }
+
+  // --- Активное устройство: активация и авто-активация (api.md §4, plan-player.md §5)
+
+  /**
+   * Активация устройства (api.md §4). Ответ — полный стейт плеера: применяем
+   * сразу, своё эхо playback.device.changed роутер глушит. Активное в стейте
+   * переключаем оптимистично, при ошибке — откат.
+   */
+  async function activateDevice(deviceUuid: string): Promise<boolean> {
+    const fields = echo();
+    if (!fields) {
+      toast.show('Устройство ещё не зарегистрировано', '', true);
+      return false;
+    }
+    const prevActive = state.value.active_device_id;
+    applyActiveDevice(deviceUuid);
+    try {
+      const payload = await devicesApi.activateDevice(deviceUuid, fields);
+      applyServerState(payload, { force: true });
+      return true;
+    } catch (cause) {
+      applyActiveDevice(prevActive);
+      toast.show(errorText(cause, 'Не удалось переключить устройство'), '', true);
+      return false;
+    }
+  }
+
+  /**
+   * Перед «играй здесь» (/play, resume): активное устройство могло умереть
+   * без бродкаста — потерю presence бэк наружу не вещает (api.md §4/§17).
+   * Освежаем стейт; онлайн-активного нет — активируемся сами, иначе
+   * остаёмся пультом чужого активного устройства.
+   */
+  async function ensureActiveForPlayback() {
+    const devices = useDevicesStore();
+    if (!devices.myDeviceUuid) return;
+    await resync();
+    if (isActiveDevice.value) return;
+    const active = state.value.active_device_id;
+    const activeOnline =
+      active != null && state.value.devices.some((device) => device.device_uuid === active);
+    if (!activeOnline) await activateDevice(devices.myDeviceUuid);
+  }
+
+  /**
+   * Сокет playback.device.changed/disconnected: активное устройство сменилось
+   * вне команд плеера — патчим стейт, версию не трогаем (ближайший стейт
+   * с бэка перезапишет). Аудио-движок отреагирует вотчером isActiveDevice.
+   */
+  function applyActiveDevice(deviceUuid: string | null) {
+    if (state.value.active_device_id === deviceUuid) return;
+    state.value = { ...state.value, active_device_id: deviceUuid };
+  }
+
+  // --- Применение состояния: ответ команды (force) → сокет (version-gate) →
+  // --- reconnect (пульт — подмена, активное — слияние по владению)
+
+  /**
+   * Потолок доверия к `position_updated_at`: репорты идут раз в 10 с,
+   * свежий штамп — это секунды доставки. Протухший штамп (бэк не штампует
+   * при resume?) или кривые часы докида не дают — иначе слайдер прыгал бы.
+   */
+  const POSITION_STAMP_TRUST_S = 30;
 
   function anchorPosition() {
-    anchor.value = state.value.position_seconds;
+    let position = state.value.position_seconds;
+    // Пульт экстраполирует от серверного замера (api.md §5): без докида
+    // каждый позиционный репорт пересаживал бы якорь на округлённое значение
+    // и слайдер дёргался бы раз в интервал репорта.
+    if (state.value.is_playing && state.value.position_updated_at) {
+      const measuredAt = Date.parse(state.value.position_updated_at);
+      if (Number.isFinite(measuredAt)) {
+        const elapsed = (Date.now() - measuredAt) / 1000;
+        if (elapsed >= 0 && elapsed <= POSITION_STAMP_TRUST_S) position += elapsed;
+      }
+    }
+    anchor.value = position;
     anchorAt = Date.now();
   }
 
   function applyServerState(payload: PlayerStatePayload, opts: { force?: boolean } = {}) {
     if (!payload?.state) return;
+    // Версии монотонны (бэк-фикс 2026-11-25): устаревшие и дубли отсекаем.
     if (!opts.force && serverStateApplied && payload.state.version <= state.value.version) return;
     serverStateApplied = true;
-    // DEBUG(2026-11-23): фиксация расхождения снапшота на проводе — убрать после сверки.
-    if (payload.state.current_snapshot) {
-      console.debug('[player] state.current_snapshot keys:', Object.keys(payload.state.current_snapshot));
-    }
     state.value = payload.state;
-    queue.value = sortQueue(payload.queue ?? []);
+    // Сокет-репорты позиции несут ту же очередь — не пересоздаём массив,
+    // чтобы список очереди не перерисовывался на каждый репорт.
+    const nextQueue = sortQueue(payload.queue ?? []);
+    if (!sameQueue(nextQueue, queue.value)) queue.value = nextQueue;
     queueLoaded.value = true;
     anchorPosition();
     // Автопауза выключена: код на месте, вызов не стартует.
@@ -149,30 +267,50 @@ export const usePlayerStore = defineStore('player', () => {
     void syncContextWithSource();
   }
 
-  /** Сокет-ивент playback.state.updated (эхо и дедуп уже отсеял роутер). */
-  function applySocketState(view: PlayerStateView) {
-    applyServerState({ state: view, queue: queue.value });
+  /** Очередь совпадает по содержимому: сокет-стейты тащат очередь каждый
+   *  репорт новыми объектами — без сравнения список перерисовывался бы. */
+  function sameQueue(a: QueueItem[], b: QueueItem[]): boolean {
+    return (
+      a.length === b.length &&
+      a.every(
+        (item, index) =>
+          item.id === b[index].id && item.position === b[index].position && item.status === b[index].status,
+      )
+    );
   }
 
-  // --- Контекст (resolver, plan-player.md §2/§7): пока favorites с API и волна целиком
+  /** Сокет-ивент playback.state.updated (эхо и дедуп уже отсеял роутер):
+   *  пейлоад — тот же JSON, что GET /player (state + queue, api.md §17). */
+  function applySocketState(payload: PlayerStatePayload) {
+    applyServerState(payload);
+  }
+
+  // --- Контекст (resolver, plan-player.md §2/§7): favorites/uploads/волна —
+  // --- одним запросом; search/playlist по context_ref постранично
+
+  /** Ключ контекста из серверного стейта: источник + ref — указатель, не содержимое. */
+  function contextKeyOf(source: PlaySource, ref: string | null) {
+    return `${source}|${ref ?? ''}`;
+  }
 
   async function syncContextWithSource() {
-    const source = state.value.play_source;
-    if (source === contextSource) return;
+    const key = contextKeyOf(state.value.play_source, state.value.context_ref);
+    if (key === contextKeyLoaded) return;
     const token = ++contextToken;
-    contextSource = source;
+    contextKeyLoaded = key;
     try {
-      if (source === 'favorites') {
-        const favorites = await fetchFavorites();
-        if (token !== contextToken || contextSource !== 'favorites') return;
-        contextItems.value = favorites.tracks;
-      } else if (source === 'wave') {
-        const window = await waveApi.fetchWaveWindow();
-        if (token !== contextToken || contextSource !== 'wave') return;
-        contextItems.value = window;
-      } else {
-        contextItems.value = [];
-      }
+      const resolved = await resolveContext(
+        {
+          playSource: state.value.play_source,
+          contextRef: state.value.context_ref,
+          currentType: state.value.current_snapshot?.type ?? null,
+        },
+        state.value.current_snapshot,
+      );
+      if (token !== contextToken || contextKeyLoaded !== key) return;
+      contextItems.value = resolved.items;
+      contextHasMore = resolved.hasMore;
+      contextNextPage = resolved.pages + 1;
     } catch {
       /* контекст догрузится со следующим переходом */
     }
@@ -180,7 +318,7 @@ export const usePlayerStore = defineStore('player', () => {
 
   /** Ивент playback.wave.updated: окно изменилось — перечитываем целиком (api.md §14). */
   function invalidateWave() {
-    if (contextSource === 'wave') contextSource = null;
+    if (state.value.play_source === 'wave') contextKeyLoaded = null;
     void syncContextWithSource();
   }
 
@@ -202,8 +340,11 @@ export const usePlayerStore = defineStore('player', () => {
     void waveApi
       .fetchWaveWindow()
       .then((window) => {
-        if (contextSource !== 'wave' || state.value.play_source !== 'wave') return;
+        if (contextKeyLoaded !== contextKeyOf('wave', state.value.context_ref) || state.value.play_source !== 'wave')
+          return;
         contextItems.value = window;
+        contextHasMore = false;
+        contextNextPage = 2;
       })
       .catch(() => {
         /* следующий переход на хвост повторит */
@@ -226,12 +367,15 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   async function loadFavoritesContext(): Promise<AnySnapshot[]> {
-    if (contextSource === 'favorites' && contextItems.value.length) return contextItems.value;
+    const key = contextKeyOf('favorites', null);
+    if (contextKeyLoaded === key && contextItems.value.length) return contextItems.value;
     const token = ++contextToken;
-    contextSource = 'favorites';
+    contextKeyLoaded = key;
+    contextHasMore = false;
+    contextNextPage = 2;
     try {
       const favorites = await fetchFavorites();
-      if (token === contextToken && contextSource === 'favorites') contextItems.value = favorites.tracks;
+      if (token === contextToken && contextKeyLoaded === key) contextItems.value = favorites.tracks;
     } catch {
       /* fallback без списка — не страшно */
     }
@@ -260,6 +404,37 @@ export const usePlayerStore = defineStore('player', () => {
 
   let transitioning = false;
 
+  /**
+   * Догрузка страницы пагинированного контекста (поиск/плейлист), когда
+   * движок уперся в край загруженного: без неё next за краем страницы
+   * проваливался в fallback избранного, хотя контекст продолжается.
+   */
+  async function expandContextFor(action: EngineAction, reason: NextReason): Promise<EngineAction> {
+    if (action.action !== 'fallback_favorites') return action;
+    const source = state.value.play_source;
+    if ((source !== 'search' && source !== 'playlist') || !contextHasMore) return action;
+    try {
+      const page = await fetchContextPage(
+        {
+          playSource: source,
+          contextRef: state.value.context_ref,
+          currentType: state.value.current_snapshot?.type ?? null,
+        },
+        contextNextPage,
+      );
+      if (!page || contextKeyLoaded !== contextKeyOf(source, state.value.context_ref)) return action;
+      const known = new Set(contextItems.value.map((item) => snapshotKey(item)));
+      const fresh = page.items.filter((item) => !known.has(snapshotKey(item)));
+      contextItems.value = [...contextItems.value, ...fresh];
+      contextHasMore = page.hasMore;
+      contextNextPage += 1;
+      if (!fresh.length) return action;
+      return resolveNext(engineContext(), reason);
+    } catch {
+      return action;
+    }
+  }
+
   async function runAction(action: EngineAction) {
     switch (action.action) {
       case 'play':
@@ -283,7 +458,10 @@ export const usePlayerStore = defineStore('player', () => {
     if (transitioning) return;
     cancelPendingSeek();
     transitioning = true;
-    void runAction(resolveNext(engineContext(), reason)).finally(() => {
+    void (async () => {
+      const action = await expandContextFor(resolveNext(engineContext(), reason), reason);
+      await runAction(action);
+    })().finally(() => {
       transitioning = false;
     });
   }
@@ -306,7 +484,12 @@ export const usePlayerStore = defineStore('player', () => {
   async function restartTrack() {
     cancelPendingSeek();
     if (!canCommand.value) {
-      state.value = { ...state.value, position_seconds: 0, is_playing: true };
+      state.value = {
+        ...state.value,
+        position_seconds: 0,
+        is_playing: true,
+        position_updated_at: new Date().toISOString(),
+      };
       anchorPosition();
       return;
     }
@@ -317,6 +500,20 @@ export const usePlayerStore = defineStore('player', () => {
     } catch (cause) {
       toast.show(errorText(cause, 'Не удалось перезапустить трек'), '', true);
     }
+  }
+
+  /**
+   * context_ref для /play (api.md §5): явный из вызова побеждает; search/
+   * playlist без явного сохраняют серверный — переходы движка и next пульта
+   * идут внутри того же контекста, указатель стирать нельзя (пульт = зеркало,
+   * не источник контекста); queue ref не трогает (в очереди живёт прежний
+   * контекст возврата); остальные источники шлют null — их ref всегда null.
+   */
+  function playContextRef(playbackSource: PlaySource, explicit: string | null | undefined): string | null | undefined {
+    if (explicit !== undefined) return explicit;
+    if (playbackSource === 'queue') return undefined;
+    if (playbackSource === 'search' || playbackSource === 'playlist') return state.value.context_ref;
+    return null;
   }
 
   /**
@@ -334,9 +531,12 @@ export const usePlayerStore = defineStore('player', () => {
     unlockMediaPlayback();
     cancelPendingSeek();
     dropFromQueue(snapshotId(snapshot));
+    const contextRef = playContextRef(playbackSource, opts.contextRef);
     if (opts.contextItems) {
       contextItems.value = opts.contextItems;
-      contextSource = playbackSource;
+      contextKeyLoaded = contextRef === undefined ? null : contextKeyOf(playbackSource, contextRef);
+      contextHasMore = false;
+      contextNextPage = 2;
     }
     if (!canCommand.value) {
       state.value = {
@@ -345,6 +545,7 @@ export const usePlayerStore = defineStore('player', () => {
         position_seconds: 0,
         is_playing: true,
         play_source: playbackSource,
+        position_updated_at: new Date().toISOString(),
       };
       anchorPosition();
       return;
@@ -354,14 +555,13 @@ export const usePlayerStore = defineStore('player', () => {
       toast.show('Устройство ещё не зарегистрировано', '', true);
       return;
     }
+    // «Играть будет это устройство»: без онлайн-активного активируемся сами.
+    if (!isActiveDevice.value) await ensureActiveForPlayback();
     try {
-      // Тап из списка всегда задаёт контекст — ref шлём (null чистит старое).
       const extra: { context_ref?: string | null; shuffle_seed?: string | null } = {
         shuffle_seed: opts.rollSeed === false ? undefined : crypto.randomUUID(),
       };
-      if (playbackSource !== 'single' || opts.contextRef !== undefined) {
-        extra.context_ref = opts.contextRef ?? null;
-      }
+      if (contextRef !== undefined) extra.context_ref = contextRef;
       const payload = await playerApi.playSnapshot(snapshot, playbackSource, fields, extra);
       applyServerState(payload, { force: true });
     } catch (cause) {
@@ -396,7 +596,11 @@ export const usePlayerStore = defineStore('player', () => {
     if (now - lastToggleAt < 400) return;
     lastToggleAt = now;
     if (!canCommand.value) {
-      state.value = { ...state.value, is_playing: !state.value.is_playing };
+      state.value = {
+        ...state.value,
+        is_playing: !state.value.is_playing,
+        position_updated_at: new Date().toISOString(),
+      };
       anchorPosition();
       return;
     }
@@ -416,11 +620,24 @@ export const usePlayerStore = defineStore('player', () => {
       kickEngine();
       return;
     }
-    if (!wasPlaying) unlockMediaPlayback();
+    if (!wasPlaying) {
+      unlockMediaPlayback();
+      // Resume = «играть здесь»: без онлайн-активного активируемся сами.
+      if (!isActiveDevice.value) {
+        await ensureActiveForPlayback();
+        // Пока освежали стейт, играть могло начаться (сокет, другой тап) —
+        // цель достигнута, паузу вслед не шлём.
+        if (state.value.is_playing) return;
+      }
+    }
     // Оптимистично, с откатом по ошибке (plan-player.md §5). Пауза сама
     // увозит позицию — висящий seek отменяем, чтобы не дёргать бэк дважды.
     if (wasPlaying) cancelPendingSeek();
-    state.value = { ...state.value, is_playing: !wasPlaying };
+    state.value = {
+      ...state.value,
+      is_playing: !wasPlaying,
+      position_updated_at: new Date().toISOString(),
+    };
     anchorPosition();
     try {
       const payload = wasPlaying
@@ -428,7 +645,11 @@ export const usePlayerStore = defineStore('player', () => {
         : await playerApi.resumePlayback(fields);
       applyServerState(payload, { force: true });
     } catch (cause) {
-      state.value = { ...state.value, is_playing: wasPlaying };
+      state.value = {
+        ...state.value,
+        is_playing: wasPlaying,
+        position_updated_at: new Date().toISOString(),
+      };
       anchorPosition();
       toast.show(errorText(cause, 'Не удалось переключить воспроизведение'), '', true);
       void resync();
@@ -474,7 +695,7 @@ export const usePlayerStore = defineStore('player', () => {
   const anchor = ref(state.value.position_seconds);
   let anchorAt = Date.now();
   /** 1-секундный тикер: двигает экстраполированную позицию и шлёт периодический репорт. */
-  const nowTick = ref(0);
+  const nowTick = ref(Date.now());
   let positionTimer: ReturnType<typeof setInterval> | null = null;
 
   function startPositionTicker() {
@@ -804,7 +1025,9 @@ export const usePlayerStore = defineStore('player', () => {
     const step = next - (prev ?? 0);
     const duration = durationSeconds.value;
     const tickPct = duration > 0 ? (1.5 / duration) * 100 : 0;
-    const flowing = isPlaying.value && audioPlaying.value && !engineLoading.value && !streamWarming.value;
+    // Пульт звука не имеет, но зеркало играет — ползунок тоже ползёт плавно.
+    const sounding = audioPlaying.value || (!isActiveDevice.value && canCommand.value);
+    const flowing = isPlaying.value && sounding && !engineLoading.value && !streamWarming.value;
     progressSmooth.value = flowing && step > 0 && step <= tickPct;
   });
 
@@ -841,6 +1064,7 @@ export const usePlayerStore = defineStore('player', () => {
     state.value = {
       ...state.value,
       position_seconds: Math.min(max, Math.max(0, seconds)),
+      position_updated_at: new Date().toISOString(),
     };
     anchorPosition();
     // Драг шлёт десятки событий в секунду — на сервер уходит только последняя
@@ -1093,6 +1317,9 @@ export const usePlayerStore = defineStore('player', () => {
     setVolume,
     applyServerState,
     applySocketState,
+    applyActiveDevice,
+    activateDevice,
+    resync,
     invalidateWave,
     joinWave,
     bindServerPlayback,

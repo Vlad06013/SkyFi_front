@@ -1,10 +1,12 @@
-import type { FriendshipPayload, PlayerStateView, PlayerDevice } from '@/types/api';
+import type { FriendshipPayload, PlayerStateView, PlayerStatePayload, PlayerDevice } from '@/types/api';
 import type { AnySnapshot } from '@/types/snapshots';
 
 /** Payload ивентов сокетов (api.md §17, contracts.md «Сокеты»). */
 
+/** playback.state.updated: state/queue — тот же JSON, что GET /player. */
 export interface PlaybackStateUpdatedPayload {
   state: PlayerStateView;
+  queue: PlayerStatePayload['queue'];
   origin_device_id: string | null;
   command_id: string | null;
 }

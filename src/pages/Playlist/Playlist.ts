@@ -6,6 +6,7 @@ import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import { useEntityDetails } from '@/composables/useEntityDetails';
 import { coverVar, artistsLine, trackCover } from '@/lib/cover';
+import { playlistContextRef } from '@/lib/context-resolver';
 import { PLAY_SOURCE_PLAYLIST } from '@/lib/play-sources';
 import { usePlayerStore } from '@/stores/player';
 import { useFavoritesStore } from '@/stores/favorites';
@@ -31,7 +32,11 @@ export default defineComponent({
 
     function playAll() {
       const first = tracks.value[0];
-      if (first) player.playSnapshot(first, PLAY_SOURCE_PLAYLIST, { contextItems: tracks.value, contextRef: playlist.value?.source_id ?? null });
+      if (first && playlist.value)
+        player.playSnapshot(first, PLAY_SOURCE_PLAYLIST, {
+          contextItems: tracks.value,
+          contextRef: playlistContextRef(playlist.value.source_type, playlist.value.source_id),
+        });
     }
 
     function toggleLike() {

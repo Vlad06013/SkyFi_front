@@ -6,10 +6,10 @@ import type {
   WaveUpdatedPayload,
 } from '@/types/realtime';
 
-/** playback.state.updated (api.md §17): стейт целиком, version-gate в сторе. */
+/** playback.state.updated (api.md §17): state+queue целиком, version-gate в сторе. */
 export function handlePlaybackStateUpdated(payload: PlaybackStateUpdatedPayload) {
   if (!payload?.state) return;
-  usePlayerStore().applySocketState(payload.state);
+  usePlayerStore().applySocketState({ state: payload.state, queue: payload.queue ?? [] });
 }
 
 /** playback.queue.updated (api.md §17): add (item заполнен — тост «добавлено»), remove/reorder (null). */

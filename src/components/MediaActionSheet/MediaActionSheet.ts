@@ -9,6 +9,7 @@ import { friendInitial, friendTone } from '@/lib/friends';
 import { favoritePlaylists } from '@/mocks/catalog';
 import { useDevicesStore } from '@/stores/devices';
 import { useFriendsStore, type FriendEntry } from '@/stores/friends';
+import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
 import type { MediaSheet, MenuEntity } from '@/lib/media-menu';
 import type { PlayerDevice } from '@/types';
@@ -25,6 +26,7 @@ export default defineComponent({
     const toast = useToastStore();
     const friendsStore = useFriendsStore();
     const devicesStore = useDevicesStore();
+    const playerStore = usePlayerStore();
     const friendQuery = ref('');
     const friendFocus = ref(false);
 
@@ -91,7 +93,8 @@ export default defineComponent({
           void friendsStore.ensure();
         }
         if (next === 'devices') {
-          void devicesStore.ensure();
+          // Presence сокетом не догоняется — при каждом открытии свежий GET.
+          void devicesStore.refresh();
         }
       },
       // Монтирование сразу с открытым шитом — тоже обрабатываем.
@@ -155,7 +158,9 @@ export default defineComponent({
 
     const deviceList = computed(() => devicesStore.devices);
     const deviceLoaded = computed(() => devicesStore.loaded);
-    const activeDeviceUuid = computed(() => devicesStore.activeUuid);
+    // Активное устройство — только из стейта плеера (api.md §4: признака
+    // «активности» у самого устройства нет).
+    const activeDeviceUuid = computed(() => playerStore.state.active_device_id);
     const myDeviceUuid = computed(() => devicesStore.myDeviceUuid);
 
     function deviceCaption(device: PlayerDevice) {
@@ -166,7 +171,7 @@ export default defineComponent({
 
     async function pickDevice(deviceUuid: string) {
       const name = deviceList.value.find((device) => device.device_uuid === deviceUuid)?.name ?? '';
-      if (await devicesStore.activate(deviceUuid)) {
+      if (await playerStore.activateDevice(deviceUuid)) {
         toast.show(name, 'играет здесь');
         close();
       }

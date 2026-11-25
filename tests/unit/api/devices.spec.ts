@@ -23,7 +23,6 @@ const device: PlayerDevice = {
   device_uuid: UUID,
   name: 'Pixel 7',
   type: 'phone',
-  is_active: true,
   last_seen_at: '2026-11-20T06:00:00.000000Z',
 };
 

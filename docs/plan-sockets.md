@@ -21,9 +21,9 @@ payload — `contracts.md` «Сокеты», правила клиента — `
 
 | Ивент | Канал | Payload | Фронт |
 |---|---|---|---|
-| `playback.device.connected` | User.{id} | `{device, origin_device_id}` | обновить список устройств |
-| `playback.device.changed` | User.{id} | `{device_id, origin_device_id}` | сменить активное устройство |
-| `playback.device.disconnected` | User.{id} | `{device_id, device_name, origin_device_id, command_id}` | убрать устройство |
+| `playback.device.connected` | User.{id} | `{device, origin_device_id}` | обновить список устройств; незнакомый uuid (после сида) — тост «новое устройство в сети» |
+| `playback.device.changed` | User.{id} | `{device_id, origin_device_id}` | сменить активное устройство (список + `active_device_id` в стейте плеера) |
+| `playback.device.disconnected` | User.{id} | `{device_id, device_name, origin_device_id, command_id}` | убрать устройство; было активным — `active_device_id` → null |
 | `friendship.request.sent` | получателю | friendship целиком | upsert в incoming + бейдж |
 | `friendship.request.accepted` | отправителю | friendship целиком | outgoing → friends |
 | `friendship.request.declined`? | — | — | нет в контракте — не делаем |
@@ -43,6 +43,39 @@ payload — `contracts.md` «Сокеты», правила клиента — `
    ключа — дописать обёртку в доку.
 3. Панель уведомлений до сих пор на моке: заявки/шары прилетают в
    сторы и тосты, но бейджи панели — отдельная UI-задача (вне этапа).
+
+## Сверка 2026-11-25 (кросс-девайс) — ЗАКРЫТА бэком
+
+Бэк-фиксы подтверждены пробником №2/№3 (pusher-js + curl,
+свежий юзер после migrate:fresh):
+
+1. **`version` монотонна** — инкремент в `PlayerService::saveState`,
+   регистрация устройства тоже бампит (devices[] — часть состояния).
+   Пробник: версии 1→6 по командам, GET /player совпадает.
+   Фронт вернул строгий гейт `<=`.
+2. **Бродкаст — ресурс `GET /player`**: uuid в `active_device_id`,
+   `devices[]` на месте, сырых полей нет; очередь — соседний ключ
+   `{state, queue, origin_device_id, command_id}`. Фронт снял
+   `normalizeWireState`, очередь применяет из пейлоада (sameQueue
+   по содержимому id+position+status против перерисовок).
+3. **`is_active` у устройства удалён** — активное определяется
+   только `state.active_device_id`. Фронт убрал поле из типа,
+   `activeUuid`/`applyChanged` из devices store; шит читает
+   активное из стейта плеера.
+4. **`POST /pause`: `position_seconds` опционален** — фронт шлёт
+   всегда, совместимо.
+5. **Семантика активации (пробник №3)**: `/play` и `/resume` от
+   неактивного НЕ перехватывают активное, пока оно онлайн (пульт
+   сохранён); когда активного нет — бэк сам активирует origin.
+   Дополняет фронт-автоактивацию (она покрывает stale-случай
+   «active_device_id указывает на мёртвое» по `state.devices`).
+6. **Presence-таймаут**: планировщик ежеминутно обнуляет
+   `active_device_id` у мёртвых и вещает `state.updated` с null и
+   свежей версией — пульты узнают сами.
+7. `device.connected` диспатчится при каждой (пере)регистрации —
+   фронтовый known-фильтр тоста «новое устройство» корректен.
+8. Инвариант `position_updated_at` покрыт тестом бэка (пауза без
+   позиции штамп не двигает) — экстраполяция пультов валидна.
 
 ## Общая семантика
 
@@ -123,10 +156,13 @@ src/types/realtime.ts — payload-типы из contracts.md
 - [x] Юнит-тесты: роутер (uuid-эхо), social-хендлеры. Всего 257.
 
 ### Этап 3. Плеер (последним, отдельная схема)
-- [ ] Схема применения состояния (version-gate, эхо, конфликты
-      команд) — отдельная проработка перед кодом.
-- [ ] `playback.state.updated` → player store.
-- [ ] `playback.queue.updated` → тост + рефетч очереди.
-- [ ] Reconnect → `GET /player` подмена состояния.
+- [x] Схема применения состояния (version-gate, эхо, конфликты
+      команд) — роли «пульт-зеркало / активное-истина»,
+      reconnect-слияние по владению, экстраполяция позиции по
+      `position_updated_at` (2026-11-25, frontend.md §5).
+- [x] `playback.state.updated` → player store.
+- [x] `playback.queue.updated` → тост + рефетч очереди.
+- [x] Reconnect → `GET /player` подмена состояния (пульт) /
+      слияние по владению (активное).
 - [ ] Ленивая подписка `friends.{friendId}` для live now-playing
       на странице друга (замена поллинга).

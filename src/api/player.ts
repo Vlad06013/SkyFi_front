@@ -23,8 +23,6 @@ export function playSnapshot(
   echo: EchoFields,
   extra?: { context_ref?: string | null; shuffle_seed?: string | null },
 ) {
-  // DEBUG(2026-11-23): фиксация расхождения снапшота на проводе — убрать после сверки.
-  console.debug('[player] POST /play keys:', Object.keys(snapshot), snapshot);
   return http.post<PlayerStatePayload>('player/play', {
     snapshot,
     playback_source: playbackSource,

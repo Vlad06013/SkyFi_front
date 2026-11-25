@@ -5,7 +5,6 @@ import * as identity from '@/lib/device';
 import { useAuthStore } from '@/stores/auth';
 import { HEARTBEAT_INTERVAL_MS, useDevicesStore } from '@/stores/devices';
 import { useOnlineStore } from '@/stores/online';
-import { useToastStore } from '@/stores/toast';
 import type { PlayerDevice } from '@/types';
 
 vi.mock('@/api/devices', () => ({
@@ -36,17 +35,15 @@ vi.mock('@capacitor/app', () => ({
 
 const registerDeviceMock = vi.mocked(devicesApi.registerDevice);
 const fetchDevicesMock = vi.mocked(devicesApi.fetchDevices);
-const activateDeviceMock = vi.mocked(devicesApi.activateDevice);
 const sendHeartbeatMock = vi.mocked(devicesApi.sendHeartbeat);
 const ensureDeviceMock = vi.mocked(identity.ensureDevice);
 
 const uuid = (n: number) => `9f1c7a2e-4b3d-4c8a-9e5f-2d6b0a1c4f7${n}`;
 
-const device = (n: number, isActive = false): PlayerDevice => ({
+const device = (n: number): PlayerDevice => ({
   device_uuid: uuid(n),
   name: `dev-${n}`,
   type: 'phone',
-  is_active: isActive,
   last_seen_at: null,
 });
 
@@ -61,26 +58,38 @@ describe('stores/devices', () => {
     vi.useFakeTimers();
     vi.clearAllMocks();
     ensureDeviceMock.mockResolvedValue({ uuid: 'uuid-1' });
+    // registerPresence сидит presence-список — по умолчанию пустой.
+    fetchDevicesMock.mockResolvedValue([]);
   });
 
   describe('список', () => {
     it('ensure грузит список и ставит loaded', async () => {
-      fetchDevicesMock.mockResolvedValue([device(1), device(2, true)]);
+      fetchDevicesMock.mockResolvedValue([device(1), device(2)]);
       const store = useDevicesStore();
 
       await store.ensure();
       expect(store.devices).toHaveLength(2);
       expect(store.loaded).toBe(true);
-      expect(store.activeUuid).toBe(uuid(2));
     });
 
-    it('неудача сбрасывает флажок — повторим при следующем открытии', async () => {
+    it('неудача — loaded остаётся false, повторим при следующем открытии', async () => {
       fetchDevicesMock.mockRejectedValue(new Error('down'));
       const store = useDevicesStore();
 
       await store.ensure();
       expect(store.loaded).toBe(false);
       expect(store.devices).toHaveLength(0);
+    });
+
+    it('refresh перечитывает список даже после loaded', async () => {
+      fetchDevicesMock.mockResolvedValue([device(1)]);
+      const store = useDevicesStore();
+      await store.ensure();
+      expect(store.devices).toHaveLength(1);
+
+      fetchDevicesMock.mockResolvedValue([device(1), device(2)]);
+      await store.refresh();
+      expect(store.devices).toHaveLength(2);
     });
   });
 
@@ -97,16 +106,6 @@ describe('stores/devices', () => {
       expect(store.devices).toHaveLength(2);
     });
 
-    it('applyChanged переключает is_active', () => {
-      const store = useDevicesStore();
-      store.devices = [device(1, true), device(2)];
-
-      store.applyChanged(uuid(2));
-      expect(store.devices.find((d) => d.device_uuid === uuid(1))?.is_active).toBe(false);
-      expect(store.devices.find((d) => d.device_uuid === uuid(2))?.is_active).toBe(true);
-      expect(store.activeUuid).toBe(uuid(2));
-    });
-
     it('applyDisconnected убирает устройство', () => {
       const store = useDevicesStore();
       store.devices = [device(1), device(2)];
@@ -116,42 +115,10 @@ describe('stores/devices', () => {
     });
   });
 
-  describe('activate', () => {
-    it('успех: оптимистично переключает, сервер подтвердил', async () => {
-      const store = useDevicesStore();
-      store.devices = [device(1, true), device(2)];
-      store.myDeviceUuid = 'uuid-1';
-      activateDeviceMock.mockResolvedValue({ state: null as never, queue: [] });
-
-      await expect(store.activate(uuid(2))).resolves.toBe(true);
-      expect(activateDeviceMock).toHaveBeenCalledWith(uuid(2), { origin_device_id: 'uuid-1', command_id: expect.any(String) });
-      expect(store.activeUuid).toBe(uuid(2));
-    });
-
-    it('ошибка: откат к прежнему активному + тост', async () => {
-      const store = useDevicesStore();
-      const toast = useToastStore();
-      store.devices = [device(1, true), device(2)];
-      store.myDeviceUuid = 'uuid-1';
-      activateDeviceMock.mockRejectedValue(new Error('бэк упал'));
-
-      await expect(store.activate(uuid(2))).resolves.toBe(false);
-      expect(store.activeUuid).toBe(uuid(1));
-      expect(toast.toast?.error).toBe(true);
-    });
-
-    it('мой uuid неизвестен — не вызываем API, тост', async () => {
-      const store = useDevicesStore();
-      store.devices = [device(1), device(2)];
-
-      await expect(store.activate(uuid(2))).resolves.toBe(false);
-      expect(activateDeviceMock).not.toHaveBeenCalled();
-    });
-  });
-
   describe('presence', () => {
-    it('registerPresence: регистрирует по uuid и добавляет в список', async () => {
-      registerDeviceMock.mockResolvedValue(device(5, true));
+    it('registerPresence: регистрирует по uuid и сидит presence-список', async () => {
+      registerDeviceMock.mockResolvedValue(device(5));
+      fetchDevicesMock.mockResolvedValue([device(5), device(6)]);
       const store = useDevicesStore();
 
       await expect(store.registerPresence()).resolves.toBe(true);
@@ -162,15 +129,19 @@ describe('stores/devices', () => {
         command_id: expect.any(String),
       });
       expect(store.myDeviceUuid).toBe('uuid-1');
-      expect(store.devices.some((d) => d.device_uuid === uuid(5))).toBe(true);
+      await flush();
+      expect(fetchDevicesMock).toHaveBeenCalled();
+      expect(store.devices.map((d) => d.device_uuid)).toEqual([uuid(5), uuid(6)]);
+      expect(store.loaded).toBe(true);
     });
 
-    it('registerPresence: бэк недоступен — false, в список не добавлено', async () => {
+    it('registerPresence: бэк недоступен — false, список не сидится', async () => {
       registerDeviceMock.mockRejectedValue(new Error('down'));
       const store = useDevicesStore();
 
       await expect(store.registerPresence()).resolves.toBe(false);
       expect(store.devices).toHaveLength(0);
+      expect(fetchDevicesMock).not.toHaveBeenCalled();
     });
 
     it('bindPresence: auth+online → регистрация + heartbeat раз в интервал', async () => {

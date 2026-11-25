@@ -64,7 +64,6 @@ export interface PlayerDevice {
   device_uuid: string;
   name: string;
   type: DeviceType;
-  is_active: boolean;
   last_seen_at: string | null;
 }
 

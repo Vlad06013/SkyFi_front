@@ -141,7 +141,6 @@ export interface PlayerDevice {
   device_uuid: string;
   name: string;
   type: DeviceType;
-  is_active: boolean;
   last_seen_at: string | null;
 }
 
@@ -414,6 +413,8 @@ export type WaveFeedbackType =
 ```ts
 export interface PlaybackStateUpdatedPayload {
   state: PlayerStateView;
+  /** Та же очередь, что в ответе GET /player: устройства применяют её целиком. */
+  queue: QueueItem[];
   origin_device_id: string | null;
   command_id: string | null;
 }
@@ -562,7 +563,7 @@ export const mockPlayerState: PlayerStatePayload = {
     position_updated_at: new Date().toISOString(),
     active_device_id: '9f1c7a2e-4b3d-4c8a-9e5f-2d6b0a1c4f77',
     devices: [
-      { device_uuid: '9f1c7a2e-4b3d-4c8a-9e5f-2d6b0a1c4f77', name: 'Pixel 7', type: 'phone', is_active: true, last_seen_at: new Date().toISOString() },
+      { device_uuid: '9f1c7a2e-4b3d-4c8a-9e5f-2d6b0a1c4f77', name: 'Pixel 7', type: 'phone', last_seen_at: new Date().toISOString() },
     ],
   },
   queue: [
