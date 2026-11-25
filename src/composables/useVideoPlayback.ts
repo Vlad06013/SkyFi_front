@@ -5,6 +5,7 @@ import { ApiError } from '@/api/http';
 import { hlsDetach, hlsLoad, hlsResume, hlsSetAudioTrack, hlsSetQuality, hlsSupported, setHlsHooks } from '@/lib/hls-engine';
 import { afterMediaUnlock } from '@/lib/media-unlock';
 import { snapshotKey } from '@/lib/playback-engine';
+import { cacheVideoStreams, getCachedStream, invalidateStream } from '@/lib/stream-url-cache';
 import { useOnlineStore } from '@/stores/online';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
@@ -360,7 +361,10 @@ function handleStreamError() {
   if (streamRetries === 0) {
     streamRetries = 1;
     const current = store.clipPlaybackVideo;
-    if (current) void refreshStreams(current);
+    if (current) {
+      invalidateStream(current);
+      void refreshStreams(current);
+    }
     return;
   }
   if (store.clipHls && progressiveOnlyKey !== key && store.clipStreams.length > 0) {
@@ -439,8 +443,20 @@ async function refreshStreams(snapshot: VideoSnapshot) {
   const store = usePlayerStore();
   store.setEngineLoading(true);
   try {
+    // Тёплый ответ из кеша (предзагрузка): применяем без сети.
+    const cached = getCachedStream(snapshot);
+    if (cached?.kind === 'video') {
+      if (!store.clipPlaybackVideo || snapshotKey(store.clipPlaybackVideo) !== snapshotKey(snapshot)) return;
+      store.setClipStreams(cached.streams);
+      store.setClipHls(cached.hls);
+      if (!cached.hls) store.clampClipQualityToStreams();
+      reapplyStreams();
+      scheduleTtlRefresh(Math.max(1, Math.round((cached.expiresAt - Date.now()) / 1000)), snapshot);
+      return;
+    }
     const payload = await fetchVideoStreams(snapshot);
     if (!store.clipPlaybackVideo || snapshotKey(store.clipPlaybackVideo) !== snapshotKey(snapshot)) return;
+    cacheVideoStreams(snapshot, payload.streams, payload.hls, payload.ttl_sec);
     store.setClipStreams(payload.streams);
     store.setClipHls(payload.hls);
     // Прогрессив-режим: выбор качества клампим по списку потоков; в HLS — по высотам манифеста.
@@ -502,6 +518,19 @@ export function useVideoPlayback() {
     // До get-url: прошлый is-ready кадр иначе лежит чёрным поверх новой обложки,
     // а спиннер ждёт waiting и появляется уже на чёрном.
     beginOpening();
+    // Тёплые потоки из кеша (предзагрузка/повтор в пределах TTL) — без сети.
+    const cached = getCachedStream(snapshot);
+    if (cached?.kind === 'video') {
+      appliedKey = key;
+      player.setClipStreams(cached.streams);
+      player.setClipHls(cached.hls);
+      if (!cached.hls) player.clampClipQualityToStreams();
+      applyStream(player.positionSeconds);
+      // Продление от остатка TTL, а не от полного: кеш мог протухнуть частично.
+      scheduleTtlRefresh(Math.max(1, Math.round((cached.expiresAt - Date.now()) / 1000)), snapshot);
+      syncAttachment();
+      return;
+    }
     loadAbort?.abort();
     const controller = new AbortController();
     loadAbort = controller;
@@ -515,6 +544,7 @@ export function useVideoPlayback() {
         return;
       }
       appliedKey = key;
+      cacheVideoStreams(snapshot, payload.streams, payload.hls, payload.ttl_sec);
       player.setClipStreams(payload.streams);
       player.setClipHls(payload.hls);
       if (!payload.hls) player.clampClipQualityToStreams();

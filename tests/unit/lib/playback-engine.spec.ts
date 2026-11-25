@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   orderedContext,
+  peekAdjacent,
   resolveNext,
   resolvePrevious,
   snapshotKey,
@@ -179,5 +180,82 @@ describe('orderedContext (shuffle)', () => {
     } else {
       expect(resolveNext(context, 'manual')).toEqual({ action: 'fallback_favorites' });
     }
+  });
+});
+
+
+describe('playback-engine: peekAdjacent (предзагрузка ссылок)', () => {
+  it('вперёд: очередь приоритетнее контекста, ходим по pending подряд', () => {
+    const context = ctx({
+      current: track('cur'),
+      playSource: 'favorites',
+      queuePending: [track('q1'), track('q2')],
+      contextItems: [track('cur'), track('n1'), track('n2'), track('n3')],
+    });
+
+    const { ahead, back } = peekAdjacent(context, 2, 2);
+
+    expect(ahead.map((item) => item.source_id)).toEqual(['yandex_music-q1', 'yandex_music-q2']);
+    // current — первый элемент контекста: назад некуда.
+    expect(back).toEqual([]);
+  });
+
+  it('контекст продолжается после исчерпания очереди (previous — серверный)', () => {
+    // Серверное состояние после входа в очередь: previous_* — точка возврата.
+    const context = ctx({
+      current: track('q1'),
+      playSource: 'queue',
+      previousSource: 'favorites',
+      previous: track('cur'),
+      queuePending: [],
+      contextItems: [track('cur'), track('n1')],
+    });
+
+    const { ahead } = peekAdjacent(context, 2, 0);
+
+    // Возврат к 'cur' (его ссылка уже в кеше — играл до очереди), дальше
+    // контекст продолжается обычным ходом.
+    expect(ahead.map((item) => item.source_id)).toEqual(['yandex_music-cur', 'yandex_music-n1']);
+  });
+
+  it('назад: соседи слева в (перемешанном) порядке контекста', () => {
+    const context = ctx({
+      current: track('c'),
+      playSource: 'favorites',
+      contextItems: [track('p2'), track('p1'), track('c'), track('n1')],
+    });
+
+    const { ahead, back } = peekAdjacent(context, 2, 2);
+
+    expect(ahead.map((item) => item.source_id)).toEqual(['yandex_music-n1']);
+    expect(back.map((item) => item.source_id)).toEqual(['yandex_music-p1', 'yandex_music-p2']);
+  });
+
+  it('single без контекста: некуда — пустые списки', () => {
+    const context = ctx({ current: track('only'), playSource: 'single', contextItems: [] });
+
+    expect(peekAdjacent(context, 2, 2)).toEqual({ ahead: [], back: [] });
+  });
+
+  it('одноэлементный контекст с repeat=all не отдаёт текущий как соседа', () => {
+    const context = ctx({
+      current: track('only'),
+      playSource: 'favorites',
+      repeatMode: 'all',
+      contextItems: [track('only')],
+    });
+
+    expect(peekAdjacent(context, 2, 2)).toEqual({ ahead: [], back: [] });
+  });
+
+  it('конец контекста с repeat=off: дальше некуда (fallback — не снапшот)', () => {
+    const context = ctx({
+      current: track('last'),
+      playSource: 'favorites',
+      repeatMode: 'off',
+      contextItems: [track('last')],
+    });
+
+    expect(peekAdjacent(context, 2, 0).ahead).toEqual([]);
   });
 });

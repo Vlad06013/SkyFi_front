@@ -143,3 +143,54 @@ export function resolvePrevious(ctx: EngineContext, positionSeconds: number): En
   if (!previous) return { action: 'restart' };
   return { action: 'play', snapshot: previous, playbackSource: ctx.playSource };
 }
+
+/** Симулированный шаг курсора: сыгранный элемент очереди из pending убираем. */
+function advancePeek(ctx: EngineContext, snapshot: AnySnapshot, playbackSource: PlaySource): EngineContext {
+  return {
+    ...ctx,
+    current: snapshot,
+    playSource: playbackSource,
+    queuePending: playbackSource === 'queue' ? ctx.queuePending.slice(1) : ctx.queuePending,
+  };
+}
+
+/**
+ * Соседи виртуального потока для предзагрузки ссылок (frontend.md §9):
+ * прогулка тем же движком вперёд и назад по симулированному состоянию.
+ * Best-effort: неточность означает лишь лишнюю прогретую ссылку или
+ * пропуск одной — на воспроизведение не влияет. Текущий снапшот и дубли
+ * не отдаём.
+ */
+export function peekAdjacent(
+  ctx: EngineContext,
+  aheadCount: number,
+  backCount: number,
+): { ahead: AnySnapshot[]; back: AnySnapshot[] } {
+  const seen = new Set(ctx.current ? [snapshotKey(ctx.current)] : []);
+
+  const ahead: AnySnapshot[] = [];
+  let sim = ctx;
+  for (let i = 0; i < aheadCount; i++) {
+    const action = resolveNext(sim, 'manual');
+    if (action.action !== 'play') break;
+    const key = snapshotKey(action.snapshot);
+    if (seen.has(key)) break;
+    seen.add(key);
+    ahead.push(action.snapshot);
+    sim = advancePeek(sim, action.snapshot, action.playbackSource);
+  }
+
+  const back: AnySnapshot[] = [];
+  sim = ctx;
+  for (let i = 0; i < backCount; i++) {
+    // Позиция за порогом рестарта: целимся в «переход», не в рестарт текущего.
+    const action = resolvePrevious(sim, Number.POSITIVE_INFINITY);
+    if (action.action !== 'play') break;
+    const key = snapshotKey(action.snapshot);
+    if (seen.has(key)) break;
+    seen.add(key);
+    back.push(action.snapshot);
+    sim = advancePeek(sim, action.snapshot, action.playbackSource);
+  }
+  return { ahead, back };
+}

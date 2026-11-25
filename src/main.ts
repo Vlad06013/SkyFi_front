@@ -7,6 +7,7 @@ import router from './router';
 import { onUnauthorized } from '@/api/http';
 import { bindSessionRealtime } from '@/realtime';
 import { useAudioPlayback } from '@/composables/useAudioPlayback';
+import { useStreamPrefetch } from '@/composables/useStreamPrefetch';
 import { getClipVideoElement, useVideoPlayback } from '@/composables/useVideoPlayback';
 import { useAuthStore } from '@/stores/auth';
 import { useAppStore } from '@/stores/app';
@@ -48,6 +49,8 @@ void appStore.bootstrap().finally(() => {
   usePlayerStore(pinia).bindServerPlayback();
   useAudioPlayback();
   useVideoPlayback();
+  // Предзагрузка stream URL: 2 трека вперёд/назад, только на активном (§9).
+  useStreamPrefetch();
   // DEV-диагностика: доступ из консоли (window.__player/__devices/__clipVideo).
   if (import.meta.env.DEV) {
     (window as unknown as { __player: ReturnType<typeof usePlayerStore> }).__player = usePlayerStore(pinia);

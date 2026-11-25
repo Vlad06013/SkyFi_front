@@ -9,6 +9,7 @@ import type { ClipAudioTrack } from '@/lib/hls-engine';
 import { fetchFavorites } from '@/api/favorites';
 import { fetchContextPage, resolveContext } from '@/lib/context-resolver';
 import {
+  peekAdjacent,
   resolveNext,
   resolvePrevious,
   snapshotKey,
@@ -405,6 +406,14 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   let transitioning = false;
+
+  /**
+   * Соседи виртуального потока для предзагрузки stream URL
+   * (frontend.md §9): движок знает и очередь, и контекст, и волну.
+   */
+  function adjacentSnapshots(aheadCount: number, backCount: number) {
+    return peekAdjacent(engineContext(), aheadCount, backCount);
+  }
 
   /**
    * Догрузка страницы пагинированного контекста (поиск/плейлист), когда
@@ -1332,6 +1341,7 @@ export const usePlayerStore = defineStore('player', () => {
     reorderQueue,
     skipNext: () => skipNext('manual'),
     skipPrevious,
+    adjacentSnapshots,
     handleTrackEnded,
     seek,
     seekRatio,

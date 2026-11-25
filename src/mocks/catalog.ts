@@ -20,18 +20,6 @@ export const trackRadio: TrackSnapshot = {
   stream_url: null,
 };
 
-export const trackColonel: TrackSnapshot = {
-  type: 'track',
-  source_type: 'upload',
-  source_id: 'up-1',
-  title: 'Полковнику никто не пишет',
-  duration_ms: 312000,
-  cover_url: null,
-  artists: [{ name: 'Би-2' }],
-  album: { title: 'Мяу кисс ми' },
-  stream_url: '/local/colonel.mp3',
-};
-
 export const trackSea: TrackSnapshot = {
   type: 'track',
   source_type: 'vk',
@@ -131,23 +119,12 @@ export const mockVideoJellyfish: VideoSnapshot = {
   watch_url: 'https://test-videos.co.uk/',
 };
 
-export const favoriteTracks: TrackSnapshot[] = [
-  trackRadio,
-  trackColonel,
-  trackSea,
-  trackFatLip,
-];
+export const favoriteTracks: TrackSnapshot[] = [trackRadio, trackSea, trackFatLip];
 
-export const downloadedTracks: TrackSnapshot[] = [trackRadio, trackColonel, trackFatLip];
+export const downloadedTracks: TrackSnapshot[] = [trackRadio, trackFatLip];
 
 /** Контент «В дорогу»: треки + один клип, чтобы проверить смешанный список. */
-export const playlistRoadContent: AnySnapshot[] = [
-  trackRadio,
-  trackColonel,
-  mockVideo,
-  trackSea,
-  trackFatLip,
-];
+export const playlistRoadContent: AnySnapshot[] = [trackRadio, mockVideo, trackSea, trackFatLip];
 
 export const favoriteAlbums: AlbumSnapshot[] = [albumMixtape];
 export const favoriteArtists: ArtistSnapshot[] = [artistShinedown];

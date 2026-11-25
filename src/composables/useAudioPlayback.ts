@@ -2,6 +2,7 @@ import { watch } from 'vue';
 import { fetchAudioUrl } from '@/api/audio';
 import { afterMediaUnlock } from '@/lib/media-unlock';
 import { snapshotKey } from '@/lib/playback-engine';
+import { cacheAudioUrl, getCachedStream, invalidateStream } from '@/lib/stream-url-cache';
 import { usePlayerStore } from '@/stores/player';
 import type { AnySnapshot } from '@/types';
 
@@ -82,9 +83,19 @@ export function useAudioPlayback() {
     // старый элемент ещё играет и его timeupdate пересаживает якорь стора на
     // позицию старого трека — читать позицию по окончании fetch нельзя.
     const startPosition = player.positionSeconds;
+    // Тёплая ссылка из кеша (предзагрузка/повтор в пределах TTL) — без сети.
+    const cached = getCachedStream(snapshot);
+    if (cached?.kind === 'audio') {
+      appliedKey = key;
+      el.src = cached.url;
+      resumeAt = startPosition;
+      tryPlay(el);
+      return;
+    }
     player.setEngineLoading(true);
     try {
-      const { url } = await fetchAudioUrl(snapshot, controller.signal);
+      const { url, ttlSec } = await fetchAudioUrl(snapshot, controller.signal);
+      cacheAudioUrl(snapshot, url, ttlSec);
       // Пока запрашивали ссылку, эффективный снапшот мог смениться (клип,
       // другой трек) — не грузим старое.
       if (!player.effectiveCurrent || snapshotKey(player.effectiveCurrent) !== key) {
@@ -129,6 +140,7 @@ export function useAudioPlayback() {
       if (shouldPlay && el.error) {
         loadedKey = null;
         appliedKey = null;
+        invalidateStream(player.effectiveCurrent);
         void loadSnapshot(player.effectiveCurrent);
         return;
       }
@@ -170,6 +182,7 @@ export function useAudioPlayback() {
       if (el.error) {
         loadedKey = null;
         appliedKey = null;
+        invalidateStream(player.effectiveCurrent);
         void loadSnapshot(player.effectiveCurrent);
         return;
       }
@@ -219,7 +232,10 @@ export function useAudioPlayback() {
     el.addEventListener('error', () => {
       const store = usePlayerStore();
       resumeAt = null;
-      if (store.effectiveCurrent?.type === 'track') store.setAudioPlaying(false);
+      if (store.effectiveCurrent?.type === 'track') {
+        store.setAudioPlaying(false);
+        invalidateStream(store.effectiveCurrent);
+      }
     });
     el.addEventListener('timeupdate', () => {
       const store = usePlayerStore();
