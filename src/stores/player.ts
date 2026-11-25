@@ -9,8 +9,11 @@ import type { ClipAudioTrack } from '@/lib/hls-engine';
 import { fetchFavorites } from '@/api/favorites';
 import { fetchContextPage, resolveContext } from '@/lib/context-resolver';
 import {
+  orderedContext,
   peekAdjacent,
   resolveNext,
+  resolvePlayableNext,
+  resolvePlayablePrevious,
   resolvePrevious,
   snapshotKey,
   SKIP_RESTART_AFTER,
@@ -20,10 +23,13 @@ import {
 } from '@/lib/playback-engine';
 import { moveItem } from '@/lib/list-sort';
 import { unlockMediaPlayback } from '@/lib/media-unlock';
+import { clearPlayerCache, loadPlayerCache, savePlayerCache } from '@/lib/library-cache';
 import { readPlayerDevicePrefs, writePlayerDevicePrefs } from '@/lib/player-prefs';
 import { onRealtimeReconnect } from '@/realtime';
 import { useAuthStore } from '@/stores/auth';
 import { useDevicesStore } from '@/stores/devices';
+import { useDownloadsStore } from '@/stores/downloads';
+import { useOnlineStore } from '@/stores/online';
 import { useToastStore } from '@/stores/toast';
 import type { AnySnapshot, EchoFields, PlaySource, PlayerStatePayload, PlayerStateView, QueueItem, RepeatMode, TrackSnapshot, VideoSnapshot } from '@/types';
 
@@ -60,6 +66,10 @@ export const usePlayerStore = defineStore('player', () => {
   });
   /** Серверный стейт уже применялся. До этого version-gate не работает. */
   let serverStateApplied = false;
+  /** Пока кеш не поднят, пустой стартовый стейт в базу не пишем. */
+  let persistReady = false;
+  /** Чей кеш уже поднят: чужой стейт в памяти не записываем на нового пользователя. */
+  let hydratedUserId: number | null = null;
 
   const expanded = ref(false);
   const clipMode = ref(false);
@@ -132,8 +142,19 @@ export const usePlayerStore = defineStore('player', () => {
 
   // --- Роли и команды (api.md §1.6: эхо-поля всегда с uuid устройства)
 
+  /** Сети нет: команды не шлём, играет это устройство. */
+  function offlinePlayback() {
+    return useOnlineStore().isOnline === false;
+  }
+
+  /** Офлайн звучит только файл из скачанного. Ссылка потока — это Яндекс, не наш бэкенд. */
+  function offlinePlayable(snapshot: AnySnapshot) {
+    return snapshot.type === 'track' && useDownloadsStore().isDownloaded(snapshot);
+  }
+
   /** Активное устройство = источник истины воспроизведения (plan-player.md §5). */
   const isActiveDevice = computed(() => {
+    if (offlinePlayback()) return true;
     const uuid = useDevicesStore().myDeviceUuid;
     return uuid != null && state.value.active_device_id === uuid;
   });
@@ -151,6 +172,7 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   async function resync() {
+    if (offlinePlayback()) return;
     try {
       const payload = await playerApi.fetchPlayerState();
       // Слияние по владению (frontend.md §5): reconnect АКТИВНОГО устройства —
@@ -480,11 +502,79 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
+  /**
+   * Сид следующей перемешки, когда текущая уже доиграна.
+   * Превью и свайп читают один и тот же, в стейт он попадает только на переходе.
+   */
+  let nextShuffleSeed: string | null = null;
+
+  /** Офлайн: шаффл только по скачанным этого списка. После последнего — новая перемешка. */
+  function offlineNext(reason: 'manual' | 'ended'): EngineAction {
+    const ctx = engineContext();
+    const queued = ctx.queuePending.find((item) => offlinePlayable(item));
+    if (reason !== 'ended' && queued) {
+      nextShuffleSeed = null;
+      return { action: 'play', snapshot: queued, playbackSource: 'queue' };
+    }
+    if (reason === 'ended' && ctx.repeatMode === 'one' && ctx.current) {
+      nextShuffleSeed = null;
+      return { action: 'restart' };
+    }
+    if (queued) {
+      nextShuffleSeed = null;
+      return { action: 'play', snapshot: queued, playbackSource: 'queue' };
+    }
+    const items = ctx.contextItems.filter((item) => offlinePlayable(item));
+    const shuffle = ctx.shuffleEnabled && ctx.playSource !== 'wave';
+    if (shuffle && items.length > 1 && ctx.current) {
+      const order = orderedContext(items, true, ctx.seed);
+      const index = order.findIndex((item) => snapshotKey(item) === snapshotKey(ctx.current!));
+      if (index === order.length - 1) {
+        if (!nextShuffleSeed) nextShuffleSeed = crypto.randomUUID();
+        const fresh = orderedContext(items, true, nextShuffleSeed);
+        const start =
+          fresh.find((item) => snapshotKey(item) !== snapshotKey(ctx.current!)) ?? fresh[0];
+        return { action: 'play', snapshot: start, playbackSource: ctx.playSource };
+      }
+    }
+    nextShuffleSeed = null;
+    return resolvePlayableNext(items, ctx.current, {
+      shuffle,
+      seed: ctx.seed,
+      repeatMode: ctx.repeatMode,
+      playSource: ctx.playSource,
+      reason,
+    });
+  }
+
+  function offlinePrevious(): EngineAction {
+    const ctx = engineContext();
+    return resolvePlayablePrevious(
+      ctx.contextItems.filter((item) => offlinePlayable(item)),
+      ctx.current,
+      positionSeconds.value,
+      {
+        shuffle: ctx.shuffleEnabled && ctx.playSource !== 'wave',
+        seed: ctx.seed,
+        playSource: ctx.playSource,
+      },
+    );
+  }
+
   function skipNext(reason: 'manual' | 'ended' = 'manual') {
     if (transitioning) return;
     cancelPendingSeek();
     transitioning = true;
     void (async () => {
+      if (offlinePlayback()) {
+        const action = offlineNext(reason);
+        if (nextShuffleSeed) {
+          state.value = { ...state.value, shuffle_seed: nextShuffleSeed };
+          nextShuffleSeed = null;
+        }
+        await runAction(action);
+        return;
+      }
       const action = await expandContextFor(resolveNext(engineContext(), reason), reason);
       await runAction(action);
     })().finally(() => {
@@ -501,7 +591,7 @@ export const usePlayerStore = defineStore('player', () => {
     if (transitioning) return;
     cancelPendingSeek();
     transitioning = true;
-    void runAction(resolvePrevious(engineContext(), positionSeconds.value)).finally(() => {
+    void runAction(offlinePlayback() ? offlinePrevious() : resolvePrevious(engineContext(), positionSeconds.value)).finally(() => {
       transitioning = false;
     });
   }
@@ -519,7 +609,7 @@ export const usePlayerStore = defineStore('player', () => {
     // Серверная позиция часто ещё 0, а элемент уже ушёл вперёд — вотч по
     // position_seconds тогда не стреляет, и сброс не доходит до звука.
     mediaSeek.value += 1;
-    if (!canCommand.value) return;
+    if (!canCommand.value || offlinePlayback()) return;
     const fields = echo();
     if (!fields) return;
     try {
@@ -556,6 +646,7 @@ export const usePlayerStore = defineStore('player', () => {
   ) {
     // До await: жест тапа ещё жив, иначе play() после get-url браузер глушит.
     unlockMediaPlayback();
+    if (offlinePlayback() && !offlinePlayable(snapshot)) return;
     cancelPendingSeek();
     dropFromQueue(snapshotId(snapshot));
     const contextRef = playContextRef(playbackSource, opts.contextRef);
@@ -565,7 +656,7 @@ export const usePlayerStore = defineStore('player', () => {
       contextHasMore = false;
       contextNextPage = 2;
     }
-    if (!canCommand.value) {
+    if (!canCommand.value || offlinePlayback()) {
       state.value = {
         ...state.value,
         current_snapshot: snapshot,
@@ -622,6 +713,20 @@ export const usePlayerStore = defineStore('player', () => {
     const now = Date.now();
     if (now - lastToggleAt < 400) return;
     lastToggleAt = now;
+    if (offlinePlayback()) {
+      unlockMediaPlayback();
+      if (state.value.is_playing && !audioPlaying.value) {
+        kickEngine();
+        return;
+      }
+      state.value = {
+        ...state.value,
+        is_playing: !state.value.is_playing,
+        position_updated_at: new Date().toISOString(),
+      };
+      anchorPosition();
+      return;
+    }
     if (!canCommand.value) {
       state.value = {
         ...state.value,
@@ -686,7 +791,7 @@ export const usePlayerStore = defineStore('player', () => {
   async function toggleRepeat() {
     const index = repeatCycle.indexOf(state.value.repeat_mode);
     const next = repeatCycle[(index + 1) % repeatCycle.length];
-    if (!canCommand.value) {
+    if (!canCommand.value || offlinePlayback()) {
       state.value = { ...state.value, repeat_mode: next };
       return;
     }
@@ -701,8 +806,12 @@ export const usePlayerStore = defineStore('player', () => {
 
   async function toggleShuffle() {
     const next = !state.value.shuffle_enabled;
-    if (!canCommand.value) {
-      state.value = { ...state.value, shuffle_enabled: next };
+    if (!canCommand.value || offlinePlayback()) {
+      state.value = {
+        ...state.value,
+        shuffle_enabled: next,
+        shuffle_seed: next ? crypto.randomUUID() : null,
+      };
       return;
     }
     const fields = echo();
@@ -729,7 +838,7 @@ export const usePlayerStore = defineStore('player', () => {
     stopPositionTicker();
     positionTimer = setInterval(() => {
       nowTick.value = Date.now();
-      if (canCommand.value && isActiveDevice.value && state.value.is_playing) {
+      if (canCommand.value && isActiveDevice.value && state.value.is_playing && !offlinePlayback()) {
         void reportPosition();
       }
     }, 1000);
@@ -934,6 +1043,7 @@ export const usePlayerStore = defineStore('player', () => {
 
   /** Форс-рефетч очереди (сокеты playback.queue.updated / friend.queue.item.added). */
   async function refreshQueue() {
+    if (offlinePlayback()) return;
     try {
       queue.value = sortQueue(await queueApi.fetchQueue());
       queueLoaded.value = true;
@@ -1015,11 +1125,13 @@ export const usePlayerStore = defineStore('player', () => {
     current.value?.artists.map((a) => a.name).join(', ') ?? '',
   );
   const previewNext = computed<AnySnapshot | null>(() => {
-    const action = resolveNext(engineContext(), 'manual');
+    const action = offlinePlayback() ? offlineNext('manual') : resolveNext(engineContext(), 'manual');
     return action.action === 'play' ? action.snapshot : null;
   });
   const previewPrevious = computed<AnySnapshot | null>(() => {
-    const action = resolvePrevious(engineContext(), SKIP_RESTART_AFTER);
+    const action = offlinePlayback()
+      ? offlinePrevious()
+      : resolvePrevious(engineContext(), SKIP_RESTART_AFTER);
     return action.action === 'play' ? action.snapshot : null;
   });
   const album = computed(() => {
@@ -1077,7 +1189,7 @@ export const usePlayerStore = defineStore('player', () => {
     // Бэк принимает только целые секунды (api.md §5).
     const seconds = Math.round(pendingSeekSeconds);
     pendingSeekSeconds = null;
-    if (!canCommand.value) return;
+    if (!canCommand.value || offlinePlayback()) return;
     const fields = echo();
     if (!fields) return;
     void playerApi.seekTo(seconds, fields).catch((cause) => {
@@ -1119,8 +1231,8 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   async function toggleClips() {
-    if (!canCommand.value) {
-      // Мок-режим: сервера нет — тоглим локально, движок следит за clipMode.
+    if (!canCommand.value || offlinePlayback()) {
+      // Мок-режим и офлайн: сервера нет — тоглим локально, движок следит за clipMode.
       if (clipMode.value) {
         clipMode.value = false;
         clearClip();
@@ -1271,20 +1383,58 @@ export const usePlayerStore = defineStore('player', () => {
   let unbindReconnect: (() => void) | null = null;
 
   /** Первичная загрузка состояния и рефетч на reconnect (полная подмена зеркала). */
+  function persistPlayer() {
+    if (!persistReady) return;
+    const userId = useAuthStore().user?.id;
+    if (!userId) return;
+    if (!serverStateApplied && hydratedUserId !== userId) return;
+    void savePlayerCache(userId, {
+      state: state.value,
+      queue: queue.value,
+      contextItems: contextItems.value,
+    });
+  }
+
+  watch([state, queue, contextItems], () => persistPlayer());
+
+  /** Последняя копия до ответа сервера. Холодный GET /player её заменяет. */
+  async function hydratePlayer(userId: number) {
+    const row = await loadPlayerCache(userId);
+    if (!row?.state || serverStateApplied || useAuthStore().user?.id !== userId) return;
+    state.value = row.state;
+    queue.value = sortQueue(row.queue ?? []);
+    queueLoaded.value = true;
+    contextItems.value = row.contextItems ?? [];
+    contextKeyLoaded = contextKeyOf(row.state.play_source, row.state.context_ref);
+    hydratedUserId = userId;
+    anchorPosition();
+  }
+
   function bindServerPlayback() {
     startPositionTicker();
     const auth = useAuthStore();
     watch(
-      () => auth.isAuthed,
-      (authed) => {
+      () => [auth.isAuthed, useOnlineStore().isOnline] as const,
+      ([authed, online]) => {
         if (authed) {
-          void refreshQueue();
-          void resync();
           unbindReconnect ??= onRealtimeReconnect(() => {
             void refreshQueue();
             void resync();
           });
+          const userId = auth.user?.id;
+          void (async () => {
+            if (userId) await hydratePlayer(userId);
+            if (!useAuthStore().isAuthed) return;
+            persistReady = true;
+            if (online !== true) return;
+            void refreshQueue();
+            void resync();
+          })();
         } else {
+          persistReady = false;
+          hydratedUserId = null;
+          serverStateApplied = false;
+          void clearPlayerCache();
           unbindReconnect?.();
           unbindReconnect = null;
         }

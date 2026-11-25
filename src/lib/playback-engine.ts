@@ -63,9 +63,13 @@ export function hashString(input: string): number {
  */
 export function orderedContext(items: AnySnapshot[], shuffleEnabled: boolean, seed: string): AnySnapshot[] {
   if (!shuffleEnabled) return items;
-  return [...items].sort(
-    (a, b) => hashString(`${seed}:${snapshotKey(a)})`) - hashString(`${seed}:${snapshotKey(b)})`),
-  );
+  return [...items].sort((a, b) => {
+    const left = hashString(`${seed}:${snapshotKey(a)}`);
+    const right = hashString(`${seed}:${snapshotKey(b)}`);
+    if (left < right) return -1;
+    if (left > right) return 1;
+    return 0;
+  });
 }
 
 function sameSnapshot(a: AnySnapshot | null, b: AnySnapshot | null): boolean {
@@ -144,6 +148,39 @@ export function resolvePrevious(ctx: EngineContext, positionSeconds: number): En
   // Дальше назад некуда — рестарт всегда, независимо от repeat.
   if (!previous) return { action: 'restart' };
   return { action: 'play', snapshot: previous, playbackSource: ctx.playSource };
+}
+
+/**
+ * Офлайн-переход по уже отфильтрованному списку (только скачанные).
+ * Шаффл перемешивает этот список. Круг по той же перемешке — запасной
+ * шаг; офлайн-стор на последнем треке вместо круга роллит новый сид.
+ */
+export function resolvePlayableNext(
+  items: AnySnapshot[],
+  current: AnySnapshot | null,
+  opts: { shuffle: boolean; seed: string; repeatMode: RepeatMode; playSource: PlaySource; reason: NextReason },
+): EngineAction {
+  if (opts.reason === 'ended' && opts.repeatMode === 'one' && current) return { action: 'restart' };
+  const order = orderedContext(items, opts.shuffle, opts.seed);
+  if (!order.length) return { action: 'noop' };
+  const index = current ? order.findIndex((item) => sameSnapshot(item, current)) : -1;
+  const next = index < 0 ? order[0] : (order[index + 1] ?? order[0]);
+  return { action: 'play', snapshot: next, playbackSource: opts.playSource };
+}
+
+/** Назад по тому же отфильтрованному списку. С начала трека дальше некуда — рестарт. */
+export function resolvePlayablePrevious(
+  items: AnySnapshot[],
+  current: AnySnapshot | null,
+  positionSeconds: number,
+  opts: { shuffle: boolean; seed: string; playSource: PlaySource },
+): EngineAction {
+  if (positionSeconds > SKIP_RESTART_AFTER) return { action: 'restart' };
+  const order = orderedContext(items, opts.shuffle, opts.seed);
+  if (!order.length || !current) return { action: 'restart' };
+  const index = order.findIndex((item) => sameSnapshot(item, current));
+  if (index <= 0) return { action: 'restart' };
+  return { action: 'play', snapshot: order[index - 1], playbackSource: opts.playSource };
 }
 
 /** Симулированный шаг курсора: сыгранный элемент очереди из pending убираем. */

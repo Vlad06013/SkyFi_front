@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   orderedContext,
+  resolvePlayableNext,
   peekAdjacent,
   resolveNext,
   resolvePrevious,
@@ -168,6 +169,27 @@ describe('orderedContext (shuffle)', () => {
     const a = orderedContext(items, true, 'seed-1').map(snapshotKey);
     const b = orderedContext(items, true, 'seed-2').map(snapshotKey);
     expect(a).not.toEqual(b);
+  });
+
+  it('скачанный шаффл проходит все треки и после последнего возвращается в начало перемешки', () => {
+    const order = orderedContext(items, true, 'seed-1');
+    let current: AnySnapshot | null = order[2];
+    const heard: string[] = [];
+    for (let step = 0; step < items.length + 1; step += 1) {
+      const action = resolvePlayableNext(items, current, {
+        shuffle: true,
+        seed: 'seed-1',
+        repeatMode: 'off',
+        playSource: 'favorites',
+        reason: 'manual',
+      });
+      expect(action.action).toBe('play');
+      if (action.action !== 'play') return;
+      heard.push(snapshotKey(action.snapshot));
+      current = action.snapshot;
+    }
+    expect(new Set(heard.slice(0, items.length)).size).toBe(items.length);
+    expect(heard[1]).toBe(snapshotKey(order[0]));
   });
 
   it('shuffle не дырявит next: следующий после current живёт в перестановке', () => {

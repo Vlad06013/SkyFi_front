@@ -1,7 +1,8 @@
-import { defineComponent, ref } from 'vue';
+import { computed, defineComponent, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import AppBar from '@/components/AppBar/AppBar.vue';
+import AppConfirm from '@/components/AppConfirm/AppConfirm.vue';
 import AppSheet from '@/components/AppSheet/AppSheet.vue';
 import SeekBar from '@/components/SeekBar/SeekBar.vue';
 import SettingRow from '@/components/SettingRow/SettingRow.vue';
@@ -9,12 +10,13 @@ import YandexCard from '@/components/YandexCard/YandexCard.vue';
 import YoutubeCard from '@/components/YoutubeCard/YoutubeCard.vue';
 import QrScannerSheet from '@/components/QrScannerSheet/QrScannerSheet.vue';
 import { useAuthStore } from '@/stores/auth';
+import { useDownloadsStore } from '@/stores/downloads';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
 
 export default defineComponent({
   name: 'SettingsPage',
-  components: { AppBar, AppSheet, SeekBar, SettingRow, YandexCard, YoutubeCard, QrScannerSheet },
+  components: { AppBar, AppConfirm, AppSheet, SeekBar, SettingRow, YandexCard, YoutubeCard, QrScannerSheet },
   setup() {
     const router = useRouter();
     const auth = useAuthStore();
@@ -27,7 +29,11 @@ export default defineComponent({
     const avatarInput = ref<HTMLInputElement | null>(null);
     const avatarBusy = ref(false);
     const appLatest = ref(false);
-    const downloadedGb = ref(1.2);
+    const confirmClear = ref(false);
+    const downloads = useDownloadsStore();
+    const { items: downloadedItems, downloadedBytes } = storeToRefs(downloads);
+    const hasDownloads = computed(() => downloadedItems.value.length > 0);
+    const downloadedSize = computed(() => formatBytes(downloadedBytes.value));
     const builds = [
       { id: 'apk', title: 'Android · APK', idle: 'телефон, ТВ, магнитола' },
       { id: 'linux', title: 'Linux', idle: 'AppImage' },
@@ -86,9 +92,26 @@ export default defineComponent({
       toast.show(build.title, 'сборки пока нет');
     }
 
-    function clearDownloads() {
-      downloadedGb.value = 0;
-      toast.show('Скачанное', 'очищено');
+    function formatBytes(bytes: number): string {
+      if (bytes < 1024 * 1024) {
+        const kb = Math.max(1, Math.round(bytes / 1024));
+        return `${kb} КБ`;
+      }
+      const mb = bytes / (1024 * 1024);
+      if (mb < 1024) return `${mb.toFixed(1).replace('.', ',')} МБ`;
+      const gb = mb / 1024;
+      return `${gb.toFixed(1).replace('.', ',')} ГБ`;
+    }
+
+    function askClearDownloads() {
+      if (!hasDownloads.value) return;
+      confirmClear.value = true;
+    }
+
+    async function clearDownloads() {
+      confirmClear.value = false;
+      await downloads.clearDownloads();
+      toast.show('Скачанное', 'удалено');
     }
 
     async function logout() {
@@ -110,7 +133,9 @@ export default defineComponent({
       avatarInput,
       avatarBusy,
       appLatest,
-      downloadedGb,
+      confirmClear,
+      hasDownloads,
+      downloadedSize,
       builds,
       openName,
       pickAvatar,
@@ -118,6 +143,7 @@ export default defineComponent({
       saveName,
       updateApp,
       downloadBuild,
+      askClearDownloads,
       clearDownloads,
       logout,
       onScanned,

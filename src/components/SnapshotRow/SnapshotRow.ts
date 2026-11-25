@@ -3,6 +3,7 @@ import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { coverVar } from '@/lib/cover';
 import { formatTime } from '@/lib/time';
 import { useDownloadsStore } from '@/stores/downloads';
+import { useOnlineStore } from '@/stores/online';
 import type { SnapshotSource } from '@/types';
 
 export type SnapshotRowKind = 'track' | 'video' | 'media';
@@ -39,6 +40,7 @@ export default defineComponent({
   emits: ['open', 'menu', 'sort', 'remove'],
   setup(props, { emit }) {
     const downloads = useDownloadsStore();
+    const online = useOnlineStore();
     const rootClass = computed(() => {
       if (props.kind === 'video') return 'vid-row';
       if (props.kind === 'media') return 'pl-row';
@@ -70,12 +72,39 @@ export default defineComponent({
             : false)),
     );
 
+    /** Офлайн: нескачанный трек виден, но не запускается. Играющий остаётся кликабельным. */
+    const unavailable = computed(
+      () =>
+        props.offline ||
+        (props.kind === 'track' &&
+          !props.playing &&
+          online.isOnline === false &&
+          !showDownloaded.value),
+    );
+
+    function onOpen() {
+      if (unavailable.value) return;
+      emit('open');
+    }
+
     const durationLabel = computed(() => {
       const ms = props.durationMs;
       if (ms == null || !Number.isFinite(ms) || ms < 0) return '';
       return formatTime(ms / 1000);
     });
 
-    return { emit, rootClass, isVideo, isPlayable, coverVar, durationLabel, downloadPct, downloadArc, showDownloaded };
+    return {
+      emit,
+      rootClass,
+      isVideo,
+      isPlayable,
+      coverVar,
+      durationLabel,
+      downloadPct,
+      downloadArc,
+      showDownloaded,
+      unavailable,
+      onOpen,
+    };
   },
 });

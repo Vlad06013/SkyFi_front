@@ -128,7 +128,15 @@
 .friend-row .icon-btn:hover,
 .best .icon-btn:hover { color: var(--color-text-primary); }
 .track-row .icon-btn.liked { color: var(--color-like); }
+.track-row.offline { cursor: default; }
+.track-row.offline .thumb,
+.track-row.offline .track-meta,
+.track-row.offline .track-dur,
+.track-row.offline .dl-mark { opacity: .45; }
 .track-row.offline .track-title, .track-row.offline .track-artist { color: var(--color-text-faint); }
+@media (hover: hover) {
+  .track-row.offline:hover { background: transparent; }
+}
 
 /* Видео-строка: широкое 16:9-превью, бейджи — того же размера, что у треков. */
 .vid-row { display: flex; align-items: center; gap: 10px; padding: 8px 2px; border-radius: var(--radius-m); }

@@ -1,12 +1,14 @@
 import { defineStore } from 'pinia';
 import { computed, ref, watch, type Ref } from 'vue';
 import { addFavorite, fetchFavorites, removeFavorite, sortFavorites } from '@/api/favorites';
+import { clearFavoritesCache, loadFavoritesCache, saveFavoritesCache } from '@/lib/library-cache';
 import { useAuthStore } from '@/stores/auth';
 import { useOnlineStore } from '@/stores/online';
 import type {
   AlbumSnapshot,
   AnySnapshot,
   ArtistSnapshot,
+  FavoritesPayload,
   PlaylistSnapshot,
   TrackSnapshot,
   VideoSnapshot,
@@ -43,27 +45,56 @@ export const useFavoritesStore = defineStore('favorites', () => {
     const section = sections[snapshot.type];
     if (section.value.some((item) => sameIdentity(item, snapshot))) return;
     section.value = [snapshot, ...section.value];
+    persist();
   }
 
   function applyRemove(snapshot: AnySnapshot) {
     const section = sections[snapshot.type];
     section.value = section.value.filter((item) => !sameIdentity(item, snapshot));
+    persist();
   }
 
-  function clearAll() {
-    for (const section of Object.values(sections)) section.value = [];
-    loaded.value = false;
+  function payloadFromMemory(): FavoritesPayload {
+    return {
+      tracks: sections.track.value as TrackSnapshot[],
+      videos: sections.video.value as VideoSnapshot[],
+      albums: sections.album.value as AlbumSnapshot[],
+      artists: sections.artist.value as ArtistSnapshot[],
+      playlists: sections.playlist.value as PlaylistSnapshot[],
+    };
   }
 
-  /** Вкладки целиком с сервера (api.md §10). */
-  async function fetchAll() {
-    const payload = await fetchFavorites();
+  function applyPayload(payload: FavoritesPayload) {
     sections.track.value = payload.tracks;
     sections.video.value = payload.videos;
     sections.album.value = payload.albums;
     sections.artist.value = payload.artists;
     sections.playlist.value = payload.playlists;
+  }
+
+  /** Последнее состояние вкладок — в базу текущего пользователя. */
+  function persist() {
+    const userId = useAuthStore().user?.id;
+    if (!userId) return;
+    void saveFavoritesCache(userId, payloadFromMemory());
+  }
+
+  function hasAny() {
+    return Object.values(sections).some((section) => section.value.length > 0);
+  }
+
+  function clearAll() {
+    for (const section of Object.values(sections)) section.value = [];
+    loaded.value = false;
+    void clearFavoritesCache();
+  }
+
+  /** Вкладки целиком с сервера (api.md §10). Успех перезаписывает базу. */
+  async function fetchAll() {
+    const payload = await fetchFavorites();
+    applyPayload(payload);
     loaded.value = true;
+    persist();
   }
 
   async function add(snapshot: AnySnapshot) {
@@ -86,6 +117,7 @@ export const useFavoritesStore = defineStore('favorites', () => {
       await removeFavorite(snapshot);
     } catch (error) {
       section.value = [...section.value.slice(0, index), snapshot, ...section.value.slice(index)];
+      persist();
       throw error;
     }
   }
@@ -113,6 +145,7 @@ export const useFavoritesStore = defineStore('favorites', () => {
     if (!item) return;
     next.splice(to, 0, item);
     section.value = next;
+    persist();
     const items = next.map((snapshot, index) => ({
       source_type: snapshot.source_type,
       source_id: snapshot.source_id,
@@ -127,18 +160,26 @@ export const useFavoritesStore = defineStore('favorites', () => {
     section.value = section.value.map((item) =>
       sameIdentity(item, snapshot) ? { ...item, ...patch } : item,
     );
+    persist();
   }
 
-  // Автозагрузка: вход/восстановление сессии + возврат онлайна —
-  // один стор сам решает, когда списки актуальны. Выход чистит чужие данные.
+  // Автозагрузка: кеш из базы сразу, сервер — когда есть сеть.
+  // Серверный ответ и правки списка перезаписывают базу.
+  // Выход чистит чужие данные.
   const auth = useAuthStore();
   watch(
-    () => [auth.isAuthed, useOnlineStore().isOnline] as const,
-    ([authed, online]) => {
+    () => [auth.isAuthed, auth.user?.id ?? null, useOnlineStore().isOnline] as const,
+    ([authed, userId, online]) => {
+      if (authed && userId && !loaded.value) {
+        void loadFavoritesCache(userId).then((payload) => {
+          if (!payload || loaded.value || useAuthStore().user?.id !== userId) return;
+          applyPayload(payload);
+        });
+      }
       if (authed && online && !loaded.value) {
         void fetchAll().catch(() => undefined);
       }
-      if (!authed && loaded.value) {
+      if (!authed && (loaded.value || hasAny())) {
         clearAll();
       }
     },

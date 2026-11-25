@@ -59,6 +59,8 @@ export const useDownloadsStore = defineStore('downloads', () => {
       .map((row) => row.snapshot),
   );
 
+  const downloadedBytes = computed(() => trackRows.value.reduce((sum, row) => sum + row.bytes, 0));
+
   /** «Скачать всё»: сколько треков уже лежит / сколько всего в этой закачке. */
   const bulkPct = computed(() => {
     const job = bulk.value;
@@ -343,6 +345,27 @@ export const useDownloadsStore = defineStore('downloads', () => {
     }
   }
 
+  async function clearDownloads() {
+    cancelActive();
+    const tracks = [...trackRows.value];
+    const owned = [...collections.value];
+    const linkIds = links.value.map((link) => link.id);
+    trackRows.value = [];
+    collections.value = [];
+    links.value = [];
+    filePct.value = {};
+    await Promise.all([
+      ...linkIds.map((id) => deleteLinkRecord(id)),
+      ...tracks.map((row) => deleteTrackRecord(row.key)),
+      ...owned.map((row) => deleteCollectionRecord(row.key)),
+      ...tracks.map((row) => removeDownload(row.path)),
+      ...tracks.filter((row) => row.coverPath).map((row) => removeDownload(row.coverPath!)),
+      ...owned.filter((row) => row.coverPath).map((row) => removeDownload(row.coverPath!)),
+    ]);
+    for (const row of tracks) clearLocalCover(row.key);
+    for (const row of owned) clearLocalCover(row.key);
+  }
+
   async function removeTrack(snapshot: AnySnapshot) {
     if (snapshot.type !== 'track') return;
     const key = entityKey(snapshot);
@@ -404,6 +427,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
   return {
     items,
+    downloadedBytes,
     bulk,
     bulkPct,
     filePct,
@@ -418,6 +442,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
     cancelActive,
     removeTrack,
     removeCollection,
+    clearDownloads,
     localUrl,
   };
 });

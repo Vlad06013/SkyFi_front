@@ -6,6 +6,7 @@ import * as queueApi from '@/api/queue';
 import * as searchApi from '@/api/search';
 import { useAuthStore } from '@/stores/auth';
 import { useDevicesStore } from '@/stores/devices';
+import { useOnlineStore } from '@/stores/online';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
 import type { PlayerDevice, QueueItem, SearchPagePayload, TrackSnapshot, VideoSnapshot } from '@/types';
@@ -1175,5 +1176,56 @@ describe('stores/player: режим клипов — серверный clips_en
     expect(player.clipMode).toBe(true);
     expect(player.state.clips_enabled).toBe(true);
     expect(patchPlaybackOptionsMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('stores/player: офлайн', () => {
+  const seekToMock = vi.mocked(playerApi.seekTo);
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    playSnapshotMock.mockReset();
+    resumePlaybackMock.mockReset();
+    pausePlaybackMock.mockReset();
+    seekToMock.mockReset();
+    const auth = useAuthStore();
+    auth.user = { id: 1 } as never;
+    auth.token = 't';
+    useOnlineStore().isOnline = false;
+  });
+
+  it('нескачанный трек офлайн не запускается и не шлёт play', async () => {
+    const player = usePlayerStore();
+
+    await player.playSnapshot(track, 'single');
+
+    expect(playSnapshotMock).not.toHaveBeenCalled();
+    expect(player.state.current_snapshot).toBeNull();
+    expect(player.state.is_playing).toBe(false);
+    expect(useToastStore().toast).toBeNull();
+  });
+
+  it('play на уже «играющем» не шлёт resume', async () => {
+    const player = usePlayerStore();
+    player.state = { ...player.state, current_snapshot: track, is_playing: true };
+
+    await player.togglePlay();
+
+    expect(resumePlaybackMock).not.toHaveBeenCalled();
+    expect(pausePlaybackMock).not.toHaveBeenCalled();
+    expect(player.state.is_playing).toBe(true);
+  });
+
+  it('seek не уходит на сервер', async () => {
+    vi.useFakeTimers();
+    const player = usePlayerStore();
+    player.state = { ...player.state, current_snapshot: track, is_playing: true, position_seconds: 1 };
+
+    player.seek(12);
+    await vi.advanceTimersByTimeAsync(400);
+
+    expect(seekToMock).not.toHaveBeenCalled();
+    expect(player.state.position_seconds).toBe(12);
+    vi.useRealTimers();
   });
 });

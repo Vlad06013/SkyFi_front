@@ -99,8 +99,8 @@
       </span>
     </SettingRow>
     <SettingRow
-      :title="downloadedGb ? 'Очистить скачанное' : 'Скачанное'"
-      :idle="downloadedGb ? '1,2 ГБ' : 'ничего нет'"
+      :title="hasDownloads ? 'Очистить скачанное' : 'Скачанное'"
+      :idle="hasDownloads ? downloadedSize : 'ничего нет'"
     >
       <template #icon>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -108,7 +108,7 @@
           <path d="M10 11v5M14 11v5" />
         </svg>
       </template>
-      <button v-if="downloadedGb" class="btn btn-danger sm" type="button" @click="clearDownloads">Очистить</button>
+      <button v-if="hasDownloads" class="btn btn-danger sm" type="button" @click="askClearDownloads">Очистить</button>
     </SettingRow>
 
     <div class="logout-wrap">
@@ -161,6 +161,15 @@
         </SettingRow>
       </template>
     </AppSheet>
+
+    <AppConfirm
+      :open="confirmClear"
+      title="Удалить скачанное?"
+      message="Все скачанные треки будут удалены с устройства."
+      confirm-label="Удалить"
+      @confirm="clearDownloads"
+      @close="confirmClear = false"
+    />
 
     <QrScannerSheet :open="scanOpen" @close="scanOpen = false" @scanned="onScanned" />
   </div>

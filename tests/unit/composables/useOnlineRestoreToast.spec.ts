@@ -17,6 +17,23 @@ describe('composables/useOnlineRestoreToast', () => {
     return { online, toast };
   }
 
+  it('вход в офлайн: тост «Офлайн-режим»', async () => {
+    const { online, toast } = setup();
+    online.isOnline = false;
+    await nextTick();
+    expect(toast.toast?.title).toBe('Офлайн-режим');
+  });
+
+  it('повторный офлайн тост не дублирует', async () => {
+    const { online, toast } = setup();
+    online.isOnline = false;
+    await nextTick();
+    toast.toast = null;
+    online.isOnline = false;
+    await nextTick();
+    expect(toast.toast).toBeNull();
+  });
+
   it('офлайн → онлайн: тост «Соединение восстановлено»', async () => {
     const { online, toast } = setup();
     online.isOnline = false;

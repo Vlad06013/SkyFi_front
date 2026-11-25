@@ -1,10 +1,11 @@
 <template>
   <div
-    :class="[rootClass, { 'is-playing': isPlayable && playing, 'is-drag': dragging, offline }]"
+    :class="[rootClass, { 'is-playing': isPlayable && playing, 'is-drag': dragging, offline: unavailable }]"
     :style="dragStyle"
     role="button"
     tabindex="0"
-    @click="emit('open')"
+    :aria-disabled="unavailable || undefined"
+    @click="onOpen"
   >
     <button
       v-if="sortable"

@@ -3,9 +3,10 @@ import { useOnlineStore } from '@/stores/online';
 import { useToastStore } from '@/stores/toast';
 
 /**
- * Тост при восстановлении связи: показываем один раз на переход
- * «офлайн → онлайн» (сам прячется через 5 с — ttl тоста в ките).
- * Первый переход null → true (бутстрэп) тостом не считаем.
+ * Тосты сети на весь экран (сами прячутся через 5 с).
+ * Офлайн — любой вход в false, включая первую проверку.
+ * «Соединение восстановлено» — только офлайн → онлайн;
+ * первый переход null → true тостом не считаем.
  */
 export function useOnlineRestoreToast() {
   const online = useOnlineStore();
@@ -14,6 +15,10 @@ export function useOnlineRestoreToast() {
   watch(
     () => online.isOnline,
     (value, previous) => {
+      if (value === false && previous !== false) {
+        toast.show('Офлайн-режим');
+        return;
+      }
       if (value === true && previous === false) {
         toast.show('Соединение восстановлено');
       }

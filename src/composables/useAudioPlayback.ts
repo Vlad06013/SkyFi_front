@@ -5,6 +5,7 @@ import { afterMediaUnlock, isAutoplayBlocked, markAutoplayBlocked } from '@/lib/
 import { snapshotKey } from '@/lib/playback-engine';
 import { cacheAudioUrl, getCachedStream, invalidateStream } from '@/lib/stream-url-cache';
 import { useDownloadsStore } from '@/stores/downloads';
+import { useOnlineStore } from '@/stores/online';
 import { usePlayerStore } from '@/stores/player';
 import type { AnySnapshot } from '@/types';
 
@@ -125,6 +126,15 @@ export function useAudioPlayback() {
     // Файл уже в скачанном: get-url не просим, даже если локальный URL не открылся.
     if (downloaded) {
       if (loadedKey === key) loadedKey = null;
+      return;
+    }
+    // Офлайн без файла молчит. Ссылка из SkyFiStreamUrls — адрес Яндекса,
+    // браузер играет её из своего кеша и без нашего бэкенда.
+    if (useOnlineStore().isOnline === false) {
+      if (loadedKey === key) loadedKey = null;
+      appliedKey = null;
+      el.pause();
+      el.removeAttribute('src');
       return;
     }
     // Тёплая ссылка из кеша (предзагрузка/повтор в пределах TTL) — без сети.

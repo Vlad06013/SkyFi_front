@@ -8,8 +8,3 @@
   align-items: center;
   gap: 8px;
 }
-
-.offline-hint {
-  font-size: 12px;
-  color: var(--color-text-faint);
-}
