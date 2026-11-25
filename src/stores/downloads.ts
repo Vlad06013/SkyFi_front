@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
-import { downloadedTracks } from '@/mocks/catalog';
 import type { AnySnapshot, TrackSnapshot } from '@/types';
 
 export type DownloadAllStatus = 'idle' | 'run' | 'done';
@@ -9,9 +8,9 @@ function keyOf(snapshot: AnySnapshot) {
   return `${snapshot.type}:${snapshot.source_type}:${snapshot.source_id}`;
 }
 
-/** Мок «Скачано»: индекс скачанных треков + состояния «скачать всё» по вкладкам. */
+/** Индекс скачанных треков + состояния «скачать всё» по вкладкам. */
 export const useDownloadsStore = defineStore('downloads', () => {
-  const items = ref<TrackSnapshot[]>([...downloadedTracks]);
+  const items = ref<TrackSnapshot[]>([]);
   const allStatus = ref<Record<string, DownloadAllStatus>>({});
   const allPct = ref<Record<string, number>>({});
   const timers = new Map<string, ReturnType<typeof setInterval>>();

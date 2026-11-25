@@ -6,8 +6,8 @@ import { addToFriendQueue, shareWithFriend } from '@/api/friends';
 import { fetchShareUrl } from '@/api/shares';
 import { coverVar, trackCover } from '@/lib/cover';
 import { friendInitial, friendTone } from '@/lib/friends';
-import { favoritePlaylists } from '@/mocks/catalog';
 import { useDevicesStore } from '@/stores/devices';
+import { useFavoritesStore } from '@/stores/favorites';
 import { useFriendsStore, type FriendEntry } from '@/stores/friends';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
@@ -27,6 +27,8 @@ export default defineComponent({
     const friendsStore = useFriendsStore();
     const devicesStore = useDevicesStore();
     const playerStore = usePlayerStore();
+    const favoritesStore = useFavoritesStore();
+    const favoritePlaylists = computed(() => favoritesStore.playlists);
     const friendQuery = ref('');
     const friendFocus = ref(false);
 

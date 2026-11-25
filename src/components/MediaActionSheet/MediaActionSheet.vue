@@ -70,6 +70,7 @@
         </template>
 
         <template v-else-if="sheet === 'playlist'">
+          <div v-if="!favoritePlaylists.length" class="empty">плейлистов нет</div>
           <SnapshotRow
             v-for="playlist in favoritePlaylists"
             :key="playlist.source_id"

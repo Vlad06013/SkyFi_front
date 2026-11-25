@@ -21,8 +21,6 @@ import {
 import { moveItem } from '@/lib/list-sort';
 import { unlockMediaPlayback } from '@/lib/media-unlock';
 import { readPlayerDevicePrefs, writePlayerDevicePrefs } from '@/lib/player-prefs';
-import { favoriteTracks } from '@/mocks/catalog';
-import { mockPlayerState } from '@/mocks/player';
 import { onRealtimeReconnect } from '@/realtime';
 import { useAuthStore } from '@/stores/auth';
 import { useDevicesStore } from '@/stores/devices';
@@ -40,10 +38,27 @@ export const SEEK_COMMIT_DELAY_MS = 300;
 export const usePlayerStore = defineStore('player', () => {
   const toast = useToastStore();
 
-  // --- Состояние (источник истины — сервер; до первого ответа живёт мок)
+  // --- Состояние (источник истины — сервер; до ответа плеера нет)
 
-  const state = ref<PlayerStateView>(mockPlayerState.state);
-  /** Серверный стейт уже применялся (мок перекрыт). До этого version-gate не работает. */
+  const state = ref<PlayerStateView>({
+    id: 0,
+    current_snapshot: null,
+    position_seconds: 0,
+    is_playing: false,
+    repeat_mode: 'off',
+    shuffle_enabled: false,
+    version: 0,
+    play_source: 'single',
+    previous_play_source: 'single',
+    previous_play_source_snapshot: null,
+    context_ref: null,
+    clips_enabled: false,
+    shuffle_seed: null,
+    position_updated_at: null,
+    active_device_id: null,
+    devices: [],
+  });
+  /** Серверный стейт уже применялся. До этого version-gate не работает. */
   let serverStateApplied = false;
 
   const expanded = ref(false);
@@ -102,10 +117,10 @@ export const usePlayerStore = defineStore('player', () => {
   const queueLoaded = ref(false);
 
   /** Материализованный контекст (plan-player.md §2); для волны — серверное окно. */
-  const contextItems = ref<AnySnapshot[]>([...favoriteTracks]);
+  const contextItems = ref<AnySnapshot[]>([]);
   /**
    * Ключ загруженного контекста: источник + ref. Смена плейлиста без смены
-   * источника — тоже перезагрузка (null — мок-начальник, ещё ни разу не резолвился).
+   * источника — тоже перезагрузка (null — ещё ни разу не резолвился).
    */
   let contextKeyLoaded: string | null = null;
   /** У пагинированного источника (поиск/плейлист) за краем загруженного есть ещё. */

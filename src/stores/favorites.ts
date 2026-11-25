@@ -121,7 +121,7 @@ export const useFavoritesStore = defineStore('favorites', () => {
     void sortFavorites('track', items).catch(() => undefined);
   }
 
-  /** Локальная правка мок-плейлистов (CRUD плейлистов — отдельный этап). */
+  /** Локальная правка плейлиста до следующего ответа сервера. */
   function update(snapshot: AnySnapshot, patch: { title?: string; cover_url?: string | null }) {
     const section = sections[snapshot.type];
     section.value = section.value.map((item) =>
