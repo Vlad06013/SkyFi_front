@@ -1,4 +1,4 @@
-import { computed, defineComponent, ref } from 'vue';
+import { computed, defineComponent, onActivated, ref } from 'vue';
 import { usePageRefresh } from '@/composables/usePageRefresh';
 import { useYandexStore } from '@/stores/yandex';
 import { useYoutubeStore } from '@/stores/youtube';
@@ -45,6 +45,10 @@ export default defineComponent({
 
     const apk = useApkBuildStore();
     const { updateIdle, updateAvailable, checking: apkChecking } = storeToRefs(apk);
+    // Вкладка живёт в keep-alive: onActivated — каждый заход, не только первый.
+    onActivated(() => {
+      void apk.refresh(false, true);
+    });
     const downloads = useDownloadsStore();
     const { items: downloadedItems, downloadedBytes } = storeToRefs(downloads);
     const hasDownloads = computed(() => downloadedItems.value.length > 0);

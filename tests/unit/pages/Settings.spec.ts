@@ -17,6 +17,7 @@ vi.mock('vue-router', async () => {
   return {
     ...actual,
     useRouter: () => ({ replace: routerMocks.replace, push: vi.fn() }),
+    useRoute: () => ({ name: 'settings' }),
   };
 });
 

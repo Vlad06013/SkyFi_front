@@ -20,6 +20,8 @@ export const useApkBuildStore = defineStore('apk-build', () => {
   const checking = ref(false);
   let announced = '';
   let timer: ReturnType<typeof setInterval> | null = null;
+  /** Один запрос на всех: таймер и заход в настройки не затирают друг друга. */
+  let flight: Promise<string | null> | null = null;
 
   const updateAvailable = computed(
     () => Boolean(installedSha.value && remoteSha.value && installedSha.value !== remoteSha.value),
@@ -54,31 +56,46 @@ export const useApkBuildStore = defineStore('apk-build', () => {
     });
   }
 
-  async function refresh(manual = false) {
-    if (!inApk || checking.value) return;
-    checking.value = true;
-    try {
-      const sha = await fetchApkBlob();
-      if (!sha) {
-        if (manual) useToastStore().show('Не удалось проверить сборку', '', true);
-        return;
+  /** Скачать blob-sha. Пока запрос летит, повторный вызов ждёт его, а не выходит. */
+  function pull(): Promise<string | null> {
+    if (!inApk) return Promise.resolve(null);
+    if (flight) return flight;
+    flight = (async () => {
+      checking.value = true;
+      try {
+        const sha = await fetchApkBlob();
+        if (!sha) return null;
+        remoteSha.value = sha;
+        if (!installedSha.value) remember(sha);
+        return sha;
+      } catch {
+        return null;
+      } finally {
+        checking.value = false;
+        flight = null;
       }
-      remoteSha.value = sha;
-      if (!installedSha.value) {
-        remember(sha);
-        if (manual) useToastStore().show('Сборка актуальна', shortBlob(sha));
-        return;
-      }
-      if (sha === installedSha.value) {
-        if (manual) useToastStore().show('Сборка актуальна', shortBlob(sha));
-        return;
-      }
-      if (manual || announced !== sha) offerUpdate(sha);
-    } catch {
+    })();
+    return flight;
+  }
+
+  /**
+   * manual — кнопка «Проверить»: тост и когда сборка та же, и когда сеть молчит.
+   * repeat — заход в настройки: тост «Новая сборка» снова, даже если таймер его уже показывал.
+   * Обычный таймер тост не повторяет.
+   */
+  async function refresh(manual = false, repeat = false) {
+    if (!inApk) return;
+    const sha = await pull();
+    if (!sha) {
       if (manual) useToastStore().show('Не удалось проверить сборку', '', true);
-    } finally {
-      checking.value = false;
+      return;
     }
+    const current = installedSha.value;
+    if (!current || sha === current) {
+      if (manual) useToastStore().show('Сборка актуальна', shortBlob(sha));
+      return;
+    }
+    if (manual || repeat || announced !== sha) offerUpdate(sha);
   }
 
   function watchApk() {

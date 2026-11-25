@@ -51,6 +51,29 @@ describe('apk blob', () => {
     expect(apk.updateIdle).toBe('1111111 → 2222222');
   });
 
+  it('повторный заход показывает тост снова, таймер — нет', async () => {
+    const installed = '1111111111111111111111111111111111111111';
+    const remote = '2222222222222222222222222222222222222222';
+    localStorage.setItem('skyfi.apk-blob', installed);
+    setActivePinia(createPinia());
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => tree(remote),
+    } as Response);
+
+    const apk = useApkBuildStore();
+    await apk.refresh();
+    expect(useToastStore().toast?.title).toBe('Новая сборка');
+
+    useToastStore().hide();
+    await apk.refresh();
+    expect(useToastStore().toast).toBeNull();
+
+    await apk.refresh(false, true);
+    expect(useToastStore().toast?.title).toBe('Новая сборка');
+    expect(useToastStore().toast?.who).toBe('1111111 → 2222222');
+  });
+
   it('в браузере сборку не опрашиваем', async () => {
     native.value = false;
     setActivePinia(createPinia());

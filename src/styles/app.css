@@ -203,7 +203,7 @@
   transition: none;
 }
 
-.sky-toast {
+.sky-toast-anchor {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
@@ -211,10 +211,13 @@
   z-index: 70;
   width: max-content;
   max-width: min(520px, calc(100% - 32px));
-  pointer-events: none;
+}
+.sky-toast {
+  width: 100%;
+  pointer-events: auto;
+  touch-action: pan-y;
   align-items: center;
 }
-.sky-toast.has-action { pointer-events: auto; }
 .sky-toast.has-action .btn { margin-left: auto; flex-shrink: 0; }
 
 .hero-cover.round .src {

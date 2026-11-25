@@ -37,5 +37,5 @@ export const useToastStore = defineStore('toast', () => {
     action?.run();
   }
 
-  return { toast, show, runAction };
+  return { toast, show, hide, runAction };
 });
