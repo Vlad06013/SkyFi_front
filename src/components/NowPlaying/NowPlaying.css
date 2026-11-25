@@ -24,7 +24,10 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: max(12px, env(safe-area-inset-top, 0px), var(--safe-top)) 16px max(16px, env(safe-area-inset-bottom, 0px), var(--safe-bottom));
+  padding:
+    max(clamp(8px, 1.4dvh, 12px), env(safe-area-inset-top, 0px), var(--safe-top))
+    16px
+    max(clamp(8px, 1.6dvh, 16px), env(safe-area-inset-bottom, 0px), var(--safe-bottom));
 }
 
 .now-top {
@@ -34,6 +37,7 @@
   color: var(--color-text-secondary);
   flex-shrink: 0;
   min-height: 36px;
+  min-height: clamp(28px, 4.2dvh, 36px);
 }
 
 /* Тот же тёмный фон, что у чипа «авто»: на светлом кадре голые иконки пропадают. */
@@ -54,7 +58,7 @@
   container-type: size;
   display: grid;
   place-items: center;
-  margin: 8px 0 16px;
+  margin: clamp(4px, 1dvh, 8px) 0 clamp(6px, 1.6dvh, 16px);
 }
 
 .now-stage.is-list {
@@ -141,7 +145,75 @@
 }
 
 .seek {
-  margin-top: 8px;
+  margin-top: clamp(4px, 0.8dvh, 8px);
+}
+
+.now-playing :deep(.seek-bar) {
+  padding: clamp(6px, 1.2dvh, 12px) 0;
+}
+
+.now-playing .p-title {
+  font-size: 19px;
+  font-size: clamp(15px, 2.4dvh, 19px);
+}
+
+.now-playing .p-artist {
+  font-size: 13px;
+  font-size: clamp(11px, 1.7dvh, 13px);
+}
+
+.now-playing .p-times {
+  font-size: 11px;
+  font-size: clamp(10px, 1.4dvh, 11px);
+  margin-top: clamp(2px, 0.6dvh, 6px);
+}
+
+.now-playing .p-controls {
+  margin-top: clamp(6px, 1.6dvh, 16px);
+}
+
+.now-playing .p-controls .side {
+  gap: clamp(8px, 1.8dvh, 18px);
+}
+
+.now-playing .p-controls .side svg {
+  width: 22px;
+  height: 22px;
+  width: clamp(16px, 2.6dvh, 22px);
+  height: clamp(16px, 2.6dvh, 22px);
+}
+
+.now-playing .p-controls > .plain svg {
+  width: 30px;
+  height: 30px;
+  width: clamp(20px, 3.6dvh, 30px);
+  height: clamp(20px, 3.6dvh, 30px);
+}
+
+.now-playing .p-controls .fab {
+  width: 60px;
+  height: 60px;
+  width: clamp(44px, 7.2dvh, 60px);
+  height: clamp(44px, 7.2dvh, 60px);
+}
+
+.now-playing .p-controls .fab svg {
+  width: 26px;
+  height: 26px;
+  width: clamp(18px, 3.2dvh, 26px);
+  height: clamp(18px, 3.2dvh, 26px);
+}
+
+.now-playing .p-actions {
+  margin-top: clamp(8px, 1.8dvh, 18px);
+}
+
+.now-playing .p-actions svg,
+.now-playing .p-actions .plain svg {
+  width: 20px;
+  height: 20px;
+  width: clamp(16px, 2.4dvh, 20px);
+  height: clamp(16px, 2.4dvh, 20px);
 }
 
 .now-playing.is-clip {
@@ -196,13 +268,12 @@
 
 @media (min-width: 701px) {
   .now-playing-inner {
-    padding: max(18px, env(safe-area-inset-top, 0px), var(--safe-top)) 28px max(20px, env(safe-area-inset-bottom, 0px), var(--safe-bottom));
+    padding-inline: 28px;
   }
 }
 
 @media (min-width: 1051px) {
   .now-playing-inner {
     max-width: 560px;
-    padding-top: max(24px, env(safe-area-inset-top, 0px), var(--safe-top));
   }
 }
