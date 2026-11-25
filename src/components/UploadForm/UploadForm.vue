@@ -38,10 +38,20 @@
     <div class="field" :class="{ 'is-focus': albumFocus }">
       <input
         v-model="album"
-        placeholder="необязательно"
+        placeholder="название альбома"
         @focus="albumFocus = true"
         @blur="albumFocus = false"
       >
+    </div>
+    <label>Текст песни</label>
+    <div class="field is-area" :class="{ 'is-focus': lyricsFocus }">
+      <textarea
+        v-model="lyrics"
+        placeholder="необязательно"
+        rows="5"
+        @focus="lyricsFocus = true"
+        @blur="lyricsFocus = false"
+      />
     </div>
     <label>Видимость</label>
     <div class="select" :class="{ 'is-open': visibilityOpen }">
@@ -76,8 +86,15 @@
         </button>
       </div>
     </div>
-    <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center">
-      {{ submitLabel }}
+    <div v-if="progress != null" class="ym-progress">
+      <div class="ym-progress-head">
+        <span>Загрузка</span>
+        <span class="ym-progress-pct">{{ progress }}%</span>
+      </div>
+      <div class="ym-bar"><i :style="{ width: `${progress}%` }" /></div>
+    </div>
+    <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center" :disabled="progress != null">
+      {{ progress != null ? 'Загрузка…' : submitLabel }}
     </button>
   </form>
 </template>

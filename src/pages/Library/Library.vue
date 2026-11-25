@@ -210,12 +210,14 @@
 
     <AppSheet :open="uploadOpen" :title="uploadTitle" @close="uploadOpen = false">
       <UploadForm
+        v-if="uploadOpen"
         :key="editingUpload?.source_id ?? 'new'"
         :initial-title="editingUpload?.title ?? ''"
         :initial-artists="editingUpload ? artistsLine(editingUpload.artists) : ''"
         :initial-album="editingUpload?.album?.title ?? ''"
         :initial-visibility="editingUpload?.visibility ?? 'public'"
         :require-file="!editingUpload"
+        :progress="editingUpload ? null : uploadPct"
         :submit-label="editingUpload ? 'Сохранить' : 'Загрузить'"
         @upload="editingUpload ? saveUpload($event) : onUpload($event)"
       />

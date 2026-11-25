@@ -1,0 +1,13 @@
+VITE_REVERB_APP_KEY=vpu88awigtkvxluumpff
+
+# Домашняя сеть. Включается, когда внешний IP устройства совпадает с хостом VITE_API_URL.
+VITE_API_URL=http://192.168.8.33:8080/api/v1/skyfy/
+VITE_REVERB_HOST=192.168.8.33
+VITE_REVERB_PORT=8081
+
+# Снаружи. Это адрес по умолчанию, пока сеть не опознана как домашняя.
+#VITE_API_URL=http://91.228.31.47:4915/api/v1/skyfy/
+#VITE_REVERB_PORT=4916
+#VITE_REVERB_HOST=91.228.31.47
+VITE_REVERB_SCHEME=http
+VITE_REVERB_PROXY=true

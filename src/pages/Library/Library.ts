@@ -60,6 +60,8 @@ export default defineComponent({
 
     const createOpen = ref(false);
     const uploadOpen = ref(false);
+    /** Процент ухода файла на сервер. null — загрузки нет, форма свободна. */
+    const uploadPct = ref<number | null>(null);
     const editing = ref<PlaylistSnapshot | null>(null);
     const editingUpload = ref<TrackSnapshot | null>(null);
     const uploadsStore = useUploadsStore();
@@ -355,15 +357,26 @@ export default defineComponent({
         return;
       }
       try {
-        await uploadsStore.add(draft.file, {
-          title: draft.title,
-          artistNames: splitArtists(draft.artists),
-          albumTitle: draft.album.trim(),
-        });
+        uploadPct.value = 0;
+        const lyrics = draft.lyrics.trim();
+        await uploadsStore.add(
+          draft.file,
+          {
+            title: draft.title,
+            artistNames: splitArtists(draft.artists),
+            albumTitle: draft.album.trim(),
+            ...(lyrics ? { lyrics } : {}),
+          },
+          (ratio) => {
+            uploadPct.value = Math.min(100, Math.round(ratio * 100));
+          },
+        );
         uploadOpen.value = false;
         toast.show(draft.title, `загружено · ${visibilityHint(draft.visibility)}`);
       } catch (error) {
         toast.show(error instanceof Error ? error.message : 'Не удалось загрузить', '', true);
+      } finally {
+        uploadPct.value = null;
       }
     }
 
@@ -371,11 +384,13 @@ export default defineComponent({
       const current = editingUpload.value;
       if (!current) return;
       try {
+        const lyrics = draft.lyrics.trim();
         await uploadsStore.update(current.source_id, {
           title: draft.title,
           artist_names: splitArtists(draft.artists),
           album_title: draft.album.trim(),
           visibility: draft.visibility,
+          ...(lyrics ? { lyrics } : {}),
         });
         editingUpload.value = null;
         uploadOpen.value = false;
@@ -456,6 +471,7 @@ export default defineComponent({
       run,
       createOpen,
       uploadOpen,
+      uploadPct,
       editing,
       editingUpload,
       uploads,

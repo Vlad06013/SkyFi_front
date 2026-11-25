@@ -60,6 +60,14 @@ describe('api/uploads', () => {
     expect(form.get('album_title')).toBe('Мяу кисс ми');
   });
 
+  it('POST /uploads — lyrics уходит, только если его заполнили', async () => {
+    const file = new File(['x'], 'song.mp3', { type: 'audio/mpeg' });
+    postMock.mockResolvedValue(snapshot);
+    await uploadTrack(file, { title: 'Полковнику', artistNames: [], lyrics: 'строка' });
+    const form = postMock.mock.calls[0]?.[1] as FormData;
+    expect(form.get('lyrics')).toBe('строка');
+  });
+
   it('POST /uploads — без album_title поле не шлём', async () => {
     const file = new File(['x'], 'song.mp3', { type: 'audio/mpeg' });
     postMock.mockResolvedValue(snapshot);

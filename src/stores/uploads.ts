@@ -19,9 +19,10 @@ export const useUploadsStore = defineStore('uploads', () => {
   /** Файл + мета; итоговый снапшот с сервера встаёт в начало списка. */
   async function add(
     file: File,
-    meta: { title: string; artistNames: string[]; albumTitle?: string },
+    meta: { title: string; artistNames: string[]; albumTitle?: string; lyrics?: string },
+    onProgress?: (ratio: number) => void,
   ) {
-    const snapshot = await uploadTrack(file, meta);
+    const snapshot = await uploadTrack(file, meta, onProgress);
     items.value = [snapshot, ...items.value.filter((item) => item.source_id !== snapshot.source_id)];
   }
 
