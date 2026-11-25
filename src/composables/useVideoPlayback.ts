@@ -86,6 +86,8 @@ let frameToken = 0;
  */
 let openGen = 0;
 let armedGen = 0;
+/** Поколение резолва: опоздавший ответ не гасит спиннер нового клика. */
+let resolveGen = 0;
 
 /** Новое видео: обложка сразу, спиннер на ней, прошлый кадр спрятан. */
 function beginOpening() {
@@ -107,6 +109,12 @@ function armOpening() {
  * но обложка поиска остаётся вместо кадра на сохранённой позиции.
  * Пока currentTime не на цели — не показываем чужой кадр.
  */
+/** Пока летит resolve, спиннер держим: события старого ролика его не снимают. */
+function releaseBuffering() {
+  if (usePlayerStore().clipStatus === 'resolving') return;
+  clipBuffering.value = false;
+}
+
 function revealPausedFrame(el: HTMLVideoElement) {
   if (!openingArmed()) return;
   if (!usePlayerStore().clipActive) return;
@@ -114,7 +122,7 @@ function revealPausedFrame(el: HTMLVideoElement) {
   if (resumeAt != null) return;
   if (resumeTarget != null && Math.abs(el.currentTime - resumeTarget) > 1) return;
   if (el.readyState < 2) return;
-  clipBuffering.value = false;
+  releaseBuffering();
   setClipFrameReady(true);
 }
 
@@ -501,7 +509,7 @@ export function useVideoPlayback() {
     }
     if (!snapshot) {
       el.pause();
-      clipBuffering.value = false;
+      releaseBuffering();
       setClipFrameReady(false);
       player.setStreamWarming(false);
       if (hlsAttached) {
@@ -574,7 +582,7 @@ export function useVideoPlayback() {
       if (controller.signal.aborted) return;
       if (loadedKey === key) {
         loadedKey = null;
-        clipBuffering.value = false;
+        releaseBuffering();
       }
       if (!(await maybeHintCookies(cause, key))) {
         toast.show(cause instanceof Error ? cause.message : 'Не удалось загрузить видео', '', true);
@@ -588,7 +596,11 @@ export function useVideoPlayback() {
   /** Резолв «трек → видео»: video null — честно «клипа нет», остаёмся на аудио. */
   async function resolveClip(track: TrackSnapshot) {
     const key = snapshotKey(track);
+    const gen = ++resolveGen;
     player.setClipResolving();
+    // Спиннер с самого клика: до ответа resolve клипа ещё нет, HLS-ожидание
+    // начнётся только после него.
+    clipBuffering.value = true;
     resolveAbort?.abort();
     const controller = new AbortController();
     resolveAbort = controller;
@@ -596,9 +608,13 @@ export function useVideoPlayback() {
       const payload = await resolveVideo(track, controller.signal);
       if (controller.signal.aborted) return;
       // Пока резолвили, трек мог смениться или режим выключили — старое не применяем.
-      if (!player.clipMode || !player.current || snapshotKey(player.current) !== key) return;
+      if (!player.clipMode || !player.current || snapshotKey(player.current) !== key) {
+        if (gen === resolveGen) clipBuffering.value = false;
+        return;
+      }
       if (!payload.video) {
         player.setClipUnavailable();
+        clipBuffering.value = false;
         return;
       }
       player.setClipResolved(track, payload.video, payload.streams);
@@ -610,6 +626,7 @@ export function useVideoPlayback() {
       void refreshStreams(payload.video);
     } catch (cause) {
       if (controller.signal.aborted) return;
+      if (gen === resolveGen) clipBuffering.value = false;
       if (player.current && snapshotKey(player.current) === key) player.setClipUnavailable();
       if (!(await maybeHintCookies(cause, key))) {
         toast.show(cause instanceof Error ? cause.message : 'Не удалось найти клип', '', true);
@@ -753,7 +770,7 @@ export function useVideoPlayback() {
     bound = true;
     const el = ensureVideo();
     el.addEventListener('ended', () => {
-      clipBuffering.value = false;
+      releaseBuffering();
       const store = usePlayerStore();
       if (store.isActiveDevice && store.clipActive) store.handleTrackEnded();
     });
@@ -789,7 +806,7 @@ export function useVideoPlayback() {
       store.setAudioPlaying(true);
       // playing прошлого ролика приходит уже после смены снапшота — кадр не возвращаем.
       if (!openingArmed()) return;
-      clipBuffering.value = false;
+      releaseBuffering();
       store.setStreamWarming(false);
       armFirstFrame(el);
     });
@@ -798,7 +815,7 @@ export function useVideoPlayback() {
       if (store.clipActive) store.setAudioPlaying(false);
       // Сервер уже на паузе — крутить нечего, даже если playing так и не было
       // (обновление страницы в play: автоплей не стартовал, буфер на месте).
-      if (!store.state.is_playing) clipBuffering.value = false;
+      if (!store.state.is_playing) releaseBuffering();
       revealPausedFrame(el);
     });
     el.addEventListener('error', () => handleStreamError());

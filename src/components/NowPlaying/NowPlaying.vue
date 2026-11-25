@@ -244,7 +244,7 @@
         >
           <img v-if="current.type === 'track'" :src="trackCover(current)" alt="">
           <SourceBadge :source="current.source_type" />
-          <div v-if="audioLoading" class="clip-spinner" aria-hidden="true">
+          <div v-if="audioLoading || clipBuffering" class="clip-spinner" aria-hidden="true">
             <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
               <circle cx="12" cy="12" r="8" opacity=".25" />
               <path d="M12 4a8 8 0 0 1 8 8" stroke-linecap="round" />
