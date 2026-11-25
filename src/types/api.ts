@@ -154,9 +154,14 @@ export interface PlaylistPayload {
   snapshots: AnySnapshot[];
 }
 
+/** Элемент окна волны: снапшот + отметка прослушанного (contracts.md).
+ * played=true — уже звучал; отметки не снимаются. Новый заход в волну
+ * стартует с первого played=false. */
+export type WaveItem = AnySnapshot & { played: boolean };
+
 /** data ответа GET /wave (api.md §14): полное окно ротации в порядке следования; пустым не бывает. */
 export interface WavePayload {
-  snapshots: AnySnapshot[];
+  snapshots: WaveItem[];
 }
 
 /** Тело POST /wave/feedback (api.md §14) — реакции ротации; batch_id бэк подставляет сам. */

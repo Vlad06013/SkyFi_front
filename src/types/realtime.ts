@@ -17,7 +17,8 @@ export interface PlaybackQueueUpdatedPayload {
   command_id: string | null;
 }
 
-/** playback.wave.updated (api.md §17): окно волны изменилось — клиент делает GET /wave. */
+/** playback.wave.updated (api.md §17): окно выросло — GET /wave и замена
+ * копии, воспроизведение не трогаем. Эхо не глушится: поля могут быть null. */
 export interface WaveUpdatedPayload {
   origin_device_id: string | null;
   command_id: string | null;

@@ -22,7 +22,7 @@ export function handlePlaybackQueueUpdated(payload: PlaybackQueueUpdatedPayload)
   void player.refreshQueue();
 }
 
-/** playback.wave.updated (api.md §17): окно волны изменилось — перечитываем целиком. */
+/** playback.wave.updated (api.md §17): окно выросло — заменяем копию, трек не трогаем. */
 export function handleWaveUpdated(payload: WaveUpdatedPayload) {
   if (!payload) return;
   usePlayerStore().invalidateWave();

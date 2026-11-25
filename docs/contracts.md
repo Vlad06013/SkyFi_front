@@ -396,9 +396,16 @@ export interface PlaylistPayload {
   snapshots: AnySnapshot[];
 }
 
+/** Элемент окна волны: снапшот + отметка прослушанного.
+ * played=true — уже звучал (бэк помечает позиционно от
+ * играющего трека, отметки не снимаются); новый заход в волну
+ * стартует с первого played=false, возврат к прослушанному —
+ * только ручной. */
+export type WaveItem = AnySnapshot & { played: boolean };
+
 export interface WavePayload {
   /** Полное окно ротации в порядке следования; пустым не бывает. */
-  snapshots: AnySnapshot[];
+  snapshots: WaveItem[];
 }
 
 export type WaveFeedbackType =
@@ -427,7 +434,10 @@ export interface PlaybackQueueUpdatedPayload {
   command_id: string | null;
 }
 
-/** playback.wave.updated: окно волны изменилось — клиент делает GET /wave. */
+/** playback.wave.updated: окно волны выросло — клиент делает
+ * GET /wave и заменяет локальную копию (воспроизведение не
+ * трогает). Эхо-глушение не применяется: инициатор play тоже
+ * обновляет копию, эхо-поля могут быть null. */
 export interface WaveUpdatedPayload {
   origin_device_id: string | null;
   command_id: string | null;

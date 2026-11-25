@@ -356,51 +356,25 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
-  /** Ивент playback.wave.updated: окно изменилось — перечитываем целиком (api.md §14). */
+  /** Ивент playback.wave.updated: окно выросло — заменяем копию, воспроизведение не трогаем. */
   function invalidateWave() {
     if (state.value.play_source === 'wave') contextKeyLoaded = null;
     void syncContextWithSource();
   }
 
-  // --- Догрузка окна по исчерпании контекста: пока GET /wave провоцирует рост
-  // окна сам (api.md §14), фронт дёргает его, когда до конца волны остаётся
-  // играть текущий трек. Срабатывает на переходе «стал последним» — пока
-  // сидим на последнем треке повторных запросов нет (окно не выросло — не выросло).
-
-  const waveTailReached = computed(() => {
-    if (state.value.play_source !== 'wave' || !state.value.current_snapshot) return false;
-    const items = contextItems.value;
-    if (!items.length) return false;
-    const index = items.findIndex((item) => snapshotKey(item) === snapshotKey(state.value.current_snapshot!));
-    return index === items.length - 1;
-  });
-
-  watch(waveTailReached, (reached) => {
-    if (!reached) return;
-    void waveApi
-      .fetchWaveWindow()
-      .then((window) => {
-        if (contextKeyLoaded !== contextKeyOf('wave', state.value.context_ref) || state.value.play_source !== 'wave')
-          return;
-        contextItems.value = window;
-        contextHasMore = false;
-        contextNextPage = 2;
-      })
-      .catch(() => {
-        /* следующий переход на хвост повторит */
-      });
-  });
-
   /**
-   * Вход в волну с главной: окно у сервера уже есть, играем его первый
-   * снапшот с source=wave — ротация дальше пойдёт по этому окну.
+   * Вход в волну с главной. Окно уже на сервере; играем первый
+   * непрослушанный (played=false). Прослушанное остаётся в списке —
+   * вернуться к нему можно только вручную.
    */
   async function joinWave() {
     try {
       const window = await waveApi.fetchWaveWindow();
-      const first = window[0];
-      if (!first) return;
-      await playSnapshot(first, 'wave', { contextItems: window });
+      const start = window.find((item) => !item.played);
+      if (!start) return;
+      await playSnapshot(waveApi.waveSnapshot(start), 'wave', {
+        contextItems: window.map(waveApi.waveSnapshot),
+      });
     } catch (cause) {
       toast.show(errorText(cause, 'Не удалось включить волну'), '', true);
     }

@@ -81,7 +81,7 @@ export async function fetchContextPage(req: ContextRequest, page: number): Promi
     }
     case 'wave': {
       if (page > 1) return { items: [], hasMore: false };
-      const items = await fetchWaveWindow();
+      const items = (await fetchWaveWindow()).map(({ played: _played, ...snapshot }) => snapshot);
       return { items, hasMore: false };
     }
     case 'search': {

@@ -68,7 +68,9 @@ function subscribeOwnChannel(userId: number) {
   // Плеер: стейт (version-gate в сторе), очередь (тост + рефетч), окно волны (рефетч целиком).
   router.listen<PlaybackStateUpdatedPayload>(channel, '.playback.state.updated', { echo: true, dedup: true }, handlePlaybackStateUpdated);
   router.listen<PlaybackQueueUpdatedPayload>(channel, '.playback.queue.updated', { echo: true, dedup: true }, handlePlaybackQueueUpdated);
-  router.listen<WaveUpdatedPayload>(channel, '.playback.wave.updated', { echo: true, dedup: true }, handleWaveUpdated);
+  // Эхо не глушим (api.md §17): догрузка от play-хука приходит с null-полями,
+  // и инициатор play тоже заменяет свою копию окна.
+  router.listen<WaveUpdatedPayload>(channel, '.playback.wave.updated', {}, handleWaveUpdated);
 }
 
 /** Подключение и подписка на свой канал. Повторный вызов — no-op. */

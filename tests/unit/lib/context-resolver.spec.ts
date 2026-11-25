@@ -97,7 +97,7 @@ describe('context-resolver: fetchContextPage', () => {
     expect((await fetchContextPage({ playSource: 'uploads', contextRef: null, currentType: 'track' }, 1))?.items).toBe(
       tracks,
     );
-    expect((await fetchContextPage({ playSource: 'wave', contextRef: null, currentType: 'track' }, 1))?.items).toBe(
+    expect((await fetchContextPage({ playSource: 'wave', contextRef: null, currentType: 'track' }, 1))?.items).toEqual(
       tracks,
     );
   });
