@@ -10,6 +10,26 @@ import { useOnlineStore } from '@/stores/online';
 import { useToastStore } from '@/stores/toast';
 import type { AppUpdatePayload } from '@/types/app-update';
 
+const SHELL_INFO_TIMEOUT_MS = 1_500;
+
+function errorDetail(error: unknown): string {
+  const message = error instanceof Error
+    ? error.message
+    : typeof error === 'string'
+      ? error
+      : error && typeof error === 'object' && 'message' in error && typeof error.message === 'string'
+        ? error.message
+        : '';
+  return message.replace(/https?:\/\/\S+/g, (url) => {
+    try {
+      const parsed = new URL(url);
+      return `${parsed.origin}${parsed.pathname}`;
+    } catch {
+      return 'ссылка';
+    }
+  });
+}
+
 export const useAppUpdateStore = defineStore('app-update', () => {
   const inApk = Capacitor.isNativePlatform();
   const checking = ref(false);
@@ -39,72 +59,96 @@ export const useAppUpdateStore = defineStore('app-update', () => {
     return pending.value?.notes ?? '';
   });
 
+  function fail(title: string, error?: unknown) {
+    if (error !== undefined) console.error(title, error);
+    useToastStore().show(title, error === undefined ? '' : errorDetail(error), true);
+  }
+
+  /** getInfo ходит в нативный мост. Если он молчит, проверка всё равно
+   *  уходит на бэк — иначе кнопки нет в логе nginx. */
   async function shellVersion() {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      return shellSemver((await App.getInfo()).version);
-    } catch {
+      const info = await Promise.race([
+        App.getInfo(),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error('версия оболочки не ответила')), SHELL_INFO_TIMEOUT_MS);
+        }),
+      ]);
+      return shellSemver(info.version);
+    } catch (error) {
+      console.error('shell version', error);
       return '1.0.0';
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 
   async function download(update: AppUpdatePayload) {
     downloading.value = true;
     progress.value = 0;
-    if (update.mandatory) promptOpen.value = true;
-    const events = await CapacitorUpdater.addListener('download', (state) => {
-      progress.value = state.percent;
-    });
+    let events: { remove: () => Promise<void> } | undefined;
     try {
+      events = await CapacitorUpdater.addListener('download', (state) => {
+        progress.value = state.percent;
+      });
       const bundle = await CapacitorUpdater.download({
         url: update.url,
         version: update.version,
         checksum: update.sha256,
       });
       bundleId.value = bundle.id;
-      promptOpen.value = true;
-    } catch {
-      pending.value = null;
-      promptOpen.value = false;
-      useToastStore().show('Не удалось скачать обновление', '', true);
+      return true;
+    } catch (error) {
+      fail('Не удалось скачать обновление', error);
+      return false;
     } finally {
       downloading.value = false;
-      await events.remove();
+      await events?.remove();
     }
   }
 
-  /** manual — кнопка: тост, если бандл уже этой версии или сеть молчит. */
+  /** manual — кнопка: тост, если бандл уже этой версии. Скачивание не
+   *  начинается, пока пользователь не подтвердит диалог. */
   async function check(manual = false) {
-    if (!inApk || checking.value || downloading.value) return;
+    if (!inApk) return;
+    if (checking.value || downloading.value) {
+      if (manual) useToastStore().show('Проверка уже идёт');
+      return;
+    }
     checking.value = true;
     try {
       const update = await fetchAppUpdate(BUNDLE_VERSION, await shellVersion());
       if (!update) {
         pending.value = null;
         bundleId.value = null;
+        promptOpen.value = false;
         if (manual) useToastStore().show('Обновлений нет', BUNDLE_VERSION);
         return;
       }
-      if (bundleId.value && pending.value?.version === update.version) {
-        promptOpen.value = true;
-        return;
-      }
+      if (pending.value?.version !== update.version) bundleId.value = null;
       pending.value = update;
-      bundleId.value = null;
-      await download(update);
-    } catch {
-      if (manual) useToastStore().show('Не удалось проверить обновление', '', true);
+      promptOpen.value = true;
+    } catch (error) {
+      fail('Не удалось проверить обновление', error);
     } finally {
       checking.value = false;
     }
   }
 
-  async function apply() {
+  async function accept() {
+    const update = pending.value;
+    if (!update || downloading.value) return;
+    if (!bundleId.value) {
+      const ok = await download(update);
+      if (!ok) return;
+    }
     const id = bundleId.value;
     if (!id) return;
     try {
       await CapacitorUpdater.set({ id });
-    } catch {
-      useToastStore().show('Не удалось установить обновление', '', true);
+    } catch (error) {
+      fail('Не удалось установить обновление', error);
       promptOpen.value = true;
     }
   }
@@ -141,7 +185,7 @@ export const useAppUpdateStore = defineStore('app-update', () => {
     promptTitle,
     promptMessage,
     check,
-    apply,
+    accept,
     dismiss,
     bind,
   };

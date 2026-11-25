@@ -40,7 +40,7 @@ export default defineComponent({
       updateMessage,
       updateMandatory,
       updateDownloading,
-      applyUpdate: () => void updates.apply(),
+      applyUpdate: () => void updates.accept(),
       dismissUpdate: updates.dismiss,
     };
   },

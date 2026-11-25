@@ -34,7 +34,9 @@ import './styles/adaptive.css';
 if (Capacitor.isNativePlatform()) {
   // Битый бандл без этого отката плагин откатит сам. Звать до сети:
   // таймаут плагина короткий, bootstrap его не ждёт.
-  void CapacitorUpdater.notifyAppReady();
+  void CapacitorUpdater.notifyAppReady().catch((error: unknown) => {
+    console.error('notifyAppReady', error);
+  });
 }
 
 if (Capacitor.getPlatform() === 'android') {

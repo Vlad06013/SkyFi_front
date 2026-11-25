@@ -13,6 +13,9 @@ const config: CapacitorConfig = {
     CapacitorUpdater: {
       autoUpdate: false,
       version: BUNDLE_VERSION,
+      // Бэк отдаёт архив по http. У плагина httpsOnly включён по умолчанию,
+      // и он отклоняет ссылку ещё до запроса.
+      httpsOnly: false,
     },
   },
 };
