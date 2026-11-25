@@ -40,8 +40,8 @@
         <span v-if="dlAllStatus === 'done'" class="dl-all is-done">Скачано</span>
         <button
           v-else
-          class="dl-all is-progress"
-          :class="{ 'is-run': dlAllActive }"
+          class="dl-all"
+          :class="{ 'is-run': dlAllActive, 'is-progress': dlAllArc > 0 }"
           type="button"
           :aria-label="dlAllActive ? `остановить скачивание, ${dlAllPct}%` : 'скачать все'"
           @click="downloadAllTab"
@@ -52,7 +52,7 @@
           </svg>
           <svg v-else class="ring" viewBox="0 0 36 36" aria-hidden="true">
             <circle class="track" cx="18" cy="18" r="15" />
-            <circle class="arc" cx="18" cy="18" r="15" transform="rotate(-90 18 18)" :style="{ strokeDasharray: `${dlAllArc} 94` }" />
+            <circle v-if="dlAllArc > 0" class="arc" cx="18" cy="18" r="15" transform="rotate(-90 18 18)" :style="{ strokeDasharray: `${dlAllArc} 94` }" />
           </svg>
           <span v-if="dlAllActive" class="pct">{{ dlAllPct }}%</span>
           <svg v-else class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
