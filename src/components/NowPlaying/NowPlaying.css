@@ -10,6 +10,7 @@
   touch-action: none;
   transition: transform .2s ease, opacity .2s ease;
   user-select: none;
+  outline: none;
 }
 
 .now-playing.is-dragging {

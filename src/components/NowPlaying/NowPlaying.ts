@@ -1,4 +1,4 @@
-import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, defineComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
 import SeekBar from '@/components/SeekBar/SeekBar.vue';
@@ -18,6 +18,26 @@ import { pushBackOverlay } from '@/lib/hardware-back';
 import { trackPointer } from '@/lib/pointer-drag';
 import { formatTime } from '@/lib/time';
 import { usePlayerStore } from '@/stores/player';
+
+/** Пульт в простое: эти клавиши только поднимают кнопки, не жмут спрятанную. */
+export function isPlayerWakeKey(event: { key: string; keyCode?: number }): boolean {
+  const code = event.keyCode ?? -1;
+  return (
+    event.key === 'ArrowLeft' ||
+    event.key === 'ArrowRight' ||
+    event.key === 'ArrowUp' ||
+    event.key === 'ArrowDown' ||
+    event.key === 'Enter' ||
+    event.key === ' ' ||
+    event.key === 'OK' ||
+    code === 19 ||
+    code === 20 ||
+    code === 21 ||
+    code === 22 ||
+    code === 23 ||
+    code === 66
+  );
+}
 import type { AnySnapshot, QueueItem } from '@/types';
 
 type Layer = 'now' | 'queue' | 'lyrics';
@@ -295,14 +315,29 @@ export default defineComponent({
 
     watch([clipActive, expanded, qualityOpen, audioOpen, layer], wake);
 
+    function onIdleKey(event: KeyboardEvent) {
+      if (!clipIdle.value || !isPlayerWakeKey(event)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      wake();
+    }
+
+    watch(clipIdle, (idle) => {
+      if (!idle) return;
+      // Фокус остаётся на «вперёд» под спрятанными кнопками — ок тогда скипает трек.
+      void nextTick(() => rootEl.value?.focus());
+    });
+
     onMounted(() => {
       wake();
       document.addEventListener('fullscreenchange', onFullscreenChange);
+      document.addEventListener('keydown', onIdleKey, true);
     });
 
     onBeforeUnmount(() => {
       if (idleTimer) clearTimeout(idleTimer);
       document.removeEventListener('fullscreenchange', onFullscreenChange);
+      document.removeEventListener('keydown', onIdleKey, true);
     });
 
     const { open, items, top, right, sheet, entity, openMenu, closeMenu, run } = useMediaMenu({

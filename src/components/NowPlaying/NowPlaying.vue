@@ -3,6 +3,7 @@
     v-if="expanded && current"
     ref="rootEl"
     class="now-playing"
+    tabindex="-1"
     :class="{ 'is-dragging': playerDragging, 'is-clip': clipActive, 'is-clip-idle': clipIdle, 'has-frame': clipFrameReady }"
     :style="playerDragStyle"
     @pointerdown="onPlayerDragStart"
@@ -18,7 +19,7 @@
       </svg>
     </div>
 
-    <div class="now-playing-inner">
+    <div class="now-playing-inner" :inert="clipIdle">
       <div class="now-top">
         <button class="icon-btn ghost" type="button" :aria-label="topLabel" @click="onTop">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -261,6 +262,7 @@
         class="seek"
         :model-value="progress"
         :buffered="bufferedRanges"
+        :duration="durationSeconds"
         label="позиция"
         @update:model-value="seekRatio($event / 100)"
       />
