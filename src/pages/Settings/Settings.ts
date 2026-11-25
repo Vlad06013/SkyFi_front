@@ -28,7 +28,6 @@ export default defineComponent({
     const draft = ref(user.value?.name ?? '');
     const avatarInput = ref<HTMLInputElement | null>(null);
     const avatarBusy = ref(false);
-    const appLatest = ref(false);
     const confirmClear = ref(false);
     const downloads = useDownloadsStore();
     const { items: downloadedItems, downloadedBytes } = storeToRefs(downloads);
@@ -36,8 +35,6 @@ export default defineComponent({
     const downloadedSize = computed(() => formatBytes(downloadedBytes.value));
     const builds = [
       { id: 'apk', title: 'Android · APK', idle: 'телефон, ТВ, магнитола' },
-      { id: 'linux', title: 'Linux', idle: 'AppImage' },
-      { id: 'windows', title: 'Windows', idle: 'установщик' },
     ] as const;
     // /tree/ открывает страницу GitHub, raw отдаёт сам файл skyFy.apk из dev_v2.
     const APK_URL = 'https://github.com/Vlad06013/SkyFi_front/raw/dev_v2/skyFy.apk';
@@ -78,18 +75,9 @@ export default defineComponent({
       }
     }
 
-    function updateApp() {
-      appLatest.value = true;
-      toast.show('SkyFi 1.5.0', 'обновлено');
-    }
-
-    function downloadBuild(build: { id: string; title: string }) {
+    function downloadBuild() {
       sheet.value = null;
-      if (build.id === 'apk') {
-        window.open(APK_URL, '_blank', 'noopener');
-        return;
-      }
-      toast.show(build.title, 'сборки пока нет');
+      window.open(APK_URL, '_blank', 'noopener');
     }
 
     function formatBytes(bytes: number): string {
@@ -132,7 +120,6 @@ export default defineComponent({
       draft,
       avatarInput,
       avatarBusy,
-      appLatest,
       confirmClear,
       hasDownloads,
       downloadedSize,
@@ -141,7 +128,6 @@ export default defineComponent({
       pickAvatar,
       onAvatarPicked,
       saveName,
-      updateApp,
       downloadBuild,
       askClearDownloads,
       clearDownloads,

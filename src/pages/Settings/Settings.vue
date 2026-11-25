@@ -62,29 +62,7 @@
         </svg>
       </span>
     </SettingRow>
-    <SettingRow
-      v-if="appLatest"
-      title="Приложение"
-      idle="1.5.0 · последняя"
-      on
-    >
-      <template #icon>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M5 12.5 9.5 17 19 7.5" />
-        </svg>
-      </template>
-      <span class="muted-pill">актуально</span>
-    </SettingRow>
-    <SettingRow v-else title="Обновить приложение" idle="1.4.2 → 1.5.0">
-      <template #icon>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20 12a8 8 0 1 1-2.3-5.7" />
-          <path d="M20 4v5h-5" />
-        </svg>
-      </template>
-      <button class="btn btn-ghost sm" type="button" @click="updateApp">Обновить</button>
-    </SettingRow>
-    <SettingRow title="Скачать приложение" idle="APK · Linux · Windows" clickable @open="sheet = 'download'">
+    <SettingRow title="Скачать приложение" idle="APK" clickable @open="sheet = 'download'">
       <template #icon>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 4v11" />
@@ -135,20 +113,9 @@
           @open="downloadBuild(build)"
         >
           <template #icon>
-            <svg v-if="build.id === 'apk'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <rect x="7" y="3" width="10" height="18" rx="2" />
               <path d="M11 18h2" />
-            </svg>
-            <svg v-else-if="build.id === 'linux'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="5" width="18" height="14" rx="2" />
-              <path d="m7 10 3 2-3 2" />
-              <path d="M13 14h4" />
-            </svg>
-            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-              <rect x="4" y="4" width="7" height="7" rx="1" />
-              <rect x="13" y="4" width="7" height="7" rx="1" />
-              <rect x="4" y="13" width="7" height="7" rx="1" />
-              <rect x="13" y="13" width="7" height="7" rx="1" />
             </svg>
           </template>
           <span class="go" aria-hidden="true">
