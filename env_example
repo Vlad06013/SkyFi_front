@@ -1,5 +1,10 @@
 VITE_REVERB_APP_KEY=vpu88awigtkvxluumpff
 
+# true — всегда домашняя пара, сверка внешнего IP не выполняется.
+# Нужно браузеру этой машины: https-страница сама на локальный http не переключается.
+# В клиент попадает только имя с префиксом VITE_.
+VITE_IS_LOCAL_FORCE=false
+
 # Домашняя сеть. Включается, когда внешний IP устройства совпадает с хостом VITE_API_URL.
 VITE_API_URL_LOCAL=http://192.168.8.33:8080/api/v1/skyfy/
 VITE_REVERB_HOST_LOCAL=192.168.8.33

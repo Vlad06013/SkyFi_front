@@ -1,4 +1,5 @@
-import { computed, defineComponent, onMounted, onBeforeUnmount } from 'vue';
+import { computed, defineComponent, onBeforeUnmount, watch } from 'vue';
+import { pushBackOverlay } from '@/lib/hardware-back';
 
 export default defineComponent({
   name: 'ContextMenu',
@@ -22,8 +23,20 @@ export default defineComponent({
       if (event.key === 'Escape') close();
     }
 
-    onMounted(() => window.addEventListener('keydown', onKey));
-    onBeforeUnmount(() => window.removeEventListener('keydown', onKey));
+    let stopBack: (() => void) | null = null;
+    watch(
+      () => props.open,
+      (isOpen) => {
+        if (isOpen) window.addEventListener('keydown', onKey);
+        else window.removeEventListener('keydown', onKey);
+        stopBack?.();
+        stopBack = isOpen ? pushBackOverlay(() => { close(); return true; }) : null;
+      },
+    );
+    onBeforeUnmount(() => {
+      window.removeEventListener('keydown', onKey);
+      stopBack?.();
+    });
 
     return { popStyle, close };
   },

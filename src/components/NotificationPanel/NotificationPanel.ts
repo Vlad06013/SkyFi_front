@@ -1,4 +1,5 @@
 import { defineComponent, onMounted, onBeforeUnmount, watch } from 'vue';
+import { pushBackOverlay } from '@/lib/hardware-back';
 import { storeToRefs } from 'pinia';
 import { useRoute, useRouter } from 'vue-router';
 import { friendInitial, friendTone } from '@/lib/friends';
@@ -31,6 +32,13 @@ export default defineComponent({
     watch(open, (value) => {
       if (value) ensure();
     });
+
+    let stopBack: (() => void) | null = null;
+    watch(open, (value) => {
+      stopBack?.();
+      stopBack = value ? pushBackOverlay(() => { close(); return true; }) : null;
+    });
+    onBeforeUnmount(() => stopBack?.());
 
     /** Клик по шаре: как обычный клик по снапшоту (плеер/деталка) + гасим непрочитанность. */
     function openShare(share: ShareNotice) {

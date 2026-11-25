@@ -3,6 +3,8 @@
 interface ImportMetaEnv {
   readonly VITE_API_URL: string;
   readonly VITE_API_URL_LOCAL?: string;
+  /** `true` — всегда домашняя пара, без сверки внешнего IP. */
+  readonly VITE_IS_LOCAL_FORCE?: string;
   readonly VITE_REVERB_APP_KEY: string;
   readonly VITE_REVERB_HOST?: string;
   readonly VITE_REVERB_HOST_LOCAL?: string;

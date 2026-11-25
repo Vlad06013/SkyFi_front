@@ -1,4 +1,5 @@
-import { defineComponent, ref, watch } from 'vue';
+import { defineComponent, onBeforeUnmount, ref, watch } from 'vue';
+import { pushBackOverlay } from '@/lib/hardware-back';
 import { trackPointer } from '@/lib/pointer-drag';
 
 const closeThreshold = 88;
@@ -46,13 +47,22 @@ export default defineComponent({
       if (event.key === 'Escape') close();
     }
 
+    let stopBack: (() => void) | null = null;
+
     watch(
       () => props.open,
       (isOpen) => {
         if (isOpen) window.addEventListener('keydown', onKey);
         else window.removeEventListener('keydown', onKey);
+        stopBack?.();
+        stopBack = isOpen ? pushBackOverlay(() => { close(); return true; }) : null;
       },
     );
+
+    onBeforeUnmount(() => {
+      window.removeEventListener('keydown', onKey);
+      stopBack?.();
+    });
 
     return { dragging, dragStyle, close, onDragStart };
   },

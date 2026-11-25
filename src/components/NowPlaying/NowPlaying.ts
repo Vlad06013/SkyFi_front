@@ -14,6 +14,7 @@ import { coverVar, artistsLine, trackCover } from '@/lib/cover';
 import { sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
 import { entityFromSnapshot } from '@/lib/media-menu';
 import { PLAY_SOURCE_QUEUE } from '@/lib/play-sources';
+import { pushBackOverlay } from '@/lib/hardware-back';
 import { trackPointer } from '@/lib/pointer-drag';
 import { formatTime } from '@/lib/time';
 import { usePlayerStore } from '@/stores/player';
@@ -362,6 +363,28 @@ export default defineComponent({
       }
       collapse();
     }
+
+    let stopPlayerBack: (() => void) | null = null;
+    watch(expanded, (open) => {
+      stopPlayerBack?.();
+      stopPlayerBack = null;
+      if (!open) return;
+      // Поверх уже открытых шитов: «назад» сначала разбирает плеер.
+      stopPlayerBack = pushBackOverlay(() => {
+        if (document.fullscreenElement) {
+          void document.exitFullscreen().catch(() => undefined);
+          return true;
+        }
+        if (qualityOpen.value || audioOpen.value) {
+          qualityOpen.value = false;
+          audioOpen.value = false;
+          return true;
+        }
+        onTop();
+        return true;
+      });
+    });
+    onBeforeUnmount(() => stopPlayerBack?.());
 
     function openQueue() {
       closeMenu();

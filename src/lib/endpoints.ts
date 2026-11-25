@@ -20,28 +20,79 @@ export interface EndpointTarget {
  * Совпадает внешний IP устройства с хостом бэка — мы в его домашней сети.
  * IP нет или локалка не задана — остаёмся на внешнем адресе.
  */
+/** `VITE_IS_LOCAL_FORCE=true` — не спрашивать внешний IP, сразу домашняя пара. */
+export function isLocalForce(value: string | undefined): boolean {
+  return value === 'true';
+}
+
 export function chooseRoute(myPublicIp: string | null, wanHost: string, localAllowed: boolean): EndpointKind {
   if (!localAllowed || !myPublicIp) return 'wan';
   return myPublicIp.trim() === wanHost.trim() ? 'local' : 'wan';
+}
+
+/**
+ * Принудительная локалка не смотрит на IP. Без домашнего адреса в .env
+ * остаётся внешняя пара. IP не узнали — оставляем текущую пару.
+ */
+export function selectEndpoint(input: {
+  force: boolean;
+  hasLocal: boolean;
+  allowed: boolean;
+  ip: string | null;
+  wanHost: string;
+  current: EndpointKind;
+}): EndpointKind {
+  if (input.force) return input.hasLocal ? 'local' : 'wan';
+  if (!input.allowed) return 'wan';
+  if (!input.ip) return input.current;
+  return chooseRoute(input.ip, input.wanHost, true);
 }
 
 function wanHost(): string {
   return new URL(import.meta.env.VITE_API_URL).hostname;
 }
 
-function localAllowed(): boolean {
+function localConfigUrl(): URL | null {
   const raw = import.meta.env.VITE_API_URL_LOCAL;
-  if (!raw) return false;
+  if (!raw) return null;
   try {
-    const url = new URL(raw);
-    // https-страница не имеет права на http-бэк: смешанный контент.
-    // APK открыт по http, ему локальный адрес доступен.
-    if (url.protocol === 'http:' && typeof window !== 'undefined' && window.location.protocol === 'https:') {
-      return false;
-    }
-    return true;
+    return new URL(raw);
   } catch {
+    return null;
+  }
+}
+
+function localForced(): boolean {
+  return isLocalForce(import.meta.env.VITE_IS_LOCAL_FORCE);
+}
+
+function localAllowed(): boolean {
+  const url = localConfigUrl();
+  if (!url) return false;
+  // Принудительная локалка: адрес берём даже с https-страницы.
+  // В dev запрос уходит на сам dev-сервер, vite проксирует его на локальный бэк.
+  if (localForced()) return true;
+  // https-страница не имеет права на http-бэк: смешанный контент.
+  // APK открыт по http, ему локальный адрес доступен.
+  if (url.protocol === 'http:' && typeof window !== 'undefined' && window.location.protocol === 'https:') {
     return false;
+  }
+  return true;
+}
+
+/**
+ * С https-страницы dev прямой http://192.168… режется браузером.
+ * База axios тогда — путь на самом dev-сервере, vite.config проксирует /api.
+ */
+function browserBase(apiUrl: string): string {
+  if (!import.meta.env.DEV || !localForced() || typeof window === 'undefined') return apiUrl;
+  if (window.location.protocol !== 'https:') return apiUrl;
+  try {
+    const url = new URL(apiUrl);
+    if (url.protocol !== 'http:') return apiUrl;
+    return url.pathname.endsWith('/') ? url.pathname : `${url.pathname}/`;
+  } catch {
+    return apiUrl;
   }
 }
 
@@ -91,7 +142,7 @@ function applyEndpoint(next: EndpointKind): boolean {
   const changed = next !== endpointKind.value;
   endpointKind.value = next;
   const target = currentEndpoint();
-  setApiBaseUrl(target.apiUrl);
+  setApiBaseUrl(browserBase(target.apiUrl));
   if (changed || !announced) {
     console.info(
       `[net] ${next === 'local' ? 'домашняя сеть' : 'внешний адрес'} → ${target.apiUrl} (сокет ${target.reverbHost}:${target.reverbPort})`,
@@ -107,8 +158,24 @@ function applyEndpoint(next: EndpointKind): boolean {
  * Внешний IP не узнали — оставляем текущую пару (на старте это внешний адрес).
  */
 export async function resolveEndpoint(): Promise<boolean> {
+  const force = localForced();
+  const hasLocal = localConfigUrl() !== null;
+  if (force) return applyEndpoint(selectEndpoint({
+    force,
+    hasLocal,
+    allowed: false,
+    ip: null,
+    wanHost: wanHost(),
+    current: endpointKind.value,
+  }));
   if (!localAllowed()) return applyEndpoint('wan');
   const ip = await fetchPublicIp();
-  if (!ip) return applyEndpoint(endpointKind.value);
-  return applyEndpoint(chooseRoute(ip, wanHost(), true));
+  return applyEndpoint(selectEndpoint({
+    force: false,
+    hasLocal,
+    allowed: true,
+    ip,
+    wanHost: wanHost(),
+    current: endpointKind.value,
+  }));
 }
