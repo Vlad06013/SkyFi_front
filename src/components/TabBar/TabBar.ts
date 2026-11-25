@@ -1,16 +1,18 @@
-import { defineComponent } from 'vue';
+import { computed, defineComponent } from 'vue';
 import { useRoute } from 'vue-router';
+import { useFriendsStore } from '@/stores/friends';
 
 export default defineComponent({
   name: 'TabBar',
   setup() {
-    const tabs = [
+    const friends = useFriendsStore();
+    const tabs = computed(() => [
       { id: 'home', to: '/home', label: 'Главная', badge: false },
       { id: 'search', to: '/search', label: 'Поиск', badge: false },
       { id: 'library', to: '/library', label: 'Моё', badge: false },
-      { id: 'friends', to: '/friends', label: 'Друзья', badge: true },
+      { id: 'friends', to: '/friends', label: 'Друзья', badge: friends.incoming.length > 0 },
       { id: 'settings', to: '/settings', label: 'Настройки', badge: false },
-    ] as const;
+    ]);
 
     const route = useRoute();
 

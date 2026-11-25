@@ -1,9 +1,49 @@
 .sky-body {
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior-y: none;
 }
+
+.pull-refresh {
+  position: absolute;
+  z-index: 6;
+  top: 0;
+  left: 0;
+  right: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+  pointer-events: none;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.pull-refresh-mark {
+  width: 22px;
+  height: 22px;
+  margin-bottom: 6px;
+  display: flex;
+  color: var(--color-text-faint);
+  transition: transform 0.16s ease;
+}
+
+.pull-refresh-mark svg { width: 22px; height: 22px; }
+
+.pull-refresh.is-ready .pull-refresh-mark {
+  transform: rotate(180deg);
+  color: var(--color-accent);
+}
+
+.pull-refresh.is-ready .pull-refresh-label { color: var(--color-accent); }
+
+.pull-refresh.is-busy .pull-refresh-mark { transform: none; color: var(--color-accent); }
+
+.pull-refresh-label { margin-bottom: 8px; }
 
 .sky-body::-webkit-scrollbar { width: 0; }
 

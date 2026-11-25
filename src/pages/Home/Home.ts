@@ -1,4 +1,5 @@
 import { computed, defineComponent } from 'vue';
+import { usePageRefresh } from '@/composables/usePageRefresh';
 import { storeToRefs } from 'pinia';
 import { usePlayerStore } from '@/stores/player';
 import { useNotificationsStore } from '@/stores/notifications';
@@ -37,6 +38,11 @@ export default defineComponent({
     function onHomeClipHost(el: unknown) {
       setHomeClipHost(el instanceof HTMLElement ? el : null);
     }
+
+    usePageRefresh(async () => {
+      await player.resync();
+      if (player.state.play_source === 'wave') player.invalidateWave();
+    });
 
     const notifications = useNotificationsStore();
     const { hasUnread } = storeToRefs(notifications);

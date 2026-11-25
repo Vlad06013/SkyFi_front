@@ -1,4 +1,5 @@
 import { computed, defineComponent, ref } from 'vue';
+import { usePageRefresh } from '@/composables/usePageRefresh';
 import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import AppBar from '@/components/AppBar/AppBar.vue';
@@ -63,6 +64,13 @@ export default defineComponent({
     const editingUpload = ref<TrackSnapshot | null>(null);
     const uploadsStore = useUploadsStore();
     const { items: uploads } = storeToRefs(uploadsStore);
+    usePageRefresh(() =>
+      Promise.all([
+        favorites.fetchAll().catch(() => undefined),
+        uploadsStore.fetchAll().catch(() => undefined),
+      ]),
+    );
+
     const downloads = useDownloadsStore();
     const online = useOnlineStore();
     const isOffline = computed(() => online.isOnline === false);

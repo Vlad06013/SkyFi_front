@@ -1,4 +1,5 @@
 import { computed, defineComponent, ref, watch } from 'vue';
+import { usePageRefresh } from '@/composables/usePageRefresh';
 import { useRoute, useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import AppBar from '@/components/AppBar/AppBar.vue';
@@ -98,6 +99,8 @@ export default defineComponent({
         if (gen === generation) loading.value = false;
       }
     }
+
+    usePageRefresh(() => load());
 
     watch(
       userId,

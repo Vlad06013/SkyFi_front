@@ -1,4 +1,5 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { usePageRefresh } from '@/composables/usePageRefresh';
 import { useRoute } from 'vue-router';
 import { fetchEntityDetails, type DetailsEntityType } from '@/api/details';
 import { useDownloadsStore } from '@/stores/downloads';
@@ -124,6 +125,7 @@ export function useEntityDetails(type: DetailsEntityType) {
     observer.observe(el);
   });
 
+  usePageRefresh(() => load(1));
   onMounted(() => void load(1));
   onBeforeUnmount(() => observer?.disconnect());
 

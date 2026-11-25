@@ -1,4 +1,5 @@
 import { computed, defineComponent, ref, watch } from 'vue';
+import { usePageRefresh } from '@/composables/usePageRefresh';
 import { storeToRefs } from 'pinia';
 import { useRouter } from 'vue-router';
 import AppBar from '@/components/AppBar/AppBar.vue';
@@ -25,6 +26,7 @@ export default defineComponent({
     const query = ref('');
     const focused = ref(false);
     const friendsStore = useFriendsStore();
+    usePageRefresh(() => friendsStore.fetchAll());
     const { friends, incoming, outgoing, loaded } = storeToRefs(friendsStore);
 
     const foundUsers = ref<UserSearchItem[]>([]);

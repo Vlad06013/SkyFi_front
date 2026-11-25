@@ -1,4 +1,7 @@
 import { computed, defineComponent, ref } from 'vue';
+import { usePageRefresh } from '@/composables/usePageRefresh';
+import { useYandexStore } from '@/stores/yandex';
+import { useYoutubeStore } from '@/stores/youtube';
 import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import AppBar from '@/components/AppBar/AppBar.vue';
@@ -30,6 +33,16 @@ export default defineComponent({
     const avatarInput = ref<HTMLInputElement | null>(null);
     const avatarBusy = ref(false);
     const confirmClear = ref(false);
+    const yandex = useYandexStore();
+    const youtube = useYoutubeStore();
+    usePageRefresh(() =>
+      Promise.all([
+        auth.restoreSession({ refresh: true }),
+        yandex.refresh().catch(() => undefined),
+        youtube.refresh().catch(() => undefined),
+      ]),
+    );
+
     const apk = useApkBuildStore();
     const { updateIdle, updateAvailable, checking: apkChecking } = storeToRefs(apk);
     const downloads = useDownloadsStore();

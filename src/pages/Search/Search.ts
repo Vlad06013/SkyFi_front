@@ -1,4 +1,5 @@
 import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { usePageRefresh } from '@/composables/usePageRefresh';
 import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
 import AppBar from '@/components/AppBar/AppBar.vue';
@@ -226,6 +227,15 @@ export default defineComponent({
         }
       }
     }
+
+    usePageRefresh(() => {
+      if (q.value.length < SEARCH_MIN_LENGTH) return;
+      if (offline.value) {
+        applyDownloadedSearch();
+        return;
+      }
+      return search(1);
+    });
 
     function loadMore() {
       if (!sectionHasMore.value || !result.value) return;
