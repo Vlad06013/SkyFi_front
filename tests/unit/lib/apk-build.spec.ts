@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
-import { fetchApkBlob, shortBlob } from '@/lib/apk-build';
+import { fetchApkBlob, settleInstall, shortBlob } from '@/lib/apk-build';
 import { useApkBuildStore } from '@/stores/apk-build';
 import { useToastStore } from '@/stores/toast';
 
@@ -8,6 +8,10 @@ const native = vi.hoisted(() => ({ value: true }));
 
 vi.mock('@capacitor/core', () => ({
   Capacitor: { isNativePlatform: () => native.value },
+}));
+
+vi.mock('@capacitor/app', () => ({
+  App: { getInfo: vi.fn().mockRejectedValue(new Error('нет сборки')) },
 }));
 
 const tree = (sha: string) => ({
@@ -72,6 +76,25 @@ describe('apk blob', () => {
     await apk.refresh(false, true);
     expect(useToastStore().toast?.title).toBe('Новая сборка');
     expect(useToastStore().toast?.who).toBe('1111111 → 2222222');
+  });
+
+  it('отмена загрузки не подменяет установленный sha', () => {
+    const installed = '1111111111111111111111111111111111111111';
+    const pending = '2222222222222222222222222222222222222222';
+    expect(
+      settleInstall({ seenBuild: '4', pending, installed }, '4'),
+    ).toEqual({ seenBuild: '4', pending: null, installed });
+  });
+
+  it('новый versionCode принимает ждавший sha, первый запуск старую отметку сбрасывает', () => {
+    const installed = '1111111111111111111111111111111111111111';
+    const pending = '2222222222222222222222222222222222222222';
+    expect(
+      settleInstall({ seenBuild: '4', pending, installed }, '5'),
+    ).toEqual({ seenBuild: '5', pending: null, installed: pending });
+    expect(
+      settleInstall({ seenBuild: null, pending: null, installed }, '5'),
+    ).toEqual({ seenBuild: '5', pending: null, installed: null });
   });
 
   it('в браузере сборку не опрашиваем', async () => {

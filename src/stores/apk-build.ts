@@ -1,12 +1,20 @@
+import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import {
+  clearInstalledBlob,
+  clearPendingBlob,
   fetchApkBlob,
   openApkDownload,
   readInstalledBlob,
+  readPendingBlob,
+  readSeenBuild,
+  settleInstall,
   shortBlob,
   writeInstalledBlob,
+  writePendingBlob,
+  writeSeenBuild,
 } from '@/lib/apk-build';
 import { useToastStore } from '@/stores/toast';
 
@@ -41,9 +49,37 @@ export const useApkBuildStore = defineStore('apk-build', () => {
     writeInstalledBlob(sha);
   }
 
+  function forgetInstalled() {
+    installedSha.value = null;
+    clearInstalledBlob();
+  }
+
+  let adopted = false;
+
+  /** Номер сборки Android: отмена загрузки его не меняет, установка — меняет. */
+  async function adoptRunningBuild() {
+    if (adopted || !inApk) return;
+    let running = '';
+    try {
+      running = (await App.getInfo()).build;
+    } catch {
+      return;
+    }
+    if (!running) return;
+    adopted = true;
+    const next = settleInstall(
+      { seenBuild: readSeenBuild(), pending: readPendingBlob(), installed: installedSha.value },
+      running,
+    );
+    writeSeenBuild(next.seenBuild ?? running);
+    clearPendingBlob();
+    if (next.installed) remember(next.installed);
+    else forgetInstalled();
+  }
+
   function downloadApk() {
     openApkDownload();
-    if (remoteSha.value) remember(remoteSha.value);
+    if (remoteSha.value) writePendingBlob(remoteSha.value);
   }
 
   function offerUpdate(sha: string) {
@@ -85,6 +121,7 @@ export const useApkBuildStore = defineStore('apk-build', () => {
    */
   async function refresh(manual = false, repeat = false) {
     if (!inApk) return;
+    await adoptRunningBuild();
     const sha = await pull();
     if (!sha) {
       if (manual) useToastStore().show('Не удалось проверить сборку', '', true);
