@@ -9,6 +9,7 @@ import {
   startYandexDeviceAuth,
   startYandexImport,
 } from '@/api/yandex';
+import { useFavoritesStore } from '@/stores/favorites';
 import type { YandexDeviceStatusPayload, YandexImportProgressPayload, YandexImportSummaryPayload } from '@/types';
 
 /** Троттлинг статуса 30/мин — 3 с даёт ~20/мин с запасом. */
@@ -142,17 +143,19 @@ export const useYandexStore = defineStore('yandex', () => {
     stopImportPolling();
   }
 
-  /** Поллинг джобы: активные статусы глушим тихо, финал обновляет сводку. */
+  /** Поллинг джобы: активные статусы глушим тихо, финал обновляет сводку и «Моё». */
   async function pollImport() {
     try {
+      const wasActive = isActiveJob(progress.value);
       const payload = await fetchYandexImportProgress();
       applyProgress(payload);
-      if (payload?.status === 'completed') {
+      if (payload?.status === 'completed' && wasActive) {
         try {
           summary.value = await fetchYandexImportSummary();
         } catch {
           summary.value = null;
         }
+        void useFavoritesStore().fetchAll().catch(() => undefined);
       }
     } catch {
       // Намеренно пусто.

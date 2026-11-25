@@ -120,7 +120,6 @@ export default defineComponent({
     onMounted(refresh);
     onBeforeUnmount(() => {
       yandex.stopPolling();
-      yandex.stopImportPolling();
     });
 
     return {
