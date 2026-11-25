@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { checkHealth } from '@/api/health';
+import { resolveEndpoint } from '@/lib/endpoints';
 
 const POLL_INTERVAL_MS = 10_000;
 
@@ -15,7 +16,11 @@ export const useOnlineStore = defineStore('online', () => {
 
   async function check() {
     try {
-      isOnline.value = await checkHealth();
+      let ok = await checkHealth();
+      // С домашней сети внешний адрес бэка не открывается. Зонд молчит —
+      // переспрашиваем внешний IP и, если сеть домашняя, бьём в локальный адрес.
+      if (!ok && (await resolveEndpoint())) ok = await checkHealth();
+      isOnline.value = ok;
     } catch {
       // checkHealth по контракту не бросает, но поллер не должен падать
       // от любой неожиданной ошибки.

@@ -1,5 +1,6 @@
 import { readonly, ref, watch } from 'vue';
 import Echo from 'laravel-echo';
+import { endpointKind } from '@/lib/endpoints';
 import { createEcho } from '@/realtime/echo';
 import { createRouter } from '@/realtime/router';
 import {
@@ -38,6 +39,8 @@ const status = ref<RealtimeStatus>('idle');
 
 let echo: Echo<'reverb'> | null = null;
 let wasConnected = false;
+/** Смена домашняя/внешка рвёт сокет: после нового connect плеер должен забрать стейт. */
+let resyncOnConnect = false;
 const reconnectHandlers = new Set<() => void>();
 
 export const realtimeStatus = readonly(status);
@@ -89,7 +92,8 @@ export function startRealtime(userId: number) {
   connection.bind('connected', () => {
     console.info(`[realtime] соединение установлено (user ${userId})`);
     if (!wasConnected) subscribeOwnChannel(userId);
-    else reconnectHandlers.forEach((handler) => handler());
+    if (wasConnected || resyncOnConnect) reconnectHandlers.forEach((handler) => handler());
+    resyncOnConnect = false;
     wasConnected = true;
     status.value = 'connected';
   });
@@ -131,4 +135,11 @@ export function bindSessionRealtime() {
     },
     { immediate: true },
   );
+  watch(endpointKind, () => {
+    const userId = auth.user?.id;
+    if (!auth.isAuthed || userId == null || !echo) return;
+    resyncOnConnect = wasConnected;
+    stopRealtime();
+    startRealtime(userId);
+  });
 }

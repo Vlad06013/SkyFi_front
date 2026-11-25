@@ -15,6 +15,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useAppStore } from '@/stores/app';
 import { useDevicesStore } from '@/stores/devices';
 import { useOnlineStore } from '@/stores/online';
+import { resolveEndpoint } from '@/lib/endpoints';
 import { hydrateStreamCache } from '@/lib/stream-url-cache';
 import { useDownloadsStore } from '@/stores/downloads';
 import { usePlayerStore } from '@/stores/player';
@@ -51,26 +52,29 @@ onUnauthorized(() => {
 app.mount('#app');
 
 const appStore = useAppStore(pinia);
-void appStore.bootstrap().finally(async () => {
-  void useOnlineStore(pinia).startPolling();
-  // Session-scoped сервисы: presence устройства + сокеты (docs/plan-sockets.md).
-  useDevicesStore(pinia).bindPresence();
-  bindSessionRealtime();
-  // Ссылки get-url из прошлой сессии — до движка, иначе он запросит текущий трек заново.
-  await hydrateStreamCache();
-  await useDownloadsStore(pinia).hydrate();
-  // Плеер: серверное состояние + реконнект-рефетч + аудио-движок (docs/plan-player.md).
-  usePlayerStore(pinia).bindServerPlayback();
-  useAudioPlayback();
-  bindMediaKeys();
-  useVideoPlayback();
-  // Предзагрузка stream URL: 2 трека вперёд/назад, только на активном (§9).
-  useStreamPrefetch();
-  // DEV-диагностика: доступ из консоли (window.__player/__devices/__clipVideo).
-  if (import.meta.env.DEV) {
-    (window as unknown as { __player: ReturnType<typeof usePlayerStore> }).__player = usePlayerStore(pinia);
-    (window as unknown as { __devices: ReturnType<typeof useDevicesStore> }).__devices = useDevicesStore(pinia);
-    (window as unknown as { __clipVideo: () => HTMLVideoElement | null }).__clipVideo = () =>
-      getClipVideoElement();
-  }
+// До первого запроса: домашний Wi‑Fi не открывает внешний адрес бэка.
+void resolveEndpoint().finally(() => {
+  void appStore.bootstrap().finally(async () => {
+    void useOnlineStore(pinia).startPolling();
+    // Session-scoped сервисы: presence устройства + сокеты (docs/plan-sockets.md).
+    useDevicesStore(pinia).bindPresence();
+    bindSessionRealtime();
+    // Ссылки get-url из прошлой сессии — до движка, иначе он запросит текущий трек заново.
+    await hydrateStreamCache();
+    await useDownloadsStore(pinia).hydrate();
+    // Плеер: серверное состояние + реконнект-рефетч + аудио-движок (docs/plan-player.md).
+    usePlayerStore(pinia).bindServerPlayback();
+    useAudioPlayback();
+    bindMediaKeys();
+    useVideoPlayback();
+    // Предзагрузка stream URL: 2 трека вперёд/назад, только на активном (§9).
+    useStreamPrefetch();
+    // DEV-диагностика: доступ из консоли (window.__player/__devices/__clipVideo).
+    if (import.meta.env.DEV) {
+      (window as unknown as { __player: ReturnType<typeof usePlayerStore> }).__player = usePlayerStore(pinia);
+      (window as unknown as { __devices: ReturnType<typeof useDevicesStore> }).__devices = useDevicesStore(pinia);
+      (window as unknown as { __clipVideo: () => HTMLVideoElement | null }).__clipVideo = () =>
+        getClipVideoElement();
+    }
+  });
 });

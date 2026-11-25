@@ -1,12 +1,13 @@
-#VITE_API_URL=http://127.0.0.1:8080/api/v1/skyfy/
-VITE_API_URL=http://192.168.8.33:8080/api/v1/skyfy/
 VITE_REVERB_APP_KEY=vpu88awigtkvxluumpff
-#VITE_REVERB_HOST=localhost
-VITE_REVERB_HOST=192.168.8.33
-VITE_REVERB_PORT=8081
+
+# Домашняя сеть. Включается, когда внешний IP устройства совпадает с хостом VITE_API_URL.
+VITE_API_URL_LOCAL=http://192.168.8.33:8080/api/v1/skyfy/
+VITE_REVERB_HOST_LOCAL=192.168.8.33
+VITE_REVERB_PORT_LOCAL=8081
+
+# Снаружи. Это адрес по умолчанию, пока сеть не опознана как домашняя.
+VITE_API_URL=http://91.228.31.47:4915/api/v1/skyfy/
+VITE_REVERB_PORT=4916
+VITE_REVERB_HOST=91.228.31.47
 VITE_REVERB_SCHEME=http
-# Dev-прокси сокетов через vite: страница https (basicSsl), Reverb plain ws.
-# Клиент ходит в wss://<dev-сервер>/app/{key} и /broadcasting/auth, vite
-# пересылает на ws://VITE_REVERB_HOST:VITE_REVERB_PORT (см. vite.config.ts).
-# В проде закомментировать — клиент подключится напрямую по VITE_REVERB_*.
 VITE_REVERB_PROXY=true

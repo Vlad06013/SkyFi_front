@@ -1,37 +1,37 @@
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
+import { currentEndpoint } from '@/lib/endpoints';
 import { getSession } from '@/lib/session';
 /*
- * Хост WebSocket-сервера берём из VITE_API_URL, чтобы не дублировать
- * адрес сервера в отдельных переменных. При необходимости можно
- * переопределить через VITE_REVERB_*.
+ * Куда стучаться, решает lib/endpoints: внешний адрес или домашняя пара
+ * VITE_*_LOCAL. Здесь только чтение уже выбранной пары.
  *
- * VITE_REVERB_PROXY=true (dev): страница https, а Reverb на бэке plain
- * ws — прямое ws:// с https-страницы заблокировано бы как mixed content.
- * Подключаемся на сам dev-сервер (wss://localhost:5173), vite проксирует
- * на Reverb (см. server.proxy в vite.config.ts). В проде флаг выключен —
- * прямое подключение по VITE_REVERB_*.
+ * VITE_REVERB_PROXY=true и только dev: страница https, а Reverb на бэке
+ * plain ws — прямое ws:// с https-страницы заблокировано бы как mixed
+ * content. Подключаемся на сам dev-сервер (wss://localhost:5173), vite
+ * проксирует на Reverb (см. server.proxy в vite.config.ts). В APK флаг
+ * не действует: сокет идёт напрямую на выбранный адрес.
  */
 
-const apiUrl = new URL(import.meta.env.VITE_API_URL);
-const proxySockets = import.meta.env.VITE_REVERB_PROXY === 'true';
-
-const host = proxySockets
-  ? window.location.hostname
-  : (import.meta.env.VITE_REVERB_HOST ?? apiUrl.hostname);
-
-const port = proxySockets
-  ? Number(window.location.port || (window.location.protocol === 'https:' ? 443 : 80))
-  : Number(
-      import.meta.env.VITE_REVERB_PORT ?? (apiUrl.port || (apiUrl.protocol === 'https:' ? 443 : 80)),
-    );
-
-const scheme = proxySockets
-  ? window.location.protocol.replace(':', '')
-  : (import.meta.env.VITE_REVERB_SCHEME ?? apiUrl.protocol.replace(':', ''));
-
-/** Handshake вне API-префикса и вне обёртки {errors,data}; в режиме прокси — на сам dev-сервер. */
-const authUrl = proxySockets ? '/broadcasting/auth' : `${apiUrl.origin}/broadcasting/auth`;
+function socketTarget(): { host: string; port: number; scheme: string; authUrl: string } {
+  const proxySockets = import.meta.env.DEV && import.meta.env.VITE_REVERB_PROXY === 'true';
+  if (proxySockets) {
+    return {
+      host: window.location.hostname,
+      port: Number(window.location.port || (window.location.protocol === 'https:' ? 443 : 80)),
+      scheme: window.location.protocol.replace(':', ''),
+      authUrl: '/broadcasting/auth',
+    };
+  }
+  const endpoint = currentEndpoint();
+  const api = new URL(endpoint.apiUrl);
+  return {
+    host: endpoint.reverbHost,
+    port: endpoint.reverbPort,
+    scheme: endpoint.reverbScheme,
+    authUrl: `${api.origin}/broadcasting/auth`,
+  };
+}
 
 /**
  * Echo + Reverb (api.md §17). Handshake `/broadcasting/auth` живёт вне
@@ -48,28 +48,29 @@ export function createEcho(): Echo<'reverb'> {
     );
   }
 
-  const useTls = scheme === 'https';
-  console.info(`[realtime] подключение к ${useTls ? 'wss' : 'ws'}://${host}:${port} (app ${key})`);
+  const target = socketTarget();
+  const useTls = target.scheme === 'https';
+  console.info(`[realtime] подключение к ${useTls ? 'wss' : 'ws'}://${target.host}:${target.port} (app ${key})`);
 
   return new Echo({
     broadcaster: 'reverb',
     key,
     Pusher,
-    wsHost: host,
-    wsPort: port,
-    wssPort: port,
+    wsHost: target.host,
+    wsPort: target.port,
+    wssPort: target.port,
     forceTLS: useTls,
     enabledTransports: ['ws', 'wss'],
     disableStats: true,
 
-    authEndpoint: authUrl,
+    authEndpoint: target.authUrl,
 
     authorizer: (channel) => ({
       authorize: (socketId, callback) => {
         void (async () => {
           try {
             const stored = await getSession();
-            const response = await fetch(authUrl, {
+            const response = await fetch(target.authUrl, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',

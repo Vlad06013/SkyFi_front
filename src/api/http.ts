@@ -35,6 +35,11 @@ const instance: AxiosInstance = axios.create({
   timeout: 15_000,
 });
 
+/** Смена базового адреса, когда устройство село в домашнюю сеть бэка или вышло из неё. */
+export function setApiBaseUrl(url: string): void {
+  instance.defaults.baseURL = url;
+}
+
 instance.interceptors.request.use(async (config) => {
   const stored = await getSession();
   if (stored?.token) {
