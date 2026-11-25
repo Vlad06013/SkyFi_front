@@ -6,9 +6,12 @@
 .mp-track {
   display: flex;
   gap: 20px;
-  overflow-x: auto;
+  /* hidden, не auto: пульт телевизора иначе фокусит ленту и листает её
+     влево-вправо по несколько пикселей, не отпуская фокус на страницу. */
+  overflow-x: hidden;
   scrollbar-width: none;
   touch-action: pan-y;
+  outline: none;
   user-select: none;
   -webkit-user-select: none;
 }

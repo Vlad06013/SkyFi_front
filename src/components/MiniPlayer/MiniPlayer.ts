@@ -167,6 +167,32 @@ export default defineComponent({
       });
     }
 
+    /** Пульт: влево/вправо не сдвигают ленту, вверх возвращает фокус на страницу. */
+    function onRemoteKey(event: KeyboardEvent) {
+      const left = event.key === 'ArrowLeft' || event.keyCode === 21;
+      const right = event.key === 'ArrowRight' || event.keyCode === 22;
+      const up = event.key === 'ArrowUp' || event.keyCode === 19;
+      const down = event.key === 'ArrowDown' || event.keyCode === 20;
+      if (left || right) {
+        event.preventDefault();
+        event.stopPropagation();
+        centerInstant();
+        return;
+      }
+      if (!up && !down) return;
+      event.preventDefault();
+      if (up) {
+        const body = document.querySelector('.sky-body');
+        if (body instanceof HTMLElement) {
+          body.tabIndex = -1;
+          body.focus();
+        }
+        return;
+      }
+      const tab = document.querySelector('.tabbar .tab.on, .tabbar .tab');
+      if (tab instanceof HTMLElement) tab.focus();
+    }
+
     function onResize() {
       if (!dragging.value) centerInstant();
     }
@@ -229,6 +255,7 @@ export default defineComponent({
       trackCover,
       onDragStart,
       onScroll,
+      onRemoteKey,
       onLike,
       onTogglePlay,
       paneIsCurrent,

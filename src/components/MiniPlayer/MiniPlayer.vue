@@ -1,8 +1,9 @@
 <template>
-  <div v-if="current" class="mp-viewport">
+  <div v-if="current" class="mp-viewport" @keydown.capture="onRemoteKey">
     <div
       ref="trackEl"
       class="mp-track"
+      tabindex="-1"
       @pointerdown="onDragStart"
       @scroll="onScroll"
     >
