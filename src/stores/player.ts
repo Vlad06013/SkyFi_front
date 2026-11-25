@@ -1454,10 +1454,25 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   // Смена трека инвалидирует клип: движок резолвит заново, пока режим включён.
+  // Тот же ролик, включённый уже как видео (поиск), — не клип на треке.
+  // Потоки не сбрасываем: иначе элемент снимается с плеера и больше не
+  // возвращается, потому что ключ ролика уже считается загруженным.
   watch(
     () => (current.value ? snapshotKey(current.value) : null),
     (key) => {
-      if (key !== clipTrackKey.value) clearClip();
+      if (key === clipTrackKey.value) return;
+      const overlay = clipVideo.value;
+      if (
+        current.value?.type === 'video' &&
+        overlay &&
+        snapshotKey(overlay) === snapshotKey(current.value)
+      ) {
+        clipVideo.value = null;
+        clipTrackKey.value = null;
+        clipStatus.value = 'idle';
+        return;
+      }
+      clearClip();
     },
   );
 
