@@ -680,8 +680,8 @@ export function useVideoPlayback() {
 
   // Подгонка дрейфа к серверной позиции — только при большом расхождении.
   watch(
-    () => player.state.position_seconds,
-    () => {
+    () => [player.state.position_seconds, player.mediaSeek] as const,
+    ([, generation], previous) => {
       const el = video;
       if (!el) return;
       const snap = player.clipPlaybackVideo;
@@ -691,7 +691,12 @@ export function useVideoPlayback() {
       // экстраполированное зеркало, иначе каждый репорт дёргал бы видео назад.
       const position = player.isActiveDevice ? player.state.position_seconds : player.positionSeconds;
       const ended = el.ended;
-      if (Number.isFinite(el.duration) && Math.abs(el.currentTime - position) > 2.5) {
+      const forced = previous != null && generation !== previous[1];
+      if (
+        Number.isFinite(el.duration) &&
+        (forced || Math.abs(el.currentTime - position) > 2.5) &&
+        Math.abs(el.currentTime - position) > 0.05
+      ) {
         el.currentTime = position;
       }
       // repeat=one: бэк отвечает seek(0) без смены is_playing — элемент после

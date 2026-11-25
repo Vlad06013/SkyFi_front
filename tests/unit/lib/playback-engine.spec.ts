@@ -114,14 +114,14 @@ describe('resolveNext', () => {
 });
 
 describe('resolvePrevious', () => {
-  it(`позиция < ${SKIP_RESTART_AFTER} с — рестарт`, () => {
+  it(`позиция > ${SKIP_RESTART_AFTER} с — рестарт текущего`, () => {
     const context = ctx({ current: B, contextItems: [A, B, C] });
-    expect(resolvePrevious(context, 1)).toEqual({ action: 'restart' });
+    expect(resolvePrevious(context, 10)).toEqual({ action: 'restart' });
   });
 
-  it('предыдущий элемент контекста', () => {
+  it('у начала трека — предыдущий элемент контекста', () => {
     const context = ctx({ current: B, contextItems: [A, B, C] });
-    expect(resolvePrevious(context, 10)).toEqual({ action: 'play', snapshot: A, playbackSource: 'favorites' });
+    expect(resolvePrevious(context, 1)).toEqual({ action: 'play', snapshot: A, playbackSource: 'favorites' });
   });
 
   it('начало контекста — рестарт всегда, независимо от repeat', () => {
@@ -138,7 +138,7 @@ describe('resolvePrevious', () => {
       previousSource: 'search',
       previous: A,
     });
-    expect(resolvePrevious(context, 15)).toEqual({ action: 'play', snapshot: A, playbackSource: 'search' });
+    expect(resolvePrevious(context, 1)).toEqual({ action: 'play', snapshot: A, playbackSource: 'search' });
   });
 
   it('из очереди без previous — рестарт', () => {

@@ -154,15 +154,20 @@ export function useAudioPlayback() {
   // Только когда поток соответствует текущему треку: сразу после смены трека
   // позиция сервера — уже новая (0), а в элементе ещё играет старый трек.
   watch(
-    () => player.state.position_seconds,
-    (position) => {
+    () => [player.state.position_seconds, player.mediaSeek] as const,
+    ([position, generation], previous) => {
       const el = audio;
       if (!el || !player.isActiveDevice) return;
       // Гейт по факту (appliedKey): пока летит ссылка, в элементе ещё старый
       // трек — seek'ать его по позиции нового нельзя.
       if (!player.effectiveCurrent || snapshotKey(player.effectiveCurrent) !== appliedKey) return;
       const ended = el.ended;
-      if (Number.isFinite(el.duration) && Math.abs(el.currentTime - position) > 2.5) {
+      const forced = previous != null && generation !== previous[1];
+      if (
+        Number.isFinite(el.duration) &&
+        (forced || Math.abs(el.currentTime - position) > 2.5) &&
+        Math.abs(el.currentTime - position) > 0.05
+      ) {
         el.currentTime = position;
       }
       // repeat=one: бэк отвечает seek(0) без смены is_playing — элемент после

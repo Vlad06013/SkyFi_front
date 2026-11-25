@@ -126,7 +126,9 @@ export function resolveNext(ctx: EngineContext, reason: NextReason): EngineActio
 }
 
 export function resolvePrevious(ctx: EngineContext, positionSeconds: number): EngineAction {
-  if (positionSeconds < SKIP_RESTART_AFTER) return { action: 'restart' };
+  // Уже ушли от начала — первый «назад» возвращает этот трек в 0.
+  // У нуля — предыдущий. Иначе с начала трека предыдущий недоступен.
+  if (positionSeconds > SKIP_RESTART_AFTER) return { action: 'restart' };
 
   // Возврат из очереди: до неё играл previous — шагаем в него.
   if (ctx.playSource === 'queue') {
@@ -183,8 +185,8 @@ export function peekAdjacent(
   const back: AnySnapshot[] = [];
   sim = ctx;
   for (let i = 0; i < backCount; i++) {
-    // Позиция за порогом рестарта: целимся в «переход», не в рестарт текущего.
-    const action = resolvePrevious(sim, Number.POSITIVE_INFINITY);
+    // Позиция у нуля: целимся в предыдущий трек, не в рестарт текущего.
+    const action = resolvePrevious(sim, 0);
     if (action.action !== 'play') break;
     const key = snapshotKey(action.snapshot);
     if (seen.has(key)) break;

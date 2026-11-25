@@ -87,7 +87,7 @@ export default defineComponent({
     }
 
     function commitPrev() {
-      const restartOnly = player.state.position_seconds > skipRestartAfter;
+      const restartOnly = player.positionSeconds > skipRestartAfter;
       if (!previewPrevious.value) {
         scrollToSlot(1);
         return;

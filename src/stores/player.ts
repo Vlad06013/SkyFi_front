@@ -486,7 +486,7 @@ export const usePlayerStore = defineStore('player', () => {
     if (transitioning) return;
     cancelPendingSeek();
     transitioning = true;
-    void runAction(resolvePrevious(engineContext(), state.value.position_seconds)).finally(() => {
+    void runAction(resolvePrevious(engineContext(), positionSeconds.value)).finally(() => {
       transitioning = false;
     });
   }
@@ -494,16 +494,17 @@ export const usePlayerStore = defineStore('player', () => {
   /** Рестарт текущего трека: позиция 0, воспроизведение продолжается. */
   async function restartTrack() {
     cancelPendingSeek();
-    if (!canCommand.value) {
-      state.value = {
-        ...state.value,
-        position_seconds: 0,
-        is_playing: true,
-        position_updated_at: new Date().toISOString(),
-      };
-      anchorPosition();
-      return;
-    }
+    state.value = {
+      ...state.value,
+      position_seconds: 0,
+      is_playing: true,
+      position_updated_at: new Date().toISOString(),
+    };
+    anchorPosition();
+    // Серверная позиция часто ещё 0, а элемент уже ушёл вперёд — вотч по
+    // position_seconds тогда не стреляет, и сброс не доходит до звука.
+    mediaSeek.value += 1;
+    if (!canCommand.value) return;
     const fields = echo();
     if (!fields) return;
     try {
@@ -1044,6 +1045,8 @@ export const usePlayerStore = defineStore('player', () => {
 
   let seekCommitTimer: ReturnType<typeof setTimeout> | null = null;
   let pendingSeekSeconds: number | null = null;
+  /** Принудительный seek элемента, даже если серверные секунды не изменились. */
+  const mediaSeek = ref(0);
 
   function cancelPendingSeek() {
     if (seekCommitTimer) {
@@ -1318,6 +1321,7 @@ export const usePlayerStore = defineStore('player', () => {
     durationSeconds,
     progress,
     progressSmooth,
+    mediaSeek,
     positionSeconds,
     audioPlaying,
     engineKick,
