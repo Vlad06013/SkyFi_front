@@ -128,14 +128,31 @@
 .friend-row .icon-btn:hover,
 .best .icon-btn:hover { color: var(--color-text-primary); }
 .track-row .icon-btn.liked { color: var(--color-like); }
-.track-row.offline { cursor: default; }
+.track-row.offline,
+.pl-row.offline,
+.vid-row.offline { cursor: default; }
 .track-row.offline .thumb,
+.pl-row.offline .cover,
+.vid-row.offline .vid-thumb,
 .track-row.offline .track-meta,
+.pl-row.offline .track-meta,
+.vid-row.offline .track-meta,
 .track-row.offline .track-dur,
+.vid-row.offline .track-dur,
 .track-row.offline .dl-mark { opacity: .45; }
-.track-row.offline .track-title, .track-row.offline .track-artist { color: var(--color-text-faint); }
+.track-row.offline .more,
+.pl-row.offline .more,
+.vid-row.offline .more { opacity: .45; color: var(--color-text-faint); pointer-events: none; }
+.track-row.offline .track-title,
+.pl-row.offline .track-title,
+.vid-row.offline .track-title,
+.track-row.offline .track-artist,
+.pl-row.offline .track-artist,
+.vid-row.offline .track-artist { color: var(--color-text-faint); }
 @media (hover: hover) {
-  .track-row.offline:hover { background: transparent; }
+  .track-row.offline:hover,
+  .pl-row.offline:hover,
+  .vid-row.offline:hover { background: transparent; }
 }
 
 /* Видео-строка: широкое 16:9-превью, бейджи — того же размера, что у треков. */
@@ -537,8 +554,9 @@
   stroke: var(--color-accent); stroke-width: 1.8; stroke-linecap: round;
 }
 .dl-all .arrow { width: 22px; height: 22px; position: relative; z-index: 1; }
-.dl-all:hover:not(.is-run):not(.is-done) { color: var(--color-accent); }
-.dl-all:hover:not(.is-run):not(.is-done) .ring circle { stroke: var(--color-accent); }
+.dl-all:hover:not(.is-run):not(.is-done):not(:disabled) { color: var(--color-accent); }
+.dl-all:hover:not(.is-run):not(.is-done):not(:disabled) .ring circle { stroke: var(--color-accent); }
+.dl-all:disabled { opacity: .45; cursor: default; color: var(--color-text-faint); }
 .dl-all.is-progress { color: var(--color-accent); }
 .dl-all.is-run .ring circle.arc { stroke-dasharray: 22 94; }
 .dl-all.is-run { cursor: pointer; }

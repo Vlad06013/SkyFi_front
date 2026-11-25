@@ -16,6 +16,7 @@ import { useFavoritesStore } from '@/stores/favorites';
 import { useDownloadsStore } from '@/stores/downloads';
 import { useOnlineStore } from '@/stores/online';
 import { useToastStore } from '@/stores/toast';
+import type { DownloadSearchHit } from '@/lib/download-search';
 import type { AlbumSnapshot, AnySnapshot, SearchPagePayload, SearchSection, WithFavorite } from '@/types';
 
 type Section = 'best' | 'tracks' | 'albums' | 'artists' | 'playlists' | 'videos';
@@ -118,6 +119,42 @@ export default defineComponent({
       return sectionContinues.value[section.value];
     });
 
+    function emptySections(): Record<PagedSection, boolean> {
+      return { tracks: false, albums: false, artists: false, playlists: false, videos: false };
+    }
+
+    function markFavorite<T extends AnySnapshot>(item: T): WithFavorite<T> {
+      return { ...item, is_favorite: favorites.has(item) };
+    }
+
+    function downloadedPayload(found: DownloadSearchHit): SearchPagePayload {
+      const sectionOf = <T extends AnySnapshot>(items: T[]): SearchSection<WithFavorite<T>> => ({
+        items: items.map((item) => markFavorite(item)),
+        total: items.length,
+        has_more: false,
+      });
+      return {
+        query: q.value,
+        page: 1,
+        best: found.best ? markFavorite(found.best) : null,
+        tracks: sectionOf(found.tracks),
+        albums: sectionOf(found.albums),
+        artists: sectionOf([]),
+        playlists: sectionOf(found.playlists),
+        videos: sectionOf([]),
+      };
+    }
+
+    function applyDownloadedSearch() {
+      abortSearch();
+      generation += 1;
+      loading.value = false;
+      loadingMore.value = false;
+      error.value = null;
+      sectionContinues.value = emptySections();
+      result.value = downloadedPayload(downloads.searchDownloaded(q.value));
+    }
+
     function rememberPage(payload: SearchPagePayload) {
       sectionContinues.value = {
         tracks: payload.tracks.items.length > 0,
@@ -205,10 +242,21 @@ export default defineComponent({
       // Следующий символ делает летящий ответ неактуальным — обрываем его сразу.
       abortSearch();
       generation++;
-      if (offline.value || q.value.length < SEARCH_MIN_LENGTH) {
+      if (q.value.length < SEARCH_MIN_LENGTH) {
         loading.value = false;
         loadingMore.value = false;
         result.value = null;
+        return;
+      }
+      if (offline.value) {
+        applyDownloadedSearch();
+        debounceTimer = setTimeout(() => {
+          void pushSearchHistory(q.value)
+            .then((next) => {
+              history.value = next;
+            })
+            .catch(() => undefined);
+        }, SEARCH_DEBOUNCE_MS);
         return;
       }
       debounceTimer = setTimeout(() => void search(1), SEARCH_DEBOUNCE_MS);
@@ -218,7 +266,11 @@ export default defineComponent({
     watch(
       () => online.isOnline,
       (isOnline) => {
-        if (isOnline && hasQuery.value && q.value.length >= SEARCH_MIN_LENGTH && !result.value) {
+        if (isOnline === false) {
+          if (q.value.length >= SEARCH_MIN_LENGTH) applyDownloadedSearch();
+          return;
+        }
+        if (isOnline && hasQuery.value && q.value.length >= SEARCH_MIN_LENGTH) {
           void search(1);
         }
       },

@@ -1,6 +1,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { fetchEntityDetails, type DetailsEntityType } from '@/api/details';
+import { useDownloadsStore } from '@/stores/downloads';
 import { useToastStore } from '@/stores/toast';
 import type {
   AlbumSnapshot,
@@ -22,6 +23,7 @@ const loadFailedTitle = 'Не удалось загрузить';
 export function useEntityDetails(type: DetailsEntityType) {
   const route = useRoute();
   const toast = useToastStore();
+  const downloads = useDownloadsStore();
   const entity = ref<(AlbumSnapshot | ArtistSnapshot | PlaylistSnapshot) | null>(null);
   const tracks = ref<TrackSnapshot[]>([]);
   const albums = ref<AlbumSnapshot[]>([]);
@@ -53,6 +55,18 @@ export function useEntityDetails(type: DetailsEntityType) {
     if (route.name !== type || !sourceType.value || !sourceId.value) return;
     const gen = ++generation;
     error.value = null;
+    if (page === 1 && (type === 'album' || type === 'playlist')) {
+      const saved = downloads.savedCollectionOf(type, sourceType.value, sourceId.value);
+      if (saved?.complete) {
+        entity.value = saved.snapshot;
+        tracks.value = saved.tracks;
+        albums.value = [];
+        hasMore.value = false;
+        loading.value = false;
+        loadingMore.value = false;
+        return;
+      }
+    }
     if (page === 1) {
       entity.value = null;
       tracks.value = [];

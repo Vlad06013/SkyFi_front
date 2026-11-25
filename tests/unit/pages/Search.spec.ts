@@ -258,13 +258,14 @@ describe('pages/Search', () => {
     expect(wrapper.findAll('.track-row')).toHaveLength(1);
   });
 
-  it('офлайн: запрос не уходит, рисуется офлайн-блок', async () => {
+  it('офлайн: запрос не уходит, ищем по скачанному', async () => {
     const wrapper = mountPage();
     useOnlineStore().isOnline = false;
     await typeAndSearch(wrapper, 'sum 41');
 
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(wrapper.text()).toContain('Нет соединения');
+    expect(wrapper.text()).not.toContain('Нет соединения');
+    expect(wrapper.text()).toContain('Лучшего совпадения нет');
   });
 
   it('клик по альбому ведёт на страницу альбома', async () => {

@@ -56,12 +56,7 @@
         <button class="chip" :class="{ active: section === 'videos' }" type="button" @click="section = 'videos'">Видео</button>
       </div>
 
-      <div v-if="offline" class="empty" style="padding-top:28px">
-        <div class="et">Нет соединения</div>
-        <div class="es">Поиск по каталогам работает только онлайн</div>
-      </div>
-
-      <div v-else-if="loading && !result" class="loading-line">
+      <div v-if="loading && !result" class="loading-line">
         <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
           <circle cx="12" cy="12" r="8" opacity=".25" />
           <path d="M12 4a8 8 0 0 1 8 8" stroke-linecap="round" />
@@ -79,8 +74,9 @@
           :kind="best.type === 'video' ? 'video' : best.type === 'track' ? 'track' : 'media'"
           :title="bestTitle"
           :subtitle="bestSubtitle"
+          :entity-type="best.type"
           :source="best.source_type"
-          :source-id="best.type === 'track' ? best.source_id : ''"
+          :source-id="best.source_id"
           :cover="bestCover"
           :round="best.type === 'artist'"
           :liked="best.is_favorite"
@@ -115,7 +111,9 @@
             kind="media"
             :title="album.title"
             :subtitle="albumLine(album)"
+            entity-type="album"
             :source="album.source_type"
+            :source-id="album.source_id"
             :cover="album.cover_url ?? ''"
             :liked="album.is_favorite"
             @open="openResult(album)"
@@ -130,7 +128,9 @@
             kind="media"
             :title="artist.title"
             subtitle="Исполнитель"
+            entity-type="artist"
             :source="artist.source_type"
+            :source-id="artist.source_id"
             :cover="artist.cover_url ?? ''"
             round
             :liked="artist.is_favorite"
@@ -146,7 +146,9 @@
             kind="media"
             :title="playlist.title"
             :subtitle="playlist.owner_name ?? 'Плейлист'"
+            entity-type="playlist"
             :source="playlist.source_type"
+            :source-id="playlist.source_id"
             :cover="playlist.cover_url ?? ''"
             :liked="playlist.is_favorite"
             @open="openResult(playlist)"
@@ -161,7 +163,9 @@
             kind="video"
             :title="video.title"
             :subtitle="`${artistsLine(video.artists)} · клип`"
+            entity-type="video"
             :source="video.source_type"
+            :source-id="video.source_id"
             :cover="video.cover_url ?? ''"
             :liked="video.is_favorite"
             :playing="isPlaying(video)"

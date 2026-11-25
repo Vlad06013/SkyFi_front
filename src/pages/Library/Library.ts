@@ -19,6 +19,7 @@ import { usePlayerStore } from '@/stores/player';
 import { useFavoritesStore } from '@/stores/favorites';
 import { useUploadsStore } from '@/stores/uploads';
 import { useDownloadsStore } from '@/stores/downloads';
+import { useOnlineStore } from '@/stores/online';
 import { useAuthStore } from '@/stores/auth';
 import { useToastStore } from '@/stores/toast';
 import { useLibraryTab, type LibraryTab } from '@/composables/useLibraryTab';
@@ -63,6 +64,8 @@ export default defineComponent({
     const uploadsStore = useUploadsStore();
     const { items: uploads } = storeToRefs(uploadsStore);
     const downloads = useDownloadsStore();
+    const online = useOnlineStore();
+    const isOffline = computed(() => online.isOnline === false);
     const downloaded = computed(() => downloads.items);
 
     const { open, items, top, right, sheet, entity, openSnapshotMenu, closeMenu, run } = useMediaMenu({
@@ -159,6 +162,12 @@ export default defineComponent({
           tracks.value.some((track) => downloads.trackFilePct(track.source_type, track.source_id) !== null)),
     );
     const dlAllPct = computed(() => {
+      const job = downloads.bulk;
+      if (job && bulkKind.value && job.kind === bulkKind.value && job.total > 0) {
+        const raw = Math.round((job.done / job.total) * 100);
+        if (job.done > 0 && job.done < job.total) return Math.max(1, Math.min(99, raw));
+        return Math.min(100, raw);
+      }
       const total = dlAllList.value.length;
       if (!total) return 0;
       const raw = Math.round((dlAllDoneCount.value / total) * 100);
@@ -174,6 +183,7 @@ export default defineComponent({
     const dlAllArc = computed(() => Math.round((dlAllPct.value / 100) * 94));
 
     function downloadAllTab() {
+      if (isOffline.value) return;
       const kind = bulkKind.value;
       if (!kind) return;
       if (dlAllActive.value) {
@@ -337,6 +347,7 @@ export default defineComponent({
       dlAllDoneCount,
       dlAllPct,
       dlAllArc,
+      isOffline,
       downloadAllTab,
       onSort,
       sortRowStyle,

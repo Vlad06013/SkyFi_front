@@ -1,4 +1,6 @@
 import { fetchEntityDetails } from '@/api/details';
+import { getActivePinia } from 'pinia';
+import { useDownloadsStore } from '@/stores/downloads';
 import { fetchFavorites } from '@/api/favorites';
 import { fetchSearch } from '@/api/search';
 import { fetchUploads } from '@/api/uploads';
@@ -91,6 +93,10 @@ export async function fetchContextPage(req: ContextRequest, page: number): Promi
     case 'playlist': {
       const ref = parsePlaylistContextRef(req.contextRef);
       if (!ref) return null;
+      if (getActivePinia()) {
+        const saved = useDownloadsStore().savedCollectionOf('playlist', ref.sourceType, ref.sourceId);
+        if (saved?.complete) return { items: page === 1 ? saved.tracks : [], hasMore: false };
+      }
       const payload = await fetchEntityDetails(
         { type: 'playlist', source_type: ref.sourceType, source_id: ref.sourceId },
         { page, limit: CONTEXT_PAGE_LIMIT },

@@ -7,6 +7,7 @@ import { useOnlineStore } from '@/stores/online';
 import type { SnapshotSource } from '@/types';
 
 export type SnapshotRowKind = 'track' | 'video' | 'media';
+export type SnapshotEntityType = 'track' | 'album' | 'playlist' | 'artist' | 'video';
 
 /**
  * Единая строка списка снапшотов. Индикаторы (играет / в избранном /
@@ -23,6 +24,8 @@ export default defineComponent({
     subtitle: { type: String, default: '' },
     source: { type: String as PropType<SnapshotSource>, required: true },
     sourceId: { type: String, default: '' },
+    /** album/playlist отличаются только этим: у обоих kind=media. */
+    entityType: { type: String as PropType<SnapshotEntityType | ''>, default: '' },
     cover: { type: String, default: '' },
     round: { type: Boolean, default: false },
     playing: { type: Boolean, default: false },
@@ -49,42 +52,65 @@ export default defineComponent({
 
     const isVideo = computed(() => props.kind === 'video');
     const isPlayable = computed(() => props.kind !== 'media');
-    const downloadPct = computed(() =>
-      props.kind === 'track' && props.sourceId ? downloads.trackFilePct(props.source, props.sourceId) : null,
-    );
+    const resolvedType = computed<SnapshotEntityType | ''>(() => {
+      if (props.entityType) return props.entityType;
+      if (props.kind === 'video') return 'video';
+      if (props.kind === 'track') return 'track';
+      if (props.round) return 'artist';
+      return '';
+    });
+
+    const downloadPct = computed(() => {
+      if (!props.sourceId) return null;
+      if (resolvedType.value === 'track') return downloads.trackFilePct(props.source, props.sourceId);
+      if (resolvedType.value === 'album' || resolvedType.value === 'playlist') {
+        return downloads.collectionProgress(resolvedType.value, props.source, props.sourceId);
+      }
+      return null;
+    });
     const downloadArc = computed(() => Math.round(((downloadPct.value ?? 0) / 100) * 94));
     const showDownloaded = computed(
       () =>
         downloadPct.value === null &&
         (props.downloaded ||
-          (props.kind === 'track' && props.sourceId
-            ? downloads.isDownloaded({
-                type: 'track',
-                source_type: props.source,
-                source_id: props.sourceId,
-                title: '',
-                artists: [],
-                duration_ms: null,
-                cover_url: null,
-                album: null,
-                stream_url: null,
-              })
-            : false)),
+          (resolvedType.value === 'track' && props.sourceId
+            ? downloads.isEntityDownloaded('track', props.source, props.sourceId)
+            : false) ||
+          ((resolvedType.value === 'album' || resolvedType.value === 'playlist') &&
+            props.sourceId &&
+            downloads.isEntityDownloaded(resolvedType.value, props.source, props.sourceId))),
     );
 
-    /** Офлайн: нескачанный трек виден, но не запускается. Играющий остаётся кликабельным. */
-    const unavailable = computed(
-      () =>
-        props.offline ||
-        (props.kind === 'track' &&
-          !props.playing &&
-          online.isOnline === false &&
-          !showDownloaded.value),
-    );
+    const collectionDownloaded = computed(() => {
+      const type = resolvedType.value;
+      if (type !== 'album' && type !== 'playlist') return false;
+      return downloads.isEntityDownloaded(type, props.source, props.sourceId);
+    });
+
+    /**
+     * Офлайн: нескачанное видно, но не открывается.
+     * Трек и загрузка — если нет файла (играющий трек остаётся кликабельным).
+     * Альбом и плейлист — если скачаны не все треки.
+     * Артиста и видео скачать нельзя.
+     */
+    const unavailable = computed(() => {
+      if (props.offline) return true;
+      if (online.isOnline !== false) return false;
+      const type = resolvedType.value;
+      if (type === 'artist' || type === 'video') return true;
+      if (type === 'track') return !props.playing && !showDownloaded.value;
+      if (type === 'album' || type === 'playlist') return !collectionDownloaded.value;
+      return props.kind === 'media';
+    });
 
     function onOpen() {
       if (unavailable.value) return;
       emit('open');
+    }
+
+    function onMenu(event: MouseEvent) {
+      if (unavailable.value) return;
+      emit('menu', event);
     }
 
     const durationLabel = computed(() => {
@@ -105,6 +131,7 @@ export default defineComponent({
       showDownloaded,
       unavailable,
       onOpen,
+      onMenu,
     };
   },
 });

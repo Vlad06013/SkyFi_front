@@ -29,14 +29,20 @@ export interface TrackRecord {
   coverPath: string | null;
   coverMime: string | null;
   downloadedAt: number;
+  /** Исполнители, название и альбом — по этой строке ищет офлайн-поиск. */
+  searchQuery?: string;
 }
 
 export interface CollectionRecord {
   key: string;
   snapshot: CollectionSnapshot;
   total: number;
+  /** Порядок треков альбома или плейлиста. Пишется в начале закачки, до файлов. */
+  trackKeys?: string[];
   coverPath: string | null;
   coverMime: string | null;
+  /** Название, исполнители и строки вложенных треков. */
+  searchQuery?: string;
 }
 
 export interface LinkRecord {

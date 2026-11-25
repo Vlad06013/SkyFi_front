@@ -194,8 +194,9 @@
                 :kind="queueRowKind(snapshot)"
                 :title="snapshot.title"
                 :subtitle="artistsLine(snapshot.artists)"
+                :entity-type="snapshot.type"
                 :source="snapshot.source_type"
-                :source-id="snapshot.type === 'track' ? snapshot.source_id : ''"
+                :source-id="snapshot.source_id"
                 :cover="queueRowCover(snapshot)"
                 :round="snapshot.type === 'artist'"
                 sortable

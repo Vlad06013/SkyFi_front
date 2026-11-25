@@ -55,6 +55,7 @@
       <svg viewBox="0 0 36 36" aria-hidden="true">
         <circle class="track" cx="18" cy="18" r="15" fill="none" stroke="currentColor" stroke-width="3" opacity=".28" />
         <circle
+          v-if="downloadArc > 0"
           class="arc"
           cx="18"
           cy="18"
@@ -101,7 +102,8 @@
       class="icon-btn more"
       type="button"
       aria-label="ещё"
-      @click.stop="emit('menu', $event)"
+      :disabled="unavailable"
+      @click.stop="onMenu"
     >
       <svg viewBox="0 0 24 24" fill="currentColor">
         <circle cx="5.5" cy="12" r="1.55" /><circle cx="12" cy="12" r="1.55" /><circle cx="18.5" cy="12" r="1.55" />

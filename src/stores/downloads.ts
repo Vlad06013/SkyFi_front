@@ -17,6 +17,8 @@ import {
   type TrackRecord,
 } from '@/lib/download-db';
 import { openDownload, removeDownload, saveCoverFromUrl, writeDownload } from '@/lib/download-files';
+import { collectionPercent, savedCollection } from '@/lib/collection-progress';
+import { collectionSearchQuery, searchDownloads, trackSearchQuery } from '@/lib/download-search';
 import { coverFilePath, entityKey, isCollection, linkId, trackFilePath, type CollectionSnapshot } from '@/lib/download-keys';
 import { useToastStore } from '@/stores/toast';
 import type { AnySnapshot, TrackSnapshot } from '@/types';
@@ -83,10 +85,31 @@ export const useDownloadsStore = defineStore('downloads', () => {
     return pct === undefined ? null : pct;
   }
 
+  function searchDownloaded(query: string) {
+    return searchDownloads(query, trackRows.value, collections.value, links.value);
+  }
+
   function isDownloaded(snapshot: AnySnapshot) {
-    if (snapshot.type === 'track') return hasTrack(entityKey(snapshot));
-    if (!isCollection(snapshot)) return false;
-    const row = collections.value.find((item) => item.key === entityKey(snapshot));
+    return isEntityDownloaded(snapshot.type, snapshot.source_type, snapshot.source_id);
+  }
+
+  function collectionRow(type: string, sourceType: string, sourceId: string) {
+    return collections.value.find((item) => item.key === `${type}:${sourceType}:${sourceId}`);
+  }
+
+  function collectionProgress(type: string, sourceType: string, sourceId: string): number | null {
+    return collectionPercent(collectionRow(type, sourceType, sourceId), trackRows.value, links.value, filePct.value);
+  }
+
+  function savedCollectionOf(type: string, sourceType: string, sourceId: string) {
+    return savedCollection(collectionRow(type, sourceType, sourceId), trackRows.value, links.value);
+  }
+
+  function isEntityDownloaded(type: string, sourceType: string, sourceId: string) {
+    if (!sourceId || (type !== 'track' && type !== 'album' && type !== 'playlist')) return false;
+    const key = `${type}:${sourceType}:${sourceId}`;
+    if (type === 'track') return hasTrack(key);
+    const row = collections.value.find((item) => item.key === key);
     if (!row) return false;
     return linkedCount(row.key) >= row.total;
   }
@@ -214,6 +237,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
         coverPath: null,
         coverMime: null,
         downloadedAt: Date.now(),
+        searchQuery: trackSearchQuery(snapshot),
       };
       trackRows.value = [row, ...trackRows.value.filter((item) => item.key !== key)];
       await saveTrackRecord(row);
@@ -261,6 +285,21 @@ export const useDownloadsStore = defineStore('downloads', () => {
     return { entity, tracks };
   }
 
+  async function refreshCollectionQuery(key: string) {
+    const row = collections.value.find((item) => item.key === key);
+    if (!row) return;
+    const nested = links.value
+      .filter((link) => link.ownerKey === key)
+      .map((link) => trackRows.value.find((track) => track.key === link.trackKey))
+      .filter((track): track is TrackRecord => Boolean(track))
+      .map((track) => track.searchQuery || trackSearchQuery(track.snapshot));
+    const searchQuery = collectionSearchQuery(row.snapshot, nested);
+    if (row.searchQuery === searchQuery) return;
+    const next = { ...row, searchQuery };
+    collections.value = collections.value.map((item) => (item.key === key ? next : item));
+    await saveCollectionRecord(next);
+  }
+
   async function rememberCollection(row: CollectionRecord) {
     collections.value = [...collections.value.filter((item) => item.key !== row.key), row];
     await saveCollectionRecord(row);
@@ -276,6 +315,8 @@ export const useDownloadsStore = defineStore('downloads', () => {
       total: listed.tracks.length,
       coverPath: prev?.coverPath ?? null,
       coverMime: prev?.coverMime ?? null,
+      searchQuery: collectionSearchQuery(listed.entity, []),
+      trackKeys: listed.tracks.map((track) => entityKey(track)),
     });
     if (report) addTotal(listed.tracks.length);
     await ensureCover(listed.entity, signal);
@@ -289,6 +330,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
         failed = true;
       }
     }
+    await refreshCollectionQuery(key);
     return failed;
   }
 
@@ -413,6 +455,16 @@ export const useDownloadsStore = defineStore('downloads', () => {
       collections.value = data.collections;
       links.value = data.links;
       for (const row of data.tracks) {
+        if (row.searchQuery) continue;
+        const next = { ...row, searchQuery: trackSearchQuery(row.snapshot) };
+        trackRows.value = trackRows.value.map((item) => (item.key === row.key ? next : item));
+        await saveTrackRecord(next);
+      }
+      for (const row of data.collections) {
+        if (row.searchQuery) continue;
+        await refreshCollectionQuery(row.key);
+      }
+      for (const row of data.tracks) {
         if (row.coverPath) await publishCover(row.key, row.coverPath, row.coverMime || 'image/jpeg');
       }
       for (const row of data.collections) {
@@ -432,7 +484,11 @@ export const useDownloadsStore = defineStore('downloads', () => {
     bulkPct,
     filePct,
     trackFilePct,
+    searchDownloaded,
     isDownloaded,
+    collectionProgress,
+    savedCollectionOf,
+    isEntityDownloaded,
     hydrate,
     downloadTrack,
     downloadCollection,
