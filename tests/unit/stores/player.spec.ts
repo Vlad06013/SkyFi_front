@@ -509,8 +509,10 @@ describe('stores/player: активация устройства', () => {
     expect(useToastStore().toast?.error).toBe(true);
   });
 
-  it('activateDevice: мой uuid неизвестен — API не зовём', async () => {
-    useDevicesStore().myDeviceUuid = null;
+  it('activateDevice: регистрация не удалась — API активации не зовём', async () => {
+    const devices = useDevicesStore();
+    devices.myDeviceUuid = null;
+    vi.mocked(devicesApi.registerDevice).mockRejectedValue(new Error('down'));
     const player = playerWith(null);
 
     await expect(player.activateDevice('uuid-2')).resolves.toBe(false);

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { feedbackOnFavorite, feedbackOnLeave, feedbackOnProgress, type WaveListen } from '@/lib/wave-feedback';
 
 function listen(patch: Partial<WaveListen> = {}): WaveListen {
-  return { unplayed: true, liked: false, disliked: false, sent: null, ...patch };
+  return { unplayed: true, liked: false, disliked: false, sent: null, heard: true, heardRatio: 0, ...patch };
 }
 
 describe('wave feedback', () => {
@@ -25,6 +25,13 @@ describe('wave feedback', () => {
     expect(feedbackOnFavorite(listen(), false)).toBe('skip');
     expect(feedbackOnLeave(listen(), 0.69)).toBe('skip');
     expect(feedbackOnLeave(listen({ disliked: true }), 0.9)).toBe('skip');
+  });
+
+  it('без реального звука и с порогом уже на старте ничего не шлёт', () => {
+    expect(feedbackOnProgress(listen({ heard: false }), 0.9)).toBeNull();
+    expect(feedbackOnLeave(listen({ heard: false }), 0.2)).toBeNull();
+    expect(feedbackOnProgress(listen({ heardRatio: 0.8 }), 0.9)).toBeNull();
+    expect(feedbackOnFavorite(listen({ heard: false }), true)).toBe('like');
   });
 
   it('уже отправленную реакцию не повторяет', () => {

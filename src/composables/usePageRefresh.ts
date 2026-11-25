@@ -1,7 +1,7 @@
 import { onBeforeUnmount } from 'vue';
 import { useRoute } from 'vue-router';
 
-type RefreshFn = () => Promise<void> | void;
+type RefreshFn = () => Promise<unknown> | void;
 
 interface RefreshHandler {
   /** Имя роута на момент setup. Keep-alive не размонтирует страницу, живой route — чужой. */

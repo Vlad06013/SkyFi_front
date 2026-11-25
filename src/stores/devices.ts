@@ -4,6 +4,7 @@ import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { Device } from '@capacitor/device';
 import * as devicesApi from '@/api/devices';
+import { ApiError } from '@/api/http';
 import * as identity from '@/lib/device';
 import { useAuthStore } from '@/stores/auth';
 import { useOnlineStore } from '@/stores/online';
@@ -26,6 +27,11 @@ function deviceType(): PlayerDevice['type'] {
   return Capacitor.isNativePlatform() ? 'phone' : 'computer';
 }
 
+/** 404 «устройство не найдено»: uuid есть локально, на сервере presence уже нет. */
+export function isUnknownDevice(cause: unknown): boolean {
+  return cause instanceof ApiError && cause.status === 404 && /устройств/i.test(cause.message);
+}
+
 export const useDevicesStore = defineStore('devices', () => {
   /** Presence-список: только онлайн-устройства пользователя (api.md §4). */
   const devices = ref<PlayerDevice[]>([]);
@@ -34,6 +40,8 @@ export const useDevicesStore = defineStore('devices', () => {
   /** Постоянный uuid этого устройства — единственный его идентификатор на проводе:
    *  подпись команд (origin_device_id) и эхо-глушение (api.md §1.6). */
   const myDeviceUuid = ref<string | null>(null);
+  /** POST /player/devices для текущего uuid прошёл. Локальный uuid сам по себе сервер не знает. */
+  const registered = ref(false);
 
   /** Ленивый первичный GET списка для шита устройств. */
   async function ensure() {
@@ -77,7 +85,11 @@ export const useDevicesStore = defineStore('devices', () => {
   function startHeartbeat(uuid: string) {
     stopHeartbeat();
     heartbeatTimer = setInterval(() => {
-      void devicesApi.sendHeartbeat(uuid).catch(() => undefined);
+      void devicesApi.sendHeartbeat(uuid).catch((cause: unknown) => {
+        if (!isUnknownDevice(cause)) return;
+        registered.value = false;
+        void registerPresence();
+      });
     }, HEARTBEAT_INTERVAL_MS);
   }
 
@@ -105,11 +117,13 @@ export const useDevicesStore = defineStore('devices', () => {
           command_id: crypto.randomUUID(),
         });
         applyConnected(device);
+        registered.value = true;
         // Сид presence-списка: без него «новое устройство» по сокету не
         // отличить от известного, а шит открывался бы со старым снимком.
         void refresh();
         return true;
       } catch {
+        registered.value = false;
         /* офлайн/бэк недоступен — heartbeat не нужен */
         return false;
       }
@@ -117,6 +131,15 @@ export const useDevicesStore = defineStore('devices', () => {
       registerPromise = null;
     });
     return registerPromise;
+  }
+
+  /**
+   * Устройство известно серверу. Повторный вызов, пока регистрация жива,
+   * сеть не трогает: POST идемпотентен, но лимит 30/мин.
+   */
+  async function ensurePresence(): Promise<boolean> {
+    if (registered.value && myDeviceUuid.value) return true;
+    return registerPresence();
   }
 
   function stopPresence() {
@@ -128,6 +151,7 @@ export const useDevicesStore = defineStore('devices', () => {
     devices.value = [];
     loaded.value = false;
     myDeviceUuid.value = null;
+    registered.value = false;
     stopPresence();
   }
 
@@ -158,12 +182,16 @@ export const useDevicesStore = defineStore('devices', () => {
     if (!Capacitor.isNativePlatform()) return;
     // Листенер живёт весь жизненный цикл приложения — ссылку не храним.
     void App.addListener('appStateChange', ({ isActive }) => {
-      if (isActive && myDeviceUuid.value) {
-        void devicesApi.sendHeartbeat(myDeviceUuid.value).catch(() => undefined);
-        startHeartbeat(myDeviceUuid.value);
-      } else {
+      if (!isActive) {
         stopHeartbeat();
+        return;
       }
+      // Presence протухает в фоне, а регистрация при входе этого не чинит.
+      // Повторный POST по тому же uuid идемпотентен.
+      if (!useAuthStore().isAuthed || useOnlineStore().isOnline !== true) return;
+      void registerPresence().then((ok) => {
+        if (ok && myDeviceUuid.value) startHeartbeat(myDeviceUuid.value);
+      });
     });
   }
 
@@ -171,7 +199,9 @@ export const useDevicesStore = defineStore('devices', () => {
     devices,
     loaded,
     myDeviceUuid,
+    registered,
     ensure,
+    ensurePresence,
     refresh,
     applyConnected,
     applyDisconnected,

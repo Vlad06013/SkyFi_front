@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import * as devicesApi from '@/api/devices';
+import { ApiError } from '@/api/http';
 import * as identity from '@/lib/device';
 import { useAuthStore } from '@/stores/auth';
 import { HEARTBEAT_INTERVAL_MS, useDevicesStore } from '@/stores/devices';
@@ -129,6 +130,7 @@ describe('stores/devices', () => {
         command_id: expect.any(String),
       });
       expect(store.myDeviceUuid).toBe('uuid-1');
+      expect(store.registered).toBe(true);
       await flush();
       expect(fetchDevicesMock).toHaveBeenCalled();
       expect(store.devices.map((d) => d.device_uuid)).toEqual([uuid(5), uuid(6)]);
@@ -140,6 +142,7 @@ describe('stores/devices', () => {
       const store = useDevicesStore();
 
       await expect(store.registerPresence()).resolves.toBe(false);
+      expect(store.registered).toBe(false);
       expect(store.devices).toHaveLength(0);
       expect(fetchDevicesMock).not.toHaveBeenCalled();
     });
@@ -188,6 +191,25 @@ describe('stores/devices', () => {
       const calls = sendHeartbeatMock.mock.calls.length;
       await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS * 3);
       expect(sendHeartbeatMock).toHaveBeenCalledTimes(calls);
+    });
+
+    it('heartbeat 404 регистрирует устройство заново', async () => {
+      registerDeviceMock.mockResolvedValue(device(5));
+      sendHeartbeatMock.mockRejectedValue(new ApiError(404, 'not-found', 'Устройство не найдено'));
+      const auth = useAuthStore();
+      const online = useOnlineStore();
+      auth.user = { id: 1, name: 'Влад', email: 'v@mail.ru', avatar_url: null };
+      online.isOnline = true;
+
+      const store = useDevicesStore();
+      store.bindPresence();
+      await flush();
+      expect(registerDeviceMock).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS);
+      await flush();
+      expect(registerDeviceMock).toHaveBeenCalledTimes(2);
+      expect(store.registered).toBe(true);
     });
   });
 });

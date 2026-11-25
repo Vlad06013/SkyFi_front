@@ -28,7 +28,7 @@ import { clearPlayerCache, loadPlayerCache, savePlayerCache } from '@/lib/librar
 import { readPlayerDevicePrefs, writePlayerDevicePrefs } from '@/lib/player-prefs';
 import { onRealtimeReconnect } from '@/realtime';
 import { useAuthStore } from '@/stores/auth';
-import { useDevicesStore } from '@/stores/devices';
+import { isUnknownDevice, useDevicesStore } from '@/stores/devices';
 import { useDownloadsStore } from '@/stores/downloads';
 import { useOnlineStore } from '@/stores/online';
 import { useToastStore } from '@/stores/toast';
@@ -167,6 +167,31 @@ export const usePlayerStore = defineStore('player', () => {
     return origin ? { origin_device_id: origin, command_id: crypto.randomUUID() } : null;
   }
 
+  /**
+   * Команда с устройством. Если uuid ещё не зарегистрирован — регистрируем.
+   * Если сервер устройство уже забыл (404) — регистрируем ещё раз и повторяем.
+   * null — зарегистрироваться не вышло.
+   */
+  async function withDevice<T>(run: (fields: EchoFields) => Promise<T>): Promise<T | null> {
+    const devices = useDevicesStore();
+    let fields = echo();
+    if (!fields) {
+      if (!(await devices.ensurePresence())) return null;
+      fields = echo();
+      if (!fields) return null;
+    }
+    try {
+      return await run(fields);
+    } catch (cause) {
+      if (!isUnknownDevice(cause)) throw cause;
+      devices.registered = false;
+      if (!(await devices.registerPresence())) throw cause;
+      const again = echo();
+      if (!again) throw cause;
+      return await run(again);
+    }
+  }
+
   /** Текст ошибки сети/бэка для тоста. */
   function errorText(cause: unknown, fallback: string) {
     return cause instanceof Error ? cause.message : fallback;
@@ -195,8 +220,12 @@ export const usePlayerStore = defineStore('player', () => {
    * интервал репорта; команды пульта из мёртвой зоны догонятся следующими
    * ивентами — «последняя команда побеждает»).
    */
+  /** Пока применяем серверный стейт, скачок позиции не считается прослушиванием волны. */
+  let applyingServer = false;
+
   function applyServerStateMerged(payload: PlayerStatePayload) {
     if (!payload?.state) return;
+    applyingServer = true;
     state.value = {
       ...payload.state,
       current_snapshot: state.value.current_snapshot,
@@ -208,6 +237,9 @@ export const usePlayerStore = defineStore('player', () => {
     queue.value = sortQueue(payload.queue ?? []);
     queueLoaded.value = true;
     anchorPosition();
+    queueMicrotask(() => {
+      applyingServer = false;
+    });
     void syncContextWithSource();
   }
 
@@ -219,15 +251,15 @@ export const usePlayerStore = defineStore('player', () => {
    * переключаем оптимистично, при ошибке — откат.
    */
   async function activateDevice(deviceUuid: string): Promise<boolean> {
-    const fields = echo();
-    if (!fields) {
-      toast.show('Устройство ещё не зарегистрировано', '', true);
-      return false;
-    }
     const prevActive = state.value.active_device_id;
     applyActiveDevice(deviceUuid);
     try {
-      const payload = await devicesApi.activateDevice(deviceUuid, fields);
+      const payload = await withDevice((fields) => devicesApi.activateDevice(deviceUuid, fields));
+      if (!payload) {
+        applyActiveDevice(prevActive);
+        toast.show('Устройство ещё не зарегистрировано', '', true);
+        return false;
+      }
       applyServerState(payload, { force: true });
       return true;
     } catch (cause) {
@@ -295,6 +327,7 @@ export const usePlayerStore = defineStore('player', () => {
     // Версии монотонны (бэк-фикс 2026-11-25): устаревшие и дубли отсекаем.
     if (!opts.force && serverStateApplied && payload.state.version <= state.value.version) return;
     serverStateApplied = true;
+    applyingServer = true;
     state.value = payload.state;
     applyClipsEnabled(payload.state.clips_enabled);
     // Сокет-репорты позиции несут ту же очередь — не пересоздаём массив,
@@ -303,6 +336,9 @@ export const usePlayerStore = defineStore('player', () => {
     if (!sameQueue(nextQueue, queue.value)) queue.value = nextQueue;
     queueLoaded.value = true;
     anchorPosition();
+    queueMicrotask(() => {
+      applyingServer = false;
+    });
     // Автопауза выключена: код на месте, вызов не стартует.
     // reconcileBoot();
     void syncContextWithSource();
@@ -585,10 +621,10 @@ export const usePlayerStore = defineStore('player', () => {
     // position_seconds тогда не стреляет, и сброс не доходит до звука.
     mediaSeek.value += 1;
     if (!canCommand.value || offlinePlayback()) return;
-    const fields = echo();
-    if (!fields) return;
     try {
-      applyServerState(await playerApi.seekTo(0, fields), { force: true });
+      const payload = await withDevice((fields) => playerApi.seekTo(0, fields));
+      if (!payload) return;
+      applyServerState(payload, { force: true });
     } catch (cause) {
       toast.show(errorText(cause, 'Не удалось перезапустить трек'), '', true);
     }
@@ -649,11 +685,6 @@ export const usePlayerStore = defineStore('player', () => {
       anchorPosition();
       return;
     }
-    const fields = echo();
-    if (!fields) {
-      toast.show('Устройство ещё не зарегистрировано', '', true);
-      return;
-    }
     // «Играть будет это устройство»: без онлайн-активного активируемся сами.
     if (!isActiveDevice.value) await ensureActiveForPlayback();
     try {
@@ -661,7 +692,11 @@ export const usePlayerStore = defineStore('player', () => {
         shuffle_seed: opts.rollSeed === false ? undefined : crypto.randomUUID(),
       };
       if (contextRef !== undefined) extra.context_ref = contextRef;
-      const payload = await playerApi.playSnapshot(snapshot, playbackSource, fields, extra);
+      const payload = await withDevice((fields) => playerApi.playSnapshot(snapshot, playbackSource, fields, extra));
+      if (!payload) {
+        toast.show('Устройство ещё не зарегистрировано', '', true);
+        return;
+      }
       applyServerState(payload, { force: true });
     } catch (cause) {
       toast.show(errorText(cause, 'Не удалось включить'), '', true);
@@ -717,11 +752,6 @@ export const usePlayerStore = defineStore('player', () => {
       anchorPosition();
       return;
     }
-    const fields = echo();
-    if (!fields) {
-      toast.show('Устройство ещё не зарегистрировано', '', true);
-      return;
-    }
     const wasPlaying = state.value.is_playing;
     // Рассинхрон после загрузки страницы/сбоя потока: сервер уверен, что
     // играем, а элемент активного устройства молчит (автоплей отклонён,
@@ -753,9 +783,21 @@ export const usePlayerStore = defineStore('player', () => {
     };
     anchorPosition();
     try {
-      const payload = wasPlaying
-        ? await playerApi.pausePlayback(fields, Math.round(extrapolatedPosition.value))
-        : await playerApi.resumePlayback(fields);
+      const payload = await withDevice((fields) =>
+        wasPlaying
+          ? playerApi.pausePlayback(fields, Math.round(extrapolatedPosition.value))
+          : playerApi.resumePlayback(fields),
+      );
+      if (!payload) {
+        state.value = {
+          ...state.value,
+          is_playing: wasPlaying,
+          position_updated_at: new Date().toISOString(),
+        };
+        anchorPosition();
+        toast.show('Устройство ещё не зарегистрировано', '', true);
+        return;
+      }
       applyServerState(payload, { force: true });
     } catch (cause) {
       state.value = {
@@ -776,10 +818,10 @@ export const usePlayerStore = defineStore('player', () => {
       state.value = { ...state.value, repeat_mode: next };
       return;
     }
-    const fields = echo();
-    if (!fields) return;
     try {
-      applyServerState(await playerApi.patchPlaybackOptions({ repeat_mode: next }, fields), { force: true });
+      const payload = await withDevice((fields) => playerApi.patchPlaybackOptions({ repeat_mode: next }, fields));
+      if (!payload) return;
+      applyServerState(payload, { force: true });
     } catch (cause) {
       toast.show(errorText(cause, 'Не удалось сменить повтор'), '', true);
     }
@@ -795,13 +837,12 @@ export const usePlayerStore = defineStore('player', () => {
       };
       return;
     }
-    const fields = echo();
-    if (!fields) return;
     // Включение — ролл ключа («перемешать заново»); выключение — seed: null (plan-player.md §2).
+    const seed = next ? crypto.randomUUID() : null;
     try {
-      applyServerState(await playerApi.patchPlaybackOptions({ shuffle_enabled: next }, fields, next ? crypto.randomUUID() : null), {
-        force: true,
-      });
+      const payload = await withDevice((fields) => playerApi.patchPlaybackOptions({ shuffle_enabled: next }, fields, seed));
+      if (!payload) return;
+      applyServerState(payload, { force: true });
     } catch (cause) {
       toast.show(errorText(cause, 'Не удалось переключить shuffle'), '', true);
     }
@@ -841,10 +882,9 @@ export const usePlayerStore = defineStore('player', () => {
     const seconds = Math.round(extrapolatedPosition.value);
     if (Math.abs(seconds - state.value.position_seconds) < 3) return;
     lastReportAt = now;
-    const fields = echo();
-    if (!fields) return;
     try {
-      applyServerState(await playerApi.seekTo(seconds, fields), { force: true });
+      const payload = await withDevice((fields) => playerApi.seekTo(seconds, fields));
+      if (payload) applyServerState(payload, { force: true });
     } catch {
       /* следующий тик повторит */
     }
@@ -1143,6 +1183,13 @@ export const usePlayerStore = defineStore('player', () => {
   // листать быстро — реакции на них нет.
   let waveListen: (WaveListen & { key: string; trackId: string }) | null = null;
 
+  function noteWaveHeard() {
+    const listen = waveListen;
+    if (!listen || listen.heard || !audioPlaying.value) return;
+    listen.heard = true;
+    listen.heardRatio = progress.value / 100;
+  }
+
   function postWaveFeedback(type: 'like' | 'skip') {
     const listen = waveListen;
     if (!listen) return;
@@ -1178,7 +1225,10 @@ export const usePlayerStore = defineStore('player', () => {
       liked: false,
       disliked: false,
       sent: null,
+      heard: false,
+      heardRatio: 0,
     };
+    noteWaveHeard();
   }
 
   /** Лайк или дизлайк текущего непрослушанного трека волны. */
@@ -1198,8 +1248,12 @@ export const usePlayerStore = defineStore('player', () => {
     { immediate: true },
   );
 
+  watch(audioPlaying, (playing) => {
+    if (playing) noteWaveHeard();
+  });
+
   watch(progress, (value) => {
-    if (!waveListen || !isActiveDevice.value) return;
+    if (applyingServer || !waveListen || !isActiveDevice.value || !audioPlaying.value) return;
     if (feedbackOnProgress(waveListen, value / 100) !== 'like') return;
     postWaveFeedback('like');
   });
@@ -1236,9 +1290,7 @@ export const usePlayerStore = defineStore('player', () => {
     const seconds = Math.round(pendingSeekSeconds);
     pendingSeekSeconds = null;
     if (!canCommand.value || offlinePlayback()) return;
-    const fields = echo();
-    if (!fields) return;
-    void playerApi.seekTo(seconds, fields).catch((cause) => {
+    void withDevice((fields) => playerApi.seekTo(seconds, fields)).catch((cause) => {
       toast.show(errorText(cause, 'Не удалось перемотать'), '', true);
     });
   }
@@ -1288,11 +1340,6 @@ export const usePlayerStore = defineStore('player', () => {
       state.value = { ...state.value, clips_enabled: clipMode.value };
       return;
     }
-    const fields = echo();
-    if (!fields) {
-      toast.show('Устройство ещё не зарегистрировано', '', true);
-      return;
-    }
     const next = !clipMode.value;
     const prev = clipMode.value;
     // Оптимистично, с откатом: движок начинает резолв клипа сразу, без
@@ -1300,7 +1347,14 @@ export const usePlayerStore = defineStore('player', () => {
     clipMode.value = next;
     if (!next) clearClip();
     try {
-      applyServerState(await playerApi.patchPlaybackOptions({ clips_enabled: next }, fields), { force: true });
+      const payload = await withDevice((fields) => playerApi.patchPlaybackOptions({ clips_enabled: next }, fields));
+      if (!payload) {
+        clipMode.value = prev;
+        if (!prev) clearClip();
+        toast.show('Устройство ещё не зарегистрировано', '', true);
+        return;
+      }
+      applyServerState(payload, { force: true });
     } catch (cause) {
       clipMode.value = prev;
       if (!prev) clearClip();
