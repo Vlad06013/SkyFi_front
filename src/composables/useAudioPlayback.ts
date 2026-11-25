@@ -87,6 +87,7 @@ export function useAudioPlayback() {
     // старый элемент ещё играет и его timeupdate пересаживает якорь стора на
     // позицию старого трека — читать позицию по окончании fetch нельзя.
     const startPosition = player.positionSeconds;
+    const downloaded = useDownloadsStore().isDownloaded(snapshot);
     if (!localFailed.has(key)) {
       const local = await useDownloadsStore().localUrl(snapshot);
       if (controller.signal.aborted) return;
@@ -101,6 +102,11 @@ export function useAudioPlayback() {
         tryPlay(el);
         return;
       }
+    }
+    // Файл уже в скачанном: get-url не просим, даже если локальный URL не открылся.
+    if (downloaded) {
+      if (loadedKey === key) loadedKey = null;
+      return;
     }
     // Тёплая ссылка из кеша (предзагрузка/повтор в пределах TTL) — без сети.
     const cached = getCachedStream(snapshot);

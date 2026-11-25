@@ -4,6 +4,7 @@ import { fetchVideoStreams, resolveVideo } from '@/api/videos';
 import { snapshotKey } from '@/lib/playback-engine';
 import { cacheAudioUrl, cacheVideoStreams, getCachedStream } from '@/lib/stream-url-cache';
 import { useAuthStore } from '@/stores/auth';
+import { useDownloadsStore } from '@/stores/downloads';
 import { useOnlineStore } from '@/stores/online';
 import { usePlayerStore } from '@/stores/player';
 import type { AnySnapshot, TrackSnapshot, VideoSnapshot } from '@/types';
@@ -34,6 +35,7 @@ export function useStreamPrefetch() {
   const auth = useAuthStore();
 
   async function ensureAudio(snapshot: AnySnapshot): Promise<void> {
+    if (snapshot.type === 'track' && useDownloadsStore().isDownloaded(snapshot)) return;
     if (getCachedStream(snapshot)?.kind === 'audio') return;
     const key = snapshotKey(snapshot);
     if (inflight.has(key)) return;
