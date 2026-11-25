@@ -32,6 +32,17 @@ export default defineComponent({
       });
     }
 
-    return { onPointerDown };
+    /** Пульт телевизора: влево/вправо двигают ползунок, а не фокус. */
+    function onKeydown(event: KeyboardEvent) {
+      const left = event.key === 'ArrowLeft' || event.keyCode === 21;
+      const right = event.key === 'ArrowRight' || event.keyCode === 22;
+      if (!left && !right) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const next = Math.min(100, Math.max(0, props.modelValue + (right ? 5 : -5)));
+      emit('update:modelValue', next);
+    }
+
+    return { onPointerDown, onKeydown };
   },
 });

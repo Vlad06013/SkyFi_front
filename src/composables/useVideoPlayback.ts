@@ -150,6 +150,14 @@ function armFirstFrame(el: HTMLVideoElement) {
 /** Какая попытка play() ещё актуальна: опоздавший отказ не гасит новый прогрев. */
 let playAttempt = 0;
 
+/** Кадр стоит, пока элемент ждёт данные — ползунок не тикает вперёд. */
+function holdProgressWhileBuffering(store: ReturnType<typeof usePlayerStore>, el: HTMLVideoElement) {
+  if (!store.state.is_playing || !store.clipActive) return;
+  const snap = store.clipPlaybackVideo;
+  if (!snap || snapshotKey(snap) !== appliedKey) return;
+  store.setPlaybackStalled(true, el.currentTime);
+}
+
 /**
  * Старт или повтор play(). Прогрев держим до события playing: canplay на
  * холодном HLS приходит задолго до картинки. Отказ автоплея после
@@ -774,10 +782,15 @@ export function useVideoPlayback() {
       // (в т.ч. перемотка на паузе) спиннер не нужен — там индикатор паузы.
       const store = usePlayerStore();
       if (store.state.is_playing) clipBuffering.value = true;
+      holdProgressWhileBuffering(store, el);
+    });
+    el.addEventListener('stalled', () => {
+      holdProgressWhileBuffering(usePlayerStore(), el);
     });
     el.addEventListener('playing', () => {
       const store = usePlayerStore();
       if (!store.clipActive) return;
+      store.setPlaybackStalled(false, el.currentTime);
       store.setAudioPlaying(true);
       // playing прошлого ролика приходит уже после смены снапшота — кадр не возвращаем.
       if (!openingArmed()) return;
@@ -791,7 +804,10 @@ export function useVideoPlayback() {
     });
     el.addEventListener('pause', () => {
       const store = usePlayerStore();
-      if (store.clipActive) store.setAudioPlaying(false);
+      if (store.clipActive) {
+        store.setAudioPlaying(false);
+        store.setPlaybackStalled(false, el.currentTime);
+      }
       if (store.clipActive && store.isActiveDevice) noteExternalTransport(false);
       // Сервер уже на паузе — крутить нечего, даже если playing так и не было
       // (обновление страницы в play: автоплей не стартовал, буфер на месте).

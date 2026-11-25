@@ -2,11 +2,13 @@
   <div
     class="seek-bar"
     role="slider"
+    tabindex="0"
     :aria-valuemin="0"
     :aria-valuemax="100"
     :aria-valuenow="Math.round(modelValue)"
     :aria-label="label"
     @pointerdown="onPointerDown"
+    @keydown="onKeydown"
   >
     <div class="progress">
       <div class="buffer" aria-hidden="true">

@@ -726,6 +726,44 @@ describe('stores/player: realtime-синхронизация', () => {
       expect(player.queue.map((item) => item.id)).toEqual([1, 2]);
     });
 
+    it('ожидание буфера не двигает позицию активного устройства', () => {
+      vi.useFakeTimers();
+      try {
+        const player = usePlayerStore();
+        player.applyServerState(
+          {
+            state: {
+              ...player.state,
+              current_snapshot: track,
+              is_playing: true,
+              position_seconds: 10,
+              position_updated_at: new Date().toISOString(),
+              active_device_id: 'uuid-1',
+              devices: [me],
+            },
+            queue: [],
+          } as never,
+          { force: true },
+        );
+        player.setAudioPlaying(true);
+        player.bindServerPlayback();
+        const start = player.positionSeconds;
+        vi.advanceTimersByTime(3000);
+        expect(player.positionSeconds).toBeGreaterThan(start + 2);
+
+        player.setPlaybackStalled(true);
+        const frozen = player.positionSeconds;
+        vi.advanceTimersByTime(4000);
+        expect(Math.abs(player.positionSeconds - frozen)).toBeLessThan(0.05);
+
+        player.setPlaybackStalled(false);
+        vi.advanceTimersByTime(2000);
+        expect(player.positionSeconds).toBeGreaterThan(frozen + 1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('локальный seek обновляет штамп — старый elapsed не прилипает', () => {
       vi.useFakeTimers();
       try {

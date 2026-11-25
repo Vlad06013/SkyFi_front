@@ -37,6 +37,20 @@ describe('components/SeekBar: буферизованные диапазоны', 
     });
   });
 
+  it('влево и вправо с пульта двигают ползунок на 5%', async () => {
+    const wrapper = mount(SeekBar, {
+      props: { modelValue: 40, label: 'позиция' },
+    });
+    const bar = wrapper.get('.seek-bar');
+
+    await bar.trigger('keydown', { key: 'ArrowRight' });
+    expect(wrapper.emitted('update:modelValue')?.[0]).toEqual([45]);
+
+    await wrapper.setProps({ modelValue: 40 });
+    await bar.trigger('keydown', { key: 'ArrowLeft', keyCode: 21 });
+    expect(wrapper.emitted('update:modelValue')?.[1]).toEqual([35]);
+  });
+
   it('без пропа buffered сегментов нет', () => {
     const wrapper = mount(SeekBar, {
       props: { modelValue: 0, label: 'позиция' },

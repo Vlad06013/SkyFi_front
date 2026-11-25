@@ -928,6 +928,12 @@ export const usePlayerStore = defineStore('player', () => {
   /** Аудио-элемент активного устройства реально звучит (метит композабл по событиям). */
   const audioPlaying = ref(false);
   /**
+   * Видео ждёт буфер (`waiting`/`stalled`) при включённом воспроизведении.
+   * `playing` уже был, поэтому audioPlaying остаётся true — без этого флага
+   * ползунок дальше тикает по часам, хотя кадр стоит.
+   */
+  const playbackStalled = ref(false);
+  /**
    * Пинок движку: элемент должен реально заиграть. Счётчик, а не колбэк —
    * движки (аудио/видео) сами решают, кто из них текущий, по своим вотчерам.
    */
@@ -935,6 +941,15 @@ export const usePlayerStore = defineStore('player', () => {
 
   function setAudioPlaying(playing: boolean) {
     audioPlaying.value = playing;
+  }
+
+  /** Застыть на текущей секунде и продолжить с неё, когда буфер доедет. */
+  function setPlaybackStalled(stalled: boolean, atSeconds?: number) {
+    if (playbackStalled.value === stalled && atSeconds == null) return;
+    const measured = atSeconds != null && Number.isFinite(atSeconds) ? atSeconds : extrapolatedPosition.value;
+    anchor.value = Math.max(0, measured);
+    anchorAt = Date.now();
+    playbackStalled.value = stalled;
   }
 
   function kickEngine() {
@@ -1069,7 +1084,7 @@ export const usePlayerStore = defineStore('player', () => {
     // полоска растёт на обложке со спиннером.
     if (
       isActiveDevice.value &&
-      (!audioPlaying.value || engineLoading.value || streamWarming.value)
+      (!audioPlaying.value || engineLoading.value || streamWarming.value || playbackStalled.value)
     ) {
       return anchor.value;
     }
@@ -1299,7 +1314,7 @@ export const usePlayerStore = defineStore('player', () => {
     const tickPct = duration > 0 ? (1.5 / duration) * 100 : 0;
     // Пульт звука не имеет, но зеркало играет — ползунок тоже ползёт плавно.
     const sounding = audioPlaying.value || (!isActiveDevice.value && canCommand.value);
-    const flowing = isPlaying.value && sounding && !engineLoading.value && !streamWarming.value;
+    const flowing = isPlaying.value && sounding && !engineLoading.value && !streamWarming.value && !playbackStalled.value;
     progressSmooth.value = flowing && step > 0 && step <= tickPct;
   });
 
@@ -1630,6 +1645,7 @@ export const usePlayerStore = defineStore('player', () => {
     audioLoading,
     isPlaying,
     setAudioPlaying,
+    setPlaybackStalled,
     setEngineLoading,
     setStreamWarming,
     anchorFromAudio,
