@@ -102,7 +102,7 @@
           <button class="friend-row" type="button" style="padding:8px 4px" @click="openInAppShare">
             <div class="avatar ini" style="background:linear-gradient(135deg,#3ee87f,#0a3d24)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M4.2 10.6a8.4 8.4 0 0 1 15.6 0" />
+                <path d="M4.2 10.6a8.4 8.4 0 0 1 15.6 0" stroke-linecap="butt" />
                 <path d="M9 12.4v8.1l7.7-4.05z" fill="currentColor" stroke="none" />
               </svg>
             </div>

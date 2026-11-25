@@ -6,6 +6,7 @@ import { snapshotKey } from '@/lib/playback-engine';
 import { cacheAudioUrl, getCachedStream, invalidateStream } from '@/lib/stream-url-cache';
 import { useDownloadsStore } from '@/stores/downloads';
 import { useOnlineStore } from '@/stores/online';
+import { noteExternalTransport, runOwned, runOwnedAsync } from '@/lib/media-keys';
 import { usePlayerStore } from '@/stores/player';
 import type { AnySnapshot } from '@/types';
 
@@ -55,12 +56,14 @@ function tryPlay(el: HTMLAudioElement) {
       return;
     }
     if (!el.paused) return;
-    void el.play().catch((error: unknown) => {
-      if (stale()) return;
-      if (error instanceof DOMException && error.name === 'AbortError') return;
-      if (error instanceof DOMException && error.name === 'NotAllowedError') markAutoplayBlocked();
-      store.setStreamWarming(false);
-    });
+    void runOwnedAsync(() =>
+      el.play().catch((error: unknown) => {
+        if (stale()) return;
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        if (error instanceof DOMException && error.name === 'NotAllowedError') markAutoplayBlocked();
+        store.setStreamWarming(false);
+      }),
+    );
   });
 }
 
@@ -87,7 +90,7 @@ export function useAudioPlayback() {
     // (за время клипа позиция ушла вперёд — элемент с места остановки
     // не продолжает).
     if (!player.isActiveDevice || !snapshot || snapshot.type !== 'track') {
-      el.pause();
+      runOwned(() => el.pause());
       // Подмена/остановка: летящий запрос уже никому не нужен — отменяем.
       loadAbort?.abort();
       loadAbort = null;
@@ -133,7 +136,7 @@ export function useAudioPlayback() {
     if (useOnlineStore().isOnline === false) {
       if (loadedKey === key) loadedKey = null;
       appliedKey = null;
-      el.pause();
+      runOwned(() => el.pause());
       el.removeAttribute('src');
       return;
     }
@@ -187,7 +190,7 @@ export function useAudioPlayback() {
     (shouldPlay) => {
       const el = ensureAudio();
       if (!player.isActiveDevice || player.effectiveCurrent?.type !== 'track') {
-        el.pause();
+        runOwned(() => el.pause());
         return;
       }
       // Мёртвая ссылка (протухший поток): play() не оживит — перезагружаем.
@@ -202,7 +205,7 @@ export function useAudioPlayback() {
         return;
       }
       if (shouldPlay) tryPlay(el);
-      else el.pause();
+      else runOwned(() => el.pause());
     },
   );
 
@@ -284,6 +287,11 @@ export function useAudioPlayback() {
       // Ссылка доехала — play() после get-url мог быть отбракован, пробуем снова.
       tryPlay(el);
     });
+    el.addEventListener('play', () => {
+      const store = usePlayerStore();
+      if (store.effectiveCurrent?.type !== 'track' || !store.isActiveDevice) return;
+      noteExternalTransport(true);
+    });
     el.addEventListener('playing', () => {
       const store = usePlayerStore();
       if (store.effectiveCurrent?.type !== 'track') return;
@@ -293,6 +301,7 @@ export function useAudioPlayback() {
     el.addEventListener('pause', () => {
       const store = usePlayerStore();
       if (store.effectiveCurrent?.type === 'track') store.setAudioPlaying(false);
+      if (store.effectiveCurrent?.type === 'track' && store.isActiveDevice) noteExternalTransport(false);
     });
     el.addEventListener('error', () => {
       const store = usePlayerStore();

@@ -32,6 +32,10 @@
     --wave-flame-mint:  #1ed760;
     --wave-flame-ember: #ff9f1a;
     color-scheme: dark;
+    --safe-top: 0px;
+    --safe-bottom: 0px;
+    --safe-left: 0px;
+    --safe-right: 0px;
 
     --layout: phone;
     --app-max: 100%;
@@ -39,16 +43,21 @@
     --app-pad-top: 12px;
     --app-pad-bottom: 8px;
     --thumb-size: 44px;
+    --thumb-size: clamp(28px, 5.6dvh, 44px);
     --hero-size: 188px;
     --hero-round: 148px;
     --wave-cover-size: 186px;
+    --wave-cover-size: clamp(88px, 26dvh, 186px);
     --title-size: 14px;
     --meta-size: 12px;
     --tab-label: 10px;
+    --tab-label: clamp(8px, 1.4dvh, 11px);
     --tab-icon: 22px;
+    --tab-icon: clamp(15px, 2.7dvh, 22px);
     --appbar-logo: 20px;
     --hero-name-size: 22px;
-    --wave-fab: 72px;
+    --wave-fab: 68px;
+    --wave-fab: clamp(40px, 8.4dvh, 68px);
     --auth-max: 100%;
   }
 
@@ -59,17 +68,14 @@
     --app-pad-x: 28px;
     --app-pad-top: 18px;
     --app-pad-bottom: 12px;
-    --thumb-size: 52px;
     --hero-size: 220px;
     --hero-round: 168px;
-    --wave-cover-size: 220px;
     --title-size: 15px;
     --meta-size: 13px;
-    --tab-label: 11px;
-    --tab-icon: 24px;
     --appbar-logo: 22px;
     --hero-name-size: 26px;
-    --wave-fab: 80px;
+    --wave-fab: 68px;
+    --wave-fab: clamp(40px, 8.4dvh, 68px);
     --auth-max: 440px;
   }
 }
@@ -81,17 +87,14 @@
     --app-pad-x: 36px;
     --app-pad-top: 20px;
     --app-pad-bottom: 14px;
-    --thumb-size: 56px;
     --hero-size: 240px;
     --hero-round: 184px;
-    --wave-cover-size: 240px;
     --title-size: 16px;
     --meta-size: 13px;
-    --tab-label: 12px;
-    --tab-icon: 26px;
     --appbar-logo: 24px;
     --hero-name-size: 28px;
-    --wave-fab: 84px;
+    --wave-fab: 68px;
+    --wave-fab: clamp(40px, 8.4dvh, 68px);
     --auth-max: 440px;
   }
 }

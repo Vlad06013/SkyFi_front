@@ -763,22 +763,57 @@ export const usePlayerStore = defineStore('player', () => {
       kickEngine();
       return;
     }
-    if (!wasPlaying) {
+    await commitTransport(!wasPlaying);
+  }
+
+  let hardwareAt = 0;
+
+  /**
+   * Медиа-клавиша. В отличие от togglePlay, пауза уходит на бэк даже если
+   * элемент уже замолчал сам: иначе сервер остаётся в play.
+   */
+  async function hardwareTransport(action: 'play' | 'pause') {
+    if (action === 'pause' && !state.value.is_playing) return;
+    if (action === 'play' && state.value.is_playing) {
+      if (isActiveDevice.value && !audioPlaying.value) {
+        unlockMediaPlayback();
+        kickEngine();
+      }
+      return;
+    }
+    const now = Date.now();
+    if (now - hardwareAt < 350) return;
+    hardwareAt = now;
+    await commitTransport(action === 'play');
+  }
+
+  async function commitTransport(wantPlaying: boolean) {
+    if (state.value.is_playing === wantPlaying) return;
+    if (wantPlaying) {
       unlockMediaPlayback();
       // Resume = «играть здесь»: без онлайн-активного активируемся сами.
-      if (!isActiveDevice.value) {
+      if (canCommand.value && !offlinePlayback() && !isActiveDevice.value) {
         await ensureActiveForPlayback();
-        // Пока освежали стейт, играть могло начаться (сокет, другой тап) —
-        // цель достигнута, паузу вслед не шлём.
         if (state.value.is_playing) return;
       }
     }
+    if (!canCommand.value || offlinePlayback()) {
+      if (!wantPlaying) cancelPendingSeek();
+      state.value = {
+        ...state.value,
+        is_playing: wantPlaying,
+        position_updated_at: new Date().toISOString(),
+      };
+      anchorPosition();
+      return;
+    }
+    const wasPlaying = !wantPlaying;
     // Оптимистично, с откатом по ошибке (plan-player.md §5). Пауза сама
     // увозит позицию — висящий seek отменяем, чтобы не дёргать бэк дважды.
     if (wasPlaying) cancelPendingSeek();
     state.value = {
       ...state.value,
-      is_playing: !wasPlaying,
+      is_playing: wantPlaying,
       position_updated_at: new Date().toISOString(),
     };
     anchorPosition();
@@ -1599,6 +1634,7 @@ export const usePlayerStore = defineStore('player', () => {
     setStreamWarming,
     anchorFromAudio,
     togglePlay,
+    hardwareTransport,
     toggleShuffle,
     toggleRepeat,
     playSnapshot,

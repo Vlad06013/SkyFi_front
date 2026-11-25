@@ -3,6 +3,7 @@ import { fetchVideoStreams, resolveVideo } from '@/api/videos';
 import type { VideoHls } from '@/api/videos';
 import { ApiError } from '@/api/http';
 import { hlsDetach, hlsLoad, hlsResume, hlsSetAudioTrack, hlsSetQuality, hlsSupported, setHlsHooks } from '@/lib/hls-engine';
+import { noteExternalTransport, runOwned, runOwnedAsync } from '@/lib/media-keys';
 import { afterMediaUnlock, isAutoplayBlocked, markAutoplayBlocked } from '@/lib/media-unlock';
 import { snapshotKey } from '@/lib/playback-engine';
 import { cacheVideoStreams, getCachedStream, invalidateStream } from '@/lib/stream-url-cache';
@@ -173,13 +174,13 @@ function tryPlay(el: HTMLVideoElement) {
       return;
     }
     if (!el.paused) return;
-    void el.play().catch((error: unknown) => {
+    void runOwnedAsync(() => el.play().catch((error: unknown) => {
       if (stale()) return;
       if (error instanceof DOMException && error.name === 'AbortError') return;
       if (error instanceof DOMException && error.name === 'NotAllowedError') markAutoplayBlocked();
       store.setStreamWarming(false);
       revealPausedFrame(el);
-    });
+    }));
   });
 }
 
@@ -508,7 +509,7 @@ export function useVideoPlayback() {
       ttlTimer = null;
     }
     if (!snapshot) {
-      el.pause();
+      runOwned(() => el.pause());
       releaseBuffering();
       setClipFrameReady(false);
       player.setStreamWarming(false);
@@ -676,7 +677,7 @@ export function useVideoPlayback() {
         return;
       }
       if (shouldPlay) tryPlay(el);
-      else el.pause();
+      else runOwned(() => el.pause());
     },
   );
 
@@ -735,7 +736,7 @@ export function useVideoPlayback() {
       }
       // repeat=one: бэк отвечает seek(0) без смены is_playing — элемент после
       // 'ended' остался на паузе, автоповтор должен его возобновить.
-      if (ended && player.state.is_playing) void el.play().catch(() => undefined);
+      if (ended && player.state.is_playing) void runOwnedAsync(() => el.play().catch(() => undefined));
     },
   );
 
@@ -810,9 +811,14 @@ export function useVideoPlayback() {
       store.setStreamWarming(false);
       armFirstFrame(el);
     });
+    el.addEventListener('play', () => {
+      const store = usePlayerStore();
+      if (store.clipActive && store.isActiveDevice) noteExternalTransport(true);
+    });
     el.addEventListener('pause', () => {
       const store = usePlayerStore();
       if (store.clipActive) store.setAudioPlaying(false);
+      if (store.clipActive && store.isActiveDevice) noteExternalTransport(false);
       // Сервер уже на паузе — крутить нечего, даже если playing так и не было
       // (обновление страницы в play: автоплей не стартовал, буфер на месте).
       if (!store.state.is_playing) releaseBuffering();

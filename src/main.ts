@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import { IonicVue } from '@ionic/vue';
@@ -7,6 +8,7 @@ import router from './router';
 import { onUnauthorized } from '@/api/http';
 import { bindSessionRealtime } from '@/realtime';
 import { useAudioPlayback } from '@/composables/useAudioPlayback';
+import { bindMediaKeys } from '@/lib/media-keys';
 import { useStreamPrefetch } from '@/composables/useStreamPrefetch';
 import { getClipVideoElement, useVideoPlayback } from '@/composables/useVideoPlayback';
 import { useAuthStore } from '@/stores/auth';
@@ -26,6 +28,13 @@ import './styles/kit.css';
 import './styles/base.css';
 import './styles/app.css';
 import './styles/adaptive.css';
+
+if (Capacitor.getPlatform() === 'android') {
+  // Пока нативный инсет не доехал, колокольчик не должен сидеть на батарее.
+  // Точное значение потом пишет MainActivity в те же переменные.
+  document.documentElement.style.setProperty('--safe-top', '32px');
+  document.documentElement.style.setProperty('--safe-bottom', '24px');
+}
 
 const app = createApp(App);
 const pinia = createPinia();
@@ -53,6 +62,7 @@ void appStore.bootstrap().finally(async () => {
   // Плеер: серверное состояние + реконнект-рефетч + аудио-движок (docs/plan-player.md).
   usePlayerStore(pinia).bindServerPlayback();
   useAudioPlayback();
+  bindMediaKeys();
   useVideoPlayback();
   // Предзагрузка stream URL: 2 трека вперёд/назад, только на активном (§9).
   useStreamPrefetch();

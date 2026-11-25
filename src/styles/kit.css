@@ -189,7 +189,7 @@
 .media-card .mtitle { font-size: 14px; font-weight: 600; }
 .media-card .msub { font-size: 12px; color: var(--color-text-secondary); margin-top: 2px; }
 
-.mini-player { display: flex; align-items: center; gap: 12px; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-m); padding: 10px 12px; position: relative; overflow: hidden; }
+.mini-player { display: flex; align-items: center; gap: clamp(6px, 1.4dvh, 12px); background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-m); padding: clamp(4px, 1.1dvh, 10px) clamp(8px, 1.4dvh, 12px); position: relative; overflow: hidden; }
 .mini-player > :not(.bar) { position: relative; z-index: 1; }
 .mini-player .bar { position: absolute; inset: 0; z-index: 0; background: none; pointer-events: none; }
 .mini-player .bar i {
@@ -580,7 +580,8 @@
 .tabbar {
   display: flex; justify-content: space-between; gap: 4px;
   background: var(--color-surface); border: 1px solid var(--color-border);
-  border-radius: 20px; padding: 8px 6px 10px;
+  border-radius: clamp(14px, 2.2dvh, 20px);
+  padding: clamp(4px, 1dvh, 8px) clamp(4px, 0.8dvh, 6px) clamp(5px, 1.2dvh, 10px);
 }
 .tab { flex: 1; text-align: center; color: var(--color-text-faint); font-size: 10px; position: relative; }
 .tab svg { width: 22px; height: 22px; display: block; margin: 0 auto 4px; }
@@ -961,13 +962,13 @@
 .wave-return {
   position: relative;
   z-index: 2;
-  margin: 0 auto 18px;
-  padding: 9px 18px;
+  margin: 0 auto clamp(6px, 1.6dvh, 18px);
+  padding: clamp(4px, 1dvh, 9px) clamp(10px, 2dvh, 18px);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-pill);
   background: rgba(18,18,18,.86);
   color: var(--color-text-primary);
-  font: 700 13px/1.2 var(--font-body);
+  font: 700 clamp(11px, 1.7dvh, 13px)/1.2 var(--font-body);
   cursor: pointer;
 }
 .wave-return:hover { background: var(--color-surface-3); }
@@ -1070,11 +1071,11 @@
   z-index: 2;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: clamp(6px, 1.2dvh, 10px);
   width: min(280px, 100%);
-  min-height: 52px;
-  margin-top: 18px;
-  padding: 6px 8px 6px 16px;
+  min-height: clamp(36px, 6.2dvh, 52px);
+  margin-top: clamp(8px, 2dvh, 18px);
+  padding: clamp(3px, 0.7dvh, 6px) clamp(6px, 1dvh, 8px) clamp(3px, 0.7dvh, 6px) clamp(10px, 1.8dvh, 16px);
   box-sizing: border-box;
   overflow: hidden;
   border: 1px solid var(--color-border);
@@ -1099,16 +1100,16 @@
   min-width: 0;
   overflow: hidden;
   color: var(--color-text-primary);
-  font-size: 13px;
+  font-size: clamp(11px, 1.7dvh, 13px);
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .wave-pill .icon-btn {
   position: relative;
-  flex: 0 0 40px;
-  width: 40px;
-  height: 40px;
+  flex: 0 0 clamp(28px, 4.6dvh, 40px);
+  width: clamp(28px, 4.6dvh, 40px);
+  height: clamp(28px, 4.6dvh, 40px);
   background: rgba(255,255,255,.08);
   border: 0;
 }
@@ -1118,23 +1119,23 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 22px;
-  margin-top: 22px;
+  gap: clamp(10px, 2.6dvh, 22px);
+  margin-top: clamp(8px, 2.2dvh, 22px);
 }
 .wave-controls .plain {
   background: 0;
   border: 0;
   color: var(--color-text-primary);
-  padding: 8px;
+  padding: clamp(4px, 0.8dvh, 8px);
   cursor: pointer;
   display: inline-flex;
   transition: color .12s ease, transform .12s ease;
 }
-.wave-controls .plain svg { width: 34px; height: 34px; display: block; }
+.wave-controls .plain svg { width: clamp(20px, 4dvh, 34px); height: clamp(20px, 4dvh, 34px); display: block; }
 .wave-controls .plain:hover { color: var(--color-accent-strong); }
 .wave-controls .plain:active { color: var(--color-accent); transform: scale(0.9); }
 .wave-controls .fab { width: 72px; height: 72px; }
-.wave-controls .fab svg { width: 30px; height: 30px; }
+.wave-controls .fab svg { width: clamp(16px, 3.4dvh, 28px); height: clamp(16px, 3.4dvh, 28px); }
 .wave-note {
   position: relative;
   z-index: 2;

@@ -52,7 +52,7 @@
   padding-top: 8px;
 }
 
-.sky-dock .mini-player { margin-bottom: 8px; width: 100%; }
+.sky-dock .mini-player { margin-bottom: clamp(4px, 0.9dvh, 8px); width: 100%; }
 .sky-dock .tabbar { margin: 0; }
 
 .sky-shell.is-wave .sky-body {
@@ -207,7 +207,7 @@
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  top: calc(12px + env(safe-area-inset-top));
+  top: calc(12px + max(env(safe-area-inset-top, 0px), var(--safe-top)));
   z-index: 70;
   width: max-content;
   max-width: min(520px, calc(100% - 32px));
