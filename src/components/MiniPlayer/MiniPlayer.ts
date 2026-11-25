@@ -1,4 +1,4 @@
-import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, defineComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { usePlayerStore } from '@/stores/player';
 import { clipBuffering, clipFrameReady, clipTapHandlers, setMiniClipHost } from '@/composables/useVideoPlayback';
@@ -71,6 +71,30 @@ export default defineComponent({
       const el = trackEl.value;
       if (!el) return;
       el.scrollLeft = slotOffset(1);
+    }
+
+    /** Ширина вьюпорта появляется не в тот же кадр, что монтирование. Пока её нет — слева виден сосед, его кнопка не текущий трек. */
+    function centerSoon() {
+      nextTick(() => {
+        requestAnimationFrame(() => {
+          if (!trackEl.value?.clientWidth) {
+            requestAnimationFrame(centerInstant);
+            return;
+          }
+          centerInstant();
+        });
+      });
+    }
+
+    function paneIsCurrent(index: number) {
+      const pane = panes.value[index];
+      const now = current.value;
+      if (!pane || !now) return false;
+      return (
+        pane.snapshot.type === now.type &&
+        pane.snapshot.source_type === now.source_type &&
+        pane.snapshot.source_id === now.source_id
+      );
     }
 
     function scrollToSlot(index: number) {
@@ -153,20 +177,39 @@ export default defineComponent({
       if (!dragging.value) centerInstant();
     }
 
+    let widthObserver: ResizeObserver | null = null;
+
     function onLike(index: number) {
       if (index === 1) toggleLike();
     }
 
     function onTogglePlay(index: number) {
-      if (index === 1) togglePlay();
+      if (paneIsCurrent(index)) togglePlay();
     }
 
+    watch(
+      () =>
+        current.value
+          ? `${current.value.type}:${current.value.source_type}:${current.value.source_id}`
+          : null,
+      () => centerSoon(),
+    );
+
     onMounted(() => {
-      requestAnimationFrame(centerInstant);
+      centerSoon();
       window.addEventListener('resize', onResize);
+      const el = trackEl.value;
+      if (el && typeof ResizeObserver !== 'undefined') {
+        widthObserver = new ResizeObserver(() => {
+          if (!dragging.value) centerInstant();
+        });
+        widthObserver.observe(el);
+      }
     });
 
     onBeforeUnmount(() => {
+      widthObserver?.disconnect();
+      widthObserver = null;
       // Хост ещё в документе: уводим video до того, как Vue снимет узел и браузер поставит паузу.
       setMiniClipHost(null);
       if (settleTimer) clearTimeout(settleTimer);
@@ -195,6 +238,7 @@ export default defineComponent({
       onScroll,
       onLike,
       onTogglePlay,
+      paneIsCurrent,
     };
   },
 });
