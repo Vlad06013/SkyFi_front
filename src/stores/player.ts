@@ -21,6 +21,7 @@ import {
   type EngineContext,
   type NextReason,
 } from '@/lib/playback-engine';
+import { feedbackOnFavorite, feedbackOnLeave, feedbackOnProgress, type WaveListen } from '@/lib/wave-feedback';
 import { moveItem } from '@/lib/list-sort';
 import { unlockMediaPlayback } from '@/lib/media-unlock';
 import { clearPlayerCache, loadPlayerCache, savePlayerCache } from '@/lib/library-cache';
@@ -621,6 +622,12 @@ export const usePlayerStore = defineStore('player', () => {
     // До await: жест тапа ещё жив, иначе play() после get-url браузер глушит.
     unlockMediaPlayback();
     if (offlinePlayback() && !offlinePlayable(snapshot)) return;
+    const leaving = state.value.current_snapshot;
+    const sameTrack =
+      leaving != null &&
+      snapshotKey(leaving) === snapshotKey(snapshot) &&
+      state.value.play_source === playbackSource;
+    if (!sameTrack) finishWaveListen();
     cancelPendingSeek();
     dropFromQueue(snapshotId(snapshot));
     const contextRef = playContextRef(playbackSource, opts.contextRef);
@@ -1132,6 +1139,71 @@ export const usePlayerStore = defineStore('player', () => {
    * Сброс в 0, старт с позиции и seek — сразу, без доезда.
    */
   const progressSmooth = ref(false);
+  // Фидбек волны только с непрослушанного захода. Прослушанные можно
+  // листать быстро — реакции на них нет.
+  let waveListen: (WaveListen & { key: string; trackId: string }) | null = null;
+
+  function postWaveFeedback(type: 'like' | 'skip') {
+    const listen = waveListen;
+    if (!listen) return;
+    listen.sent = type;
+    waveApi.markWaveTrackKey(listen.key);
+    if (!listen.trackId) return;
+    void waveApi.sendWaveFeedback(listen.trackId, type, positionSeconds.value).catch(() => undefined);
+  }
+
+  function finishWaveListen() {
+    const listen = waveListen;
+    waveListen = null;
+    if (!listen) return;
+    const type = feedbackOnLeave(listen, progress.value / 100);
+    if (!type) return;
+    waveListen = listen;
+    postWaveFeedback(type);
+    waveListen = null;
+  }
+
+  function adoptWaveListen() {
+    const snapshot = state.value.current_snapshot;
+    if (!snapshot || state.value.play_source !== 'wave') {
+      waveListen = null;
+      return;
+    }
+    const key = snapshotKey(snapshot);
+    if (waveListen?.key === key) return;
+    waveListen = {
+      key,
+      trackId: snapshot.source_id,
+      unplayed: !waveApi.isWaveTrackPlayed(snapshot),
+      liked: false,
+      disliked: false,
+      sent: null,
+    };
+  }
+
+  /** Лайк или дизлайк текущего непрослушанного трека волны. */
+  function noteWaveFavorite(snapshot: AnySnapshot, added: boolean) {
+    if (!waveListen || snapshotKey(snapshot) !== waveListen.key) return;
+    const type = feedbackOnFavorite(waveListen, added);
+    if (!type) return;
+    waveListen.liked = added;
+    waveListen.disliked = !added;
+    postWaveFeedback(type);
+  }
+
+  watch(
+    () =>
+      [state.value.play_source, state.value.current_snapshot ? snapshotKey(state.value.current_snapshot) : ''] as const,
+    () => adoptWaveListen(),
+    { immediate: true },
+  );
+
+  watch(progress, (value) => {
+    if (!waveListen || !isActiveDevice.value) return;
+    if (feedbackOnProgress(waveListen, value / 100) !== 'like') return;
+    postWaveFeedback('like');
+  });
+
   watch(progress, (next, prev) => {
     const step = next - (prev ?? 0);
     const duration = durationSeconds.value;
@@ -1500,6 +1572,7 @@ export const usePlayerStore = defineStore('player', () => {
     resync,
     invalidateWave,
     joinWave,
+    noteWaveFavorite,
     bindServerPlayback,
   };
 });

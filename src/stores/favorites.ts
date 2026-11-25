@@ -3,6 +3,7 @@ import { computed, ref, watch, type Ref } from 'vue';
 import { addFavorite, fetchFavorites, removeFavorite, sortFavorites } from '@/api/favorites';
 import { clearFavoritesCache, loadFavoritesCache, saveFavoritesCache } from '@/lib/library-cache';
 import { useAuthStore } from '@/stores/auth';
+import { usePlayerStore } from '@/stores/player';
 import { useOnlineStore } from '@/stores/online';
 import type {
   AlbumSnapshot,
@@ -126,9 +127,11 @@ export const useFavoritesStore = defineStore('favorites', () => {
   async function toggle(snapshot: AnySnapshot) {
     if (has(snapshot)) {
       await remove(snapshot);
+      usePlayerStore().noteWaveFavorite(snapshot, false);
       return false;
     }
     await add(snapshot);
+    usePlayerStore().noteWaveFavorite(snapshot, true);
     return true;
   }
 
