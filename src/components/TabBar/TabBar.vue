@@ -27,7 +27,7 @@
         <circle cx="12" cy="12" r="3.2" />
         <path d="M12 2.8v2.7M12 18.5v2.7M21.2 12h-2.7M5.5 12H2.8M18.7 5.3l-1.9 1.9M7.2 16.8l-1.9 1.9M18.7 18.7l-1.9-1.9M7.2 7.2 5.3 5.3" />
       </svg>
-      {{ item.label }}
+      <span class="tab-label">{{ item.label }}</span>
     </router-link>
   </nav>
 </template>

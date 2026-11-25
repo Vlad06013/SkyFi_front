@@ -109,6 +109,16 @@
   height: var(--tab-icon);
 }
 
+/* Низкий экран: подписи вкладок съедают высоту, остаются иконки. */
+@media (max-height: 720px) {
+  .tab-label { display: none; }
+  .tab svg { margin-bottom: 0; }
+  .tabbar {
+    padding-top: clamp(6px, 1.2dvh, 10px);
+    padding-bottom: clamp(6px, 1.2dvh, 10px);
+  }
+}
+
 .wave-disc { --wave-cover: var(--wave-cover-size); }
 .wave-controls .fab {
   width: var(--wave-fab);
