@@ -262,10 +262,9 @@
   object-fit: cover; display: block;
   background: #000;
 }
-/* До первого кадра элемент не рисуем: под ним остаётся обложка (.clip-bg). */
-.is-clip .clip-video:not(.is-ready) {
-  opacity: 0;
-}
+/* Кадр есть — видео выше превью. До этого превью закрывает чёрный буфер. */
+.is-clip.has-frame .clip-video { z-index: 3; }
+.is-clip.has-frame .clip-spinner { z-index: 4; }
 /* Спиннер буферизации поверх клипа: элемент ждёт данные при включённом
    воспроизведении (waiting). Указатель прозрачен — тапы идут в видео. */
 .clip-spinner {

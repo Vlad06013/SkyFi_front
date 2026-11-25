@@ -8,7 +8,7 @@ import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { getAudioElement } from '@/composables/useAudioPlayback';
 import { useLyrics } from '@/composables/useLyrics';
 import { useMediaMenu } from '@/composables/useMediaMenu';
-import { clipBuffering, clipFrameReady, getClipVideoElement, setClipHost } from '@/composables/useVideoPlayback';
+import { clipBuffering, clipFrameReady, clipSurface, getClipVideoElement, setClipHost } from '@/composables/useVideoPlayback';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { coverVar, artistsLine, trackCover } from '@/lib/cover';
 import { sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
@@ -428,7 +428,11 @@ export default defineComponent({
       layer.value = layer.value === 'queue' ? 'now' : 'queue';
     }
 
+    /** Чистое видео: аудио под клипом нет, режим нечем заменить. */
+    const clipsLocked = computed(() => current.value?.type === 'video');
+
     function onClips() {
+      if (clipsLocked.value) return;
       closeMenu();
       toggleClips();
     }
@@ -547,13 +551,14 @@ export default defineComponent({
       liked,
       state,
       clipMode,
+      clipsLocked,
       clipActive,
       clipQuality,
       clipQualities,
       clipHostEl,
       clipBuffering,
       audioLoading,
-      clipFrameReady,
+      expandedFrame: computed(() => clipFrameReady.value && clipSurface.value === 'expanded'),
       bufferedRanges,
       clipQualityAvailable,
       clipHlsActive,

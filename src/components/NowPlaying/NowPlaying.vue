@@ -4,7 +4,7 @@
     ref="rootEl"
     class="now-playing"
     tabindex="-1"
-    :class="{ 'is-dragging': playerDragging, 'is-clip': clipActive, 'is-clip-idle': clipIdle, 'has-frame': clipFrameReady }"
+    :class="{ 'is-dragging': playerDragging, 'is-clip': clipActive, 'is-clip-idle': clipIdle, 'has-frame': expandedFrame }"
     :style="playerDragStyle"
     @pointerdown="onPlayerDragStart"
     @pointermove="onClipPointerMove"
@@ -341,7 +341,8 @@
         <button
           class="plain"
           type="button"
-          :class="{ 'is-on': clipMode }"
+          :class="{ 'is-on': clipMode, 'is-locked': clipsLocked }"
+          :aria-disabled="clipsLocked || undefined"
           aria-label="клипы"
           @click.stop="onClips"
         >

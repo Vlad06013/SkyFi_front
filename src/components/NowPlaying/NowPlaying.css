@@ -209,6 +209,19 @@
   margin-top: clamp(8px, 1.8dvh, 18px);
 }
 
+.now-playing .p-actions .plain.is-locked {
+  cursor: default;
+}
+
+.now-playing .p-actions .plain.is-locked:active {
+  transform: none;
+}
+
+.now-playing .p-actions .plain.is-locked.is-on:hover,
+.now-playing .p-actions .plain.is-locked.is-on:active {
+  color: var(--color-accent);
+}
+
 .now-playing .p-actions svg,
 .now-playing .p-actions .plain svg {
   width: 20px;
@@ -219,6 +232,12 @@
 
 .now-playing.is-clip {
   background: #000;
+}
+
+.now-playing.is-clip .clip-host {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
 }
 
 .now-playing.is-clip .now-top,

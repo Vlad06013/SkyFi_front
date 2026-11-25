@@ -4,7 +4,7 @@ import { storeToRefs } from 'pinia';
 import { usePlayerStore } from '@/stores/player';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
-import { clipBuffering, clipFrameReady, setHomeClipHost } from '@/composables/useVideoPlayback';
+import { clipBuffering, clipFrameReady, clipSurface, setHomeClipHost } from '@/composables/useVideoPlayback';
 import { coverVar, trackCover } from '@/lib/cover';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import OfflineBanner from '@/components/OfflineBanner/OfflineBanner.vue';
@@ -59,7 +59,7 @@ export default defineComponent({
       audioLoading,
       clipActive,
       clipBuffering,
-      clipFrameReady,
+      homeFrame: computed(() => clipFrameReady.value && clipSurface.value === 'home'),
       coverSrc,
       onHomeClipHost,
       showJoinWave,

@@ -1379,6 +1379,8 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   async function toggleClips() {
+    // Чистое видео не на что переключать: выключение оставило бы пустой звук.
+    if (current.value?.type === 'video') return;
     if (!canCommand.value || offlinePlayback()) {
       // Мок-режим и офлайн: сервера нет — тоглим локально, движок следит за clipMode.
       if (clipMode.value) {

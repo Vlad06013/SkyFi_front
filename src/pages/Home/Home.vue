@@ -29,9 +29,9 @@
             v-if="clipActive"
             :ref="onHomeClipHost"
             class="home-clip-host"
-            :class="{ 'is-frame': clipFrameReady }"
+            :class="{ 'is-frame': homeFrame }"
           />
-          <img v-if="coverSrc" class="home-cover" :class="{ 'is-behind': clipActive && clipFrameReady }" :src="coverSrc" alt="">
+          <img v-if="coverSrc" class="home-cover" :class="{ 'is-behind': homeFrame }" :src="coverSrc" alt="">
           <SourceBadge v-if="current" :source="current.source_type" />
           <div v-if="audioLoading || clipBuffering" class="clip-spinner" aria-hidden="true">
             <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">

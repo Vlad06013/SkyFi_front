@@ -91,10 +91,6 @@
   display: block;
 }
 
-.mp-clip-host :deep(.clip-video:not(.is-ready)) {
-  opacity: 0;
-}
-
 /* Спиннер выше обложки: хост под ней, пока нет кадра. */
 .thumb > .clip-spinner {
   z-index: 3;

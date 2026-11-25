@@ -77,6 +77,9 @@ export const clipBuffering = ref(false);
  * закрывать обложку. Обложка стоит, пока не придёт реальный кадр.
  */
 export const clipFrameReady = ref(false);
+/** Где сейчас висит единственный <video>. Обложку снимаем только там. */
+export type ClipSurface = 'expanded' | 'home' | 'mini';
+export const clipSurface = ref<ClipSurface | null>(null);
 /** Смена потока отменяет опоздавший колбэк кадра предыдущего ролика. */
 let frameToken = 0;
 /**
@@ -135,16 +138,27 @@ function setClipFrameReady(ready: boolean) {
   video?.classList.toggle('is-ready', ready);
 }
 
-/** Кадр на экране, не просто canplay: MSE часто отдаёт чёрный буфер раньше картинки. */
+/** Кадр на экране, не просто canplay: MSE часто отдаёт чёрный буфер раньше картинки.
+ *  requestVideoFrameCallback не приходит, пока элемент с opacity:0, и превью так и висит. */
 function armFirstFrame(el: HTMLVideoElement) {
   const token = ++frameToken;
   const mark = () => {
-    if (token !== frameToken) return;
+    if (token !== frameToken || el.videoWidth === 0) return;
     clipFrameReady.value = true;
     el.classList.add('is-ready');
   };
   if (typeof el.requestVideoFrameCallback === 'function') el.requestVideoFrameCallback(() => mark());
-  else mark();
+  const started = performance.now();
+  const poll = () => {
+    if (token !== frameToken || clipFrameReady.value) return;
+    if (el.videoWidth > 0 && el.readyState >= 2) {
+      mark();
+      return;
+    }
+    if (performance.now() - started > 4_000) return;
+    requestAnimationFrame(poll);
+  };
+  requestAnimationFrame(poll);
 }
 
 /** Какая попытка play() ещё актуальна: опоздавший отказ не гасит новый прогрев. */
@@ -289,7 +303,15 @@ function applyStream(resumePosition?: number) {
     appliedManifest = null;
   }
   const stream = activeStream(player.clipStreams, player.clipQuality);
-  if (!stream || el.src === stream.url) return;
+  if (!stream) return;
+  // Уже этот поток: всё равно кладём элемент в видимый хост. Иначе src
+  // совпал, функция выходила раньше, и превью оставалось без видео под ним.
+  if (el.src === stream.url) {
+    syncAttachment();
+    if (!openingArmed()) armOpening();
+    armFirstFrame(el);
+    return;
+  }
   // Свежий клип на треке стартует с серверной позиции трека; смена качества
   // и продление TTL — с текущей позиции элемента.
   resumeAt = resume;
@@ -340,7 +362,9 @@ function applyHls(el: HTMLVideoElement, hls: VideoHls, resumePosition?: number) 
     if (!attached) hlsResume();
     // События до этой точки — ещё прошлый ролик (чёрный кадр / его playing).
     armOpening();
-    // Аттач асинхронный (ленивый hls.js): вотчер is_playing уже отстрелил — догоняем плей.
+    // playing часто успевает прийти, пока грузится hls.js, и второй раз не
+    // повторяется. Без этого превью остаётся, хотя звук уже идёт.
+    armFirstFrame(el);
     tryPlay(el);
   })().catch(() => handleStreamError());
 }
@@ -417,20 +441,40 @@ function activeStream(streams: { quality: number; url: string }[], preferred: nu
   );
 }
 
+function placeOf(host: HTMLElement): ClipSurface {
+  if (host === clipHost.value) return 'expanded';
+  if (host === homeClipHost.value) return 'home';
+  return 'mini';
+}
+
+/** keep-alive снимает главную с экрана, но хост остаётся. В невидимый
+ *  элемент кадр не рисуется, а превью на видимом месте так и висит. */
+function hostVisible(host: HTMLElement | null): host is HTMLElement {
+  return host != null && host.isConnected && host.getClientRects().length > 0;
+}
+
+function visibleHost(): HTMLElement | null {
+  if (hostVisible(clipHost.value)) return clipHost.value;
+  if (hostVisible(homeClipHost.value)) return homeClipHost.value;
+  if (hostVisible(miniClipHost.value)) return miniClipHost.value;
+  return null;
+}
+
 function syncAttachment() {
   const el = ensureVideo();
   const player = usePlayerStore();
-  // Развёрнутый важнее мини, мини важнее диска главной.
-  const host = clipHost.value ?? miniClipHost.value ?? homeClipHost.value;
-  const playable = player.clipStreams.length > 0 || player.clipHls != null;
+  const host = visibleHost();
+  const playable =
+    player.clipStreams.length > 0 || player.clipHls != null || (el.currentSrc !== '' && el.error == null);
   const show = host != null && player.clipPlaybackVideo != null && playable;
-  if (show && host && el.parentElement !== host) host.appendChild(el);
-  // Хост вот-вот уничтожит Vue (уход на главную снимает мини-плеер).
-  // Элемент без документа браузер ставит на паузу — держим его в парковке.
-  else if (!show && player.clipPlaybackVideo != null && playable) {
-    const holder = parkEl();
-    if (el.parentElement !== holder) holder.appendChild(el);
-  } else if (!show && el.parentElement) el.remove();
+  if (show && host) {
+    if (el.parentElement !== host) host.appendChild(el);
+    clipSurface.value = placeOf(host);
+    return;
+  }
+  const holder = parkEl();
+  if (el.parentElement !== holder) holder.appendChild(el);
+  clipSurface.value = null;
 }
 
 /** Перед протуханием ссылок (ttl_sec) догоняем потоки заново — src пересоздаётся с той же позиции. */
@@ -511,7 +555,20 @@ export function useVideoPlayback() {
       return;
     }
     const key = snapshotKey(snapshot);
-    if (key === appliedKey || key === loadedKey) return;
+    if (key === appliedKey || key === loadedKey) {
+      const hasSource = player.clipStreams.length > 0 || player.clipHls != null;
+      if (hasSource) {
+        // Повтор того же ролика: поток уже стоит, кадр только показываем заново.
+        syncAttachment();
+        if (!openingArmed()) armOpening();
+        armFirstFrame(el);
+        return;
+      }
+      // Потоки сброшены сменой трека. Ключ тот же, источника уже нет —
+      // грузим заново, иначе <video> остаётся вне плеера.
+      loadedKey = null;
+      appliedKey = null;
+    }
     // Клип на треке: потоки приехали вместе с resolve — только применяем.
     // Позиция общая с треком: клип стартует с неё (0 — тоже валидная позиция).
     if (player.clipVideo && snapshotKey(player.clipVideo) === key) {
@@ -743,7 +800,7 @@ export function useVideoPlayback() {
   // Хосты появляются/исчезают с развёрнутым/мини-плеером, меняются потоки/
   // видео — элемент крепим/снимаем.
   watch(
-    [clipHost, miniClipHost, homeClipHost, () => player.clipStreams.length, () => player.clipPlaybackVideo],
+    [clipHost, miniClipHost, homeClipHost, () => player.clipStreams.length, () => player.clipHls, () => player.clipPlaybackVideo],
     () => syncAttachment(),
   );
 
@@ -767,6 +824,7 @@ export function useVideoPlayback() {
     });
     el.addEventListener('seeked', () => {
       revealPausedFrame(el);
+      if (openingArmed() && el.videoWidth > 0) armFirstFrame(el);
     });
     el.addEventListener('loadeddata', () => {
       revealPausedFrame(el);

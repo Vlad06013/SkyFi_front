@@ -29,10 +29,6 @@
   display: block;
 }
 
-.home-clip-host :deep(.clip-video:not(.is-ready)) {
-  opacity: 0;
-}
-
 .home-cover {
   z-index: 2;
   pointer-events: none;

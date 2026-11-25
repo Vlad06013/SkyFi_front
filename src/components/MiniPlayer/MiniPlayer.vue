@@ -19,12 +19,12 @@
               v-if="index === 1 && clipActive"
               :ref="onClipHost"
               class="mp-clip-host"
-              :class="{ 'is-frame': clipFrameReady }"
+              :class="{ 'is-frame': miniFrame }"
             />
             <img
               v-if="index === 1 && clipActive && clipCover && pane.snapshot.type !== 'video'"
               class="mp-cover"
-              :class="{ 'is-behind': clipFrameReady }"
+              :class="{ 'is-behind': miniFrame }"
               :src="clipCover"
               alt=""
             >
@@ -32,7 +32,7 @@
               <img
                 v-if="pane.snapshot.cover_url"
                 class="mp-cover"
-                :class="{ 'is-behind': index === 1 && clipFrameReady }"
+                :class="{ 'is-behind': index === 1 && miniFrame }"
                 :src="pane.snapshot.cover_url"
                 alt=""
               >

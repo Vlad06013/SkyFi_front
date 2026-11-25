@@ -1,7 +1,7 @@
 import { computed, defineComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { usePlayerStore } from '@/stores/player';
-import { clipBuffering, clipFrameReady, setMiniClipHost } from '@/composables/useVideoPlayback';
+import { clipBuffering, clipFrameReady, clipSurface, setMiniClipHost } from '@/composables/useVideoPlayback';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { trackPointer } from '@/lib/pointer-drag';
 import { artistsLine, coverVar, trackCover } from '@/lib/cover';
@@ -248,7 +248,7 @@ export default defineComponent({
       clipHostEl,
       clipBuffering,
       audioLoading,
-      clipFrameReady,
+      miniFrame: computed(() => clipFrameReady.value && clipSurface.value === 'mini'),
       onClipHost,
       trackEl,
       coverVar,
