@@ -66,7 +66,7 @@
 
     <div v-if="tab === 'tracks'" class="list-sort" :class="{ 'is-sorting': Boolean(sortDrag) }">
       <SnapshotRow
-        v-for="(track, index) in tracks"
+        v-for="(track, index) in visibleTracks"
         :key="track.source_id"
         :title="track.title"
         :subtitle="artistsLine(track.artists)"
@@ -87,7 +87,7 @@
 
     <template v-else-if="tab === 'playlists'">
       <SnapshotRow
-        v-for="pl in playlists"
+        v-for="pl in visiblePlaylists"
         :key="pl.source_id"
         kind="media"
         :title="pl.title"
@@ -103,7 +103,7 @@
 
     <template v-else-if="tab === 'albums'">
       <SnapshotRow
-        v-for="album in albums"
+        v-for="album in visibleAlbums"
         :key="album.source_id"
         kind="media"
         :title="album.title"
@@ -119,7 +119,7 @@
 
     <template v-else-if="tab === 'artists'">
       <SnapshotRow
-        v-for="artist in artists"
+        v-for="artist in visibleArtists"
         :key="artist.source_id"
         kind="media"
         :title="artist.title"
@@ -136,7 +136,7 @@
 
     <template v-else-if="tab === 'videos'">
       <SnapshotRow
-        v-for="video in videos"
+        v-for="video in visibleVideos"
         :key="video.source_id"
         kind="video"
         :title="video.title"
@@ -154,7 +154,7 @@
 
     <template v-else-if="tab === 'uploads'">
       <SnapshotRow
-        v-for="track in uploads"
+        v-for="track in visibleUploads"
         :key="track.source_id"
         :title="track.title"
         :subtitle="artistsLine(track.artists)"
@@ -170,7 +170,7 @@
 
     <template v-else-if="tab === 'downloaded'">
       <SnapshotRow
-        v-for="track in downloaded"
+        v-for="track in visibleDownloaded"
         :key="track.source_id"
         :title="track.title"
         :subtitle="artistsLine(track.artists)"
@@ -185,7 +185,9 @@
       />
     </template>
 
-    <div v-else class="empty" style="padding-top:28px">
+    <div v-if="listHasMore" ref="listSentinel" class="more-sentinel" aria-hidden="true" />
+
+    <div v-if="listEmpty" class="empty" style="padding-top:28px">
       <div class="et">Пусто</div>
       <div class="es">Здесь пока ничего нет</div>
     </div>

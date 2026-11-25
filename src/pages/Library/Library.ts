@@ -1,4 +1,4 @@
-import { computed, defineComponent, ref } from 'vue';
+import { computed, defineComponent, onBeforeUnmount, ref, watch } from 'vue';
 import { usePageRefresh } from '@/composables/usePageRefresh';
 import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
@@ -75,6 +75,79 @@ export default defineComponent({
     const online = useOnlineStore();
     const isOffline = computed(() => online.isOnline === false);
     const downloaded = computed(() => downloads.items);
+
+    /** Экран берёт страницу из уже лежащего в кеше списка, не монтируя тысячу строк. */
+    const LIST_PAGE = 30;
+    const shown = ref(LIST_PAGE);
+    const listSentinel = ref<HTMLElement | null>(null);
+    let listObserver: IntersectionObserver | null = null;
+
+    function activeListLength(): number {
+      switch (tab.value) {
+        case 'tracks':
+          return tracks.value.length;
+        case 'playlists':
+          return playlists.value.length;
+        case 'albums':
+          return albums.value.length;
+        case 'artists':
+          return artists.value.length;
+        case 'videos':
+          return videos.value.length;
+        case 'uploads':
+          return uploads.value.length;
+        case 'downloaded':
+          return downloaded.value.length;
+      }
+    }
+
+    const listHasMore = computed(() => shown.value < activeListLength());
+    const listEmpty = computed(() => activeListLength() === 0);
+    const visibleTracks = computed(() => tracks.value.slice(0, shown.value));
+    const visiblePlaylists = computed(() => playlists.value.slice(0, shown.value));
+    const visibleAlbums = computed(() => albums.value.slice(0, shown.value));
+    const visibleArtists = computed(() => artists.value.slice(0, shown.value));
+    const visibleVideos = computed(() => videos.value.slice(0, shown.value));
+    const visibleUploads = computed(() => uploads.value.slice(0, shown.value));
+    const visibleDownloaded = computed(() => downloaded.value.slice(0, shown.value));
+
+    function loadMoreList() {
+      if (shown.value >= activeListLength()) return;
+      shown.value = Math.min(shown.value + LIST_PAGE, activeListLength());
+    }
+
+    /** Сентинел остаётся в экране, пока страница короче вьюпорта — добираем ещё одну. */
+    function fillList() {
+      const el = listSentinel.value;
+      if (!el || shown.value >= activeListLength()) return;
+      if (el.getBoundingClientRect().top < window.innerHeight + 240) {
+        loadMoreList();
+        requestAnimationFrame(fillList);
+      }
+    }
+
+    watch(tab, () => {
+      shown.value = LIST_PAGE;
+      requestAnimationFrame(fillList);
+    });
+
+    watch(listSentinel, (el) => {
+      listObserver?.disconnect();
+      listObserver = null;
+      if (!el || typeof IntersectionObserver === 'undefined') return;
+      listObserver = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((entry) => entry.isIntersecting)) {
+            loadMoreList();
+            requestAnimationFrame(fillList);
+          }
+        },
+        { rootMargin: '240px' },
+      );
+      listObserver.observe(el);
+    });
+
+    onBeforeUnmount(() => listObserver?.disconnect());
 
     const { open, items, top, right, sheet, entity, openSnapshotMenu, closeMenu, run } = useMediaMenu({
       onListen: (item) => listenCollection(item),
@@ -335,6 +408,16 @@ export default defineComponent({
       albums,
       artists,
       playlists,
+      visibleTracks,
+      visibleVideos,
+      visibleAlbums,
+      visibleArtists,
+      visiblePlaylists,
+      visibleUploads,
+      visibleDownloaded,
+      listHasMore,
+      listEmpty,
+      listSentinel,
       sortDrag,
       player,
       favorites,
