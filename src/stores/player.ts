@@ -165,6 +165,7 @@ export const usePlayerStore = defineStore('player', () => {
       position_updated_at: state.value.position_updated_at,
       is_playing: state.value.is_playing,
     };
+    applyClipsEnabled(payload.state.clips_enabled);
     queue.value = sortQueue(payload.queue ?? []);
     queueLoaded.value = true;
     anchorPosition();
@@ -256,6 +257,7 @@ export const usePlayerStore = defineStore('player', () => {
     if (!opts.force && serverStateApplied && payload.state.version <= state.value.version) return;
     serverStateApplied = true;
     state.value = payload.state;
+    applyClipsEnabled(payload.state.clips_enabled);
     // Сокет-репорты позиции несут ту же очередь — не пересоздаём массив,
     // чтобы список очереди не перерисовывался на каждый репорт.
     const nextQueue = sortQueue(payload.queue ?? []);
@@ -960,11 +962,11 @@ export const usePlayerStore = defineStore('player', () => {
 
   const current = computed(() => state.value.current_snapshot);
 
-  // Громкость и режим клипов живут в Preferences, как история поиска.
-  // Пока читаем сохранённое, жест пользователя важнее позднего ответа.
+  // Громкость живёт в Preferences, как история поиска. Режим клипов больше
+  // здесь не храним: серверный clips_enabled — источник истины, устройства
+  // иначе расходились бы в режиме (на одном видео, на другом аудио).
   let prefsHydrating = true;
   let volumeTouched = false;
-  let clipTouched = false;
   let prefsTimer: ReturnType<typeof setTimeout> | null = null;
 
   function rememberPlayerPrefs() {
@@ -972,18 +974,16 @@ export const usePlayerStore = defineStore('player', () => {
     if (prefsTimer) clearTimeout(prefsTimer);
     prefsTimer = setTimeout(() => {
       prefsTimer = null;
-      void writePlayerDevicePrefs({ volume: volume.value, clipMode: clipMode.value });
+      void writePlayerDevicePrefs({ volume: volume.value });
     }, 200);
   }
 
-  watch([volume, clipMode], rememberPlayerPrefs);
+  watch(volume, rememberPlayerPrefs);
 
   void readPlayerDevicePrefs().then((saved) => {
     if (saved && !volumeTouched) volume.value = saved.volume;
-    if (saved && !clipTouched && current.value?.type !== 'video') clipMode.value = saved.clipMode;
-    const touched = volumeTouched || clipTouched;
     prefsHydrating = false;
-    if (touched) rememberPlayerPrefs();
+    if (volumeTouched) rememberPlayerPrefs();
   });
   const title = computed(() => current.value?.title ?? '');
   const artist = computed(() =>
@@ -1080,16 +1080,48 @@ export const usePlayerStore = defineStore('player', () => {
     seek(ratio * durationSeconds.value);
   }
 
-  // --- Режим клипов (api.md §8): тогл — локальное UI-состояние, резолв — в useVideoPlayback
+  // --- Режим клипов (api.md §8): серверный флаг clips_enabled — все
+  // --- устройства играют в одном режиме (PATCH /options, бродкаст).
+  // --- Локальный clipMode — зеркало флага; движки и UI следят за ним.
 
-  function toggleClips() {
-    clipTouched = true;
-    if (clipMode.value) {
-      clipMode.value = false;
-      clearClip();
+  /** Зеркало clips_enabled из применённого серверного стейта. */
+  function applyClipsEnabled(enabled: boolean) {
+    if (clipMode.value === enabled) return;
+    clipMode.value = enabled;
+    if (!enabled) clearClip();
+  }
+
+  async function toggleClips() {
+    if (!canCommand.value) {
+      // Мок-режим: сервера нет — тоглим локально, движок следит за clipMode.
+      if (clipMode.value) {
+        clipMode.value = false;
+        clearClip();
+      } else {
+        clipMode.value = true;
+      }
+      state.value = { ...state.value, clips_enabled: clipMode.value };
       return;
     }
-    clipMode.value = true;
+    const fields = echo();
+    if (!fields) {
+      toast.show('Устройство ещё не зарегистрировано', '', true);
+      return;
+    }
+    const next = !clipMode.value;
+    const prev = clipMode.value;
+    // Оптимистично, с откатом: движок начинает резолв клипа сразу, без
+    // ожидания ответа (пульт увидит бродкастом).
+    clipMode.value = next;
+    if (!next) clearClip();
+    try {
+      applyServerState(await playerApi.patchPlaybackOptions({ clips_enabled: next }, fields), { force: true });
+    } catch (cause) {
+      clipMode.value = prev;
+      if (!prev) clearClip();
+      toast.show(errorText(cause, 'Не удалось переключить режим клипов'), '', true);
+      void resync();
+    }
   }
 
   function setClipResolving() {
@@ -1194,14 +1226,7 @@ export const usePlayerStore = defineStore('player', () => {
     clipAudioId.value = id;
   }
 
-  function syncClipMode() {
-    if (current.value?.type === 'video') clipMode.value = true;
-  }
-
-  watch(() => current.value?.type, syncClipMode);
-
   function openExpanded() {
-    syncClipMode();
     if (current.value) expanded.value = true;
   }
 

@@ -23,6 +23,10 @@ import type { TrackSnapshot, VideoSnapshot } from '@/types';
  * её в мини-плеер — воспроизведение не прерывается (нет хоста — элемент
  * остаётся без родителя и поёт дальше, из DOM его не выкидываем).
  * Тап по видео — пауза/плей, двойной тап — полный экран.
+ * Клип резолвит и показывает КАЖДОЕ устройство (пульт — в mute, звук только
+ * с активного, иначе двойной звук): режим клипов — серверный флаг, а картинка
+ * локальная подмена потока на каждом экране. Переходы (ended) двигает только
+ * активное; пульт подгоняет позицию к зеркалу сервера.
  */
 
 let video: HTMLVideoElement | null = null;
@@ -142,12 +146,12 @@ function armFirstFrame(el: HTMLVideoElement) {
  */
 function tryPlay(el: HTMLVideoElement) {
   const player = usePlayerStore();
-  if (!player.isActiveDevice || !player.state.is_playing || player.clipPlaybackVideo == null) return;
+  if (!player.state.is_playing || player.clipPlaybackVideo == null) return;
   if (!el.paused && !el.ended) return;
   player.setStreamWarming(true);
   afterMediaUnlock(() => {
     const store = usePlayerStore();
-    if (!store.isActiveDevice || !store.state.is_playing || el.ended) return;
+    if (!store.state.is_playing || el.ended) return;
     if (!el.paused) return;
     void el.play().catch(() => undefined);
   });
@@ -228,6 +232,10 @@ function ensureVideo(): HTMLVideoElement {
     video.playsInline = true;
     video.preload = 'auto';
     video.className = 'clip-video';
+    // Звук — только с активного устройства; пультам видео идёт в mute
+    // (иначе двойной звук; рассинхрона картинки с активным нет — позиция
+    // общая с серверного стейта).
+    video.muted = !usePlayerStore().isActiveDevice;
   }
   return video;
 }
@@ -249,7 +257,6 @@ function resumeSeconds(explicit?: number): number {
 
 /** Потоки текущего эффективного видео обновились — переприменить с той же позицией. */
 function reapplyStreams() {
-  if (!usePlayerStore().isActiveDevice) return;
   applyStream(resumeSeconds());
 }
 
@@ -343,7 +350,7 @@ function handleStreamError() {
     store.setAudioPlaying(false);
     return;
   }
-  if (!store.isActiveDevice || !store.clipActive) return;
+  if (!store.clipActive) return;
   const key = appliedKey;
   if (!key) return;
   if (streamRetryKey !== key) {
@@ -423,7 +430,7 @@ function scheduleTtlRefresh(ttlSec: number, snapshot: VideoSnapshot) {
     ttlTimer = null;
     const store = usePlayerStore();
     const current = store.clipPlaybackVideo;
-    if (!store.isActiveDevice || !current || snapshotKey(current) !== key) return;
+    if (!current || snapshotKey(current) !== key) return;
     void refreshStreams(current);
   }, delay);
 }
@@ -459,7 +466,7 @@ export function useVideoPlayback() {
       clearTimeout(ttlTimer);
       ttlTimer = null;
     }
-    if (!player.isActiveDevice || !snapshot) {
+    if (!snapshot) {
       el.pause();
       clipBuffering.value = false;
       setClipFrameReady(false);
@@ -473,11 +480,9 @@ export function useVideoPlayback() {
       loadAbort?.abort();
       loadAbort = null;
       loadedKey = null;
-      if (!snapshot) {
-        appliedKey = null;
-        progressiveOnlyKey = null;
-        player.setClipStreams([]);
-      }
+      appliedKey = null;
+      progressiveOnlyKey = null;
+      player.setClipStreams([]);
       syncAttachment();
       return;
     }
@@ -513,8 +518,9 @@ export function useVideoPlayback() {
       player.setClipStreams(payload.streams);
       player.setClipHls(payload.hls);
       if (!payload.hls) player.clampClipQualityToStreams();
-      // Сервер на play уже прислал 0. currentTime элемента — минута прошлого ролика.
-      applyStream(player.state.position_seconds);
+      // Сервер на play уже прислал 0. currentTime элемента — минута прошлого
+      // ролика. Пульт берёт экстраполированное зеркало, активное — свой замер.
+      applyStream(player.positionSeconds);
       scheduleTtlRefresh(payload.ttl_sec, snapshot);
     } catch (cause) {
       // Отменён следующим запросом — не ошибка, молча выходим.
@@ -575,10 +581,12 @@ export function useVideoPlayback() {
   );
 
   // Режим клипов на треке: резолвим, пока трек тот же и режим включён.
+  // Каждое устройство резолвит себе само: пульт тоже показывает видео (в mute),
+  // серверный current_snapshot при этом не трогаем — клип локальная подмена.
   watch(
-    [() => player.clipMode, () => player.current, () => player.isActiveDevice, () => useOnlineStore().isOnline],
-    ([clipModeOn, snapshot, active, online]) => {
-      if (!clipModeOn || !active || !snapshot || snapshot.type !== 'track') return;
+    [() => player.clipMode, () => player.current, () => useOnlineStore().isOnline],
+    ([clipModeOn, snapshot, online]) => {
+      if (!clipModeOn || !snapshot || snapshot.type !== 'track') return;
       if (player.clipTrackKey === snapshotKey(snapshot) || player.clipStatus === 'resolving') return;
       if (online === false) {
         player.setClipUnavailable();
@@ -592,9 +600,9 @@ export function useVideoPlayback() {
 
   // is_playing с сервера: активное устройство подчиняется.
   watch(
-    () => player.isActiveDevice && player.state.is_playing,
+    () => player.state.is_playing,
     (shouldPlay) => {
-      if (!player.isActiveDevice || player.clipPlaybackVideo == null) return;
+      if (player.clipPlaybackVideo == null) return;
       const el = ensureVideo();
       // Мёртвая ссылка (протухший поток): play() не оживит — перезагружаем.
       if (shouldPlay && el.error) {
@@ -613,7 +621,7 @@ export function useVideoPlayback() {
   watch(
     () => player.engineKick,
     () => {
-      if (!player.isActiveDevice || !player.state.is_playing || !player.clipActive) return;
+      if (!player.state.is_playing || !player.clipActive) return;
       tryPlay(ensureVideo());
     },
   );
@@ -643,12 +651,15 @@ export function useVideoPlayback() {
   // Подгонка дрейфа к серверной позиции — только при большом расхождении.
   watch(
     () => player.state.position_seconds,
-    (position) => {
+    () => {
       const el = video;
-      if (!el || !player.isActiveDevice) return;
+      if (!el) return;
       const snap = player.clipPlaybackVideo;
       // Гейт по факту (appliedKey): не seek'ать старое видео по позиции нового.
       if (!snap || snapshotKey(snap) !== appliedKey) return;
+      // Цель подгонки: активное — сырой серверный замер (свой репорт); пульт —
+      // экстраполированное зеркало, иначе каждый репорт дёргал бы видео назад.
+      const position = player.isActiveDevice ? player.state.position_seconds : player.positionSeconds;
       const ended = el.ended;
       if (Number.isFinite(el.duration) && Math.abs(el.currentTime - position) > 2.5) {
         el.currentTime = position;
@@ -663,6 +674,16 @@ export function useVideoPlayback() {
     () => player.volume,
     (percent) => {
       ensureVideo().volume = Math.min(1, Math.max(0, percent / 100));
+    },
+    { immediate: true },
+  );
+
+  // Звук видео — только с активного устройства; пульт смотрит в mute,
+  // иначе при клипе на двух экранах был бы двойной звук.
+  watch(
+    () => player.isActiveDevice,
+    (active) => {
+      ensureVideo().muted = !active;
     },
     { immediate: true },
   );
@@ -708,7 +729,7 @@ export function useVideoPlayback() {
       // Сталл при включённом воспроизведении — показываем спиннер; на паузе
       // (в т.ч. перемотка на паузе) спиннер не нужен — там индикатор паузы.
       const store = usePlayerStore();
-      if (store.isActiveDevice && store.state.is_playing) clipBuffering.value = true;
+      if (store.state.is_playing) clipBuffering.value = true;
     });
     el.addEventListener('playing', () => {
       const store = usePlayerStore();

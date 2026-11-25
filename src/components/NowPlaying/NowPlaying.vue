@@ -3,17 +3,17 @@
     v-if="expanded && current"
     ref="rootEl"
     class="now-playing"
-    :class="{ 'is-dragging': playerDragging, 'is-clip': clipMode, 'is-clip-idle': clipIdle, 'has-frame': clipFrameReady }"
+    :class="{ 'is-dragging': playerDragging, 'is-clip': clipActive, 'is-clip-idle': clipIdle, 'has-frame': clipFrameReady }"
     :style="playerDragStyle"
     @pointerdown="onPlayerDragStart"
     @pointermove="onClipPointerMove"
     @click="onClipTap"
     @dblclick="onClipDblTap"
   >
-    <img v-if="clipMode && clipPoster" class="clip-bg" :src="clipPoster" alt="">
-    <div v-if="clipMode" class="clip-scrim" />
-    <div v-if="clipMode" ref="clipHostEl" class="clip-host" />
-    <div v-if="clipMode && clipBuffering" class="clip-spinner" aria-hidden="true">
+    <img v-if="clipActive && clipPoster" class="clip-bg" :src="clipPoster" alt="">
+    <div v-if="clipActive" class="clip-scrim" />
+    <div v-if="clipActive" ref="clipHostEl" class="clip-host" />
+    <div v-if="clipActive && clipBuffering" class="clip-spinner" aria-hidden="true">
       <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
         <circle cx="12" cy="12" r="8" opacity=".25" />
         <path d="M12 4a8 8 0 0 1 8 8" stroke-linecap="round" />
@@ -27,7 +27,7 @@
             <path d="M6 9.5 12 15.5 18 9.5" />
           </svg>
         </button>
-        <div v-if="clipMode" class="clip-top-side">
+        <div v-if="clipActive" class="clip-top-side">
           <button
             v-if="clipAudioTracks.length > 1"
             class="q-chip"
@@ -236,7 +236,7 @@
         </div>
 
         <div
-          v-else-if="!clipMode"
+          v-else-if="!clipActive"
           class="cover-big"
           :style="{ background: coverVar(current.source_type) }"
         >

@@ -53,11 +53,11 @@ export function seekTo(positionSeconds: number, echo: EchoFields) {
 }
 
 /**
- * Настройки (api.md §5): repeat/shuffle + ролл `shuffle_seed`
+ * Настройки (api.md §5): repeat/shuffle/clips + ролл `shuffle_seed`
  * (переключение shuffle без смены трека; выключение — seed: null).
  */
 export function patchPlaybackOptions(
-  options: { repeat_mode?: RepeatMode; shuffle_enabled?: boolean },
+  options: { repeat_mode?: RepeatMode; shuffle_enabled?: boolean; clips_enabled?: boolean },
   echo: EchoFields,
   shuffleSeed?: string | null,
 ) {

@@ -160,6 +160,8 @@ export interface PlayerStateView {
   is_playing: boolean;
   repeat_mode: RepeatMode;
   shuffle_enabled: Shuffle;
+  /** Режим клипов: вместо аудио играем видео (videos/resolve). Переключается через PATCH /player/options. */
+  clips_enabled: boolean;
   /** Растёт с каждым изменением: устаревшие апдейты отсекаем. */
   version: number;
   play_source: PlaySource;
@@ -554,6 +556,7 @@ export const mockPlayerState: PlayerStatePayload = {
     is_playing: true,
     repeat_mode: 'all',
     shuffle_enabled: false,
+    clips_enabled: false,
     version: 7,
     play_source: 'favorites',
     previous_play_source: 'single',

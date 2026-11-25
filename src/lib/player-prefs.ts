@@ -2,10 +2,9 @@ import { Preferences } from '@capacitor/preferences';
 
 const PREFS_KEY = 'skyfi.player-prefs';
 
-/** Громкость и режим клипов — на устройстве, рядом с историей поиска. */
+/** Громкость — на устройстве, рядом с историей поиска. Режим клипов здесь не храним: серверный флаг. */
 export interface PlayerDevicePrefs {
   volume: number;
-  clipMode: boolean;
 }
 
 function clampVolume(value: unknown): number | null {
@@ -19,8 +18,8 @@ export async function readPlayerDevicePrefs(): Promise<PlayerDevicePrefs | null>
   try {
     const parsed = JSON.parse(value) as Partial<PlayerDevicePrefs>;
     const volume = clampVolume(parsed.volume);
-    if (volume == null || typeof parsed.clipMode !== 'boolean') return null;
-    return { volume, clipMode: parsed.clipMode };
+    if (volume == null) return null;
+    return { volume };
   } catch {
     return null;
   }
@@ -29,6 +28,6 @@ export async function readPlayerDevicePrefs(): Promise<PlayerDevicePrefs | null>
 export async function writePlayerDevicePrefs(prefs: PlayerDevicePrefs): Promise<void> {
   await Preferences.set({
     key: PREFS_KEY,
-    value: JSON.stringify({ volume: clampVolume(prefs.volume) ?? 0, clipMode: prefs.clipMode }),
+    value: JSON.stringify({ volume: clampVolume(prefs.volume) ?? 0 }),
   });
 }

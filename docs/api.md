@@ -193,7 +193,8 @@ avatar_url}`. QR-поллинг при confirmed отдаёт полную мо�
 
 **Состояние** (`GET /player`):
 `{ state: { id, current_snapshot|null, position_seconds,
-is_playing, repeat_mode: off|one|all, shuffle_enabled, version,
+is_playing, repeat_mode: off|one|all, shuffle_enabled,
+clips_enabled, version,
 play_source, previous_play_source, previous_play_source_snapshot|
 null, context_ref|null, shuffle_seed|null, position_updated_at|
 null (ISO 8601, свежесть замера позиции), active_device_id|null
@@ -213,7 +214,7 @@ status: pending|playing_now|played|skipped, snapshot|null}`.
 | `POST /pause` | `{origin_device_id, command_id, position_seconds?}` — `position_seconds`: точная позиция на момент паузы (её знает паузящее устройство); без поля позиция остаётся последней замеренной, штамп `position_updated_at` не меняется |
 | `POST /resume` | `{origin_device_id, command_id}` |
 | `POST /seek` | `{position_seconds, origin_device_id, command_id}` |
-| `PATCH /options` | `{options: {repeat_mode?, shuffle_enabled?}, origin_device_id, command_id, shuffle_seed?}` |
+| `PATCH /options` | `{options: {repeat_mode?, shuffle_enabled?, clips_enabled?}, origin_device_id, command_id, shuffle_seed?}` |
 
 `context_ref` и `shuffle_seed` — непрозрачные строки клиента,
 бэк не парсит: поле передали (даже null) — перезаписали, не
@@ -254,12 +255,19 @@ status: pending|playing_now|played|skipped, snapshot|null}`.
 ## 8. Видео (`/videos`)
 
 Источники видео: Дзен и YouTube (потоки — relay-ссылки с нашего
-хоста, обход блокировок клиенту не нужен). Резолв идёт по приоритету
-YouTube → Дзен; get-url диспатчит по `source_type` снапшота.
+хоста, обход блокировок клиенту не нужен). Резолв идёт через
+YouTube (Дзен-фолбэк временно отключён в коде), поисковая строка —
+«исполнитель — название official»; get-url диспатчит по
+`source_type` снапшота.
+
+Режим клипов (глобальный тоггл плеера) — часть состояния плеера:
+флаг `clips_enabled` в `state`, переключается через
+`PATCH /player/options` и рассылается бродкастом — все устройства
+пользователя играют в одном режиме, рассинхрона нет.
 
 | Метод/путь | Тело → Ответ |
 |---|---|
-| `POST /resolve` (60/мин) | track-снапшот → `{video: VideoSnapshot, streams: [{quality, url}], ttl_sec}` — режим клипов: матчинг «трек → видео» на бэке (YouTube → Дзен). |
+| `POST /resolve` (60/мин) | track-снапшот → `{video: VideoSnapshot, streams: [{quality, url}], ttl_sec}` — режим клипов: матчинг «трек → видео» на бэке (YouTube; Дзен временно отключён). |
 | `POST /get-url` (120/мин) | video-снапшот → `{streams, ttl_sec, hls}` — свежие потоки по видео (source-независимый контракт). `hls: null` — HLS-адаптации нет (Дзен всегда, YouTube при деградации ответа). Подробности и схема воспроизведения — ниже. |
 | `GET /youtube-cookies` | → `{has_cookies: bool, updated_at: string\|null}` — статус привязки персональных cookies YouTube. |
 | `POST /youtube-cookies` (30/мин) | multipart, поле `cookies` (Netscape .txt, «Get cookies.txt LOCALLY» с youtube.com) → 201. Файл хранится зашифрованным и подставляется в YouTube-запросы пользователя (обход «Sign in to confirm you're not a bot»). Добровольно: без него запросы идут без куки (деградация качества/стабильности). Relay-ссылки потоков несут sha256-префикс файла (параметр `ch`) — браузеру заголовок не прикрепить. |

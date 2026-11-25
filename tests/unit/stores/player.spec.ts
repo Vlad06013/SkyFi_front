@@ -43,6 +43,7 @@ const addToQueueMock = vi.mocked(queueApi.addToQueue);
 const removeFromQueueMock = vi.mocked(queueApi.removeFromQueue);
 const reorderPendingMock = vi.mocked(queueApi.reorderPending);
 const fetchSearchMock = vi.mocked(searchApi.fetchSearch);
+const patchPlaybackOptionsMock = vi.mocked(playerApi.patchPlaybackOptions);
 const fetchPlayerStateMock = vi.mocked(playerApi.fetchPlayerState);
 const pausePlaybackMock = vi.mocked(playerApi.pausePlayback);
 const playSnapshotMock = vi.mocked(playerApi.playSnapshot);
@@ -1065,5 +1066,112 @@ describe('stores/player: резолвер контекста по паре ис�
     await flush();
 
     expect(fetchSearchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe('stores/player: режим клипов — серверный clips_enabled', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    const auth = useAuthStore();
+    auth.user = { id: 1 } as never;
+    useDevicesStore().myDeviceUuid = 'uuid-1';
+  });
+
+  function activePlayer() {
+    const player = usePlayerStore();
+    player.state = {
+      ...player.state,
+      current_snapshot: track,
+      is_playing: true,
+      active_device_id: 'uuid-1',
+      clips_enabled: false,
+    };
+    return player;
+  }
+
+  it('toggleClips: оптимистично включает и шлёт PATCH /options', async () => {
+    const player = activePlayer();
+    patchPlaybackOptionsMock.mockResolvedValue({
+      state: { ...player.state, clips_enabled: true },
+      queue: [],
+    } as never);
+
+    await player.toggleClips();
+
+    expect(player.clipMode).toBe(true);
+    expect(patchPlaybackOptionsMock).toHaveBeenCalledWith(
+      { clips_enabled: true },
+      { origin_device_id: 'uuid-1', command_id: expect.any(String) },
+    );
+    // Ответ применили — зеркало совпадает с сервером.
+    expect(player.state.clips_enabled).toBe(true);
+  });
+
+  it('toggleClips: ошибка — откат флага и клипа, тост', async () => {
+    const player = activePlayer();
+    player.setClipResolved(track, clip, [{ quality: 720, url: 'https://cdn.test/720.mp4' }]);
+    patchPlaybackOptionsMock.mockRejectedValue(new Error('offline'));
+
+    await player.toggleClips();
+
+    expect(player.clipMode).toBe(false);
+    expect(player.clipStatus).toBe('idle');
+    expect(useToastStore().toast?.error).toBe(true);
+  });
+
+  it('серверный стейт с чужим устройством зеркалит режим: включили — резолвим, выключили — чистим клип', async () => {
+    const player = activePlayer();
+    player.state = { ...player.state, active_device_id: 'uuid-2' };
+    player.setClipResolved(track, clip, [{ quality: 720, url: 'https://cdn.test/720.mp4' }]);
+
+    player.applyServerState(
+      { state: { ...player.state, clips_enabled: true, version: 20 }, queue: [] } as never,
+      { force: true },
+    );
+    expect(player.clipMode).toBe(true);
+    expect(player.clipActive).toBe(true);
+
+    player.applyServerState(
+      { state: { ...player.state, clips_enabled: false, version: 21 }, queue: [] } as never,
+      { force: true },
+    );
+    // Режим выключили на другом устройстве — клип снят, играем аудио трека.
+    expect(player.clipMode).toBe(false);
+    expect(player.clipStatus).toBe('idle');
+    expect(player.effectiveCurrent?.source_id).toBe('t1');
+  });
+
+  it('reconnect активного: слияние по владению берёт clips_enabled с сервера', async () => {
+    const player = activePlayer();
+    player.setClipResolved(track, clip, [{ quality: 720, url: 'https://cdn.test/720.mp4' }]);
+
+    player.applyServerState({ state: { ...player.state, clips_enabled: true, version: 8 }, queue: [] } as never, {
+      force: true,
+    });
+    // Локальная жизнь: пока были офлайн, сами выключили клипы.
+    player.clipMode = false;
+
+    fetchPlayerStateMock.mockResolvedValue({
+      state: { ...player.state, clips_enabled: true, version: 9, active_device_id: 'uuid-1' },
+      queue: [],
+    } as never);
+    await player.resync();
+
+    expect(player.clipMode).toBe(true);
+    expect(player.state.clips_enabled).toBe(true);
+  });
+
+  it('мок-режим (гость): тоглим локально, API молчит', async () => {
+    useAuthStore().user = null;
+    const player = usePlayerStore();
+    player.state = { ...player.state, clips_enabled: false };
+
+    await player.toggleClips();
+
+    expect(player.clipMode).toBe(true);
+    expect(player.state.clips_enabled).toBe(true);
+    expect(patchPlaybackOptionsMock).not.toHaveBeenCalled();
   });
 });

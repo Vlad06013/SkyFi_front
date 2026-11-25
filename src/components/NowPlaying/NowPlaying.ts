@@ -240,7 +240,7 @@ export default defineComponent({
       // Спиннер и пауза: кнопки остаются. Простое только пока видео реально играет.
       if (clipBuffering.value || !playing.value) return;
       // Раскрытые очередь/текст/селекты не даём плееру уйти в простой — сначала закрыть слой.
-      if (clipMode.value && expanded.value && !qualityOpen.value && !audioOpen.value && layer.value === 'now') {
+      if (clipActive.value && expanded.value && !qualityOpen.value && !audioOpen.value && layer.value === 'now') {
         idleTimer = setTimeout(() => {
           if (clipBuffering.value || !playing.value) return;
           clipIdle.value = true;
@@ -293,7 +293,7 @@ export default defineComponent({
 
     watch([clipBuffering, playing], wake);
 
-    watch([clipMode, expanded, qualityOpen, audioOpen, layer], wake);
+    watch([clipActive, expanded, qualityOpen, audioOpen, layer], wake);
 
     onMounted(() => {
       wake();
@@ -400,7 +400,7 @@ export default defineComponent({
      * а в простое клики идут через pointer-events:none слоя.
      */
     function onClipTap(event: MouseEvent) {
-      if (!clipMode.value || layer.value !== 'now') return;
+      if (!clipActive.value || layer.value !== 'now') return;
       if (isNoDragTarget(event.target)) return;
       if (Date.now() - openedAt < 400) {
         revealOnly = false;
@@ -414,7 +414,7 @@ export default defineComponent({
     }
 
     function onClipDblTap(event: MouseEvent) {
-      if (!clipMode.value || layer.value !== 'now') return;
+      if (!clipActive.value || layer.value !== 'now') return;
       if (isNoDragTarget(event.target)) return;
       if (revealOnly) {
         revealOnly = false;
@@ -426,7 +426,7 @@ export default defineComponent({
     }
 
     function onClipPointerMove(event: PointerEvent) {
-      if (!clipMode.value || event.pointerType !== 'mouse') return;
+      if (!clipActive.value || event.pointerType !== 'mouse') return;
       wake();
     }
 
@@ -440,7 +440,7 @@ export default defineComponent({
       // полный экран): trackPointer глушит click через preventDefault на
       // pointerdown, поэтому драг здесь не стартуем. Свайп на сворачивание —
       // с хрома экрана (кнопка «свернуть» на месте).
-      if (clipMode.value) return;
+      if (clipActive.value) return;
       if (open.value) closeMenu();
       const startX = event.clientX;
       const startY = event.clientY;
@@ -513,6 +513,7 @@ export default defineComponent({
       liked,
       state,
       clipMode,
+      clipActive,
       clipQuality,
       clipQualities,
       clipHostEl,

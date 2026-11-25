@@ -89,6 +89,8 @@ export interface PlayerStateView {
   previous_play_source_snapshot: AnySnapshot | null;
   /** Opaque-ссылка контекста от клиента (поиск/плейлист): бэк не парсит (api.md §5). */
   context_ref: string | null;
+  /** Режим клипов: вместо аудио играем видео (videos/resolve). Переключается через PATCH /player/options. */
+  clips_enabled: boolean;
   /** Opaque-сид детерминированного шаффла: одинаковый порядок на всех устройствах. */
   shuffle_seed: string | null;
   /** Время последнего замера позиции (ISO 8601) — свежесть для экстраполяции. */

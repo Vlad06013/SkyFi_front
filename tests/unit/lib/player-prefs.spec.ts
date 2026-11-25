@@ -24,9 +24,9 @@ describe('lib/player-prefs', () => {
     await expect(readPlayerDevicePrefs()).resolves.toBeNull();
   });
 
-  it('пишет и читает громкость и режим клипов', async () => {
-    await writePlayerDevicePrefs({ volume: 140, clipMode: true });
-    await expect(readPlayerDevicePrefs()).resolves.toEqual({ volume: 100, clipMode: true });
+  it('пишет и читает громкость (кламп 0–100)', async () => {
+    await writePlayerDevicePrefs({ volume: 140 });
+    await expect(readPlayerDevicePrefs()).resolves.toEqual({ volume: 100 });
   });
 
   it('битая запись — null', async () => {

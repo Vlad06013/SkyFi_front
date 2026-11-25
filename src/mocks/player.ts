@@ -14,6 +14,7 @@ export const mockPlayerState: PlayerStatePayload = {
     previous_play_source: 'favorites',
     previous_play_source_snapshot: null,
     context_ref: null,
+    clips_enabled: false,
     shuffle_seed: null,
     position_updated_at: new Date().toISOString(),
     active_device_id: '9f1c7a2e-4b3d-4c8a-9e5f-2d6b0a1c4f77',
