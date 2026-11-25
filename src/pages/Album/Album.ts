@@ -6,7 +6,7 @@ import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import { useEntityDetails } from '@/composables/useEntityDetails';
-import { coverVar, artistsLine, trackCover } from '@/lib/cover';
+import { coverVar, artistsLine, snapshotCover, trackCover } from '@/lib/cover';
 import { PLAY_SOURCE_ALBUM } from '@/lib/play-sources';
 import { usePlayerStore } from '@/stores/player';
 import { useFavoritesStore } from '@/stores/favorites';
@@ -52,6 +52,7 @@ export default defineComponent({
       isPlaying,
       coverVar,
       artistsLine,
+      snapshotCover,
       trackCover,
       openSnapshotMenu,
       open,

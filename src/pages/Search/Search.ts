@@ -6,7 +6,7 @@ import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
 import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import { fetchSearch } from '@/api/search';
-import { artistsLine, trackCover } from '@/lib/cover';
+import { artistsLine, snapshotCover, trackCover } from '@/lib/cover';
 import { getSearchHistory, pushSearchHistory, clearSearchHistory } from '@/lib/search-history';
 import { openSnapshot, type OpenPlayOptions } from '@/lib/open-snapshot';
 import { PLAY_SOURCE_SEARCH } from '@/lib/play-sources';
@@ -133,7 +133,7 @@ export default defineComponent({
     const bestCover = computed(() => {
       const snap = best.value;
       if (!snap) return '';
-      return snap.type === 'track' ? trackCover(snap) : (snap.cover_url ?? '');
+      return snapshotCover(snap);
     });
 
     const bestSubtitle = computed(() => {

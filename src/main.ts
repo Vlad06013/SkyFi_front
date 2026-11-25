@@ -14,6 +14,7 @@ import { useAppStore } from '@/stores/app';
 import { useDevicesStore } from '@/stores/devices';
 import { useOnlineStore } from '@/stores/online';
 import { hydrateStreamCache } from '@/lib/stream-url-cache';
+import { useDownloadsStore } from '@/stores/downloads';
 import { usePlayerStore } from '@/stores/player';
 
 import '@ionic/vue/css/core.css';
@@ -48,6 +49,7 @@ void appStore.bootstrap().finally(async () => {
   bindSessionRealtime();
   // Ссылки get-url из прошлой сессии — до движка, иначе он запросит текущий трек заново.
   await hydrateStreamCache();
+  await useDownloadsStore(pinia).hydrate();
   // Плеер: серверное состояние + реконнект-рефетч + аудио-движок (docs/plan-player.md).
   usePlayerStore(pinia).bindServerPlayback();
   useAudioPlayback();

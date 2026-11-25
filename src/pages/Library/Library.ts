@@ -14,7 +14,7 @@ import { sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort
 import { plural } from '@/lib/plural';
 import { openSnapshot } from '@/lib/open-snapshot';
 import { PLAY_SOURCE_FAVORITES, PLAY_SOURCE_SINGLE, PLAY_SOURCE_UPLOADS } from '@/lib/play-sources';
-import { artistsLine, trackCover } from '@/lib/cover';
+import { artistsLine, snapshotCover, trackCover } from '@/lib/cover';
 import { usePlayerStore } from '@/stores/player';
 import { useFavoritesStore } from '@/stores/favorites';
 import { useUploadsStore } from '@/stores/uploads';
@@ -140,12 +140,48 @@ export default defineComponent({
       return downloads.isDownloaded(track);
     }
 
-    const dlAllStatus = computed(() => downloads.status(tab.value));
-    const dlAllPct = computed(() => downloads.pct(tab.value));
+    const bulkKind = computed(() =>
+      tab.value === 'tracks' || tab.value === 'albums' || tab.value === 'playlists' ? tab.value : null,
+    );
+    const dlAllList = computed(() => {
+      if (tab.value === 'tracks') return tracks.value;
+      if (tab.value === 'albums') return albums.value;
+      if (tab.value === 'playlists') return playlists.value;
+      return [];
+    });
+    const dlAllBusy = computed(() => Boolean(bulkKind.value) && downloads.bulk?.kind === bulkKind.value);
+    const dlAllDoneCount = computed(() => dlAllList.value.filter((item) => downloads.isDownloaded(item)).length);
+    /** Файл из этого списка ещё качается: кнопка уже не «скачать», хотя в счётчик он войдёт после записи. */
+    const dlAllActive = computed(
+      () =>
+        dlAllBusy.value ||
+        (tab.value === 'tracks' &&
+          tracks.value.some((track) => downloads.trackFilePct(track.source_type, track.source_id) !== null)),
+    );
+    const dlAllPct = computed(() => {
+      const total = dlAllList.value.length;
+      if (!total) return 0;
+      const raw = Math.round((dlAllDoneCount.value / total) * 100);
+      if (dlAllDoneCount.value > 0 && dlAllDoneCount.value < total) return Math.max(1, raw);
+      return raw;
+    });
+    const dlAllStatus = computed(() => {
+      const list = dlAllList.value;
+      if (!bulkKind.value || !list.length) return 'idle' as const;
+      if (dlAllDoneCount.value === list.length) return 'done' as const;
+      return 'idle' as const;
+    });
     const dlAllArc = computed(() => Math.round((dlAllPct.value / 100) * 94));
 
     function downloadAllTab() {
-      downloads.downloadAll(tab.value, tab.value === 'tracks' ? tracks.value : []);
+      const kind = bulkKind.value;
+      if (!kind) return;
+      if (dlAllActive.value) {
+        downloads.cancelActive();
+        return;
+      }
+      if (kind === 'tracks') void downloads.downloadAllTracks(tracks.value);
+      else void downloads.downloadAllCollections(kind, kind === 'albums' ? albums.value : playlists.value);
     }
 
     function listenCollection(item: MenuEntity) {
@@ -290,11 +326,15 @@ export default defineComponent({
       counts,
       showDownloadAll,
       artistsLine,
+      snapshotCover,
       trackCover,
       isPlaying,
       isPlayingVideo,
       isDownloaded,
       dlAllStatus,
+      dlAllBusy,
+      dlAllActive,
+      dlAllDoneCount,
       dlAllPct,
       dlAllArc,
       downloadAllTab,

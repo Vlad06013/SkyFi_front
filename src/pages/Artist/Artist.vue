@@ -42,6 +42,7 @@
           :title="track.title"
           :subtitle="artistsLine(track.artists)"
           :source="track.source_type"
+          :source-id="track.source_id"
           :cover="trackCover(track)"
           :liked="favorites.has(track)"
           :playing="isPlaying(track)"

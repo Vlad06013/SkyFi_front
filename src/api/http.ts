@@ -72,8 +72,15 @@ function toApiError(error: unknown): ApiError {
 }
 
 instance.interceptors.response.use(
-  (response) => response.data?.data,
+  (response) => {
+    // POST /audio/file отдаёт байты, не конверт { data }.
+    if (response.config.responseType === 'arraybuffer' || response.config.responseType === 'blob') {
+      return response.data;
+    }
+    return response.data?.data;
+  },
   (error) => {
+    if (axios.isAxiosError(error) && error.code === 'ERR_CANCELED') throw error;
     const apiError = toApiError(error);
     // 401 без Authorization в запросе (неверный пароль на входе) —
     // не повод рвать сессию: ошибку разбирает форма.
@@ -94,4 +101,6 @@ export const http = {
   put: <T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> => request<T>(instance.put(url, data, config) as Promise<unknown>),
   patch: <T>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> => request<T>(instance.patch(url, data, config) as Promise<unknown>),
   delete: <T>(url: string, config?: AxiosRequestConfig): Promise<T> => request<T>(instance.delete(url, config) as Promise<unknown>),
+  postBytes: (url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ArrayBuffer> =>
+    request<ArrayBuffer>(instance.post(url, data, { ...config, responseType: 'arraybuffer' }) as Promise<unknown>),
 };

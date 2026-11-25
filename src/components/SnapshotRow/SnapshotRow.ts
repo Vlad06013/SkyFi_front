@@ -2,6 +2,7 @@ import { computed, defineComponent, type PropType } from 'vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { coverVar } from '@/lib/cover';
 import { formatTime } from '@/lib/time';
+import { useDownloadsStore } from '@/stores/downloads';
 import type { SnapshotSource } from '@/types';
 
 export type SnapshotRowKind = 'track' | 'video' | 'media';
@@ -20,6 +21,7 @@ export default defineComponent({
     title: { type: String, required: true },
     subtitle: { type: String, default: '' },
     source: { type: String as PropType<SnapshotSource>, required: true },
+    sourceId: { type: String, default: '' },
     cover: { type: String, default: '' },
     round: { type: Boolean, default: false },
     playing: { type: Boolean, default: false },
@@ -36,6 +38,7 @@ export default defineComponent({
   },
   emits: ['open', 'menu', 'sort', 'remove'],
   setup(props, { emit }) {
+    const downloads = useDownloadsStore();
     const rootClass = computed(() => {
       if (props.kind === 'video') return 'vid-row';
       if (props.kind === 'media') return 'pl-row';
@@ -44,12 +47,35 @@ export default defineComponent({
 
     const isVideo = computed(() => props.kind === 'video');
     const isPlayable = computed(() => props.kind !== 'media');
+    const downloadPct = computed(() =>
+      props.kind === 'track' && props.sourceId ? downloads.trackFilePct(props.source, props.sourceId) : null,
+    );
+    const downloadArc = computed(() => Math.round(((downloadPct.value ?? 0) / 100) * 94));
+    const showDownloaded = computed(
+      () =>
+        downloadPct.value === null &&
+        (props.downloaded ||
+          (props.kind === 'track' && props.sourceId
+            ? downloads.isDownloaded({
+                type: 'track',
+                source_type: props.source,
+                source_id: props.sourceId,
+                title: '',
+                artists: [],
+                duration_ms: null,
+                cover_url: null,
+                album: null,
+                stream_url: null,
+              })
+            : false)),
+    );
+
     const durationLabel = computed(() => {
       const ms = props.durationMs;
       if (ms == null || !Number.isFinite(ms) || ms < 0) return '';
       return formatTime(ms / 1000);
     });
 
-    return { emit, rootClass, isVideo, isPlayable, coverVar, durationLabel };
+    return { emit, rootClass, isVideo, isPlayable, coverVar, durationLabel, downloadPct, downloadArc, showDownloaded };
   },
 });

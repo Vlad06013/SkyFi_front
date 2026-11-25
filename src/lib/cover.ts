@@ -1,4 +1,28 @@
-import type { SnapshotSource, TrackSnapshot } from '@/types';
+import { ref } from 'vue';
+import { entityKey } from '@/lib/download-keys';
+import type { AnySnapshot, SnapshotSource, TrackSnapshot } from '@/types';
+
+const localCovers = new Map<string, string>();
+/** Счётчик, чтобы шаблоны перерисовались, когда локальная обложка доехала. */
+const localCoverVersion = ref(0);
+
+export function setLocalCover(key: string, url: string) {
+  const prev = localCovers.get(key);
+  if (prev && prev !== url && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+  localCovers.set(key, url);
+  localCoverVersion.value += 1;
+}
+
+export function clearLocalCover(key: string) {
+  const prev = localCovers.get(key);
+  if (prev?.startsWith('blob:')) URL.revokeObjectURL(prev);
+  localCovers.delete(key);
+  localCoverVersion.value += 1;
+}
+
+function localCover(key: string): string {
+  return localCovers.get(key) ?? '';
+}
 
 export function coverVar(source: SnapshotSource): string {
   if (source === 'yandex_music' || source === 'mock') return 'var(--gradient-cover-1)';
@@ -6,9 +30,24 @@ export function coverVar(source: SnapshotSource): string {
   return 'var(--gradient-cover-2)';
 }
 
-/** Обложка трека: своё поле, фолбэк — обложка альбома. */
+/** Обложка трека: скачанный файл, своё поле, затем обложка альбома. */
 export function trackCover(track: TrackSnapshot): string {
-  return track.cover_url ?? track.album?.cover_url ?? '';
+  void localCoverVersion.value;
+  const own = localCover(entityKey(track));
+  if (own) return own;
+  if (track.cover_url) return track.cover_url;
+  if (track.album?.source_id) {
+    const album = localCover(`album:${track.source_type}:${track.album.source_id}`);
+    if (album) return album;
+  }
+  return track.album?.cover_url ?? '';
+}
+
+/** Обложка снапшота: скачанный файл, иначе ссылка с сервера. */
+export function snapshotCover(snapshot: AnySnapshot): string {
+  void localCoverVersion.value;
+  if (snapshot.type === 'track') return trackCover(snapshot);
+  return localCover(entityKey(snapshot)) || snapshot.cover_url || '';
 }
 
 export function sourceTitle(source: SnapshotSource): string {

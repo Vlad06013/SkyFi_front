@@ -1,8 +1,10 @@
 import { watch } from 'vue';
 import { fetchAudioUrl } from '@/api/audio';
+import { isLocalPlaybackUrl } from '@/lib/download-files';
 import { afterMediaUnlock } from '@/lib/media-unlock';
 import { snapshotKey } from '@/lib/playback-engine';
 import { cacheAudioUrl, getCachedStream, invalidateStream } from '@/lib/stream-url-cache';
+import { useDownloadsStore } from '@/stores/downloads';
 import { usePlayerStore } from '@/stores/player';
 import type { AnySnapshot } from '@/types';
 
@@ -24,6 +26,8 @@ let appliedKey: string | null = null;
 let loadAbort: AbortController | null = null;
 /** Позиция для восстановления после подмены клипом: src пересоздаёт поток. */
 let resumeAt: number | null = null;
+/** Локальный файл один раз не открылся — дальше этот трек идёт через поток. */
+const localFailed = new Set<string>();
 
 /** Прогрев до playing: canplay на медленной ссылке раньше звука, паузу не шлём. */
 function tryPlay(el: HTMLAudioElement) {
@@ -83,6 +87,21 @@ export function useAudioPlayback() {
     // старый элемент ещё играет и его timeupdate пересаживает якорь стора на
     // позицию старого трека — читать позицию по окончании fetch нельзя.
     const startPosition = player.positionSeconds;
+    if (!localFailed.has(key)) {
+      const local = await useDownloadsStore().localUrl(snapshot);
+      if (controller.signal.aborted) return;
+      if (!player.effectiveCurrent || snapshotKey(player.effectiveCurrent) !== key) {
+        if (loadedKey === key) loadedKey = null;
+        return;
+      }
+      if (local) {
+        appliedKey = key;
+        el.src = local;
+        resumeAt = startPosition;
+        tryPlay(el);
+        return;
+      }
+    }
     // Тёплая ссылка из кеша (предзагрузка/повтор в пределах TTL) — без сети.
     const cached = getCachedStream(snapshot);
     if (cached?.kind === 'audio') {
@@ -138,6 +157,9 @@ export function useAudioPlayback() {
       }
       // Мёртвая ссылка (протухший поток): play() не оживит — перезагружаем.
       if (shouldPlay && el.error) {
+        if (isLocalPlaybackUrl(el.currentSrc) || isLocalPlaybackUrl(el.src)) {
+          localFailed.add(snapshotKey(player.effectiveCurrent));
+        }
         loadedKey = null;
         appliedKey = null;
         invalidateStream(player.effectiveCurrent);
@@ -185,6 +207,9 @@ export function useAudioPlayback() {
       if (player.effectiveCurrent?.type !== 'track') return;
       const el = ensureAudio();
       if (el.error) {
+        if (isLocalPlaybackUrl(el.currentSrc) || isLocalPlaybackUrl(el.src)) {
+          localFailed.add(snapshotKey(player.effectiveCurrent));
+        }
         loadedKey = null;
         appliedKey = null;
         invalidateStream(player.effectiveCurrent);

@@ -12,7 +12,7 @@ import {
 } from '@/lib/media-menu';
 import { usePlayerStore } from '@/stores/player';
 import { useFavoritesStore } from '@/stores/favorites';
-import { useDownloadsStore } from '@/stores/downloads';
+import { isDownloadAbort, useDownloadsStore } from '@/stores/downloads';
 import { useToastStore } from '@/stores/toast';
 import type { AnySnapshot } from '@/types';
 
@@ -122,17 +122,24 @@ export function useMediaMenu(hooks: {
       return;
     }
     if (action === 'download') {
-      if (!target.snapshot) return;
-      if (downloads.isDownloaded(target.snapshot)) {
-        downloads.remove(target.snapshot);
-        toast.show(target.title, 'удалено из скачанного');
+      const snapshot = target.snapshot;
+      if (!snapshot || snapshot.type === 'video' || snapshot.type === 'artist') {
+        toast.show(target.title, 'скачивание пока только для треков');
         return;
       }
-      if (downloads.add(target.snapshot)) {
-        toast.show(`${target.title} — ${target.artist}`, 'скачано');
-      } else {
-        toast.show(target.title, 'скачивание пока только для треков');
+      if (downloads.isDownloaded(snapshot)) {
+        const job = snapshot.type === 'track' ? downloads.removeTrack(snapshot) : downloads.removeCollection(snapshot);
+        void job.then(() => toast.show(target.title, 'удалено из скачанного'));
+        return;
       }
+      const job =
+        snapshot.type === 'track' ? downloads.downloadTrack(snapshot) : downloads.downloadCollection(snapshot);
+      void job
+        .then(() => toast.show(target.title, 'скачано'))
+        .catch((error: unknown) => {
+          if (isDownloadAbort(error)) return;
+          toast.show(error instanceof Error ? error.message : 'Не удалось скачать', '', true);
+        });
       return;
     }
     if (action === 'friend-queue') {

@@ -16,6 +16,14 @@ export interface DetailsParams {
 }
 
 /** Детали album/artist/playlist (api.md §11, POST /details) + пагинация треков. */
-export function fetchEntityDetails(snapshot: DetailsRequestSnapshot, params: DetailsParams = {}) {
-  return http.post<EntityDetailsPayload>('details', { ...snapshot, ...params });
+export function fetchEntityDetails(
+  snapshot: DetailsRequestSnapshot,
+  params: DetailsParams = {},
+  signal?: AbortSignal,
+) {
+  return http.post<EntityDetailsPayload>(
+    'details',
+    { ...snapshot, ...params },
+    signal ? { signal } : undefined,
+  );
 }

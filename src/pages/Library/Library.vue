@@ -31,7 +31,7 @@
 
     <div v-if="showDownloadAll" class="dl-all-bar">
       <span class="dl-count">{{ counts[tab] }}</span>
-      <div v-if="tab !== 'videos'" class="dl-bar-side">
+      <div v-if="tab === 'tracks' || tab === 'playlists' || tab === 'albums'" class="dl-bar-side">
         <button v-if="tab === 'playlists'" class="icon-btn ghost" type="button" aria-label="новый плейлист" @click="openCreate">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
             <path d="M12 5v14M5 12h14" />
@@ -39,19 +39,23 @@
         </button>
         <span v-if="dlAllStatus === 'done'" class="dl-all is-done">Скачано</span>
         <button
-          v-else-if="dlAllStatus === 'run'"
-          class="dl-all is-run"
+          v-else
+          class="dl-all is-progress"
+          :class="{ 'is-run': dlAllActive }"
           type="button"
-          :aria-label="`скачивается ${dlAllPct}%`"
+          :aria-label="dlAllActive ? `остановить скачивание, ${dlAllPct}%` : 'скачать все'"
+          @click="downloadAllTab"
         >
-          <svg class="ring spin" viewBox="0 0 36 36" aria-hidden="true">
+          <svg v-if="dlAllActive" class="ring spin" viewBox="0 0 36 36" aria-hidden="true">
+            <circle class="track" cx="18" cy="18" r="15" />
+            <circle class="arc" cx="18" cy="18" r="15" />
+          </svg>
+          <svg v-else class="ring" viewBox="0 0 36 36" aria-hidden="true">
             <circle class="track" cx="18" cy="18" r="15" />
             <circle class="arc" cx="18" cy="18" r="15" transform="rotate(-90 18 18)" :style="{ strokeDasharray: `${dlAllArc} 94` }" />
           </svg>
-          <span class="pct">{{ dlAllPct }}%</span>
-        </button>
-        <button v-else class="icon-btn ghost" type="button" aria-label="скачать все" @click="downloadAllTab">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <span v-if="dlAllActive" class="pct">{{ dlAllPct }}%</span>
+          <svg v-else class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 4v9m0 0 3.5-3.5M12 13 8.5 9.5" />
             <path d="M5 17h14" />
           </svg>
@@ -66,6 +70,7 @@
         :title="track.title"
         :subtitle="artistsLine(track.artists)"
         :source="track.source_type"
+        :source-id="track.source_id"
         :cover="trackCover(track)"
         :playing="isPlaying(track)"
         :downloaded="isDownloaded(track)"
@@ -87,7 +92,7 @@
         :title="pl.title"
         :subtitle="`${pl.item_count} · ${pl.owner_name}`"
         :source="pl.source_type"
-        :cover="pl.cover_url ?? ''"
+        :cover="snapshotCover(pl)"
         @open="openPlaylist(pl)"
         @menu="openSnapshotMenu($event, pl, 'my-playlists', pl.owner_name ?? undefined)"
       />
@@ -101,7 +106,7 @@
         :title="album.title"
         :subtitle="`${artistsLine(album.artists)} · ${album.year}`"
         :source="album.source_type"
-        :cover="album.cover_url ?? ''"
+        :cover="snapshotCover(album)"
         @open="openAlbum(album)"
         @menu="openSnapshotMenu($event, album, 'my-albums')"
       />
@@ -145,6 +150,7 @@
         :title="track.title"
         :subtitle="artistsLine(track.artists)"
         :source="track.source_type"
+        :source-id="track.source_id"
         :cover="trackCover(track)"
         :playing="isPlaying(track)"
         :duration-ms="track.duration_ms"
@@ -160,6 +166,7 @@
         :title="track.title"
         :subtitle="artistsLine(track.artists)"
         :source="track.source_type"
+        :source-id="track.source_id"
         :cover="trackCover(track)"
         :playing="isPlaying(track)"
         :downloaded="true"

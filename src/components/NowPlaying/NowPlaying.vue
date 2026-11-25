@@ -195,6 +195,7 @@
                 :title="snapshot.title"
                 :subtitle="artistsLine(snapshot.artists)"
                 :source="snapshot.source_type"
+                :source-id="snapshot.type === 'track' ? snapshot.source_id : ''"
                 :cover="queueRowCover(snapshot)"
                 :round="snapshot.type === 'artist'"
                 sortable

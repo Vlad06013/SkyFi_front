@@ -13,7 +13,7 @@
     </div>
     <template v-else-if="album">
       <div class="hero-cover" :style="{ background: coverVar(album.source_type) }">
-        <img v-if="album.cover_url" :src="album.cover_url" alt="">
+        <img v-if="snapshotCover(album)" :src="snapshotCover(album)" alt="">
         <SourceBadge :source="album.source_type" />
       </div>
       <div class="hero-name">{{ album.title }}</div>
@@ -30,6 +30,7 @@
         :title="track.title"
         :subtitle="artistsLine(track.artists)"
         :source="track.source_type"
+        :source-id="track.source_id"
         :cover="trackCover(track)"
         :liked="favorites.has(track)"
         :playing="isPlaying(track)"
