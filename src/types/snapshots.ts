@@ -1,7 +1,15 @@
 import type { Visibility } from './api';
 
 export type SnapshotType = 'track' | 'video' | 'album' | 'playlist' | 'artist';
-export type SnapshotSource = 'yandex_music' | 'upload' | 'vk' | 'skyfi' | 'mock';
+export type SnapshotSource =
+  | 'yandex_music'
+  | 'upload'
+  | 'vk'
+  | 'skyfi'
+  | 'mock'
+  | 'dzen'
+  | 'zen'
+  | 'youtube';
 
 export interface ArtistRef {
   name: string;
