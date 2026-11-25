@@ -8,7 +8,7 @@ import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { getAudioElement } from '@/composables/useAudioPlayback';
 import { useLyrics } from '@/composables/useLyrics';
 import { useMediaMenu } from '@/composables/useMediaMenu';
-import { clipBuffering, clipFrameReady, clipTapHandlers, getClipVideoElement, setClipHost } from '@/composables/useVideoPlayback';
+import { clipBuffering, clipFrameReady, getClipVideoElement, setClipHost } from '@/composables/useVideoPlayback';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { coverVar, artistsLine, trackCover } from '@/lib/cover';
 import { sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
@@ -185,7 +185,6 @@ export default defineComponent({
     /** Хост для видео-элемента клипа: композабл крепит/снимает его по этому ref. */
     const clipHostEl = ref<HTMLElement | null>(null);
     watch(clipHostEl, (el) => setClipHost(el));
-    const clipTaps = clipTapHandlers();
 
     /** Буферизованные диапазоны активного элемента (клип — video, трек — audio)
      *  в долях длительности — полупрозрачная заливка на сикбаре. Опрос раз в
@@ -392,39 +391,6 @@ export default defineComponent({
       );
     }
 
-    /**
-     * Тап по области клипа: одинарный — пауза/плей, двойной — полный экран.
-     * Скрытый плеер клик только показывает: пауза была бы на том же жесте,
-     * потому что pointerdown уже снял простой. Вешается на корень: в
-     * развёрнутом плеере до самого видео тап не доходит (слоёный UI поверх),
-     * а в простое клики идут через pointer-events:none слоя.
-     */
-    function onClipTap(event: MouseEvent) {
-      if (!clipActive.value || layer.value !== 'now') return;
-      if (isNoDragTarget(event.target)) return;
-      if (Date.now() - openedAt < 400) {
-        revealOnly = false;
-        return;
-      }
-      const onlyReveal = revealOnly || clipIdle.value;
-      revealOnly = false;
-      wake();
-      if (onlyReveal) return;
-      clipTaps.click();
-    }
-
-    function onClipDblTap(event: MouseEvent) {
-      if (!clipActive.value || layer.value !== 'now') return;
-      if (isNoDragTarget(event.target)) return;
-      if (revealOnly) {
-        revealOnly = false;
-        wake();
-        return;
-      }
-      wake();
-      clipTaps.dblclick();
-    }
-
     function onClipPointerMove(event: PointerEvent) {
       if (!clipActive.value || event.pointerType !== 'mouse') return;
       wake();
@@ -436,21 +402,19 @@ export default defineComponent({
       if (sheet.value) return;
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       if (isNoDragTarget(event.target)) return;
-      // В клип-режиме свободная область живёт для тапов (play/pause,
-      // полный экран): trackPointer глушит click через preventDefault на
-      // pointerdown, поэтому драг здесь не стартуем. Свайп на сворачивание —
-      // с хрома экрана (кнопка «свернуть» на месте).
-      if (clipActive.value) return;
       if (open.value) closeMenu();
       const startX = event.clientX;
       const startY = event.clientY;
+      let lastDx = 0;
+      let lastDy = 0;
+      const clip = clipActive.value;
       playerDragging.value = true;
       playerDragY.value = 0;
       trackPointer(event, {
         move: (next) => {
-          const dy = next.clientY - startY;
-          const dx = next.clientX - startX;
-          playerDragY.value = dy > 0 && Math.abs(dy) >= Math.abs(dx) ? dy : 0;
+          lastDx = next.clientX - startX;
+          lastDy = next.clientY - startY;
+          playerDragY.value = lastDy > 0 && Math.abs(lastDy) >= Math.abs(lastDx) ? lastDy : 0;
         },
         up: () => {
           const shouldClose = playerDragY.value > swipeThreshold;
@@ -460,6 +424,18 @@ export default defineComponent({
             return;
           }
           playerDragY.value = 0;
+          // Короткий тап по клипу — пауза/плей. Драг глушит click, поэтому
+          // решаем здесь. Свайп вниз уже обработан выше.
+          if (!clip || layer.value !== 'now') return;
+          if (Math.abs(lastDx) > 10 || Math.abs(lastDy) > 10) return;
+          if (Date.now() - openedAt < 400) {
+            revealOnly = false;
+            return;
+          }
+          const onlyReveal = revealOnly;
+          revealOnly = false;
+          if (onlyReveal) return;
+          void togglePlay();
         },
       });
     }
@@ -580,8 +556,6 @@ export default defineComponent({
       openQueue,
       onClips,
       openNowMenu,
-      onClipTap,
-      onClipDblTap,
       onClipPointerMove,
       onPlayerDragStart,
       onSortStart,

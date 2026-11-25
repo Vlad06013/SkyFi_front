@@ -282,10 +282,10 @@
   background: rgba(0, 0, 0, .45);
   box-sizing: content-box;
 }
-/* Полный экран (двойной тап): обложечный cover кадрирует слишком сильно —
-   на весь экран растягиваем contain'ом. */
-.clip-video:fullscreen {
-  object-fit: contain;
+.clip-video::-webkit-media-controls,
+.clip-video::-webkit-media-controls-enclosure,
+.clip-video::-webkit-media-controls-panel {
+  display: none !important;
 }
 .is-clip .p-title, .is-clip .p-artist { text-shadow: 0 1px 16px rgba(0,0,0,.7); }
 .is-clip .p-artist { color: rgba(255,255,255,.78); }

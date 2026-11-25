@@ -19,7 +19,6 @@
               :ref="onClipHost"
               class="mp-clip-host"
               :class="{ 'is-frame': clipFrameReady }"
-              @dblclick="onClipDblTap"
             />
             <img
               v-if="index === 1 && clipActive && clipCover && pane.snapshot.type !== 'video'"

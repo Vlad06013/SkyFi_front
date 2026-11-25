@@ -7,8 +7,6 @@
     :style="playerDragStyle"
     @pointerdown="onPlayerDragStart"
     @pointermove="onClipPointerMove"
-    @click="onClipTap"
-    @dblclick="onClipDblTap"
   >
     <img v-if="clipActive && clipPoster" class="clip-bg" :src="clipPoster" alt="">
     <div v-if="clipActive" class="clip-scrim" />

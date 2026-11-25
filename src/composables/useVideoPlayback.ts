@@ -33,8 +33,6 @@ import type { TrackSnapshot, VideoSnapshot } from '@/types';
 
 let video: HTMLVideoElement | null = null;
 let bound = false;
-/** Задержка одинарного тапа: за это время успевает прийти dblclick. */
-const TAP_FULLSCREEN_DELAY_MS = 260;
 /** Ключ видео, для которого уже подняты потоки — сравнение по snapshotKey. */
 let loadedKey: string | null = null;
 /** Ключ видео, чьи потоки реально стоят в элементе (loadedKey — бронь до ответа). */
@@ -216,49 +214,25 @@ export function getClipVideoElement(): HTMLVideoElement | null {
   return video;
 }
 
-/** Полный экран по двойному тапу — на сам элемент, чтобы работало из мини-плеера. */
-export function toggleClipFullscreen() {
-  const el = video;
-  if (!el || !usePlayerStore().clipActive) return;
-  if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
-  else void el.requestFullscreen().catch(() => undefined);
-}
-
-/**
- * Пара обработчиков тапов по клипу: одинарный — пауза/плей через стор (все
- * устройства подчиняются), двойной — полный экран. Одинарный ждёт
- * TAP_FULLSCREEN_DELAY_MS: браузер шлёт click, click, dblclick, и без паузы
- * плей переключился бы дважды перед разворачиванием. Компонент вешает
- * обработчики на свой хост: в развёрнутом плеере тап до элемента доходит
- * только через всплытие (см. NowPlaying).
- */
-export function clipTapHandlers() {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  const click = () => {
-    if (!usePlayerStore().clipActive) return;
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(() => {
-      timer = null;
-      void usePlayerStore().togglePlay();
-    }, TAP_FULLSCREEN_DELAY_MS);
-  };
-  const dblclick = () => {
-    if (!usePlayerStore().clipActive) return;
-    if (timer) {
-      clearTimeout(timer);
-      timer = null;
-    }
-    toggleClipFullscreen();
-  };
-  return { click, dblclick };
-}
-
 function ensureVideo(): HTMLVideoElement {
   if (!video) {
     video = document.createElement('video');
     video.playsInline = true;
+    video.setAttribute('playsinline', '');
+    video.setAttribute('webkit-playsinline', '');
+    video.controls = false;
+    video.disablePictureInPicture = true;
     video.preload = 'auto';
     video.className = 'clip-video';
+    // Полноэкранный режим самого <video> — системный плеер. Наш экран
+    // разворачивает оболочку плеера кнопкой, не элемент.
+    video.addEventListener('webkitbeginfullscreen', () => {
+      const el = video as (HTMLVideoElement & { webkitExitFullscreen?: () => void }) | null;
+      el?.webkitExitFullscreen?.();
+    });
+    document.addEventListener('fullscreenchange', () => {
+      if (document.fullscreenElement === video) void document.exitFullscreen().catch(() => undefined);
+    });
     // Звук — только с активного устройства; пультам видео идёт в mute
     // (иначе двойной звук; рассинхрона картинки с активным нет — позиция
     // общая с серверного стейта).

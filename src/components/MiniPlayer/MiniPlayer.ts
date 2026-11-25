@@ -1,7 +1,7 @@
 import { computed, defineComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { usePlayerStore } from '@/stores/player';
-import { clipBuffering, clipFrameReady, clipTapHandlers, setMiniClipHost } from '@/composables/useVideoPlayback';
+import { clipBuffering, clipFrameReady, setMiniClipHost } from '@/composables/useVideoPlayback';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { trackPointer } from '@/lib/pointer-drag';
 import { artistsLine, coverVar, trackCover } from '@/lib/cover';
@@ -33,12 +33,6 @@ export default defineComponent({
     function onClipHost(el: unknown) {
       clipHostEl.value = el instanceof HTMLElement ? el : null;
     }
-    const clipTaps = clipTapHandlers();
-    /** Двойной тап по клипу в мини-плеере — полный экран. Одинарный разворачивает плеер. */
-    function onClipDblTap() {
-      clipTaps.dblclick();
-    }
-
     const trackEl = ref<HTMLElement | null>(null);
     const dragging = ref(false);
     let startClientX = 0;
@@ -230,7 +224,6 @@ export default defineComponent({
       audioLoading,
       clipFrameReady,
       onClipHost,
-      onClipDblTap,
       trackEl,
       coverVar,
       trackCover,
