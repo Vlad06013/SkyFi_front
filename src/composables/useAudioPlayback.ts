@@ -2,7 +2,9 @@ import { watch } from 'vue';
 import { fetchAudioUrl } from '@/api/audio';
 import { isLocalPlaybackUrl } from '@/lib/download-files';
 import { afterMediaUnlock, isAutoplayBlocked, markAutoplayBlocked } from '@/lib/media-unlock';
+import { alignOwnStreamUrl, isOwnApiStream } from '@/lib/own-stream';
 import { snapshotKey } from '@/lib/playback-engine';
+import { getSession } from '@/lib/session';
 import { cacheAudioUrl, getCachedStream, invalidateStream } from '@/lib/stream-url-cache';
 import { useDownloadsStore } from '@/stores/downloads';
 import { useOnlineStore } from '@/stores/online';
@@ -30,6 +32,36 @@ let loadAbort: AbortController | null = null;
 let resumeAt: number | null = null;
 /** Локальный файл один раз не открылся — дальше этот трек идёт через поток. */
 const localFailed = new Set<string>();
+/** Свой файл уже скачан с токеном: повторный клик не качает его заново. */
+let ownedBlobKey: string | null = null;
+let ownedBlobUrl: string | null = null;
+
+function dropOwnedBlob() {
+  if (ownedBlobUrl) URL.revokeObjectURL(ownedBlobUrl);
+  ownedBlobUrl = null;
+  ownedBlobKey = null;
+}
+
+/**
+ * Ссылка Яндекса играется как есть. Свой поток требует токен — качаем
+ * с Authorization и отдаём элементу blob, иначе он получает 401 и каждый
+ * следующий клик заново просит get-url.
+ */
+async function mediaSource(key: string, url: string, signal: AbortSignal): Promise<string> {
+  const aligned = alignOwnStreamUrl(url);
+  if (!isOwnApiStream(aligned)) return aligned;
+  if (ownedBlobKey === key && ownedBlobUrl) return ownedBlobUrl;
+  const stored = await getSession();
+  const response = await fetch(aligned, {
+    signal,
+    headers: stored?.token ? { Authorization: `Bearer ${stored.token}` } : {},
+  });
+  if (!response.ok) throw new Error(`stream HTTP ${response.status}`);
+  dropOwnedBlob();
+  ownedBlobKey = key;
+  ownedBlobUrl = URL.createObjectURL(await response.blob());
+  return ownedBlobUrl;
+}
 
 /** Какая попытка play() ещё актуальна: опоздавший отказ не гасит новый прогрев. */
 let playAttempt = 0;
@@ -142,25 +174,29 @@ export function useAudioPlayback() {
     }
     // Тёплая ссылка из кеша (предзагрузка/повтор в пределах TTL) — без сети.
     const cached = getCachedStream(snapshot);
-    if (cached?.kind === 'audio') {
-      appliedKey = key;
-      el.src = cached.url;
-      resumeAt = startPosition;
-      tryPlay(el);
-      return;
-    }
     player.setEngineLoading(true);
     try {
-      const { url, ttlSec } = await fetchAudioUrl(snapshot, controller.signal);
-      cacheAudioUrl(snapshot, url, ttlSec);
+      let url = cached?.kind === 'audio' ? cached.url : null;
+      if (!url) {
+        const fresh = await fetchAudioUrl(snapshot, controller.signal);
+        cacheAudioUrl(snapshot, fresh.url, fresh.ttlSec);
+        url = fresh.url;
+      }
       // Пока запрашивали ссылку, эффективный снапшот мог смениться (клип,
       // другой трек) — не грузим старое.
       if (!player.effectiveCurrent || snapshotKey(player.effectiveCurrent) !== key) {
         if (loadedKey === key) loadedKey = null;
         return;
       }
+      const playUrl = await mediaSource(key, url, controller.signal);
+      if (controller.signal.aborted) return;
+      if (!player.effectiveCurrent || snapshotKey(player.effectiveCurrent) !== key) {
+        if (loadedKey === key) loadedKey = null;
+        return;
+      }
+      if (!playUrl.startsWith('blob:')) dropOwnedBlob();
       appliedKey = key;
-      el.src = url;
+      el.src = playUrl;
       // Продолжаем с общей позиции: после клипа она ушла вперёд, при обычном
       // старте трека позиция ~0 и seek на 0 — безопасный no-op.
       resumeAt = startPosition;
@@ -306,6 +342,7 @@ export function useAudioPlayback() {
     el.addEventListener('error', () => {
       const store = usePlayerStore();
       resumeAt = null;
+      if (ownedBlobUrl && (el.src === ownedBlobUrl || el.currentSrc === ownedBlobUrl)) dropOwnedBlob();
       if (store.effectiveCurrent?.type === 'track') {
         store.setAudioPlaying(false);
         invalidateStream(store.effectiveCurrent);
