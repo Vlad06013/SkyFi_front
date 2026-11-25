@@ -1,7 +1,7 @@
 import { watch } from 'vue';
 import { fetchAudioUrl } from '@/api/audio';
 import { isLocalPlaybackUrl } from '@/lib/download-files';
-import { afterMediaUnlock } from '@/lib/media-unlock';
+import { afterMediaUnlock, isAutoplayBlocked, markAutoplayBlocked } from '@/lib/media-unlock';
 import { snapshotKey } from '@/lib/playback-engine';
 import { cacheAudioUrl, getCachedStream, invalidateStream } from '@/lib/stream-url-cache';
 import { useDownloadsStore } from '@/stores/downloads';
@@ -29,18 +29,37 @@ let resumeAt: number | null = null;
 /** Локальный файл один раз не открылся — дальше этот трек идёт через поток. */
 const localFailed = new Set<string>();
 
-/** Прогрев до playing: canplay на медленной ссылке раньше звука, паузу не шлём. */
+/** Какая попытка play() ещё актуальна: опоздавший отказ не гасит новый прогрев. */
+let playAttempt = 0;
+
+/**
+ * Прогрев до playing: canplay на медленной ссылке раньше звука.
+ * Отказ play() (перезагрузка без жеста, автоплей) — это не загрузка:
+ * спиннер снимаем, иначе он крутится при уже отвеченных запросах.
+ */
 function tryPlay(el: HTMLAudioElement) {
   const player = usePlayerStore();
   if (!player.isActiveDevice || !player.state.is_playing) return;
   if (player.effectiveCurrent?.type !== 'track') return;
   if (!el.paused && !el.ended) return;
+  if (isAutoplayBlocked()) return;
+  const attempt = ++playAttempt;
   player.setStreamWarming(true);
   afterMediaUnlock(() => {
     const store = usePlayerStore();
-    if (!store.isActiveDevice || !store.state.is_playing || el.ended) return;
-    if (store.effectiveCurrent?.type !== 'track' || !el.paused) return;
-    void el.play().catch(() => undefined);
+    const stale = () => attempt !== playAttempt;
+    if (stale()) return;
+    if (!store.isActiveDevice || !store.state.is_playing || store.effectiveCurrent?.type !== 'track' || el.ended) {
+      store.setStreamWarming(false);
+      return;
+    }
+    if (!el.paused) return;
+    void el.play().catch((error: unknown) => {
+      if (stale()) return;
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      if (error instanceof DOMException && error.name === 'NotAllowedError') markAutoplayBlocked();
+      store.setStreamWarming(false);
+    });
   });
 }
 

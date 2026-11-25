@@ -3,7 +3,7 @@ import { fetchVideoStreams, resolveVideo } from '@/api/videos';
 import type { VideoHls } from '@/api/videos';
 import { ApiError } from '@/api/http';
 import { hlsDetach, hlsLoad, hlsResume, hlsSetAudioTrack, hlsSetQuality, hlsSupported, setHlsHooks } from '@/lib/hls-engine';
-import { afterMediaUnlock } from '@/lib/media-unlock';
+import { afterMediaUnlock, isAutoplayBlocked, markAutoplayBlocked } from '@/lib/media-unlock';
 import { snapshotKey } from '@/lib/playback-engine';
 import { cacheVideoStreams, getCachedStream, invalidateStream } from '@/lib/stream-url-cache';
 import { useOnlineStore } from '@/stores/online';
@@ -140,21 +140,38 @@ function armFirstFrame(el: HTMLVideoElement) {
   else mark();
 }
 
+/** Какая попытка play() ещё актуальна: опоздавший отказ не гасит новый прогрев. */
+let playAttempt = 0;
+
 /**
  * Старт или повтор play(). Прогрев держим до события playing: canplay на
- * холодном HLS приходит задолго до картинки, и реконсиляция успевает
- * поставить паузу. Жест тапа к этому моменту уже истёк — ждём разлочку.
+ * холодном HLS приходит задолго до картинки. Отказ автоплея после
+ * перезагрузки прогревом не считается — спиннер не крутится вхолостую.
  */
+
 function tryPlay(el: HTMLVideoElement) {
   const player = usePlayerStore();
   if (!player.state.is_playing || player.clipPlaybackVideo == null) return;
   if (!el.paused && !el.ended) return;
+  if (isAutoplayBlocked()) return;
+  const attempt = ++playAttempt;
   player.setStreamWarming(true);
   afterMediaUnlock(() => {
     const store = usePlayerStore();
-    if (!store.state.is_playing || el.ended) return;
+    const stale = () => attempt !== playAttempt;
+    if (stale()) return;
+    if (!store.state.is_playing || store.clipPlaybackVideo == null || el.ended) {
+      store.setStreamWarming(false);
+      return;
+    }
     if (!el.paused) return;
-    void el.play().catch(() => undefined);
+    void el.play().catch((error: unknown) => {
+      if (stale()) return;
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      if (error instanceof DOMException && error.name === 'NotAllowedError') markAutoplayBlocked();
+      store.setStreamWarming(false);
+      revealPausedFrame(el);
+    });
   });
 }
 

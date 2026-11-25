@@ -10,9 +10,20 @@ const SILENT_WAV =
 
 let unlocked = false;
 let pending: Promise<void> | null = null;
+/** play() отклонил автоплей: повторные canplay не должны снова включать спиннер. */
+let autoplayBlocked = false;
+
+export function isAutoplayBlocked(): boolean {
+  return autoplayBlocked;
+}
+
+export function markAutoplayBlocked(): void {
+  autoplayBlocked = true;
+}
 
 /** Звать синхронно из обработчика тапа, до любого await. */
 export function unlockMediaPlayback(): void {
+  autoplayBlocked = false;
   if (unlocked || pending) return;
   // jsdom: play() кидает Not implemented и пишет в консоль. В браузере — нет.
   if (import.meta.env.VITEST) return;
