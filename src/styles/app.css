@@ -172,7 +172,10 @@
   width: max-content;
   max-width: min(520px, calc(100% - 32px));
   pointer-events: none;
+  align-items: center;
 }
+.sky-toast.has-action { pointer-events: auto; }
+.sky-toast.has-action .btn { margin-left: auto; flex-shrink: 0; }
 
 .hero-cover.round .src {
   left: 50%;

@@ -5,8 +5,9 @@ import { useToastStore } from '@/stores/toast';
 export default defineComponent({
   name: 'AppToast',
   setup() {
-    const { toast } = storeToRefs(useToastStore());
+    const toastStore = useToastStore();
+    const { toast } = storeToRefs(toastStore);
 
-    return { toast };
+    return { toast, runAction: toastStore.runAction };
   },
 });

@@ -9,6 +9,7 @@ import SettingRow from '@/components/SettingRow/SettingRow.vue';
 import YandexCard from '@/components/YandexCard/YandexCard.vue';
 import YoutubeCard from '@/components/YoutubeCard/YoutubeCard.vue';
 import QrScannerSheet from '@/components/QrScannerSheet/QrScannerSheet.vue';
+import { useApkBuildStore } from '@/stores/apk-build';
 import { useAuthStore } from '@/stores/auth';
 import { useDownloadsStore } from '@/stores/downloads';
 import { usePlayerStore } from '@/stores/player';
@@ -29,6 +30,8 @@ export default defineComponent({
     const avatarInput = ref<HTMLInputElement | null>(null);
     const avatarBusy = ref(false);
     const confirmClear = ref(false);
+    const apk = useApkBuildStore();
+    const { updateIdle, updateAvailable, checking: apkChecking } = storeToRefs(apk);
     const downloads = useDownloadsStore();
     const { items: downloadedItems, downloadedBytes } = storeToRefs(downloads);
     const hasDownloads = computed(() => downloadedItems.value.length > 0);
@@ -36,9 +39,6 @@ export default defineComponent({
     const builds = [
       { id: 'apk', title: 'Android · APK', idle: 'телефон, ТВ, магнитола' },
     ] as const;
-    // /tree/ открывает страницу GitHub, raw отдаёт сам файл skyFy.apk из dev_v2.
-    const APK_URL = 'https://github.com/Vlad06013/SkyFi_front/raw/dev_v2/skyFy.apk';
-
     function openName() {
       draft.value = user.value?.name ?? '';
       sheet.value = 'name';
@@ -77,7 +77,7 @@ export default defineComponent({
 
     function downloadBuild() {
       sheet.value = null;
-      window.open(APK_URL, '_blank', 'noopener');
+      apk.downloadApk();
     }
 
     function formatBytes(bytes: number): string {
@@ -121,6 +121,12 @@ export default defineComponent({
       avatarInput,
       avatarBusy,
       confirmClear,
+      inApk: apk.inApk,
+      updateIdle,
+      updateAvailable,
+      apkChecking,
+      downloadApk: apk.downloadApk,
+      checkApk: () => void apk.refresh(true),
       hasDownloads,
       downloadedSize,
       builds,
