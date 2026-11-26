@@ -231,10 +231,10 @@ export const useDownloadsStore = defineStore('downloads', () => {
       const path = trackFilePath(snapshot);
       let size = 0;
       if (Capacitor.isNativePlatform()) {
-        // Нативный OkHttp: закачка через XHR встаёт в пул WebView рядом с
-        // зондом/heartbeat и уводила приложение в офлайн на всё её время.
-        await downloadTrackFile(audioFileUrl(), snapshot, path, fileSignal, (loaded, total) => {
-          size = loaded;
+        // Нативный стек вне пула WebView: XHR-закачка встаёт в общую очередь
+        // рядом со зондом/heartbeat и уводила приложение в офлайн на всё время.
+        // Прогресс по байтам нативно не приходит — отчёт одним финальным кругом.
+        size = await downloadTrackFile(audioFileUrl(), snapshot, path, fileSignal, (loaded, total) => {
           markBytes(key, loaded, total);
         });
       } else {

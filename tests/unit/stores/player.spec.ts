@@ -1332,4 +1332,107 @@ describe('stores/player: позиционный репорт', () => {
       vi.useRealTimers();
     }
   });
+
+  it('housekeeping-ивент с позицией своего репорта не отматывает позицию (merged)', async () => {
+    vi.useFakeTimers();
+    try {
+      const player = usePlayerStore();
+      player.applyServerState(
+        {
+          state: {
+            ...player.state,
+            current_snapshot: track,
+            is_playing: true,
+            position_seconds: 0,
+            position_updated_at: new Date().toISOString(),
+            active_device_id: 'uuid-1',
+            devices: [me],
+          },
+          queue: [],
+        } as never,
+        { force: true },
+      );
+      player.setAudioPlaying(true);
+      player.bindServerPlayback();
+      seekToMock.mockResolvedValue({
+        state: { ...player.state, version: player.state.version + 1 },
+        queue: [],
+      } as never);
+
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(seekToMock).toHaveBeenCalledTimes(1);
+      const reported = seekToMock.mock.calls[0][0] as number;
+      // Локальный штамп состарился (репорт был ~5 с назад), экстраполированная
+      // позиция уехала вперёд от округлённого репорта.
+      await vi.advanceTimersByTimeAsync(5000);
+      const stampBefore = player.state.position_updated_at;
+      const positionBefore = player.positionSeconds;
+      expect(positionBefore).toBeGreaterThan(reported + 3);
+
+      // Бэк вещает housekeeping-ивент: версия новее, штамп СВЕЖИЙ, позиция —
+      // последний наш репорт. Старый штамповый гейт видел свежий штамп,
+      // считал ивент чужой командой и применял стейт целиком: экстраполяция
+      // схлопывалась в округлённый репорт, вотчер подгонки отматывал элемент
+      // назад — «буксование».
+      player.applySocketState({
+        state: {
+          ...player.state,
+          position_seconds: reported,
+          position_updated_at: new Date(Date.now() + 60_000).toISOString(),
+          version: player.state.version + 1,
+        },
+        queue: [],
+      });
+
+      expect(player.positionSeconds).toBeGreaterThan(positionBefore - 1);
+      expect(player.state.position_updated_at).toBe(stampBefore);
+      expect(player.state.is_playing).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('сокет-ивент с чужой позицией применяется целиком (seek с пульта)', async () => {
+    vi.useFakeTimers();
+    try {
+      const player = usePlayerStore();
+      player.applyServerState(
+        {
+          state: {
+            ...player.state,
+            current_snapshot: track,
+            is_playing: true,
+            position_seconds: 0,
+            position_updated_at: new Date().toISOString(),
+            active_device_id: 'uuid-1',
+            devices: [me],
+          },
+          queue: [],
+        } as never,
+        { force: true },
+      );
+      player.setAudioPlaying(true);
+      player.bindServerPlayback();
+      seekToMock.mockResolvedValue({
+        state: { ...player.state, version: player.state.version + 1 },
+        queue: [],
+      } as never);
+      await vi.advanceTimersByTimeAsync(10_000);
+
+      // Пульт seek'нул на 42: позиция не наша — активное устройство подчиняется.
+      player.applySocketState({
+        state: {
+          ...player.state,
+          position_seconds: 42,
+          position_updated_at: new Date().toISOString(),
+          version: player.state.version + 1,
+        },
+        queue: [],
+      });
+
+      expect(player.state.position_seconds).toBe(42);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

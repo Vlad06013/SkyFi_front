@@ -1,5 +1,4 @@
-import { Capacitor } from '@capacitor/core';
-import type { PluginListenerHandle } from '@capacitor/core';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { deleteDownloadFile, readDownloadFile, saveDownloadFile } from '@/lib/download-db';
 import { getSession } from '@/lib/session';
@@ -62,13 +61,17 @@ export async function openDownload(path: string, mime: string): Promise<string |
 }
 
 /**
- * Трек целиком в файл (POST снапшотом, api.md §7). На телефоне качает
- * нативный HTTP (OkHttp) — вне пула соединений WebView: XHR-закачка
- * десятков мегабайт встаёт в общую очередь и глушит зонд, heartbeat и API
- * (приложение уходило в офлайн ровно на время скачивания). Прогресс —
- * событием плагина. Во временный `.part`: обрыв не оставляет файл, который
- * стор считал бы скачанным. Отмена по signal не рвёт нативный запрос
- * (плагин не умеет): файл докачивается фоном и выбрасывается.
+ * Трек целиком в файл (POST снапшотом, api.md §7). На телефоне шлём
+ * CapacitorHttp: нативный стек вне пула соединений WebView (XHR-закачка
+ * десятков мегабайт встаёт в общую очередь и глушит зонд, heartbeat и API —
+ * приложение уходило в офлайн ровно на время скачивания). Filesystem
+ * .downloadFile здесь не подходит: в его нативном коде тело запроса не
+ * пишется вообще (поля data нет), POST уходил пустым и бэк отвечал 422.
+ * Во временный `.part`: обрыв не оставляет файл, который стор считал бы
+ * скачанным. Прогресс по байтам плагин не шлёт — отчёт одним финальным
+ * вызовом. Отмена по signal не рвёт нативный запрос (плагин не умеет):
+ * файл докачивается фоном и выбрасывается.
+ * @returns размер сохранённого файла в байтах.
  */
 export async function downloadTrackFile(
   url: string,
@@ -76,41 +79,59 @@ export async function downloadTrackFile(
   path: string,
   signal: AbortSignal,
   onProgress?: (loaded: number, total: number) => void,
-): Promise<void> {
+): Promise<number> {
   if (signal.aborted) throw new DOMException('aborted', 'AbortError');
   const stored = await getSession();
-  let listener: PluginListenerHandle | null = null;
-  if (onProgress) {
-    listener = await Filesystem.addListener('progress', (event) => {
-      if (event.url !== url) return;
-      onProgress(event.bytes, event.contentLength);
-    });
-  }
   const part = `${path}.part`;
   try {
-    await Filesystem.downloadFile({
-      url,
+    const response = await CapacitorHttp.request({
       method: 'POST',
-      // Строкой, а не объектом: плагин сериализует data по-своему и бэк
-      // ловил 422 «The type field is required».
-      data: JSON.stringify(data),
+      url,
+      data,
       headers: {
         'Content-Type': 'application/json',
         ...(stored?.token ? { Authorization: `Bearer ${stored.token}` } : {}),
       },
-      path: part,
-      directory: Directory.External,
-      recursive: true,
-      progress: Boolean(onProgress),
+      responseType: 'arraybuffer',
     });
     if (signal.aborted) throw new DOMException('aborted', 'AbortError');
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`HTTP ${response.status}: ${errorBodyText(response.data)}`);
+    }
+    // Нативно arraybuffer возвращается base64-строкой — прямо в writeFile.
+    await Filesystem.writeFile({
+      path: part,
+      data: response.data as string,
+      directory: Directory.External,
+      recursive: true,
+    });
     await Filesystem.rename({ from: part, to: path, directory: Directory.External, toDirectory: Directory.External });
     forgetPlayable(path);
+    const size = (await Filesystem.stat({ path, directory: Directory.External })).size;
+    onProgress?.(size, size);
+    return size;
   } catch (cause) {
     await Filesystem.deleteFile({ path: part, directory: Directory.External }).catch(() => undefined);
     throw cause;
-  } finally {
-    await listener?.remove();
+  }
+}
+
+/** Тело не-2xx ответа в текст: Laravel 422 кладёт ошибки валидации в JSON. */
+function errorBodyText(data: unknown): string {
+  try {
+    const text =
+      typeof data === 'string'
+        ? new TextDecoder().decode(Uint8Array.from(atob(data), (ch) => ch.charCodeAt(0)))
+        : JSON.stringify(data);
+    const parsed = JSON.parse(text) as { message?: string; errors?: Record<string, string[]> };
+    const fields = parsed.errors
+      ? Object.entries(parsed.errors)
+          .map(([field, messages]) => `${field}: ${messages.join(', ')}`)
+          .join('; ')
+      : '';
+    return `${parsed.message ?? ''} ${fields}`.trim().slice(0, 300) || text.slice(0, 300);
+  } catch {
+    return String(data).slice(0, 300);
   }
 }
 

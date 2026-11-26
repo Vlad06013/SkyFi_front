@@ -266,6 +266,9 @@ export function useAudioPlayback() {
       // Гейт по факту (appliedKey): пока летит ссылка, в элементе ещё старый
       // трек — seek'ать его по позиции нового нельзя.
       if (!player.effectiveCurrent || snapshotKey(player.effectiveCurrent) !== appliedKey) return;
+      console.debug(
+        `[audio] подгонка: стор ${position.toFixed(2)}, элемент ${el.currentTime.toFixed(2)}, ключ ${appliedKey}`,
+      );
       const ended = el.ended;
       const forced = previous != null && generation !== previous[1];
       if (

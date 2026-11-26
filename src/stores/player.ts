@@ -339,6 +339,9 @@ export const usePlayerStore = defineStore('player', () => {
     serverStateApplied = true;
     applyingServer = true;
     state.value = payload.state;
+    // Полная подмена — результат чужой команды (или холодного старта):
+    // позиция сервера теперь такая, следующие broadcast'ы будут нести её же.
+    lastPositionPushSeconds = payload.state.position_seconds;
     applyClipsEnabled(payload.state.clips_enabled);
     // Сокет-репорты позиции несут ту же очередь — не пересоздаём массив,
     // чтобы список очереди не перерисовывался на каждый репорт.
@@ -372,8 +375,9 @@ export const usePlayerStore = defineStore('player', () => {
    *  (версию, очередь, режимы, активное устройство) берём с сервера, а свой
    *  трек/позицию/is_playing протухшим замером не подменяем — ивент шлётся
    *  и по регистрации устройства, с позицией последнего репорта, и её
-   *  применение дёргало бы звук назад. Свежий штамп позиции (пульт seek'нул,
-   *  транспорт не совпал) — признак чужой команды: такой стейт целиком. */
+   *  применение дёргало бы звук назад. Транспорт совпал и позиция в стейте —
+   *  та, что мы сами отправляли (последний репорт/seek), — слияние. Позиция
+   *  чужая (пульт seek'нул/поставил паузу) или транспорт не совпал — целиком. */
   function applySocketState(payload: PlayerStatePayload) {
     if (!payload?.state) return;
     if (serverStateApplied && payload.state.version <= state.value.version) return;
@@ -385,9 +389,17 @@ export const usePlayerStore = defineStore('player', () => {
         (theirs.current_snapshot ? snapshotKey(theirs.current_snapshot) : '') ===
           (mine.current_snapshot ? snapshotKey(mine.current_snapshot) : '');
       if (sameTransport) {
-        const mineStamp = Date.parse(mine.position_updated_at ?? '') || 0;
-        const theirsStamp = Date.parse(theirs.position_updated_at ?? '') || 0;
-        if (theirsStamp <= mineStamp + 1000) {
+        // Позиция, которую мы сами отправляли (репорт/seek), а штамп сервер
+        // свежит при любом broadcast'е: по штампу такой ивент не отличить
+        // от чужой команды, а force-применение отматывало играющий элемент
+        // к округлённому репорту («буксование»). Своя позиция — слиянием.
+        const ownPosition =
+          lastPositionPushSeconds == null || Math.abs(theirs.position_seconds - lastPositionPushSeconds) <= 1.5;
+        console.debug(
+          `[player] socket ${ownPosition ? 'merged (своя позиция)' : 'force (чужая позиция)'}` +
+            ` позиция=${theirs.position_seconds} push=${lastPositionPushSeconds} версия=${theirs.version}`,
+        );
+        if (ownPosition) {
           applyServerStateMerged(payload);
           return;
         }
@@ -655,11 +667,17 @@ export const usePlayerStore = defineStore('player', () => {
     // position_seconds тогда не стреляет, и сброс не доходит до звука.
     mediaSeek.value += 1;
     if (!canCommand.value || offlinePlayback()) return;
+    const prevPush = lastPositionPushSeconds;
+    lastPositionPushSeconds = 0;
     try {
       const payload = await withDevice((fields) => playerApi.seekTo(0, fields));
-      if (!payload) return;
+      if (!payload) {
+        lastPositionPushSeconds = prevPush;
+        return;
+      }
       applyServerState(payload, { force: true });
     } catch (cause) {
+      lastPositionPushSeconds = prevPush;
       toast.show(errorText(cause, 'Не удалось перезапустить трек'), '', true);
     }
   }
@@ -738,6 +756,10 @@ export const usePlayerStore = defineStore('player', () => {
       };
       anchorPosition();
     }
+    // /play стартует трек с 0 и на сервере: housekeeping-broadcast'ы будут
+    // нести 0 — позиция наша, слияние по владению, не подмена.
+    const prevPush = lastPositionPushSeconds;
+    lastPositionPushSeconds = 0;
     try {
       const extra: { context_ref?: string | null; shuffle_seed?: string | null } = {
         shuffle_seed: opts.rollSeed === false ? undefined : crypto.randomUUID(),
@@ -745,6 +767,7 @@ export const usePlayerStore = defineStore('player', () => {
       if (contextRef !== undefined) extra.context_ref = contextRef;
       const payload = await withDevice((fields) => playerApi.playSnapshot(snapshot, playbackSource, fields, extra));
       if (!payload) {
+        lastPositionPushSeconds = prevPush;
         if (optimistic) {
           state.value = prevState;
           anchorPosition();
@@ -754,6 +777,7 @@ export const usePlayerStore = defineStore('player', () => {
       }
       applyServerState(payload, { force: true });
     } catch (cause) {
+      lastPositionPushSeconds = prevPush;
       if (optimistic) {
         state.value = prevState;
         anchorPosition();
@@ -885,13 +909,16 @@ export const usePlayerStore = defineStore('player', () => {
       position_updated_at: new Date().toISOString(),
     };
     anchorPosition();
+    const prevPush = lastPositionPushSeconds;
     try {
+      if (wasPlaying) lastPositionPushSeconds = Math.round(extrapolatedPosition.value);
       const payload = await withDevice((fields) =>
         wasPlaying
           ? playerApi.pausePlayback(fields, Math.round(extrapolatedPosition.value))
           : playerApi.resumePlayback(fields),
       );
       if (!payload) {
+        lastPositionPushSeconds = prevPush;
         state.value = {
           ...state.value,
           is_playing: wasPlaying,
@@ -903,6 +930,7 @@ export const usePlayerStore = defineStore('player', () => {
       }
       applyServerState(payload, { force: true });
     } catch (cause) {
+      lastPositionPushSeconds = prevPush;
       state.value = {
         ...state.value,
         is_playing: wasPlaying,
@@ -981,14 +1009,26 @@ export const usePlayerStore = defineStore('player', () => {
   /** Свой ориентир для периодичности: слияние по владению position_seconds не
    *  пересаживает, сравнивать с ним было бы «отставанием от протухшего замера». */
   let lastReportedSeconds = 0;
+  /**
+   * Последняя позиция, которую мы сами отправили на сервер (периодический
+   * репорт, seek, пауза с позицией, /play). Бэк свежит position_updated_at
+   * в каждом broadcast'е (регистрация устройства, presence-планировщик),
+   * а позиция в нём — последний репорт: по одному штампу такой ивент
+   * не отличить от seek'а с пульта. Отличник — совпадение позиции
+   * с нашей последней отправкой.
+   */
+  let lastPositionPushSeconds: number | null = null;
 
   async function reportPosition() {
     const now = Date.now();
     if (now - lastReportAt < POSITION_REPORT_INTERVAL_MS) return;
     const seconds = Math.round(extrapolatedPosition.value);
     if (Math.abs(seconds - lastReportedSeconds) < POSITION_REPORT_INTERVAL_MS / 1000) return;
+    console.debug(`[player] report: шлём ${seconds} с (прошлый репорт ${lastReportedSeconds})`);
     lastReportAt = now;
     lastReportedSeconds = seconds;
+    const prevPush = lastPositionPushSeconds;
+    lastPositionPushSeconds = seconds;
     try {
       // Ответ на свой репорт: координация из сервера, а position_seconds
       // пишем локальную точную — не округлённый серверный замер (протухает
@@ -1005,6 +1045,7 @@ export const usePlayerStore = defineStore('player', () => {
       };
       anchorPosition();
     } catch {
+      lastPositionPushSeconds = prevPush;
       /* следующий тик повторит */
     }
   }
@@ -1107,10 +1148,13 @@ export const usePlayerStore = defineStore('player', () => {
   function pauseToServer() {
     const fields = echo();
     if (!fields) return;
+    const prevPush = lastPositionPushSeconds;
+    lastPositionPushSeconds = Math.round(extrapolatedPosition.value);
     void playerApi
       .pausePlayback(fields, Math.round(extrapolatedPosition.value))
       .then((payload) => applyServerState(payload, { force: true }))
       .catch(() => {
+        lastPositionPushSeconds = prevPush;
         /* следующий виток догонит */
       });
   }
@@ -1424,7 +1468,12 @@ export const usePlayerStore = defineStore('player', () => {
     const seconds = Math.round(pendingSeekSeconds);
     pendingSeekSeconds = null;
     if (!canCommand.value || offlinePlayback()) return;
+    const prevPush = lastPositionPushSeconds;
+    lastPositionPushSeconds = seconds;
     void withDevice((fields) => playerApi.seekTo(seconds, fields)).catch((cause) => {
+      // Позиция на бэк не доехала: метка «наша позиция у сервера» неверна,
+      // иначе следующий housekeeping-ивент снялся бы как чужой seek.
+      lastPositionPushSeconds = prevPush;
       toast.show(errorText(cause, 'Не удалось перемотать'), '', true);
     });
   }
