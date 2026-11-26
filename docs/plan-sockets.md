@@ -119,7 +119,7 @@ src/types/realtime.ts — payload-типы из contracts.md
 - [x] Локальный uuid устройства: `lib/device.ts`, генерация при первом
       старте, хранение в Preferences (пара: uuid + серверный id).
 - [x] `stores/devices.ts`: регистрация при auth+online, heartbeat 30 с
-      (пауза в фоне на нативе), мутации списка (сокет + API), activate
+      (в фоне тоже), мутации списка (сокет + API), activate
       оптимистично с откатом, reset по logout.
 - [x] Слой realtime: `echo.ts` (Reverb из env, авторизация каналов
       сырым axios на `/broadcasting/auth`), `index.ts` (start/stop по

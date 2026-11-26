@@ -10,6 +10,7 @@ import { onUnauthorized } from '@/api/http';
 import { bindSessionRealtime } from '@/realtime';
 import { useAudioPlayback } from '@/composables/useAudioPlayback';
 import { bindMediaKeys } from '@/lib/media-keys';
+import { bindMediaSession } from '@/lib/media-session';
 import { useStreamPrefetch } from '@/composables/useStreamPrefetch';
 import { getClipVideoElement, useVideoPlayback } from '@/composables/useVideoPlayback';
 import { useAuthStore } from '@/stores/auth';
@@ -75,6 +76,8 @@ void resolveEndpoint().finally(() => {
     usePlayerStore(pinia).bindServerPlayback();
     useAudioPlayback();
     bindMediaKeys();
+    // Нативная медиасессия: foreground-service, иначе фон глушит звук.
+    bindMediaSession();
     useVideoPlayback();
     // Предзагрузка stream URL: 2 трека вперёд/назад, только на активном (§9).
     useStreamPrefetch();

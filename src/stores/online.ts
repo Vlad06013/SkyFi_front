@@ -41,21 +41,19 @@ export const useOnlineStore = defineStore('online', () => {
   }
 
   /**
-   * Глобальный поллер на весь жизненный цикл приложения.
-   * На нативе в фоне таймер глушим (JS throttling всё равно
-   * ломал бы ритм) и проверяем сразу при возврате.
+   * Глобальный поллер на весь жизненный цикл, в том числе в фоне.
+   * Иначе свёрнутое приложение застывает в прошлом «онлайн» или,
+   * наоборот, не видит, что сеть жива. При возврате на экран
+   * проверяем сразу, не дожидаясь следующего тика.
    */
   async function startPolling() {
     await check();
     startInterval();
     if (!Capacitor.isNativePlatform() || stateListener) return;
     stateListener = await App.addListener('appStateChange', ({ isActive }) => {
-      if (isActive) {
-        void check();
-        startInterval();
-      } else {
-        stopInterval();
-      }
+      if (!isActive) return;
+      void check();
+      if (!timer) startInterval();
     });
   }
 

@@ -16,13 +16,13 @@
 | Роутер + гварды | ✅ | Гвард ждёт bootstrap (сплэш → health → сессия), requiresAuth/guestOnly, redirect-query |
 | `api/` HTTP-клиент | ✅ | axios-инстанс, обёртка `{errors,data}`, `ApiError` (401/422/429/404/5xx/сеть), Bearer из сессии, хук `onUnauthorized` |
 | Сокеты (Echo + Reverb) | 🟡 | Слой `src/realtime/` (Echo+Reverb, авторизация `/broadcasting/auth`, эхо-глушение, dedup, старт/стоп по сессии); свой канал: `playback.device.*`, `friendship.request.sent/accepted`, `friend.queue.item.added`, `share.sent` — проверено живьём end-to-end. Дальше по docs/plan-sockets.md: этап 3 — плеер |
-| Регистрация устройства / heartbeat | ✅ | uuid в Preferences + `POST /player/devices` (идемпотентно), серверный id для эхо-полей; heartbeat 30 с на `/player/devices/heartbeat` (пауза в фоне на нативе); стор `stores/devices` |
+| Регистрация устройства / heartbeat | ✅ | uuid в Preferences + `POST /player/devices` (идемпотентно), серверный id для эхо-полей; heartbeat 30 с на `/player/devices/heartbeat`, в фоне тоже; стор `stores/devices` |
 | Аудио-движок (`<audio>`, потоки, get-url, TTL-кеш) | ❌ | Позиция/прогресс не тикают, воспроизведения нет |
 | Видео-движок (`<video>`, streams, качества) | ❌ | Только фон-картинка в клип-режиме |
 | Локальное хранилище (Dexie/Preferences) | 🟡 | Токен+профиль персистятся в `@capacitor/preferences` (офлайн-вход); кеш избранного, история поиска, очередь мутаций — нет |
 | MediaSession (кнопки руля, BT, экран блокировки) | ❌ | Зависимость @capgo/capacitor-media-session есть |
 | Фоновое воспроизведение / аудиофокус | ❌ | |
-| Офлайн-детект (`GET /health` + сокет) | ✅ | Поллер `/health` каждые 10 с (таймаут 5 с), пауза в фоне на нативе; состояние в `stores/online`, баннер «Нет соединения» на входе; на главной — пилюля «Офлайн-режим», при восстановлении — тост «Соединение восстановлено» (5 с) |
+| Офлайн-детект (`GET /health` + сокет) | ✅ | Поллер `/health` каждые 10 с (таймаут 5 с), в фоне тоже; состояние в `stores/online`, баннер «Нет соединения» на входе; на главной — пилюля «Офлайн-режим», при восстановлении — тост «Соединение восстановлено» (5 с) |
 | Тесты | ✅ | vitest 170 юнитов (api, сторы, гвард, страницы, реестр снапшотов), cypress e2e 3 спеки против живого бэка (auth, правки auth, поиск+детали с проверкой целого снапшота) |
 | Конвенция «папка = X.vue + X.ts + X.css» | 🟡 | Новые единицы по схеме (AppSplash, QrConfirm, Login.css); старые единые `.vue` не тронуты |
 

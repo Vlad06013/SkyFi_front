@@ -84,13 +84,7 @@ export const useDevicesStore = defineStore('devices', () => {
 
   function startHeartbeat(uuid: string) {
     stopHeartbeat();
-    heartbeatTimer = setInterval(() => {
-      void devicesApi.sendHeartbeat(uuid).catch((cause: unknown) => {
-        if (!isUnknownDevice(cause)) return;
-        registered.value = false;
-        void registerPresence();
-      });
-    }, HEARTBEAT_INTERVAL_MS);
+    heartbeatTimer = setInterval(() => beat(uuid), HEARTBEAT_INTERVAL_MS);
   }
 
   function stopHeartbeat() {
@@ -155,10 +149,19 @@ export const useDevicesStore = defineStore('devices', () => {
     stopPresence();
   }
 
+  function beat(uuid: string) {
+    void devicesApi.sendHeartbeat(uuid).catch((cause: unknown) => {
+      if (!isUnknownDevice(cause)) return;
+      registered.value = false;
+      void registerPresence();
+    });
+  }
+
   /**
    * Привязка к сессии и сети: регистрация и heartbeat живут, пока есть
-   * авторизация и онлайн. На нативе heartbeat глушим в фоне (JS-таймеры
-   * там всё равно троттлятся) и продлеваем presence при возврате.
+   * авторизация и онлайн. В фоне интервал не останавливаем: без отметок
+   * бэк считает устройство офлайн и снимает active_device_id. Уход в фон
+   * шлёт отметку сразу. Возврат на экран регистрирует заново.
    */
   function bindPresence() {
     const auth = useAuthStore();
@@ -183,7 +186,9 @@ export const useDevicesStore = defineStore('devices', () => {
     // Листенер живёт весь жизненный цикл приложения — ссылку не храним.
     void App.addListener('appStateChange', ({ isActive }) => {
       if (!isActive) {
-        stopHeartbeat();
+        if (useAuthStore().isAuthed && useOnlineStore().isOnline === true && myDeviceUuid.value) {
+          beat(myDeviceUuid.value);
+        }
         return;
       }
       // Presence протухает в фоне, а регистрация при входе этого не чинит.

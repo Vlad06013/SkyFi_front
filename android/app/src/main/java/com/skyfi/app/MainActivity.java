@@ -1,8 +1,14 @@
 package com.skyfi.app;
 
+import android.Manifest;
+import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
+
+import androidx.core.content.ContextCompat;
 
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -41,11 +47,27 @@ public class MainActivity extends BridgeActivity {
         ViewCompat.requestApplyInsets(content);
         content.postDelayed(this::publishSafeArea, 400);
         content.postDelayed(this::publishSafeArea, 1500);
+        askNotificationPermission();
+    }
+
+    /** Уведомление плеера с API 33. Без разрешения сервис жив, шторки нет. */
+    private void askNotificationPermission() {
+        if (Build.VERSION.SDK_INT < 33) return;
+        if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return;
+        requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 41);
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        // Сворачивание. Сервис держит процесс: сокет, скачивание, уведомления.
+        ContextCompat.startForegroundService(this, new Intent(this, ConnectionService.class));
     }
 
     @Override
     public void onResume() {
         super.onResume();
+        stopService(new Intent(this, ConnectionService.class));
         View content = findViewById(android.R.id.content);
         if (content != null) {
             ViewCompat.requestApplyInsets(content);
