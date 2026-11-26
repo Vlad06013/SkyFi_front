@@ -22,8 +22,9 @@ export interface EndpointTarget {
  */
 /**
  * `VITE_IS_LOCAL_FORCE=true` — не спрашивать внешний IP, сразу домашняя пара.
- * Ручной override на случай сбоя ipify: в dev распознавание работает и с
- * https-страницы (трафик идёт через прокси vite), флаг не обязателен.
+ * Ручной override на случай сбоя ipify, только для dev (браузер этой машины):
+ * в прод-сборке флаг игнорируется — иначе зашитая в APK «всегда локалка»
+ * оставила бы телефон без сети вне домашнего Wi‑Fi.
  */
 export function isLocalForce(value: string | undefined): boolean {
   return value === 'true';
@@ -67,7 +68,7 @@ function localConfigUrl(): URL | null {
 }
 
 function localForced(): boolean {
-  return isLocalForce(import.meta.env.VITE_IS_LOCAL_FORCE);
+  return import.meta.env.DEV && isLocalForce(import.meta.env.VITE_IS_LOCAL_FORCE);
 }
 
 function localAllowed(): boolean {
