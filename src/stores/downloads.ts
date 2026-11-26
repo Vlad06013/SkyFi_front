@@ -1,7 +1,8 @@
 import axios from 'axios';
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
-import { fetchAudioFile } from '@/api/audio';
+import { Capacitor } from '@capacitor/core';
+import { audioFileUrl, fetchAudioFile } from '@/api/audio';
 import { fetchEntityDetails } from '@/api/details';
 import { clearLocalCover, setLocalCover } from '@/lib/cover';
 import { resolveUrl } from '@/lib/endpoints';
@@ -17,7 +18,7 @@ import {
   type LinkRecord,
   type TrackRecord,
 } from '@/lib/download-db';
-import { openDownload, removeDownload, saveCoverFromUrl, writeDownload } from '@/lib/download-files';
+import { downloadTrackFile, openDownload, removeDownload, saveCoverFromUrl, writeDownload } from '@/lib/download-files';
 import { collectionPercent, savedCollection } from '@/lib/collection-progress';
 import { collectionSearchQuery, searchDownloads, trackSearchQuery } from '@/lib/download-search';
 import { coverFilePath, entityKey, isCollection, linkId, trackFilePath, type CollectionSnapshot } from '@/lib/download-keys';
@@ -227,15 +228,26 @@ export const useDownloadsStore = defineStore('downloads', () => {
     const job = (async () => {
       markBytes(key, 0, 0);
       const fileSignal = bindStop(signal);
-      const bytes = await fetchAudioFile(snapshot, fileSignal, (loaded, total) => markBytes(key, loaded, total));
-      if (fileSignal.aborted) aborted();
       const path = trackFilePath(snapshot);
-      await writeDownload(path, bytes, 'audio/mpeg');
+      let size = 0;
+      if (Capacitor.isNativePlatform()) {
+        // Нативный OkHttp: закачка через XHR встаёт в пул WebView рядом с
+        // зондом/heartbeat и уводила приложение в офлайн на всё её время.
+        await downloadTrackFile(audioFileUrl(), snapshot, path, fileSignal, (loaded, total) => {
+          size = loaded;
+          markBytes(key, loaded, total);
+        });
+      } else {
+        const bytes = await fetchAudioFile(snapshot, fileSignal, (loaded, total) => markBytes(key, loaded, total));
+        if (fileSignal.aborted) aborted();
+        size = bytes.byteLength;
+        await writeDownload(path, bytes, 'audio/mpeg');
+      }
       const row: TrackRecord = {
         key,
         snapshot,
         path,
-        bytes: bytes.byteLength,
+        bytes: size,
         coverPath: null,
         coverMime: null,
         downloadedAt: Date.now(),

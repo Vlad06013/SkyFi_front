@@ -1,5 +1,11 @@
 import { http } from '@/api/http';
+import { currentEndpoint } from '@/lib/endpoints';
 import type { AnySnapshot } from '@/types';
+
+/** Абсолютный URL скачивания файла — для нативного HTTP вне axios/WebView-пула. */
+export function audioFileUrl(): string {
+  return new URL('audio/file', currentEndpoint().apiUrl).toString();
+}
 
 /** Временная ссылка на поток (api.md §7): ссылку не хранить — запрашивать заново по снапшоту. */
 export function fetchAudioUrl(snapshot: AnySnapshot, signal?: AbortSignal) {

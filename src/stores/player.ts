@@ -784,6 +784,12 @@ export const usePlayerStore = defineStore('player', () => {
         kickEngine();
         return;
       }
+      // Нескачанный трек в офлайне играть нечем: без гарда тогл пускал
+      // прогресс «в никуда» — ползунок бежал, а звука не было.
+      if (!state.value.is_playing && (!state.value.current_snapshot || !offlinePlayable(state.value.current_snapshot))) {
+        toast.show('Трек не скачан', 'в офлайне играет только скачанное', true);
+        return;
+      }
       state.value = {
         ...state.value,
         is_playing: !state.value.is_playing,
@@ -848,6 +854,9 @@ export const usePlayerStore = defineStore('player', () => {
     }
     if (!canCommand.value || offlinePlayback()) {
       if (!wantPlaying) cancelPendingSeek();
+      // Играть нескачанное в офлайне нечем — иначе «play» без звука,
+      // с бегущим ползунком (то же, что закрыли в togglePlay).
+      if (wantPlaying && (!state.value.current_snapshot || !offlinePlayable(state.value.current_snapshot))) return;
       state.value = {
         ...state.value,
         is_playing: wantPlaying,
@@ -1635,6 +1644,25 @@ export const usePlayerStore = defineStore('player', () => {
   function bindServerPlayback() {
     startPositionTicker();
     const auth = useAuthStore();
+    // Сервер обнуляет active_device_id, когда presence активного протухает
+    // (api.md §4, планировщик раз в минуту): сеть могла задушить heartbeat
+    // на время, а мы остаёмся фактическим активным — звук идёт, а стейт уже
+    // «пульт», движок глушит поток посреди воспроизведения. Возвращаем себе
+    // активность; чужую (другой uuid) не перехватываем — выбор пользователя.
+    let reactivating = false;
+    watch(isActiveDevice, async (active, was) => {
+      if (active || was !== true || reactivating) return;
+      if (!audioPlaying.value || !canCommand.value || offlinePlayback()) return;
+      if (state.value.active_device_id != null) return;
+      const uuid = useDevicesStore().myDeviceUuid;
+      if (!uuid) return;
+      reactivating = true;
+      try {
+        await activateDevice(uuid);
+      } finally {
+        reactivating = false;
+      }
+    });
     watch(
       () => [auth.isAuthed, useOnlineStore().isOnline] as const,
       ([authed, online]) => {

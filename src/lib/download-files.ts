@@ -1,6 +1,8 @@
 import { Capacitor } from '@capacitor/core';
+import type { PluginListenerHandle } from '@capacitor/core';
 import { Directory, Filesystem } from '@capacitor/filesystem';
 import { deleteDownloadFile, readDownloadFile, saveDownloadFile } from '@/lib/download-db';
+import { getSession } from '@/lib/session';
 
 const playable = new Map<string, string>();
 
@@ -59,8 +61,58 @@ export async function openDownload(path: string, mime: string): Promise<string |
   return url;
 }
 
-/** Обложка по прямой ссылке. На телефоне — нативный GET, CORS Яндекса его не режет. */
-export async function saveCoverFromUrl(url: string, path: string, signal: AbortSignal): Promise<string | null> {
+/**
+ * Трек целиком в файл (POST снапшотом, api.md §7). На телефоне качает
+ * нативный HTTP (OkHttp) — вне пула соединений WebView: XHR-закачка
+ * десятков мегабайт встаёт в общую очередь и глушит зонд, heartbeat и API
+ * (приложение уходило в офлайн ровно на время скачивания). Прогресс —
+ * событием плагина. Во временный `.part`: обрыв не оставляет файл, который
+ * стор считал бы скачанным. Отмена по signal не рвёт нативный запрос
+ * (плагин не умеет): файл докачивается фоном и выбрасывается.
+ */
+export async function downloadTrackFile(
+  url: string,
+  data: unknown,
+  path: string,
+  signal: AbortSignal,
+  onProgress?: (loaded: number, total: number) => void,
+): Promise<void> {
+  if (signal.aborted) throw new DOMException('aborted', 'AbortError');
+  const stored = await getSession();
+  let listener: PluginListenerHandle | null = null;
+  if (onProgress) {
+    listener = await Filesystem.addListener('progress', (event) => {
+      if (event.url !== url) return;
+      onProgress(event.bytes, event.contentLength);
+    });
+  }
+  const part = `${path}.part`;
+  try {
+    await Filesystem.downloadFile({
+      url,
+      method: 'POST',
+      data,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(stored?.token ? { Authorization: `Bearer ${stored.token}` } : {}),
+      },
+      path: part,
+      directory: Directory.External,
+      recursive: true,
+      progress: Boolean(onProgress),
+    });
+    if (signal.aborted) throw new DOMException('aborted', 'AbortError');
+    await Filesystem.rename({ from: part, to: path, directory: Directory.External, toDirectory: Directory.External });
+    forgetPlayable(path);
+  } catch (cause) {
+    await Filesystem.deleteFile({ path: part, directory: Directory.External }).catch(() => undefined);
+    throw cause;
+  } finally {
+    await listener?.remove();
+  }
+}
+
+/** Обложка по прямой ссылке. На телефоне — нативный GET, CORS Яндекса его не режет. */export async function saveCoverFromUrl(url: string, path: string, signal: AbortSignal): Promise<string | null> {
   if (signal.aborted) throw new DOMException('aborted', 'AbortError');
   if (Capacitor.isNativePlatform()) {
     await Filesystem.downloadFile({
