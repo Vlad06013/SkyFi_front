@@ -1269,3 +1269,67 @@ describe('stores/player: офлайн', () => {
     vi.useRealTimers();
   });
 });
+
+
+describe('stores/player: позиционный репорт', () => {
+  const seekToMock = vi.mocked(playerApi.seekTo);
+  const me: PlayerDevice = {
+    device_uuid: 'uuid-1',
+    name: 'Мой телефон',
+    type: 'phone',
+    last_seen_at: null,
+  };
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    const auth = useAuthStore();
+    auth.user = { id: 1 } as never;
+    auth.token = 't';
+    useOnlineStore().isOnline = true;
+    useDevicesStore().myDeviceUuid = 'uuid-1';
+  });
+
+  it('репорт пишет локальную позицию в стейт — за окном доверия к штампу не схлопывается в 0', async () => {
+    vi.useFakeTimers();
+    try {
+      const player = usePlayerStore();
+      player.applyServerState(
+        {
+          state: {
+            ...player.state,
+            current_snapshot: track,
+            is_playing: true,
+            position_seconds: 0,
+            position_updated_at: new Date().toISOString(),
+            active_device_id: 'uuid-1',
+            devices: [me],
+          },
+          queue: [],
+        } as never,
+        { force: true },
+      );
+      player.setAudioPlaying(true);
+      player.bindServerPlayback();
+      seekToMock.mockResolvedValue({
+        state: { ...player.state, version: player.state.version + 1 },
+        queue: [],
+      } as never);
+
+      // Первый репорт (10 с): координация из ответа, position_seconds —
+      // локальная точная, а не застывший стартовый 0.
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(seekToMock).toHaveBeenCalledTimes(1);
+      expect(player.state.position_seconds).toBeGreaterThan(8);
+
+      // Раньше position_seconds застывал на 0: за окном доверия к штампу
+      // (30 с) экстраполяция схлопывалась в 0, и вотчер подгонки отматывал
+      // играющий элемент на старт песни.
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(player.positionSeconds).toBeGreaterThan(35);
+      expect(player.positionSeconds).toBeLessThan(45);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

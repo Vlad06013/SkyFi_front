@@ -206,7 +206,11 @@ export const usePlayerStore = defineStore('player', () => {
       // последнему репорту. Пульт и холодный старт — полная подмена зеркала.
       const mine = useDevicesStore().myDeviceUuid;
       const stillActive = serverStateApplied && mine != null && payload.state?.active_device_id === mine;
-      if (stillActive) applyServerStateMerged(payload);
+      // Фактический источник звука держим локальным и когда сервер уже
+      // обнулил active_device_id (presence протухло, пока сеть душила
+      // heartbeat): force-подмена серверным замером отматывала бы песню.
+      const playingHere = mine != null && audioPlaying.value && canCommand.value;
+      if (stillActive || playingHere) applyServerStateMerged(payload);
       else applyServerState(payload, { force: true });
     } catch {
       /* resync — лучшее, что могли */
@@ -225,6 +229,7 @@ export const usePlayerStore = defineStore('player', () => {
 
   function applyServerStateMerged(payload: PlayerStatePayload) {
     if (!payload?.state) return;
+    serverStateApplied = true;
     applyingServer = true;
     state.value = {
       ...payload.state,
@@ -260,7 +265,12 @@ export const usePlayerStore = defineStore('player', () => {
         toast.show('Устройство ещё не зарегистрировано', '', true);
         return false;
       }
-      applyServerState(payload, { force: true });
+      // Само-реактивация посреди воспроизведения: серверная позиция в ответе
+      // — последний репорт (до 10 с отстаёт), force-подмена отматывала бы
+      // играющий элемент. Факт воспроизведения остаётся локальным.
+      const mine = useDevicesStore().myDeviceUuid;
+      if (mine != null && deviceUuid === mine && audioPlaying.value) applyServerStateMerged(payload);
+      else applyServerState(payload, { force: true });
       return true;
     } catch (cause) {
       applyActiveDevice(prevActive);
@@ -980,10 +990,20 @@ export const usePlayerStore = defineStore('player', () => {
     lastReportAt = now;
     lastReportedSeconds = seconds;
     try {
-      // Ответ на свой репорт применяем слиянием: округлённая серверная копия
-      // протухает на RTT, force-подмена дёргала бы элемент назад вотчером seek.
+      // Ответ на свой репорт: координация из сервера, а position_seconds
+      // пишем локальную точную — не округлённый серверный замер (протухает
+      // на RTT). Иначе стейт застывает на 0/последнем seek'е, окно доверия
+      // к штампу (30 с) истекает посреди трека, экстраполяция схлопывается
+      // в 0 и вотчер подгонки швырял элемент на старт песни.
       const payload = await withDevice((fields) => playerApi.seekTo(seconds, fields));
-      if (payload) applyServerStateMerged(payload);
+      if (!payload) return;
+      applyServerStateMerged(payload);
+      state.value = {
+        ...state.value,
+        position_seconds: Math.round(extrapolatedPosition.value * 10) / 10,
+        position_updated_at: new Date().toISOString(),
+      };
+      anchorPosition();
     } catch {
       /* следующий тик повторит */
     }

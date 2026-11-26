@@ -91,7 +91,9 @@ export async function downloadTrackFile(
     await Filesystem.downloadFile({
       url,
       method: 'POST',
-      data,
+      // Строкой, а не объектом: плагин сериализует data по-своему и бэк
+      // ловил 422 «The type field is required».
+      data: JSON.stringify(data),
       headers: {
         'Content-Type': 'application/json',
         ...(stored?.token ? { Authorization: `Bearer ${stored.token}` } : {}),

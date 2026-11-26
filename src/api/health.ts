@@ -1,8 +1,8 @@
 import { http } from '@/api/http';
 import type { HealthPayload } from '@/types';
 
-/** Поллеру — с запасом: на холодном LTE рукопожатие легко съедает 5 с. */
-export const HEALTH_TIMEOUT_MS = 10_000;
+/** Поллеру — с запасом: на нестабильном LTE рукопожатие легко съедает 5–10 с. */
+export const HEALTH_TIMEOUT_MS = 15_000;
 
 /**
  * Офлайн-зонд (api.md §1.4): true только на осмысленный 200.
