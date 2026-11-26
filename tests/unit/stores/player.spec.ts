@@ -271,6 +271,27 @@ describe('stores/player: качество клипа', () => {
 
     expect(player.clipQuality).toBe(480);
   });
+
+  it('резолв следующего клипа не сбрасывает выбранное качество', () => {
+    const player = usePlayerStore();
+    player.setClipQuality(1080);
+
+    player.setClipResolved(track, clip, [{ quality: 720, url: 'https://cdn.test/720.mp4' }]);
+
+    expect(player.clipQuality).toBe(1080);
+    expect(player.clipHlsAuto).toBe(false);
+  });
+
+  it('режим «Авто» переживает резолв следующего клипа', () => {
+    const player = usePlayerStore();
+    player.setClipQuality(720);
+    player.setClipQualityAuto();
+
+    player.setClipResolved(track, clip, [{ quality: 720, url: 'https://cdn.test/720.mp4' }]);
+
+    expect(player.clipHlsAuto).toBe(true);
+    expect(player.clipQuality).toBe(720);
+  });
 });
 
 describe('stores/player: рассинхрон сервера с реальным воспроизведением', () => {
@@ -330,6 +351,38 @@ describe('stores/player: рассинхрон сервера с реальным
     expect(player.isPlaying).toBe(false);
     player.setAudioPlaying(true);
     expect(player.isPlaying).toBe(true);
+  });
+
+  it('isPlaying: резолв клипа — загрузка, а не рассинхрон: пауза не подменяется', async () => {
+    const player = desyncedPlayer();
+    // Инвалидация клипа сменой трека (clearClip) доигрывает до резолва.
+    await vi.advanceTimersByTimeAsync(0);
+    player.setClipResolving();
+
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(player.isPlaying).toBe(true);
+  });
+
+  it('isPlaying: прогрев потока — тоже загрузка, значок держит плей', async () => {
+    const player = desyncedPlayer();
+    player.setStreamWarming(true);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(player.isPlaying).toBe(true);
+  });
+
+  it('togglePlay во время резолва клипа — честная пауза, а не пинок движка', async () => {
+    const player = desyncedPlayer();
+    await vi.advanceTimersByTimeAsync(0);
+    player.setClipResolving();
+    pausePlaybackMock.mockResolvedValue({ state: { ...player.state, is_playing: false }, queue: [] } as never);
+
+    await player.togglePlay();
+
+    expect(pausePlaybackMock).toHaveBeenCalledTimes(1);
+    expect(player.engineKick).toBe(0);
   });
 
   it('isPlaying: пульт зеркалит сервер, пауза — сразу false', () => {

@@ -24,9 +24,19 @@ describe('lib/player-prefs', () => {
     await expect(readPlayerDevicePrefs()).resolves.toBeNull();
   });
 
-  it('пишет и читает громкость (кламп 0–100)', async () => {
-    await writePlayerDevicePrefs({ volume: 140 });
-    await expect(readPlayerDevicePrefs()).resolves.toEqual({ volume: 100 });
+  it('пишет и читает громкость (кламп 0–100) и качество клипа', async () => {
+    await writePlayerDevicePrefs({ volume: 140, clipQuality: 1080, clipHlsAuto: false });
+    await expect(readPlayerDevicePrefs()).resolves.toEqual({ volume: 100, clipQuality: 1080, clipHlsAuto: false });
+  });
+
+  it('запись старого формата (только громкость) — дефолты качества', async () => {
+    memory.set('skyfi.player-prefs', JSON.stringify({ volume: 55 }));
+    await expect(readPlayerDevicePrefs()).resolves.toEqual({ volume: 55, clipQuality: null, clipHlsAuto: true });
+  });
+
+  it('невалидное качество отбрасывается, auto по умолчанию', async () => {
+    memory.set('skyfi.player-prefs', JSON.stringify({ volume: 50, clipQuality: 99999, clipHlsAuto: 'да' }));
+    await expect(readPlayerDevicePrefs()).resolves.toEqual({ volume: 50, clipQuality: null, clipHlsAuto: true });
   });
 
   it('битая запись — null', async () => {

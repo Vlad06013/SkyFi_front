@@ -1,9 +1,12 @@
 import { ref, watch } from 'vue';
 import { fetchVideoStreams, resolveVideo } from '@/api/videos';
-import type { VideoHls } from '@/api/videos';
+import type { VideoHls, VideoStream } from '@/api/videos';
 import { ApiError } from '@/api/http';
+import { getCachedClipResolve, cacheClipResolve, invalidateClipResolve } from '@/lib/clip-resolve-cache';
+import { bufferAheadSeconds } from '@/lib/buffer-ranges';
 import { resolveUrl } from '@/lib/endpoints';
-import { hlsDetach, hlsLoad, hlsResume, hlsSetAudioTrack, hlsSetQuality, hlsSupported, setHlsHooks } from '@/lib/hls-engine';
+import { hlsDetach, hlsLoad, hlsResume, hlsSetAudioTrack, hlsSetQuality, hlsStatus, hlsSupported, setHlsHooks } from '@/lib/hls-engine';
+import { registerHealthActivity } from '@/lib/health-log';
 import { noteExternalTransport, runOwned, runOwnedAsync } from '@/lib/media-keys';
 import { afterMediaUnlock, isAutoplayBlocked, markAutoplayBlocked } from '@/lib/media-unlock';
 import { snapshotKey } from '@/lib/playback-engine';
@@ -209,6 +212,25 @@ setHlsHooks({
   onError: () => handleStreamError(),
   onHeights: (heights) => usePlayerStore().setClipHlsHeights(heights),
   onAudioTracks: (tracks) => usePlayerStore().setClipAudioTracks(tracks),
+});
+
+// Диагностика буфера клипа (bugs-player.md): запас вперёд от плейхеда,
+// играющая ступень HLS, ретраи/фолбэк — видно в «Настройки → Диагностика
+// сети», что именно стоит за немым «буфер» в момент сталла.
+registerHealthActivity('клип', () => {
+  const store = usePlayerStore();
+  if (!store.clipActive) return null;
+  const parts: string[] = [];
+  const el = getClipVideoElement();
+  if (el && Number.isFinite(el.currentTime)) {
+    parts.push(`запас ${bufferAheadSeconds(el.buffered, el.currentTime).toFixed(0)}с`);
+  }
+  const status = hlsStatus();
+  if (status.height != null) parts.push(`HLS ${status.height}p`);
+  if (streamRetries > 0) parts.push('ретрай get-url');
+  if (progressiveOnlyKey != null && progressiveOnlyKey === appliedKey) parts.push('прогрессив-фолбэк');
+  if (status.error) parts.push(`сбой: ${status.error}`);
+  return parts.length ? parts.join(' · ') : null;
 });
 
 export function setClipHost(el: HTMLElement | null) {
@@ -431,6 +453,10 @@ function handleStreamError() {
     reapplyStreams();
     return;
   }
+  // Видео умерло совсем: выкидываем маппинг из сессионного кеша резолва —
+  // бэк при 404 потоков сносит свой (GetVideoStreams), следующий заход
+  // честно перерезолвит трек, а не возьмёт мёртвое видео из кеша.
+  if (store.current?.type === 'track') invalidateClipResolve(store.current);
   store.setClipUnavailable();
   useToastStore().show('Клип недоступен, продолжаем аудио', '', true);
 }
@@ -658,6 +684,22 @@ export function useVideoPlayback() {
     }
   }
 
+  /** Применить результат резолва (сетевой или из кеша): клип закрепляется за треком. */
+  function applyClipResolve(track: TrackSnapshot, video: VideoSnapshot | null, streams: VideoStream[], ttlSec?: number) {
+    if (!video) {
+      player.setClipUnavailable();
+      clipBuffering.value = false;
+      return;
+    }
+    player.setClipResolved(track, video, streams);
+    if (ttlSec != null) scheduleTtlRefresh(ttlSec, video);
+    void loadVideo(video);
+    // В resolve нет hls (api.md §8): streams — для немедленного старта,
+    // полный ответ с манифестом добираем get-url сразу — движок подменит
+    // источник на HLS с той же позиции.
+    void refreshStreams(video);
+  }
+
   /** Резолв «трек → видео»: video null — честно «клипа нет», остаёмся на аудио. */
   async function resolveClip(track: TrackSnapshot) {
     const key = snapshotKey(track);
@@ -666,29 +708,32 @@ export function useVideoPlayback() {
     // Спиннер с самого клика: до ответа resolve клипа ещё нет, HLS-ожидание
     // начнётся только после него.
     clipBuffering.value = true;
+    // Тёплый резолв из сессионного кеша (предзагрузка/повтор трека) — без сети.
+    const cached = getCachedClipResolve(track);
+    if (cached) {
+      resolveAbort?.abort();
+      resolveAbort = null;
+      if (!player.clipMode || !player.current || snapshotKey(player.current) !== key) {
+        clipBuffering.value = false;
+        return;
+      }
+      applyClipResolve(track, cached.video, cached.streams);
+      return;
+    }
     resolveAbort?.abort();
     const controller = new AbortController();
     resolveAbort = controller;
     try {
       const payload = await resolveVideo(track, controller.signal);
       if (controller.signal.aborted) return;
+      // Связь «трек → видео» — факт о треке: кешируем, даже если трек уже сменился.
+      cacheClipResolve(track, payload.video, payload.streams);
       // Пока резолвили, трек мог смениться или режим выключили — старое не применяем.
       if (!player.clipMode || !player.current || snapshotKey(player.current) !== key) {
         if (gen === resolveGen) clipBuffering.value = false;
         return;
       }
-      if (!payload.video) {
-        player.setClipUnavailable();
-        clipBuffering.value = false;
-        return;
-      }
-      player.setClipResolved(track, payload.video, payload.streams);
-      scheduleTtlRefresh(payload.ttl_sec, payload.video);
-      void loadVideo(payload.video);
-      // В resolve нет hls (api.md §8): streams — для немедленного старта,
-      // полный ответ с манифестом добираем get-url сразу — движок подменит
-      // источник на HLS с той же позиции.
-      void refreshStreams(payload.video);
+      applyClipResolve(track, payload.video, payload.streams, payload.ttl_sec);
     } catch (cause) {
       if (controller.signal.aborted) return;
       if (gen === resolveGen) clipBuffering.value = false;

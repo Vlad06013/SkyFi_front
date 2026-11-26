@@ -34,6 +34,8 @@ const noopHooks: HlsEngineHooks = {
 };
 
 let hls: Hls | null = null;
+/** Последняя фатальная ошибка (details hls.js) — для диагностической пробы. */
+let lastFatalError: string | null = null;
 /** Промис создания инстанса: без него параллельные hlsLoad (applyHls зовётся
  *  и из loadVideo, и из вотчера clipStreams) до резолва import создавали два
  *  инстанса — второй перезаписывал singleton, не будучи аттачнутым, и вся
@@ -109,7 +111,10 @@ async function createHls(): Promise<Hls> {
   });
   created.on(HlsCtor.Events.ERROR, (_event, data: ErrorData) => {
     // Нефатальные hls.js переживает сам (свои ретраи сегментов/плейлистов).
-    if (data.fatal) hooks.onError();
+    if (data.fatal) {
+      lastFatalError = String(data.details);
+      hooks.onError();
+    }
   });
   created.on(HlsCtor.Events.MANIFEST_PARSED, () => {
     hooks.onHeights(created.levels.map((level) => level.height));
@@ -150,6 +155,7 @@ export async function hlsLoad(
   activeManifest = manifestUrl;
   // Новый манифест — качество применяем заново на MANIFEST_PARSED.
   appliedQualityKey = null;
+  lastFatalError = null;
   return true;
 }
 
@@ -169,6 +175,16 @@ export function hlsDetach(): void {
 /** Фатальная сетевая ошибка останавливает загрузку hls.js — будим после ретрая get-url. */
 export function hlsResume(): void {
   if (hls && attachedEl) hls.startLoad();
+}
+
+/** Снимок для диагностической пробы (health-журнал): играющая ступень и
+ *  последняя фатальная ошибка. В auto геттер currentLevel отдаёт уровень
+ *  играющего фрагмента — для диагностики это и нужно. */
+export function hlsStatus(): { height: number | null; error: string | null } {
+  const instance = hls;
+  if (!instance || !attachedEl) return { height: null, error: lastFatalError };
+  const level = instance.currentLevel >= 0 ? instance.levels[instance.currentLevel] : null;
+  return { height: level?.height ?? null, error: lastFatalError };
 }
 
 /** Желание дорожки (id из ClipAudioTrack): запоминаем и применяем к живой сессии. */

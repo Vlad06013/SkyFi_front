@@ -1,6 +1,8 @@
 import { watch } from 'vue';
 import { fetchAudioUrl } from '@/api/audio';
+import { bufferAheadSeconds } from '@/lib/buffer-ranges';
 import { isLocalPlaybackUrl } from '@/lib/download-files';
+import { registerHealthActivity } from '@/lib/health-log';
 import { afterMediaUnlock, isAutoplayBlocked, markAutoplayBlocked } from '@/lib/media-unlock';
 import { resolveUrl } from '@/lib/endpoints';
 import { isOwnApiStream } from '@/lib/own-stream';
@@ -114,22 +116,46 @@ export function getAudioElement(): HTMLAudioElement | null {
   return audio;
 }
 
+// Диагностика запаса буфера трека (bugs-player.md) — пара к пробе 'клип':
+// в логе зондов видно, сколько секунд звука реально лежит впереди плейхеда.
+registerHealthActivity('звук', () => {
+  const store = usePlayerStore();
+  if (store.clipActive || store.effectiveCurrent?.type !== 'track') return null;
+  if (!audio || !audio.hasAttribute('src')) return null;
+  return `запас ${bufferAheadSeconds(audio.buffered, audio.currentTime).toFixed(0)}с`;
+});
+
 export function useAudioPlayback() {
   const player = usePlayerStore();
 
   async function loadSnapshot(snapshot: AnySnapshot | null) {
     const el = ensureAudio();
-    // Клип подменяет трек: пока эффективный снапшот — видео, аудио молчит.
-    // Поток сбрасываем целиком: вернёмся за свежей ссылкой и общей позицией
-    // (за время клипа позиция ушла вперёд — элемент с места остановки
-    // не продолжает).
-    if (!player.isActiveDevice || !snapshot || snapshot.type !== 'track') {
+    const pendingKey = snapshot ? snapshotKey(snapshot) : null;
+    // Клип-режим: звук трека не поднимаем, пока резолв не сказал «клипа нет»,
+    // — иначе каждый скип играл бы трек, обрывал его и пересаживал на видео.
+    // Уже играющий ЭТОТ трек (тогл режима посреди трека) не глушим: доигрывает
+    // до подмены клипом.
+    const clipHold = player.clipMode && snapshot?.type === 'track' && player.clipStatus !== 'unavailable';
+    if (clipHold && pendingKey != null && (pendingKey === appliedKey || pendingKey === loadedKey)) return;
+    // Клип подменяет трек / ждём резолв / мы пульт: аудио молчит. Поток
+    // сбрасываем целиком: вернёмся за свежей ссылкой и общей позицией (за
+    // время клипа позиция ушла вперёд — элемент с места остановки не продолжает).
+    if (!player.isActiveDevice || !snapshot || snapshot.type !== 'track' || clipHold) {
       runOwned(() => el.pause());
       // Подмена/остановка: летящий запрос уже никому не нужен — отменяем.
       loadAbort?.abort();
       loadAbort = null;
       loadedKey = null;
       appliedKey = null;
+      // Пауза не останавливает докачку (preload=auto): src снимаем совсем,
+      // иначе файл трека тянется в никуда параллельно с HLS клипа. Флаг
+      // звучания гасим сами: событие pause придёт, когда эффективный снапшот
+      // уже видео, и его слушатель тип трека пропустит.
+      player.setAudioPlaying(false);
+      if (el.hasAttribute('src')) {
+        el.removeAttribute('src');
+        el.load();
+      }
       return;
     }
     const key = snapshotKey(snapshot);
@@ -214,11 +240,20 @@ export function useAudioPlayback() {
     }
   }
 
-  // Смена эффективного снапшота (трек/клип) или роли активного устройства —
-  // повод подгрузить поток или замолчать.
-  watch([() => player.effectiveCurrent, () => player.isActiveDevice], ([snapshot]) => loadSnapshot(snapshot), {
-    immediate: true,
-  });
+  // Смена эффективного снапшота (трек/клип), роли активного устройства или
+  // исхода резолва клипа (клипа нет → играем аудио) — повод подгрузить поток
+  // или замолчать. clipMode/clipStatus в зависимостях: удержание звука в
+  // клип-режиме живёт в loadSnapshot.
+  watch(
+    [
+      () => player.effectiveCurrent,
+      () => player.isActiveDevice,
+      () => player.clipMode,
+      () => player.clipStatus,
+    ],
+    ([snapshot]) => loadSnapshot(snapshot),
+    { immediate: true },
+  );
 
   // is_playing с сервера: активное устройство подчиняется, пульт глушит звук.
   // Пока эффективный снапшот — клип, элемент не трогаем: src старый, иначе

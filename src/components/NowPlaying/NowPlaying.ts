@@ -10,6 +10,7 @@ import { useLyrics } from '@/composables/useLyrics';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import { clipBuffering, clipFrameReady, clipSurface, getClipVideoElement, setClipHost } from '@/composables/useVideoPlayback';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
+import { aheadRanges } from '@/lib/buffer-ranges';
 import { coverVar, artistsLine, trackCover } from '@/lib/cover';
 import { resolveUrl } from '@/lib/endpoints';
 import { sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
@@ -208,7 +209,9 @@ export default defineComponent({
 
     /** Буферизованные диапазоны активного элемента (клип — video, трек — audio)
      *  в долях длительности — полупрозрачная заливка на сикбаре. Опрос раз в
-     *  500 мс: события buffered не покрывают flush, а так сброс виден сразу. */
+     *  500 мс: события buffered не покрывают flush, а так сброс виден сразу.
+     *  Рисуем только вперёд от плейхеда: сыгранное MSE держит до вытеснения,
+     *  и полная полоса врала — «буфер есть», а запас ноль. */
     const bufferedRanges = ref<BufferedRange[]>([]);
     let bufferedKey = '';
     let bufferedTimer: ReturnType<typeof setInterval> | null = null;
@@ -222,13 +225,8 @@ export default defineComponent({
         }
         return;
       }
-      const ranges: BufferedRange[] = [];
-      for (let index = 0; index < el.buffered.length; index += 1) {
-        ranges.push({
-          start: Math.min(1, el.buffered.start(index) / duration),
-          end: Math.min(1, el.buffered.end(index) / duration),
-        });
-      }
+      const position = Number.isFinite(el.currentTime) ? el.currentTime : 0;
+      const ranges = aheadRanges(el.buffered, position, duration);
       const key = ranges.map((range) => `${range.start.toFixed(3)}-${range.end.toFixed(3)}`).join('|');
       if (key === bufferedKey) return;
       bufferedKey = key;

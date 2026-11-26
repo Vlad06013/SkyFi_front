@@ -844,6 +844,13 @@ export const usePlayerStore = defineStore('player', () => {
     // не помог бы: is_playing не меняется, вотчеры элемент не пинают.
     // Пинаем движок напрямую, сервер не трогаем.
     if (wasPlaying && isActiveDevice.value && !audioPlaying.value) {
+      // Загрузка (резолв клипа, get-url, прогрев) — не рассинхрон: тап во
+      // время неё — честная пауза. В клип-режиме звук резолвом больше не
+      // маскируется, и без этого выхода пауза была бы недоступна до кадра.
+      if (engineLoading.value || streamWarming.value || clipStatus.value === 'resolving') {
+        await commitTransport(false);
+        return;
+      }
       unlockMediaPlayback();
       kickEngine();
       return;
@@ -1102,7 +1109,10 @@ export const usePlayerStore = defineStore('player', () => {
   /**
    * Рассинхрон: сервер уверен, что играем, а элемент активного устройства
    * молчит (после загрузки страницы автоплей отклонён, протухший поток).
-   * Пульт и гости зеркалят сервер — им верить нечему.
+   * Пульт и гости зеркалят сервер — им верить нечему. Загрузка — не
+   * рассинхрон: резолв клипа, get-url и прогрев до первого кадра держат
+   * честную тишину со спиннером — значок паузы на них не подменяем
+   * (в клип-режиме аудио резолв больше не маскирует своим звуком).
    */
   const playbackDesynced = computed(
     () =>
@@ -1110,7 +1120,10 @@ export const usePlayerStore = defineStore('player', () => {
       !!state.value.current_snapshot &&
       canCommand.value &&
       isActiveDevice.value &&
-      !audioPlaying.value,
+      !audioPlaying.value &&
+      !engineLoading.value &&
+      !streamWarming.value &&
+      clipStatus.value !== 'resolving',
   );
   /** Мгновенная подмена мелькает на переходах (подгрузка потока ~секунду). */
   const DESYNC_GRACE_MS = 1_500;
@@ -1290,11 +1303,17 @@ export const usePlayerStore = defineStore('player', () => {
 
   const current = computed(() => state.value.current_snapshot);
 
-  // Громкость живёт в Preferences, как история поиска. Режим клипов больше
-  // здесь не храним: серверный clips_enabled — источник истины, устройства
-  // иначе расходились бы в режиме (на одном видео, на другом аудио).
+  // Громкость и качество клипа живут в Preferences, как история поиска.
+  // Режим клипов здесь не храним: серверный clips_enabled — источник истины,
+  // устройства иначе расходились бы в режиме (на одном видео, на другом аудио).
+  // Качество наоборот локальное (экраны устройств разные, сокетами его не
+  // синхронизируем). Персистим именно выбор пользователя: рабочий clipQuality
+  // клампится по потокам прогрессива и затёр бы предпочтение.
   let prefsHydrating = true;
   let volumeTouched = false;
+  let clipQualityTouched = false;
+  let preferredClipQuality: number | null = null;
+  let preferredClipHlsAuto = true;
   let prefsTimer: ReturnType<typeof setTimeout> | null = null;
 
   function rememberPlayerPrefs() {
@@ -1302,7 +1321,11 @@ export const usePlayerStore = defineStore('player', () => {
     if (prefsTimer) clearTimeout(prefsTimer);
     prefsTimer = setTimeout(() => {
       prefsTimer = null;
-      void writePlayerDevicePrefs({ volume: volume.value });
+      void writePlayerDevicePrefs({
+        volume: volume.value,
+        clipQuality: preferredClipQuality,
+        clipHlsAuto: preferredClipHlsAuto,
+      });
     }, 200);
   }
 
@@ -1310,8 +1333,14 @@ export const usePlayerStore = defineStore('player', () => {
 
   void readPlayerDevicePrefs().then((saved) => {
     if (saved && !volumeTouched) volume.value = saved.volume;
+    if (saved?.clipQuality != null && !clipQualityTouched) {
+      preferredClipQuality = saved.clipQuality;
+      preferredClipHlsAuto = saved.clipHlsAuto;
+      clipQuality.value = saved.clipQuality;
+      clipHlsAuto.value = saved.clipHlsAuto;
+    }
     prefsHydrating = false;
-    if (volumeTouched) rememberPlayerPrefs();
+    if (volumeTouched || clipQualityTouched) rememberPlayerPrefs();
   });
   const title = computed(() => current.value?.title ?? '');
   const artist = computed(() =>
@@ -1551,13 +1580,13 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   /** Резолв приехал: клип закрепляется за треком. hls в resolve нет (api.md §8) —
-   *  стартуем на прогрессиве, манифест добирает движок ближайшим get-url. */
+   *  стартуем на прогрессиве, манифест добирает движок ближайшим get-url.
+   *  Качество между клипами не сбрасываем: выбор пользователя персистится. */
   function setClipResolved(track: TrackSnapshot, video: VideoSnapshot, streams: VideoStream[]) {
     clipTrackKey.value = snapshotKey(track);
     clipVideo.value = video;
     clipStatus.value = 'ready';
     clipAudioId.value = null;
-    clipHlsAuto.value = true;
     setClipStreams(streams);
     setClipHls(null);
   }
@@ -1610,13 +1639,20 @@ export const usePlayerStore = defineStore('player', () => {
   );
 
   function setClipQuality(quality: number) {
+    clipQualityTouched = true;
+    preferredClipQuality = quality;
+    preferredClipHlsAuto = false;
     clipHlsAuto.value = false;
     clipQuality.value = quality;
+    rememberPlayerPrefs();
   }
 
   /** HLS-режим: вернуться к ABR (потолок — clipQuality), выбор ручника отменяется. */
   function setClipQualityAuto() {
+    clipQualityTouched = true;
+    preferredClipHlsAuto = true;
     clipHlsAuto.value = true;
+    rememberPlayerPrefs();
   }
 
   /** Потоки видео. Выбор качества здесь не трогаем: у YouTube прогрессив-список —
@@ -1762,10 +1798,14 @@ export const usePlayerStore = defineStore('player', () => {
 
   // Диагностика офлайн-флапа (bugs-player.md): журнал зондов на экране
   // настроек показывает, что делало приложение в момент промаха health.
+  // «get-url» и «ждёт playing» разделены: это разные узкие места (запрос
+  // ссылки против ожидания первого кадра); запас буфера и ступень HLS
+  // добавляют пробы движков ('клип'/'звук').
   registerHealthActivity('player', () => {
     const parts: string[] = [];
     if (state.value.is_playing) parts.push(audioPlaying.value ? 'играет' : 'play без звука');
-    if (engineLoading.value || streamWarming.value) parts.push('грузит поток');
+    if (engineLoading.value) parts.push('get-url');
+    if (streamWarming.value) parts.push('ждёт playing');
     if (playbackStalled.value) parts.push('буфер');
     if (pendingSeekSeconds != null) parts.push('seek');
     return parts.length ? parts.join(' · ') : null;

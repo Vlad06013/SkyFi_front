@@ -1,6 +1,8 @@
 import { watch } from 'vue';
 import { fetchAudioUrl } from '@/api/audio';
 import { fetchVideoStreams, resolveVideo } from '@/api/videos';
+import { cacheClipResolve, getCachedClipResolve } from '@/lib/clip-resolve-cache';
+import { isUnmeteredConnection, warmHlsStart } from '@/lib/hls-warm';
 import { snapshotKey } from '@/lib/playback-engine';
 import { cacheAudioUrl, cacheVideoStreams, getCachedStream } from '@/lib/stream-url-cache';
 import { useAuthStore } from '@/stores/auth';
@@ -14,20 +16,23 @@ import type { AnySnapshot, TrackSnapshot, VideoSnapshot } from '@/types';
  * ссылки 2 трека вперёд и 2 назад (волна — та же схема: окно её контекста
  * движок берёт как обычный список). Греем ТОЛЬКО ссылки (get-url) — байты
  * не трогаем. Кеш по snapshotKey до TTL: тёплая — не просим, дохлая —
- * перезапрашиваем. Только активное устройство, только онлайн, на паузе
- * молчим. Ошибки глотаем: предзагрузка не тостит и не ломает плеер.
+ * перезапрашиваем. Клип-режим: дополнительно резолвим 2 трека вперёд
+ * (результат — в сессионный кеш резолва, движок стартует с него без сети),
+ * греем get-url их видео и «стартовый набор» HLS (init + первые сегменты
+ * выбранной ступени и аудиодорожки, lib/hls-warm.ts) — только по Wi-Fi.
+ * Назад резолв и байты не греем: «назад» чаще рестартит текущий трек, а
+ * повторный резолв уже игравшего дешёвый. Только активное устройство,
+ * только онлайн, на паузе молчим. Ошибки глотаем: предзагрузка не тостит
+ * и не ломает плеер.
  */
 
 const AHEAD_COUNT = 2;
 const BACK_COUNT = 2;
 
-/** Резолв «трек → видео» (60/мин) не чаще раза в 5 минут на один трек. */
-const CLIP_RESOLVE_REUSE_MS = 5 * 60_000;
-
 /** Летящие запросы: один ключ — один прогрев. */
 const inflight = new Set<string>();
-let lastClipResolveKey: string | null = null;
-let lastClipResolveAt = 0;
+/** Прогретые стартовые наборы (манифест+качество): повтор на скипе не нужен. */
+const warmedHls = new Set<string>();
 
 export function useStreamPrefetch() {
   const player = usePlayerStore();
@@ -65,17 +70,26 @@ export function useStreamPrefetch() {
     }
   }
 
-  /** Клип-режим: следующий трек играет видео — матчим «трек → видео» заранее. */
+  /** Клип-режим: следующие треки играют видео — матчим «трек → видео» заранее. */
   async function ensureClip(track: TrackSnapshot): Promise<void> {
+    const cached = getCachedClipResolve(track);
+    if (cached) {
+      if (cached.video) {
+        await ensureVideo(cached.video);
+        await warmClipStart(track);
+      }
+      return;
+    }
     const key = snapshotKey(track);
-    if (lastClipResolveKey === key && Date.now() - lastClipResolveAt < CLIP_RESOLVE_REUSE_MS) return;
     if (inflight.has(key)) return;
     inflight.add(key);
     try {
       const payload = await resolveVideo(track);
-      lastClipResolveKey = key;
-      lastClipResolveAt = Date.now();
-      if (payload.video) await ensureVideo(payload.video);
+      cacheClipResolve(track, payload.video, payload.streams);
+      if (payload.video) {
+        await ensureVideo(payload.video);
+        await warmClipStart(track);
+      }
     } catch {
       /* предзагрузка молчит */
     } finally {
@@ -83,18 +97,35 @@ export function useStreamPrefetch() {
     }
   }
 
+  /**
+   * «Стартовый набор» HLS следующего клипа: после тёплых резолва и get-url
+   * греем init + первые сегменты выбранной ступени и аудиодорожки — скип
+   * попадает в кеш микросервиса/браузера. Только Wi-Fi: на LTE байты не тянем.
+   */
+  async function warmClipStart(track: TrackSnapshot): Promise<void> {
+    if (!isUnmeteredConnection()) return;
+    const resolved = getCachedClipResolve(track);
+    if (!resolved?.video) return;
+    const cached = getCachedStream(resolved.video);
+    if (cached?.kind !== 'video' || !cached.hls) return;
+    const key = `${cached.hls.manifest_url}|${player.clipQuality}`;
+    if (warmedHls.has(key)) return;
+    warmedHls.add(key);
+    await warmHlsStart(cached.hls.manifest_url, player.clipQuality);
+  }
+
   function warm(): void {
     if (!auth.isAuthed || !player.isActiveDevice || !player.state.is_playing || online.isOnline === false) return;
     const { ahead, back } = player.adjacentSnapshots(AHEAD_COUNT, BACK_COUNT);
     const clipMode = player.clipMode;
-    ahead.forEach((snapshot, index) => {
+    ahead.forEach((snapshot) => {
       if (snapshot.type === 'video') {
         void ensureVideo(snapshot);
         return;
       }
       void ensureAudio(snapshot);
-      // Резолв тяжелее get-url: только ближайший трек и только в клип-режиме.
-      if (clipMode && index === 0) void ensureClip(snapshot as TrackSnapshot);
+      // Резолв тяжелее get-url: только вперёд и только в клип-режиме.
+      if (clipMode && snapshot.type === 'track') void ensureClip(snapshot);
     });
     for (const snapshot of back) {
       if (snapshot.type === 'video') void ensureVideo(snapshot);
