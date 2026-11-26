@@ -1,8 +1,7 @@
 import axios from 'axios';
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
-import { Capacitor } from '@capacitor/core';
-import { audioFileUrl, fetchAudioFile } from '@/api/audio';
+import { fetchAudioFile } from '@/api/audio';
 import { fetchEntityDetails } from '@/api/details';
 import { clearLocalCover, setLocalCover } from '@/lib/cover';
 import { resolveUrl } from '@/lib/endpoints';
@@ -18,10 +17,11 @@ import {
   type LinkRecord,
   type TrackRecord,
 } from '@/lib/download-db';
-import { downloadTrackFile, openDownload, removeDownload, saveCoverFromUrl, writeDownload } from '@/lib/download-files';
+import { openDownload, removeDownload, saveCoverFromUrl, writeDownload } from '@/lib/download-files';
 import { collectionPercent, savedCollection } from '@/lib/collection-progress';
 import { collectionSearchQuery, searchDownloads, trackSearchQuery } from '@/lib/download-search';
 import { coverFilePath, entityKey, isCollection, linkId, trackFilePath, type CollectionSnapshot } from '@/lib/download-keys';
+import { registerHealthActivity } from '@/lib/health-log';
 import { useToastStore } from '@/stores/toast';
 import type { AnySnapshot, TrackSnapshot } from '@/types';
 
@@ -230,19 +230,15 @@ export const useDownloadsStore = defineStore('downloads', () => {
       const fileSignal = bindStop(signal);
       const path = trackFilePath(snapshot);
       let size = 0;
-      if (Capacitor.isNativePlatform()) {
-        // Нативный стек вне пула WebView: XHR-закачка встаёт в общую очередь
-        // рядом со зондом/heartbeat и уводила приложение в офлайн на всё время.
-        // Прогресс по байтам нативно не приходит — отчёт одним финальным кругом.
-        size = await downloadTrackFile(audioFileUrl(), snapshot, path, fileSignal, (loaded, total) => {
-          markBytes(key, loaded, total);
-        });
-      } else {
-        const bytes = await fetchAudioFile(snapshot, fileSignal, (loaded, total) => markBytes(key, loaded, total));
-        if (fileSignal.aborted) aborted();
-        size = bytes.byteLength;
-        await writeDownload(path, bytes, 'audio/mpeg');
-      }
+      // Прогресс по байтам отдаёт ответ с Content-Length (api.md §7) —
+      // на нативе тот же axios-путь, что и в вебе: нативный CapacitorHttp
+      // прогресс не шлёт, спиннер стоял пустым.
+      const bytes = await fetchAudioFile(snapshot, fileSignal, (loaded, total) => {
+        size = loaded;
+        markBytes(key, loaded, total);
+      });
+      if (fileSignal.aborted) aborted();
+      await writeDownload(path, bytes, 'audio/mpeg');
       const row: TrackRecord = {
         key,
         snapshot,
@@ -490,6 +486,16 @@ export const useDownloadsStore = defineStore('downloads', () => {
       links.value = [];
     }
   }
+
+  // Диагностика офлайн-флапа (bugs-player.md): в момент промаха health-зонда
+  // журнал покажет, шла ли закачка — главный подозреваемый в загрузке бэка.
+  registerHealthActivity('downloads', () => {
+    const parts: string[] = [];
+    if (bulk.value) parts.push(`скачивание всё ${bulk.value.done}/${bulk.value.total}`);
+    const pcts = Object.values(filePct.value);
+    if (pcts.length) parts.push(`файл ${Math.max(...pcts)}%`);
+    return parts.length ? parts.join(' · ') : null;
+  });
 
   return {
     items,

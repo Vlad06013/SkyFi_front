@@ -633,8 +633,8 @@ describe('stores/player: realtime-синхронизация', () => {
     vi.mocked(playerApi.seekTo).mockResolvedValue({ state: null as never, queue: [] } as never);
   });
 
-  describe('экстраполяция позиции по position_updated_at', () => {
-    /** Зеркало пульта: играет чужое устройство, замер позиции 5 с назад. */
+  describe('позиция: целые секунды от якоря, штамп не читается', () => {
+    /** Зеркало пульта: играет чужое устройство, позиция из стейта 100. */
     function remoteMirror(over: Record<string, unknown> = {}) {
       const player = usePlayerStore();
       player.applyServerState(
@@ -656,24 +656,24 @@ describe('stores/player: realtime-синхронизация', () => {
       return player;
     }
 
-    it('свежий штамп: якорь докидывает время с момента замера', () => {
+    it('штамп не докидывает elapsed: позиция стартует с якоря применения', () => {
       const player = remoteMirror();
-      // Докид ≈5 с; нижняя граница с запасом на мс между созданием стора
-      // (nowTick) и применением стейта — они вычитаются из экстраполяции.
-      expect(player.positionSeconds).toBeGreaterThan(104);
-      expect(player.positionSeconds).toBeLessThan(107);
+      // Штампу 5 с — старая модель добавляла их к якорю. Теперь штамп не
+      // читается вовсе: бэк свежит его в каждом broadcast'е, и докид
+      // дёргал прогресс. Якорь — ровно применённая позиция.
+      expect(player.positionSeconds).toBe(100);
     });
 
-    it('пауза: докида нет', () => {
+    it('пауза: позиция — якорь без движения', () => {
       const player = remoteMirror({ is_playing: false });
       expect(player.positionSeconds).toBe(100);
     });
 
-    it('протухший штамп: докид 0 — страховка от кривых часов и resume без штампа', () => {
+    it('возраст штампа не влияет: позиция не схлопывается и не раздувается', () => {
       const player = remoteMirror({
         position_updated_at: new Date(Date.now() - 300_000).toISOString(),
       });
-      expect(player.positionSeconds).toBeLessThan(101);
+      expect(player.positionSeconds).toBe(100);
     });
 
     it('позиционный репорт не двигает экстраполяцию рывком', () => {
@@ -764,11 +764,11 @@ describe('stores/player: realtime-синхронизация', () => {
       }
     });
 
-    it('локальный seek обновляет штамп — старый elapsed не прилипает', () => {
+    it('локальный seek пересаживает якорь — позиция сразу на новом месте', () => {
       vi.useFakeTimers();
       try {
         const player = usePlayerStore();
-        // Я активен, играю; штамп 20-секундной давности (в пределах доверия).
+        // Я активен, играю; штамп 20-секундной давности (не читается).
         player.applyServerState(
           {
             state: {
@@ -787,7 +787,7 @@ describe('stores/player: realtime-синхронизация', () => {
 
         player.seek(60);
 
-        // Без свежего штампа к 60 прилипло бы +20 докида.
+        // Якорь пересажен seek'ом: никакой прилипший elapsed не добавляется.
         expect(player.positionSeconds).toBeGreaterThanOrEqual(60);
         expect(player.positionSeconds).toBeLessThan(62);
       } finally {
@@ -815,8 +815,10 @@ describe('stores/player: realtime-синхронизация', () => {
       await player.resync();
       expect(player.state.position_seconds).toBe(10);
 
-      // Локальная жизнь: играем дальше, позиция ушла вперёд.
-      player.state = { ...player.state, position_seconds: 77 };
+      // Локальная жизнь: играем дальше, позиция ушла вперёд. Источник
+      // правды активного устройства — аудио-элемент: timeupdate двигает
+      // якорь (state.position_seconds при этом может отставать).
+      player.anchorFromAudio(77);
 
       // Reconnect: сервер отстал (последний репорт — 20), version вырос.
       fetchPlayerStateMock.mockResolvedValue({
@@ -1290,7 +1292,7 @@ describe('stores/player: позиционный репорт', () => {
     useDevicesStore().myDeviceUuid = 'uuid-1';
   });
 
-  it('репорт пишет локальную позицию в стейт — за окном доверия к штампу не схлопывается в 0', async () => {
+  it('репорт пишет локальную позицию в стейт — стейт не застывает на стартовом 0', async () => {
     vi.useFakeTimers();
     try {
       const player = usePlayerStore();
@@ -1322,9 +1324,8 @@ describe('stores/player: позиционный репорт', () => {
       expect(seekToMock).toHaveBeenCalledTimes(1);
       expect(player.state.position_seconds).toBeGreaterThan(8);
 
-      // Раньше position_seconds застывал на 0: за окном доверия к штампу
-      // (30 с) экстраполяция схлопывалась в 0, и вотчер подгонки отматывал
-      // играющий элемент на старт песни.
+      // Раньше position_seconds застывал на 0: стейт расходился с якорем,
+      // и пауза/слияние по владению прыгали прогрессом на старт песни.
       await vi.advanceTimersByTimeAsync(30_000);
       expect(player.positionSeconds).toBeGreaterThan(35);
       expect(player.positionSeconds).toBeLessThan(45);
@@ -1365,15 +1366,13 @@ describe('stores/player: позиционный репорт', () => {
       // Локальный штамп состарился (репорт был ~5 с назад), экстраполированная
       // позиция уехала вперёд от округлённого репорта.
       await vi.advanceTimersByTimeAsync(5000);
-      const stampBefore = player.state.position_updated_at;
       const positionBefore = player.positionSeconds;
       expect(positionBefore).toBeGreaterThan(reported + 3);
 
-      // Бэк вещает housekeeping-ивент: версия новее, штамп СВЕЖИЙ, позиция —
-      // последний наш репорт. Старый штамповый гейт видел свежий штамп,
-      // считал ивент чужой командой и применял стейт целиком: экстраполяция
-      // схлопывалась в округлённый репорт, вотчер подгонки отматывал элемент
-      // назад — «буксование».
+      // Бэк вещает housekeeping-ивент: версия новее, позиция — последний
+      // наш репорт. Старый штамповый гейт считал такой ивент чужой командой
+      // и применял стейт целиком: позиция схлопывалась в округлённый репорт,
+      // вотчер подгонки отматывал элемент назад — «буксование».
       player.applySocketState({
         state: {
           ...player.state,
@@ -1384,8 +1383,9 @@ describe('stores/player: позиционный репорт', () => {
         queue: [],
       });
 
+      // Слияние: позиция не отмоталась к репорту, стейт несёт локальную.
       expect(player.positionSeconds).toBeGreaterThan(positionBefore - 1);
-      expect(player.state.position_updated_at).toBe(stampBefore);
+      expect(Math.abs(player.state.position_seconds - Math.round(player.positionSeconds))).toBeLessThan(2);
       expect(player.state.is_playing).toBe(true);
     } finally {
       vi.useRealTimers();
@@ -1431,6 +1431,85 @@ describe('stores/player: позиционный репорт', () => {
       });
 
       expect(player.state.position_seconds).toBe(42);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('секундное тикание: позиция идёт +1 в секунду целыми секундами', async () => {
+    vi.useFakeTimers();
+    try {
+      const player = usePlayerStore();
+      player.applyServerState(
+        {
+          state: {
+            ...player.state,
+            current_snapshot: track,
+            is_playing: true,
+            position_seconds: 10,
+            position_updated_at: new Date().toISOString(),
+            active_device_id: 'uuid-1',
+            devices: [me],
+          },
+          queue: [],
+        } as never,
+        { force: true },
+      );
+      player.setAudioPlaying(true);
+      player.bindServerPlayback();
+
+      expect(player.positionSeconds).toBe(10);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(player.positionSeconds).toBe(11);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(player.positionSeconds).toBe(12);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('пауза не сбрасывает позицию в 0: на сервер и в стейт уходит локальная', async () => {
+    vi.useFakeTimers();
+    try {
+      const player = usePlayerStore();
+      player.applyServerState(
+        {
+          state: {
+            ...player.state,
+            current_snapshot: track,
+            is_playing: true,
+            position_seconds: 0,
+            position_updated_at: new Date().toISOString(),
+            active_device_id: 'uuid-1',
+            devices: [me],
+          },
+          queue: [],
+        } as never,
+        { force: true },
+      );
+      player.setAudioPlaying(true);
+      player.bindServerPlayback();
+      seekToMock.mockResolvedValue({ state: null as never, queue: [] } as never);
+      // Бэк на паузу отвечает стейтом с присланной позицией (api.md §5).
+      pausePlaybackMock.mockImplementation(
+        (_fields, seconds) =>
+          Promise.resolve({
+            state: { ...player.state, is_playing: false, position_seconds: seconds ?? 0 },
+            queue: [],
+          }) as never,
+      );
+
+      // Элемент играет 15 с: сырое state.position_seconds всё ещё 0 (репорт
+      // на 10 с вернул пустое эхо), а локальная позиция ушла вперёд. Пауза
+      // обязана взять локальную — раньше брала сырую и бросала прогресс в 0.
+      await vi.advanceTimersByTimeAsync(15_000);
+      await player.togglePlay();
+
+      const sent = pausePlaybackMock.mock.calls[0]?.[1] as number;
+      expect(sent).toBeGreaterThanOrEqual(14);
+      expect(player.state.position_seconds).toBeGreaterThanOrEqual(14);
+      expect(player.positionSeconds).toBeGreaterThanOrEqual(14);
+      expect(player.state.is_playing).toBe(false);
     } finally {
       vi.useRealTimers();
     }

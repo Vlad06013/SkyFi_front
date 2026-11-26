@@ -2,8 +2,9 @@ import { defineStore } from 'pinia';
 import { ref } from 'vue';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
-import { checkHealth, HEALTH_TIMEOUT_MS } from '@/api/health';
+import { probeHealth, HEALTH_TIMEOUT_MS, type HealthProbeResult } from '@/api/health';
 import { resolveEndpoint } from '@/lib/endpoints';
+import { collectHealthActivity, recordHealth } from '@/lib/health-log';
 
 const POLL_INTERVAL_MS = 10_000;
 /** Бутстрэп и кнопка «повторить» — короткий ответ, сплэш не ждёт. */
@@ -24,17 +25,18 @@ export const useOnlineStore = defineStore('online', () => {
   let missCount = 0;
   let lastResolveAt = 0;
 
-  async function probe(timeoutMs: number): Promise<boolean> {
+  async function probe(timeoutMs: number): Promise<HealthProbeResult & { retried: boolean }> {
     try {
-      let ok = await checkHealth(timeoutMs);
+      let result = await probeHealth(timeoutMs);
       // С домашней сети внешний адрес бэка не открывается. Зонд молчит —
       // переспрашиваем внешний IP и, если сеть домашняя, бьём в локальный адрес.
-      if (!ok && (await resolveEndpointCached())) ok = await checkHealth(timeoutMs);
-      return ok;
+      const retried = !result.ok && (await resolveEndpointCached());
+      if (retried) result = await probeHealth(timeoutMs);
+      return { ...result, retried };
     } catch {
-      // checkHealth по контракту не бросает, но поллер не должен падать
+      // probeHealth по контракту не бросает, но поллер не должен падать
       // от любой неожиданной ошибки.
-      return false;
+      return { ok: false, durationMs: 0, miss: 'unknown', detail: 'probe crashed', retried: false };
     }
   }
 
@@ -53,14 +55,28 @@ export const useOnlineStore = defineStore('online', () => {
    * подряд перед переводом в офлайн; успех возвращает онлайн сразу.
    */
   async function check(opts: { fast?: boolean } = {}) {
-    const ok = await probe(opts.fast ? FAST_HEALTH_TIMEOUT_MS : HEALTH_TIMEOUT_MS);
-    if (ok) {
+    const startedAt = Date.now();
+    const result = await probe(opts.fast ? FAST_HEALTH_TIMEOUT_MS : HEALTH_TIMEOUT_MS);
+    const was = isOnline.value;
+    if (result.ok) {
       missCount = 0;
       isOnline.value = true;
-      return;
+    } else {
+      missCount += 1;
+      if (opts.fast || missCount >= OFFLINE_AFTER_MISSES) isOnline.value = false;
     }
-    missCount += 1;
-    if (opts.fast || missCount >= OFFLINE_AFTER_MISSES) isOnline.value = false;
+    // Журнал для экрана «Диагностика сети»: на устройстве консоль
+    // недоступна, тип промаха и активность смотрим там (bugs-player.md).
+    const detail = result.retried ? [result.detail, 'повтор после смены адреса'].filter(Boolean).join(' · ') : result.detail;
+    recordHealth({
+      at: startedAt,
+      ok: result.ok,
+      durationMs: result.durationMs,
+      miss: result.miss,
+      detail,
+      activity: collectHealthActivity(),
+      transition: isOnline.value === was ? null : isOnline.value ? 'online' : 'offline',
+    });
   }
 
   function startInterval() {

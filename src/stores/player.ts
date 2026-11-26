@@ -22,6 +22,7 @@ import {
   type NextReason,
 } from '@/lib/playback-engine';
 import { feedbackOnFavorite, feedbackOnLeave, feedbackOnProgress, type WaveListen } from '@/lib/wave-feedback';
+import { registerHealthActivity } from '@/lib/health-log';
 import { moveItem } from '@/lib/list-sort';
 import { unlockMediaPlayback } from '@/lib/media-unlock';
 import { clearPlayerCache, loadPlayerCache, savePlayerCache } from '@/lib/library-cache';
@@ -227,6 +228,12 @@ export const usePlayerStore = defineStore('player', () => {
   /** Пока применяем серверный стейт, скачок позиции не считается прослушиванием волны. */
   let applyingServer = false;
 
+  /** Локальная позиция в стейт (целые секунды): иначе сырой position_seconds
+   *  (последний seek/репорт) устаревает, и пауза/слияние прыгали на него. */
+  function writeLocalPosition() {
+    state.value = { ...state.value, position_seconds: Math.round(extrapolatedPosition.value) };
+  }
+
   function applyServerStateMerged(payload: PlayerStatePayload) {
     if (!payload?.state) return;
     serverStateApplied = true;
@@ -234,14 +241,15 @@ export const usePlayerStore = defineStore('player', () => {
     state.value = {
       ...payload.state,
       current_snapshot: state.value.current_snapshot,
-      position_seconds: state.value.position_seconds,
-      position_updated_at: state.value.position_updated_at,
       is_playing: state.value.is_playing,
     };
+    // Позицию НЕ пересаживаем из стейта и якорь не двигаем: у активного
+    // устройства элемент — источник правды (timeupdate), обрывать плавный
+    // ход экстраполяции каждый репорт — прогресс дёргался бы раз в 10 с.
+    writeLocalPosition();
     applyClipsEnabled(payload.state.clips_enabled);
     queue.value = sortQueue(payload.queue ?? []);
     queueLoaded.value = true;
-    anchorPosition();
     queueMicrotask(() => {
       applyingServer = false;
     });
@@ -310,25 +318,13 @@ export const usePlayerStore = defineStore('player', () => {
   // --- reconnect (пульт — подмена, активное — слияние по владению)
 
   /**
-   * Потолок доверия к `position_updated_at`: репорты идут раз в 10 с,
-   * свежий штамп — это секунды доставки. Протухший штамп (бэк не штампует
-   * при resume?) или кривые часы докида не дают — иначе слайдер прыгал бы.
+   * Потолок доверия к `position_updated_at` убран: бэк штампует его свежим
+   * временем в каждом broadcast'е, и экстраполяция от штампа дёргала
+   * прогресс. Позиция — целые секунды, тикают таймером (1 с).
    */
-  const POSITION_STAMP_TRUST_S = 30;
 
   function anchorPosition() {
-    let position = state.value.position_seconds;
-    // Пульт экстраполирует от серверного замера (api.md §5): без докида
-    // каждый позиционный репорт пересаживал бы якорь на округлённое значение
-    // и слайдер дёргался бы раз в интервал репорта.
-    if (state.value.is_playing && state.value.position_updated_at) {
-      const measuredAt = Date.parse(state.value.position_updated_at);
-      if (Number.isFinite(measuredAt)) {
-        const elapsed = (Date.now() - measuredAt) / 1000;
-        if (elapsed >= 0 && elapsed <= POSITION_STAMP_TRUST_S) position += elapsed;
-      }
-    }
-    anchor.value = position;
+    anchor.value = Math.round(state.value.position_seconds);
     anchorAt = Date.now();
   }
 
@@ -660,7 +656,6 @@ export const usePlayerStore = defineStore('player', () => {
       ...state.value,
       position_seconds: 0,
       is_playing: true,
-      position_updated_at: new Date().toISOString(),
     };
     anchorPosition();
     // Серверная позиция часто ещё 0, а элемент уже ушёл вперёд — вотч по
@@ -732,7 +727,6 @@ export const usePlayerStore = defineStore('player', () => {
         position_seconds: 0,
         is_playing: true,
         play_source: playbackSource,
-        position_updated_at: new Date().toISOString(),
       };
       anchorPosition();
       return;
@@ -752,7 +746,6 @@ export const usePlayerStore = defineStore('player', () => {
         position_seconds: 0,
         is_playing: true,
         play_source: playbackSource,
-        position_updated_at: new Date().toISOString(),
       };
       anchorPosition();
     }
@@ -824,19 +817,22 @@ export const usePlayerStore = defineStore('player', () => {
         toast.show('Трек не скачан', 'в офлайне играет только скачанное', true);
         return;
       }
+      // Перед остановкой локальную позицию кладём в стейт: иначе сырое
+      // position_seconds (последний seek/репорт) протухало, и пауза
+      // прыгала прогрессом назад, часто в 0.
+      writeLocalPosition();
       state.value = {
         ...state.value,
         is_playing: !state.value.is_playing,
-        position_updated_at: new Date().toISOString(),
       };
       anchorPosition();
       return;
     }
     if (!canCommand.value) {
+      writeLocalPosition();
       state.value = {
         ...state.value,
         is_playing: !state.value.is_playing,
-        position_updated_at: new Date().toISOString(),
       };
       anchorPosition();
       return;
@@ -891,10 +887,10 @@ export const usePlayerStore = defineStore('player', () => {
       // Играть нескачанное в офлайне нечем — иначе «play» без звука,
       // с бегущим ползунком (то же, что закрыли в togglePlay).
       if (wantPlaying && (!state.value.current_snapshot || !offlinePlayable(state.value.current_snapshot))) return;
+      writeLocalPosition();
       state.value = {
         ...state.value,
         is_playing: wantPlaying,
-        position_updated_at: new Date().toISOString(),
       };
       anchorPosition();
       return;
@@ -903,10 +899,10 @@ export const usePlayerStore = defineStore('player', () => {
     // Оптимистично, с откатом по ошибке (plan-player.md §5). Пауза сама
     // увозит позицию — висящий seek отменяем, чтобы не дёргать бэк дважды.
     if (wasPlaying) cancelPendingSeek();
+    writeLocalPosition();
     state.value = {
       ...state.value,
       is_playing: wantPlaying,
-      position_updated_at: new Date().toISOString(),
     };
     anchorPosition();
     const prevPush = lastPositionPushSeconds;
@@ -922,7 +918,6 @@ export const usePlayerStore = defineStore('player', () => {
         state.value = {
           ...state.value,
           is_playing: wasPlaying,
-          position_updated_at: new Date().toISOString(),
         };
         anchorPosition();
         toast.show('Устройство ещё не зарегистрировано', '', true);
@@ -934,7 +929,6 @@ export const usePlayerStore = defineStore('player', () => {
       state.value = {
         ...state.value,
         is_playing: wasPlaying,
-        position_updated_at: new Date().toISOString(),
       };
       anchorPosition();
       toast.show(errorText(cause, 'Не удалось переключить воспроизведение'), '', true);
@@ -1032,18 +1026,12 @@ export const usePlayerStore = defineStore('player', () => {
     try {
       // Ответ на свой репорт: координация из сервера, а position_seconds
       // пишем локальную точную — не округлённый серверный замер (протухает
-      // на RTT). Иначе стейт застывает на 0/последнем seek'е, окно доверия
-      // к штампу (30 с) истекает посреди трека, экстраполяция схлопывается
-      // в 0 и вотчер подгонки швырял элемент на старт песни.
+      // на RTT). Иначе стейт застывает на 0/последнем seek'е, и пауза или
+      // слияние по владению прыгают прогрессом назад, вплоть до старта песни.
       const payload = await withDevice((fields) => playerApi.seekTo(seconds, fields));
       if (!payload) return;
       applyServerStateMerged(payload);
-      state.value = {
-        ...state.value,
-        position_seconds: Math.round(extrapolatedPosition.value * 10) / 10,
-        position_updated_at: new Date().toISOString(),
-      };
-      anchorPosition();
+      writeLocalPosition();
     } catch {
       lastPositionPushSeconds = prevPush;
       /* следующий тик повторит */
@@ -1072,7 +1060,7 @@ export const usePlayerStore = defineStore('player', () => {
   function setPlaybackStalled(stalled: boolean, atSeconds?: number) {
     if (playbackStalled.value === stalled && atSeconds == null) return;
     const measured = atSeconds != null && Number.isFinite(atSeconds) ? atSeconds : extrapolatedPosition.value;
-    anchor.value = Math.max(0, measured);
+    anchor.value = Math.max(0, Math.round(measured));
     anchorAt = Date.now();
     playbackStalled.value = stalled;
   }
@@ -1205,6 +1193,9 @@ export const usePlayerStore = defineStore('player', () => {
     return !desyncGracePassed.value;
   });
 
+  /** Экстраполированная позиция: целые секунды, тик раз в секунду.
+   *  Никакой миллисекундной математики от штампов — только целочисленный
+   *  счётчик от якоря. */
   const extrapolatedPosition = computed(() => {
     if (!state.value.is_playing) return anchor.value;
     // Активное устройство: позиция идёт только когда звук реально идёт.
@@ -1216,12 +1207,15 @@ export const usePlayerStore = defineStore('player', () => {
     ) {
       return anchor.value;
     }
-    return anchor.value + (nowTick.value - anchorAt) / 1000;
+    // Кламп снизу: между применением якоря и ближайшим тиком тикера
+    // nowTick ещё отстоит от anchorAt — floor давал бы −1 и позиция
+    // на секунду прыгала назад.
+    return anchor.value + Math.max(0, Math.floor((nowTick.value - anchorAt) / 1000));
   });
 
-  /** Актуальная позиция из аудио-элемента: переустанавливает якорь экстраполяции. */
+  /** Актуальная позиция из аудио-элемента: переустанавливает якорь (целые секунды). */
   function anchorFromAudio(seconds: number) {
-    anchor.value = seconds;
+    anchor.value = Math.round(seconds);
     anchorAt = Date.now();
   }
 
@@ -1481,12 +1475,16 @@ export const usePlayerStore = defineStore('player', () => {
   function seek(seconds: number) {
     const max = durationSeconds.value;
     if (!max) return;
+    // Целые секунды — как у бэка (api.md §5): миллисекундная точность
+    // прогрессу не нужна, а дёргалась от неё он постоянно.
     state.value = {
       ...state.value,
-      position_seconds: Math.min(max, Math.max(0, seconds)),
-      position_updated_at: new Date().toISOString(),
+      position_seconds: Math.round(Math.min(max, Math.max(0, seconds))),
     };
     anchorPosition();
+    // Локальный seek обязан доехать до элемента даже < 2.5 с: мы источник
+    // правды своего звука. Без бампа вотчер подгонки глушил мелкие seeks.
+    mediaSeek.value += 1;
     // Драг шлёт десятки событий в секунду — на сервер уходит только последняя
     // позиция, через короткую паузу после отпускания. Пульт тоже шлёт seek —
     // бэк вещает команду на активное устройство.
@@ -1761,6 +1759,17 @@ export const usePlayerStore = defineStore('player', () => {
       { immediate: true },
     );
   }
+
+  // Диагностика офлайн-флапа (bugs-player.md): журнал зондов на экране
+  // настроек показывает, что делало приложение в момент промаха health.
+  registerHealthActivity('player', () => {
+    const parts: string[] = [];
+    if (state.value.is_playing) parts.push(audioPlaying.value ? 'играет' : 'play без звука');
+    if (engineLoading.value || streamWarming.value) parts.push('грузит поток');
+    if (playbackStalled.value) parts.push('буфер');
+    if (pendingSeekSeconds != null) parts.push('seek');
+    return parts.length ? parts.join(' · ') : null;
+  });
 
   return {
     state,

@@ -37,10 +37,20 @@ vi.mock('@/api/auth', () => ({
   deleteAvatar: vi.fn(),
 }));
 
-vi.mock('@/api/health', () => ({
-  checkHealth: vi.fn(),
-  HEALTH_TIMEOUT_MS: 10_000,
-}));
+vi.mock('@/api/health', () => {
+  const checkHealth = vi.fn();
+  return {
+    checkHealth,
+    // Поллер ходит через probeHealth — деривируем из того же мока,
+    // чтобы сценарии checkHealth работали без изменений.
+    probeHealth: vi.fn(async (timeoutMs?: number) =>
+      (await checkHealth(timeoutMs))
+        ? { ok: true, durationMs: 1, miss: null, detail: '' }
+        : { ok: false, durationMs: 1, miss: 'unknown', detail: 'mock miss' },
+    ),
+    HEALTH_TIMEOUT_MS: 10_000,
+  };
+});
 
 vi.mock('@/api/qr', () => ({
   startQrLogin: vi.fn(),

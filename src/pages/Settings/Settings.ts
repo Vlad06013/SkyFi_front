@@ -19,6 +19,7 @@ import { resolveUrl } from '@/lib/endpoints';
 import { useDownloadsStore } from '@/stores/downloads';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
+import { clearHealthLog, formatHealthLog, healthLog, healthMissLabel, type HealthLogEntry } from '@/lib/health-log';
 
 export default defineComponent({
   name: 'SettingsPage',
@@ -29,7 +30,12 @@ export default defineComponent({
     const { user } = storeToRefs(auth);
     const { volume } = storeToRefs(usePlayerStore());
     const toast = useToastStore();
-    const sheet = ref<'name' | 'download' | null>(null);
+    const sheet = ref<'name' | 'download' | 'netlog' | null>(null);
+    const sheetTitle = computed(() => {
+      if (sheet.value === 'name') return 'Имя';
+      if (sheet.value === 'netlog') return 'Диагностика сети';
+      return 'Скачать SkyFi';
+    });
     const scanOpen = ref(false);
     const draft = ref(user.value?.name ?? '');
     const avatarInput = ref<HTMLInputElement | null>(null);
@@ -132,10 +138,38 @@ export default defineComponent({
       void router.push({ path: '/qr-confirm', query: { code } });
     }
 
+    // Журнал зондов — новые сверху (bugs-player.md: офлайн-флап ловим
+    // на устройстве, консоль WebView недоступна).
+    const netlog = computed(() => [...healthLog.value].reverse());
+
+    function netlogTime(at: number) {
+      const date = new Date(at);
+      const pad = (value: number) => String(value).padStart(2, '0');
+      return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    }
+
+    function netlogStatus(entry: HealthLogEntry) {
+      return entry.ok ? 'ок' : healthMissLabel(entry.miss);
+    }
+
+    async function copyNetlog() {
+      try {
+        await navigator.clipboard.writeText(formatHealthLog(healthLog.value));
+        toast.show('Диагностика', 'журнал скопирован');
+      } catch {
+        toast.show('Не удалось скопировать журнал', '', true);
+      }
+    }
+
+    function clearNetlog() {
+      clearHealthLog();
+    }
+
     return {
       user,
       volume,
       sheet,
+      sheetTitle,
       scanOpen,
       draft,
       avatarInput,
@@ -159,6 +193,11 @@ export default defineComponent({
       clearDownloads,
       logout,
       onScanned,
+      netlog,
+      netlogTime,
+      netlogStatus,
+      copyNetlog,
+      clearNetlog,
     };
   },
 });

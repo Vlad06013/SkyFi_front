@@ -99,12 +99,24 @@
       </template>
       <button v-if="hasDownloads" class="btn btn-danger sm" type="button" @click="askClearDownloads">Очистить</button>
     </SettingRow>
+    <SettingRow title="Диагностика сети" idle="журнал проверок связи" clickable @open="sheet = 'netlog'">
+      <template #icon>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12h4l2.5-6 4 12 2.5-6h5" />
+        </svg>
+      </template>
+      <span class="go" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 6.5 15 12l-6 5.5" />
+        </svg>
+      </span>
+    </SettingRow>
 
     <div class="logout-wrap">
       <button class="btn btn-danger" type="button" @click="logout">Выйти</button>
     </div>
 
-    <AppSheet :open="Boolean(sheet)" :title="sheet === 'name' ? 'Имя' : 'Скачать SkyFi'" @close="sheet = null">
+    <AppSheet :open="Boolean(sheet)" :title="sheetTitle" @close="sheet = null">
       <form v-if="sheet === 'name'" class="up-form" @submit.prevent="saveName">
         <label>Как к вам обращаться</label>
         <div class="field is-focus">
@@ -114,6 +126,26 @@
           Сохранить
         </button>
       </form>
+      <template v-else-if="sheet === 'netlog'">
+        <div class="netlog-actions">
+          <button class="btn btn-ghost sm" type="button" :disabled="!netlog.length" @click="copyNetlog">Копировать</button>
+          <button class="btn btn-ghost sm" type="button" :disabled="!netlog.length" @click="clearNetlog">Очистить</button>
+        </div>
+        <div v-if="!netlog.length" class="idle netlog-empty">Пока пусто — проверки связи пишутся каждые 10 секунд.</div>
+        <div v-for="(entry, index) in netlog" :key="index" class="netlog-row">
+          <div class="netlog-head">
+            <span class="numeric">{{ netlogTime(entry.at) }}</span>
+            <span :class="entry.ok ? 'netlog-ok' : 'netlog-bad'">{{ netlogStatus(entry) }}</span>
+            <span class="numeric">{{ (entry.durationMs / 1000).toFixed(1) }} с</span>
+            <span v-if="entry.transition" class="netlog-transition">
+              {{ entry.transition === 'offline' ? '→ офлайн' : '→ онлайн' }}
+            </span>
+          </div>
+          <div v-if="entry.detail || entry.activity" class="idle netlog-sub">
+            {{ [entry.detail, entry.activity].filter(Boolean).join(' · ') }}
+          </div>
+        </div>
+      </template>
       <template v-else>
         <SettingRow
           v-for="build in builds"
