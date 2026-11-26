@@ -15,7 +15,7 @@
     <template v-else>
       <div class="f-head">
         <div class="avatar ini lg" :class="friendTone(userId)">
-          <img v-if="profile?.avatar_url" :src="profile.avatar_url" alt="">
+          <img v-if="profile?.avatar_url" :src="resolveUrl(profile.avatar_url)" alt="">
           <template v-else-if="profile">{{ friendInitial(profile.name) }}</template>
         </div>
         <div class="f-name">{{ profile?.name ?? '' }}</div>
@@ -30,7 +30,7 @@
           <div class="preview">
             <img
               v-if="snapshot.type === 'video'"
-              :src="snapshot.cover_url ?? ''"
+              :src="resolveUrl(snapshot.cover_url)"
               alt="кадр клипа"
             >
             <span class="vid-badge" aria-label="клип">
@@ -144,7 +144,7 @@
           entity-type="playlist"
           :source="pl.source_type"
           :source-id="pl.source_id"
-          :cover="pl.cover_url ?? ''"
+          :cover="resolveUrl(pl.cover_url)"
           @open="openPlaylist(pl)"
           @menu="openSnapshotMenu($event, pl, 'my-playlists', pl.owner_name ?? undefined)"
         />
@@ -162,7 +162,7 @@
           entity-type="artist"
           :source="artist.source_type"
           :source-id="artist.source_id"
-          :cover="artist.cover_url ?? ''"
+          :cover="resolveUrl(artist.cover_url)"
           round
           @open="openArtist(artist)"
           @menu="openSnapshotMenu($event, artist, 'my-artists')"
@@ -181,7 +181,7 @@
           entity-type="album"
           :source="album.source_type"
           :source-id="album.source_id"
-          :cover="album.cover_url ?? ''"
+          :cover="resolveUrl(album.cover_url)"
           @open="openAlbum(album)"
           @menu="openSnapshotMenu($event, album, 'my-albums')"
         />

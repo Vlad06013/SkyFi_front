@@ -160,7 +160,7 @@
           <div class="p-now">
             <div class="thumb" :style="{ background: coverVar(current.source_type) }">
               <img v-if="current.type === 'track'" :src="trackCover(current)" alt="">
-              <img v-else-if="current.cover_url" :src="current.cover_url" alt="">
+              <img v-else-if="current.cover_url" :src="resolveUrl(current.cover_url)" alt="">
               <SourceBadge :source="current.source_type" />
             </div>
             <div class="track-meta">

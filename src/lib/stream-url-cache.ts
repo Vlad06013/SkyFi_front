@@ -42,6 +42,11 @@ class StreamUrlDatabase extends Dexie {
   constructor() {
     super('SkyFiStreamUrls');
     this.version(1).stores({ urls: '&key' });
+    // Ссылки стали относительными (api.md §1.7): старые записи с абсолютными
+    // URL и чужим хостом выметаем, свежие get-url их заменят.
+    this.version(2)
+      .stores({ urls: '&key' })
+      .upgrade((tx) => tx.table('urls').clear());
   }
 }
 

@@ -11,6 +11,7 @@ import { useMediaMenu } from '@/composables/useMediaMenu';
 import { clipBuffering, clipFrameReady, clipSurface, getClipVideoElement, setClipHost } from '@/composables/useVideoPlayback';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { coverVar, artistsLine, trackCover } from '@/lib/cover';
+import { resolveUrl } from '@/lib/endpoints';
 import { sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
 import { entityFromSnapshot } from '@/lib/media-menu';
 import { PLAY_SOURCE_QUEUE } from '@/lib/play-sources';
@@ -76,11 +77,11 @@ export default defineComponent({
     /** Фон клип-режима — обложка видео-снапшота. У трека это резолвнутый клип, не обложка аудио. */
     const clipPoster = computed(() => {
       const videoCover = clipPlaybackVideo.value?.cover_url;
-      if (videoCover) return videoCover;
+      if (videoCover) return resolveUrl(videoCover);
       const snap = current.value;
       if (!snap) return '';
       if (snap.type === 'track') return trackCover(snap);
-      return snap.cover_url ?? '';
+      return resolveUrl(snap.cover_url);
     });
     const { liked, toggleLike } = useSnapshotLike(() => player.current);
     const repeatLabel = computed(() => {
@@ -121,7 +122,7 @@ export default defineComponent({
 
     function queueRowCover(snapshot: AnySnapshot): string {
       if (snapshot.type === 'track') return trackCover(snapshot);
-      return snapshot.cover_url ?? '';
+      return resolveUrl(snapshot.cover_url);
     }
 
     /** Тап по элементу очереди: текущий — пауза/плей, иной прямой запуск
@@ -596,6 +597,7 @@ export default defineComponent({
       coverVar,
       artistsLine,
       trackCover,
+      resolveUrl,
       queueRowKind,
       queueRowCover,
       sortRowStyle,

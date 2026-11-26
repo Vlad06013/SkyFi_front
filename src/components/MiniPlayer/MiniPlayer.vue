@@ -33,7 +33,7 @@
                 v-if="pane.snapshot.cover_url"
                 class="mp-cover"
                 :class="{ 'is-behind': index === 1 && miniFrame }"
-                :src="pane.snapshot.cover_url"
+                :src="resolveUrl(pane.snapshot.cover_url)"
                 alt=""
               >
               <div v-if="index === 1 && clipBuffering" class="clip-spinner" aria-hidden="true">

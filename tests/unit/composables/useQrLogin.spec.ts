@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { withActivePinia } from '../helpers/pinia';
 import * as qrApi from '@/api/qr';
 import { ApiError } from '@/api/http';
 import { useQrLogin } from '@/composables/useQrLogin';

@@ -71,6 +71,21 @@ class DownloadDatabase extends Dexie {
       links: '&id, trackKey, ownerKey',
       files: '&path',
     });
+    // Ссылки в снапшотах стали относительными (api.md §1.7): записи со
+    // старыми абсолютными URL выметаем целиком — закачки начнутся заново.
+    this.version(2)
+      .stores({
+        tracks: '&key',
+        collections: '&key',
+        links: '&id, trackKey, ownerKey',
+        files: '&path',
+      })
+      .upgrade(async (tx) => {
+        await tx.table('tracks').clear();
+        await tx.table('collections').clear();
+        await tx.table('links').clear();
+        await tx.table('files').clear();
+      });
   }
 }
 

@@ -16,6 +16,7 @@ import { plural } from '@/lib/plural';
 import { openSnapshot } from '@/lib/open-snapshot';
 import { PLAY_SOURCE_FAVORITES, PLAY_SOURCE_SINGLE, PLAY_SOURCE_UPLOADS } from '@/lib/play-sources';
 import { artistsLine, snapshotCover, trackCover } from '@/lib/cover';
+import { resolveUrl } from '@/lib/endpoints';
 import { usePlayerStore } from '@/stores/player';
 import { useFavoritesStore } from '@/stores/favorites';
 import { useUploadsStore } from '@/stores/uploads';
@@ -444,6 +445,7 @@ export default defineComponent({
       artistsLine,
       snapshotCover,
       trackCover,
+      resolveUrl,
       isPlaying,
       isPlayingVideo,
       isDownloaded,

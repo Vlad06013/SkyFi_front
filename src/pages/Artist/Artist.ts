@@ -8,6 +8,7 @@ import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import { useEntityDetails } from '@/composables/useEntityDetails';
 import { coverVar, artistsLine, trackCover } from '@/lib/cover';
+import { resolveUrl } from '@/lib/endpoints';
 import { PLAY_SOURCE_ARTIST } from '@/lib/play-sources';
 import { useFavoritesStore } from '@/stores/favorites';
 import { usePlayerStore } from '@/stores/player';
@@ -76,6 +77,7 @@ export default defineComponent({
       coverVar,
       artistsLine,
       trackCover,
+      resolveUrl,
       openAlbum,
       albumLine,
       openSnapshotMenu,

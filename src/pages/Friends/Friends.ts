@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router';
 import AppBar from '@/components/AppBar/AppBar.vue';
 import { searchUsers } from '@/api/friends';
 import { friendInitial, friendTone } from '@/lib/friends';
+import { resolveUrl } from '@/lib/endpoints';
 import { useFriendsStore } from '@/stores/friends';
 import type { UserSearchItem } from '@/types';
 
@@ -113,6 +114,7 @@ export default defineComponent({
       statusKind,
       friendInitial,
       friendTone,
+      resolveUrl,
       openFriend,
       addUser,
       cancelRequest,

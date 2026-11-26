@@ -215,9 +215,10 @@ bgutil-ytdlp-pot-provider==2.0.2, версии сервера и плагина
 прокси обложек с YouTube-CDN (i.ytimg.com/ggpht): картинки из
 РФ без обхода не открываются, хосты ограничены allowlist'ом.
 Бэк переписывает cover_url youtube-снапшотов в
-`/yt-resource/cover?u=...` (`CoverProxy`); nginx-локация
-/yt-resource/ уже есть — после правок конфига nginx нужен
-reload/restart контейнера. Снапшоты —
+`/yt-resource/cover?u=...` (`CoverProxy`) — относительным
+путём, активную базу подставляет клиент (api.md §1.7);
+nginx-локация /yt-resource/ уже есть — после правок конфига
+nginx нужен reload/restart контейнера. Снапшоты —
 `SnapshotSourceEnum::YOUTUBE`, source_id — id ролика
 (watch-URL `https://www.youtube.com/watch?v={id}`).
 
@@ -227,7 +228,8 @@ Laravel-сторона (реализовано): `YoutubeVideoResource` (ана�
 название official» (Дзен-фолбэк в `ResolveVideo` временно
 закомментирован), get-url диспатчит по источнику снапшота
 (`GetVideoStreams`). Ответ get-url: `{streams, ttl_sec, hls}` —
-`hls.manifest_url` ведёт на наш relay (тот же ch, что у потоков);
+`hls.manifest_url` ведёт на наш relay (тот же ch, что у потоков),
+относительным путём (клиент подставляет базу, api.md §1.7);
 аудиодорожки (дубляжи) и субтитры внутри манифеста (EXT-X-MEDIA),
 отдельного поля в контракте нет — фронт читает их hls.js.
 Инструкция фронту (hls.js) — api.md §8.1. Тесты: 17 зелёных на

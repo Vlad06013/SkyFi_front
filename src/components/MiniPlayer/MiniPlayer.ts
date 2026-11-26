@@ -5,6 +5,7 @@ import { clipBuffering, clipFrameReady, clipSurface, setMiniClipHost } from '@/c
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { trackPointer } from '@/lib/pointer-drag';
 import { artistsLine, coverVar, trackCover } from '@/lib/cover';
+import { resolveUrl } from '@/lib/endpoints';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import type { AnySnapshot } from '@/types';
 
@@ -21,7 +22,7 @@ export default defineComponent({
     const { current, previewNext, previewPrevious, progress, progressSmooth, clipActive, clipPlaybackVideo, audioLoading } =
       storeToRefs(player);
     /** Превью клипа на треке: обложка видео-снапшота, пока нет кадра. */
-    const clipCover = computed(() => clipPlaybackVideo.value?.cover_url ?? '');
+    const clipCover = computed(() => resolveUrl(clipPlaybackVideo.value?.cover_url));
     /** Фактическое воспроизведение (не мнение сервера) — для иконки плеера. */
     const playing = computed(() => player.isPlaying);
     const { togglePlay, openExpanded, skipRestartAfter } = player;
@@ -253,6 +254,7 @@ export default defineComponent({
       trackEl,
       coverVar,
       trackCover,
+      resolveUrl,
       onDragStart,
       onScroll,
       onRemoteKey,

@@ -4,7 +4,7 @@
     <div v-if="user" class="friend-row" style="padding:12px 2px 16px">
       <div class="pic-plus round sm" role="button" tabindex="0" aria-label="загрузить фото" @click="pickAvatar" @keydown.enter.prevent="pickAvatar">
         <div class="avatar ini">
-          <img v-if="user.avatar_url" :src="user.avatar_url" alt="">
+          <img v-if="user.avatar_url" :src="resolveUrl(user.avatar_url)" alt="">
           <template v-else>{{ user.name.slice(0, 1) }}</template>
         </div>
         <span class="plus" aria-hidden="true">

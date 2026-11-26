@@ -31,7 +31,7 @@
             @click="sheet === 'friend-share' ? pickShare(friend) : pickQueue(friend)"
           >
             <div class="avatar ini" :class="friendTone(friend.user.id)">
-              <img v-if="friend.user.avatar_url" :src="friend.user.avatar_url" alt="">
+              <img v-if="friend.user.avatar_url" :src="resolveUrl(friend.user.avatar_url)" alt="">
               <template v-else>{{ friendInitial(friend.user.name) }}</template>
             </div>
             <div class="track-meta">
@@ -80,7 +80,7 @@
             entity-type="playlist"
             :source="playlist.source_type"
             :source-id="playlist.source_id"
-            :cover="playlist.cover_url ?? ''"
+            :cover="resolveUrl(playlist.cover_url)"
             :menuable="false"
             @open="pickPlaylist(playlist.title)"
           />

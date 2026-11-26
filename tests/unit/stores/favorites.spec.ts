@@ -76,7 +76,7 @@ describe('stores/favorites', () => {
 
   it('гость не грузит; повторные триггеры без выхода не дёргают сеть повторно', async () => {
     useOnlineStore().isOnline = true;
-    const favorites = useFavoritesStore();
+    useFavoritesStore();
     await flushPromises();
     expect(fetchMock).not.toHaveBeenCalled();
 

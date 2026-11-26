@@ -13,7 +13,7 @@
     </div>
     <template v-else-if="artist">
       <div class="hero-cover round" :style="{ background: coverVar(artist.source_type) }">
-        <img v-if="artist.cover_url" :src="artist.cover_url" alt="">
+        <img v-if="artist.cover_url" :src="resolveUrl(artist.cover_url)" alt="">
         <SourceBadge :source="artist.source_type" />
       </div>
       <div class="hero-name">{{ artist.title }}</div>
@@ -70,7 +70,7 @@
           entity-type="album"
           :source="album.source_type"
           :source-id="album.source_id"
-          :cover="album.cover_url ?? ''"
+          :cover="resolveUrl(album.cover_url)"
           :liked="favorites.has(album)"
           @open="openAlbum(album)"
           @menu="openSnapshotMenu($event, album, 'my-albums')"

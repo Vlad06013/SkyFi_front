@@ -20,7 +20,11 @@ export interface EndpointTarget {
  * Совпадает внешний IP устройства с хостом бэка — мы в его домашней сети.
  * IP нет или локалка не задана — остаёмся на внешнем адресе.
  */
-/** `VITE_IS_LOCAL_FORCE=true` — не спрашивать внешний IP, сразу домашняя пара. */
+/**
+ * `VITE_IS_LOCAL_FORCE=true` — не спрашивать внешний IP, сразу домашняя пара.
+ * Ручной override на случай сбоя ipify: в dev распознавание работает и с
+ * https-страницы (трафик идёт через прокси vite), флаг не обязателен.
+ */
 export function isLocalForce(value: string | undefined): boolean {
   return value === 'true';
 }
@@ -69,31 +73,63 @@ function localForced(): boolean {
 function localAllowed(): boolean {
   const url = localConfigUrl();
   if (!url) return false;
-  // Принудительная локалка: адрес берём даже с https-страницы.
-  // В dev запрос уходит на сам dev-сервер, vite проксирует его на локальный бэк.
-  if (localForced()) return true;
-  // https-страница не имеет права на http-бэк: смешанный контент.
-  // APK открыт по http, ему локальный адрес доступен.
+  // https-страница не имеет права на http-бэк напрямую: смешанный контент.
+  // В dev это не запрет — запросы уходят на сам dev-сервер, vite проксирует
+  // их на выбранную пару (proxyActive). APK открыт по http — ему можно и так.
   if (url.protocol === 'http:' && typeof window !== 'undefined' && window.location.protocol === 'https:') {
-    return false;
+    return import.meta.env.DEV;
   }
   return true;
 }
 
 /**
- * С https-страницы dev прямой http://192.168… режется браузером.
- * База axios тогда — путь на самом dev-сервере, vite.config проксирует /api.
+ * Dev на https-странице не может ходить на http-бэк напрямую (mixed content):
+ * axios и медиа идут на origin dev-сервера, vite проксирует их дальше.
+ */
+function proxyActive(): boolean {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return false;
+  if (window.location.protocol !== 'https:') return false;
+  try {
+    return new URL(currentEndpoint().apiUrl).protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * База axios: в прокси-режиме — путь на самом dev-сервере
+ * (vite.config проксирует /api), иначе полный адрес выбранной пары.
  */
 function browserBase(apiUrl: string): string {
-  if (!import.meta.env.DEV || !localForced() || typeof window === 'undefined') return apiUrl;
-  if (window.location.protocol !== 'https:') return apiUrl;
+  if (!proxyActive()) return apiUrl;
   try {
     const url = new URL(apiUrl);
-    if (url.protocol !== 'http:') return apiUrl;
     return url.pathname.endsWith('/') ? url.pathname : `${url.pathname}/`;
   } catch {
     return apiUrl;
   }
+}
+
+/**
+ * Origin, по которому доступны ресурсы бэка (обложки, потоки, аватары):
+ * хост:порт выбранной пары, а в прокси-режиме — origin dev-сервера.
+ * Читает endpointKind — резолвер в шаблонах пересчитается при смене сети.
+ */
+export function activeOrigin(): string {
+  if (proxyActive()) return window.location.origin;
+  return new URL(currentEndpoint().apiUrl).origin;
+}
+
+/**
+ * Ссылки на ресурсы бэка приходят относительными путями (api.md §1.7) —
+ * хост подставляем в точке использования, результат не храним: устройство
+ * может уйти из домашней сети, и сохранённый хост протухнет. Внешние
+ * http(s)-ссылки и blob: проходят без изменений.
+ */
+export function resolveUrl(url: string | null | undefined): string {
+  if (!url) return '';
+  if (!url.startsWith('/') || url.startsWith('//')) return url;
+  return activeOrigin() + url;
 }
 
 export function currentEndpoint(): EndpointTarget {

@@ -4,6 +4,7 @@ import { computed, ref } from 'vue';
 import { fetchAudioFile } from '@/api/audio';
 import { fetchEntityDetails } from '@/api/details';
 import { clearLocalCover, setLocalCover } from '@/lib/cover';
+import { resolveUrl } from '@/lib/endpoints';
 import {
   deleteCollectionRecord,
   deleteLinkRecord,
@@ -182,7 +183,8 @@ export const useDownloadsStore = defineStore('downloads', () => {
   }
 
   async function ensureCover(snapshot: AnySnapshot, signal: AbortSignal) {
-    const url = coverUrlOf(snapshot);
+    // Ссылка с бэка относительная (api.md §1.7) — хост подставляем перед fetch.
+    const url = resolveUrl(coverUrlOf(snapshot)) || null;
     if (!url) return;
     const key = entityKey(snapshot);
     const track = trackRows.value.find((row) => row.key === key);

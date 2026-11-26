@@ -29,6 +29,8 @@ vi.mock('dexie', () => {
       return {
         stores: () => {
           this.urls = new Table();
+          // version().stores().upgrade(...) — апгрейд в моке не выполняем.
+          return { upgrade: () => undefined };
         },
       };
     }

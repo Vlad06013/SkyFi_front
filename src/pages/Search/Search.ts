@@ -8,6 +8,7 @@ import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import { fetchSearch } from '@/api/search';
 import { artistsLine, snapshotCover, trackCover } from '@/lib/cover';
+import { resolveUrl } from '@/lib/endpoints';
 import { getSearchHistory, pushSearchHistory, clearSearchHistory } from '@/lib/search-history';
 import { openSnapshot, type OpenPlayOptions } from '@/lib/open-snapshot';
 import { PLAY_SOURCE_SEARCH } from '@/lib/play-sources';
@@ -414,6 +415,7 @@ export default defineComponent({
       downloads,
       artistsLine,
       trackCover,
+      resolveUrl,
       albumLine,
       snapshotMenuContext,
       isPlaying,

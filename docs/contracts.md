@@ -35,10 +35,12 @@ export interface TrackSnapshot extends SnapshotBase {
   } | null;
   /** Собственная обложка трека (у Яндекса — track cover_uri,
    * совпадает с обложкой альбома). null — фолбэк на
-   * album.cover_url. У upload всегда null. */
+   * album.cover_url. У upload всегда null. Ссылки на ресурсы
+   * бэка — относительные пути (см. resolveUrl ниже). */
   cover_url: string | null;
   /** Постоянная ссылка, только у источников со стабильными URL
-   * (upload). У Яндекса null — запросить /audio/get-url. */
+   * (upload). У Яндекса null — запросить /audio/get-url.
+   * Ссылки на ресурсы бэка — относительные пути. */
   stream_url: string | null;
   sort?: number | null;
 }
@@ -79,6 +81,26 @@ export type AnySnapshot =
   | ArtistSnapshot
   | PlaylistSnapshot;
 ```
+
+## Ссылки на ресурсы бэка (относительные URL, api.md §1.7)
+
+Все ссылки на собственные ресурсы бэка приходят **относительными
+путями** (начинаются с `/`, без хоста): `cover_url`/`stream_url`
+снапшотов на наши ресурсы, `avatar_url`, обложка плейлиста,
+`url`/`manifest_url` из get-url/resolve, пейлоады сокетов.
+Внешние ссылки (обложки Яндекса/Дзена, archive.org, `watch_url`)
+остаются абсолютными. Клиент прогоняет любую ссылку через
+резолвер в точке использования — ветвления по полям не нужно:
+
+```ts
+/** activeBase — база (хост:порт), по которой клиент ходит в API. */
+export const resolveUrl = (url: string): string =>
+  url.startsWith('/') ? activeBase + url : url;
+```
+
+Сегменты внутри m3u8 не трогаем: плеер резолвит их от origin
+URL манифеста. Бэк принимает и абсолютные ссылки со своих
+хостов — обрезает до пути при приёме (старые клиенты не ломаются).
 
 ## Обёртка ответа и общие enum'ы
 

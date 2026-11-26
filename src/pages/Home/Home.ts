@@ -6,6 +6,7 @@ import { useNotificationsStore } from '@/stores/notifications';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { clipBuffering, clipFrameReady, clipSurface, setHomeClipHost } from '@/composables/useVideoPlayback';
 import { coverVar, trackCover } from '@/lib/cover';
+import { resolveUrl } from '@/lib/endpoints';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import OfflineBanner from '@/components/OfflineBanner/OfflineBanner.vue';
 
@@ -29,11 +30,11 @@ export default defineComponent({
 
     const coverSrc = computed(() => {
       const videoCover = clipPlaybackVideo.value?.cover_url;
-      if (videoCover) return videoCover;
+      if (videoCover) return resolveUrl(videoCover);
       const snap = current.value;
       if (!snap) return '';
       if (snap.type === 'track') return trackCover(snap);
-      return snap.cover_url ?? '';
+      return resolveUrl(snap.cover_url);
     });
     function onHomeClipHost(el: unknown) {
       setHomeClipHost(el instanceof HTMLElement ? el : null);

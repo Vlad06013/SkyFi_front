@@ -15,6 +15,7 @@ import QrScannerSheet from '@/components/QrScannerSheet/QrScannerSheet.vue';
 import { useApkBuildStore } from '@/stores/apk-build';
 import { useAppUpdateStore } from '@/stores/app-update';
 import { useAuthStore } from '@/stores/auth';
+import { resolveUrl } from '@/lib/endpoints';
 import { useDownloadsStore } from '@/stores/downloads';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
@@ -140,6 +141,7 @@ export default defineComponent({
       avatarInput,
       avatarBusy,
       confirmClear,
+      resolveUrl,
       inApk: updates.inApk,
       updateIdle,
       updateReady,

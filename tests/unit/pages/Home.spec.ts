@@ -1,8 +1,17 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { mount } from '@vue/test-utils';
 import Home from '@/pages/Home/Home.vue';
 import { useOnlineStore } from '@/stores/online';
+
+vi.mock('vue-router', async () => {
+  const actual = await vi.importActual<typeof import('vue-router')>('vue-router');
+  return {
+    ...actual,
+    useRoute: () => ({ name: 'home' }),
+    useRouter: () => ({ push: vi.fn() }),
+  };
+});
 
 function mountPage() {
   const pinia = createPinia();

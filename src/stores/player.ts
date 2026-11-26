@@ -1613,6 +1613,9 @@ export const usePlayerStore = defineStore('player', () => {
   return {
     state,
     expanded,
+    // Автопауза при загрузке выключена (см. applyServerState): функция
+    // выставлена наружу, чтобы не быть мёртвым кодом, вызов не стартует.
+    reconcileBoot,
     clipMode,
     clipQuality,
     clipQualities,

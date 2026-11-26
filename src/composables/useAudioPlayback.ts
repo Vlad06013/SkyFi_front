@@ -2,7 +2,8 @@ import { watch } from 'vue';
 import { fetchAudioUrl } from '@/api/audio';
 import { isLocalPlaybackUrl } from '@/lib/download-files';
 import { afterMediaUnlock, isAutoplayBlocked, markAutoplayBlocked } from '@/lib/media-unlock';
-import { alignOwnStreamUrl, isOwnApiStream } from '@/lib/own-stream';
+import { resolveUrl } from '@/lib/endpoints';
+import { isOwnApiStream } from '@/lib/own-stream';
 import { snapshotKey } from '@/lib/playback-engine';
 import { getSession } from '@/lib/session';
 import { cacheAudioUrl, getCachedStream, invalidateStream } from '@/lib/stream-url-cache';
@@ -45,14 +46,15 @@ function dropOwnedBlob() {
 /**
  * Ссылка Яндекса играется как есть. Свой поток требует токен — качаем
  * с Authorization и отдаём элементу blob, иначе он получает 401 и каждый
- * следующий клик заново просит get-url.
+ * следующий клик заново просит get-url. Ссылки с бэка относительные
+ * (api.md §1.7) — хост подставляем здесь, в момент использования.
  */
 async function mediaSource(key: string, url: string, signal: AbortSignal): Promise<string> {
-  const aligned = alignOwnStreamUrl(url);
-  if (!isOwnApiStream(aligned)) return aligned;
+  const resolved = resolveUrl(url);
+  if (!isOwnApiStream(resolved)) return resolved;
   if (ownedBlobKey === key && ownedBlobUrl) return ownedBlobUrl;
   const stored = await getSession();
-  const response = await fetch(aligned, {
+  const response = await fetch(resolved, {
     signal,
     headers: stored?.token ? { Authorization: `Bearer ${stored.token}` } : {},
   });

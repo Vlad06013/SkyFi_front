@@ -16,6 +16,7 @@ import {
   reorderFriendQueue,
 } from '@/api/friends';
 import { coverVar, artistsLine, trackCover } from '@/lib/cover';
+import { resolveUrl } from '@/lib/endpoints';
 import { friendInitial, friendTone } from '@/lib/friends';
 import { PLAY_SOURCE_SINGLE } from '@/lib/play-sources';
 import { moveItem, sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
@@ -135,7 +136,7 @@ export default defineComponent({
 
     function queueRowCover(row: AnySnapshot): string {
       if (row.type === 'track') return trackCover(row);
-      return row.cover_url ?? '';
+      return resolveUrl(row.cover_url);
     }
 
     /** Контекст меню строки чужой очереди (docs/menus.md). */
@@ -239,6 +240,7 @@ export default defineComponent({
       coverVar,
       artistsLine,
       trackCover,
+      resolveUrl,
       playSourceSingle: PLAY_SOURCE_SINGLE,
       friendInitial,
       friendTone,

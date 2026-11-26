@@ -5,6 +5,7 @@ import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { addToFriendQueue, shareWithFriend } from '@/api/friends';
 import { fetchShareUrl } from '@/api/shares';
 import { coverVar, trackCover } from '@/lib/cover';
+import { resolveUrl } from '@/lib/endpoints';
 import { friendInitial, friendTone } from '@/lib/friends';
 import { useDevicesStore } from '@/stores/devices';
 import { useFavoritesStore } from '@/stores/favorites';
@@ -50,7 +51,7 @@ export default defineComponent({
     const coverImage = computed(() => {
       const snapshot = props.entity.snapshot;
       if (!snapshot) return '';
-      if (snapshot.type === 'video') return snapshot.cover_url ?? '';
+      if (snapshot.type === 'video') return resolveUrl(snapshot.cover_url);
       if (snapshot.type === 'track') return trackCover(snapshot);
       return '';
     });
@@ -202,6 +203,7 @@ export default defineComponent({
       friendInitial,
       friendTone,
       coverVar,
+      resolveUrl,
     };
   },
 });

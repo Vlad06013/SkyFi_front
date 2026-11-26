@@ -2,6 +2,7 @@ import { ref, watch } from 'vue';
 import { fetchVideoStreams, resolveVideo } from '@/api/videos';
 import type { VideoHls } from '@/api/videos';
 import { ApiError } from '@/api/http';
+import { resolveUrl } from '@/lib/endpoints';
 import { hlsDetach, hlsLoad, hlsResume, hlsSetAudioTrack, hlsSetQuality, hlsSupported, setHlsHooks } from '@/lib/hls-engine';
 import { noteExternalTransport, runOwned, runOwnedAsync } from '@/lib/media-keys';
 import { afterMediaUnlock, isAutoplayBlocked, markAutoplayBlocked } from '@/lib/media-unlock';
@@ -304,9 +305,12 @@ function applyStream(resumePosition?: number) {
   }
   const stream = activeStream(player.clipStreams, player.clipQuality);
   if (!stream) return;
+  // Ссылки с бэка относительные (api.md §1.7) — хост подставляем в момент
+  // подстановки: кеш в IndexedDB хранит их как пришли.
+  const streamUrl = resolveUrl(stream.url);
   // Уже этот поток: всё равно кладём элемент в видимый хост. Иначе src
   // совпал, функция выходила раньше, и превью оставалось без видео под ним.
-  if (el.src === stream.url) {
+  if (el.src === streamUrl) {
     syncAttachment();
     if (!openingArmed()) armOpening();
     armFirstFrame(el);
@@ -316,7 +320,7 @@ function applyStream(resumePosition?: number) {
   // и продление TTL — с текущей позиции элемента.
   resumeAt = resume;
   resumeTarget = resume;
-  el.src = stream.url;
+  el.src = streamUrl;
   // Новый источник — обложка снова вместо кадра, пока playing не наступит.
   setClipFrameReady(false);
   armOpening();
@@ -330,9 +334,12 @@ function applyHls(el: HTMLVideoElement, hls: VideoHls, resumePosition?: number) 
   const player = usePlayerStore();
   hlsSetAudioTrack(player.clipAudioId);
   hlsSetQuality({ auto: player.clipHlsAuto, height: player.clipQuality });
+  // Манифест с бэка относительный (api.md §1.7) — резолвим в момент подстановки;
+  // сегменты внутри m3u8 плеер отрезолвит от origin'а манифеста сам.
+  const manifestUrl = resolveUrl(hls.manifest_url);
   // Новый манифест или ещё не играем — ждём playing. Повтор того же
   // манифеста на живом кадре прогрев не трогает.
-  const switching = appliedManifest !== hls.manifest_url;
+  const switching = appliedManifest !== manifestUrl;
   if (switching) setClipFrameReady(false);
   if (switching || el.paused) player.setStreamWarming(true);
   // Явная позиция (новый ролик — серверные секунды, часто 0) важнее currentTime:
@@ -354,8 +361,8 @@ function applyHls(el: HTMLVideoElement, hls: VideoHls, resumePosition?: number) 
       handleStreamError();
       return;
     }
-    const attached = await hlsLoad(el, hls.manifest_url, switching ? resume : undefined);
-    appliedManifest = hls.manifest_url;
+    const attached = await hlsLoad(el, manifestUrl, switching ? resume : undefined);
+    appliedManifest = manifestUrl;
     hlsAttached = true;
     // Манифест тот же (ретрай get-url после фатальной ошибки): источник не
     // пересоздаётся — будим остановленную hls.js загрузку.

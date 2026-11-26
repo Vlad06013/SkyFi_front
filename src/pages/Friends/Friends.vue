@@ -19,7 +19,7 @@
         <div class="sec-label">Заявки <span>{{ incoming.length }}</span></div>
         <div v-for="entry in incoming" :key="entry.user.id" class="friend-row">
           <div class="avatar ini" :class="friendTone(entry.user.id)">
-            <img v-if="entry.user.avatar_url" :src="entry.user.avatar_url" alt="">
+            <img v-if="entry.user.avatar_url" :src="resolveUrl(entry.user.avatar_url)" alt="">
             <template v-else>{{ friendInitial(entry.user.name) }}</template>
           </div>
           <div class="track-meta">
@@ -46,7 +46,7 @@
         @click="openFriend(entry.user.id)"
       >
         <div class="avatar ini" :class="friendTone(entry.user.id)">
-          <img v-if="entry.user.avatar_url" :src="entry.user.avatar_url" alt="">
+          <img v-if="entry.user.avatar_url" :src="resolveUrl(entry.user.avatar_url)" alt="">
           <template v-else>{{ friendInitial(entry.user.name) }}</template>
         </div>
         <div class="track-meta">
@@ -58,7 +58,7 @@
           class="now-prev"
           aria-hidden="true"
         >
-          <img :src="entry.user.current_snapshot.cover_url ?? ''" alt="">
+          <img :src="resolveUrl(entry.user.current_snapshot.cover_url)" alt="">
           <span class="vid-badge">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="6" width="18" height="12" rx="2" />
@@ -72,7 +72,7 @@
         <div class="sec-label">Отправлено <span>{{ outgoing.length }}</span></div>
         <div v-for="entry in outgoing" :key="entry.user.id" class="friend-row">
           <div class="avatar ini" :class="friendTone(entry.user.id)">
-            <img v-if="entry.user.avatar_url" :src="entry.user.avatar_url" alt="">
+            <img v-if="entry.user.avatar_url" :src="resolveUrl(entry.user.avatar_url)" alt="">
             <template v-else>{{ friendInitial(entry.user.name) }}</template>
           </div>
           <div class="track-meta">
@@ -94,7 +94,7 @@
         <div class="sec-label">Заявки <span>{{ requestUsers.length }}</span></div>
         <div v-for="user in requestUsers" :key="user.user_id" class="friend-row">
           <div class="avatar ini" :class="friendTone(user.user_id)">
-            <img v-if="user.avatar_url" :src="user.avatar_url" alt="">
+            <img v-if="user.avatar_url" :src="resolveUrl(user.avatar_url)" alt="">
             <template v-else>{{ friendInitial(user.name) }}</template>
           </div>
           <div class="track-meta">
@@ -123,7 +123,7 @@
           @click="openFriend(user.user_id)"
         >
           <div class="avatar ini" :class="friendTone(user.user_id)">
-            <img v-if="user.avatar_url" :src="user.avatar_url" alt="">
+            <img v-if="user.avatar_url" :src="resolveUrl(user.avatar_url)" alt="">
             <template v-else>{{ friendInitial(user.name) }}</template>
           </div>
           <div class="track-meta">
@@ -134,7 +134,7 @@
         </button>
         <div v-for="user in restUsers.filter((item) => statusKind(item) !== 'friends')" :key="user.user_id" class="friend-row">
           <div class="avatar ini" :class="friendTone(user.user_id)">
-            <img v-if="user.avatar_url" :src="user.avatar_url" alt="">
+            <img v-if="user.avatar_url" :src="resolveUrl(user.avatar_url)" alt="">
             <template v-else>{{ friendInitial(user.name) }}</template>
           </div>
           <div class="track-meta">

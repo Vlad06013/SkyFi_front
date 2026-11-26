@@ -1,4 +1,5 @@
 import { computed, defineComponent, ref, type PropType } from 'vue';
+import { resolveUrl } from '@/lib/endpoints';
 import type { Visibility } from '@/types';
 
 export const visibilityOptions: { value: Visibility; label: string; hint: string }[] = [
@@ -34,11 +35,11 @@ export default defineComponent({
       () => visibilityOptions.find((option) => option.value === visibility.value)?.label ?? '',
     );
 
-    const coverStyle = computed(() =>
-      cover.value
-        ? { background: `var(--color-surface-2) center/cover url(${cover.value})` }
-        : undefined,
-    );
+    const coverStyle = computed(() => {
+      // blob: из пикера проходит резолвер без изменений, ссылка бэка — с хостом.
+      const url = resolveUrl(cover.value);
+      return url ? { background: `var(--color-surface-2) center/cover url(${url})` } : undefined;
+    });
 
     function pickCover() {
       fileInput.value?.click();

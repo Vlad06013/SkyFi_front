@@ -21,22 +21,30 @@ describe('api/details', () => {
       { type: 'album', source_type: 'yandex_music', source_id: '43334443' },
       { page: 2, limit: 50 },
     );
-    expect(postMock).toHaveBeenCalledWith('details', {
-      type: 'album',
-      source_type: 'yandex_music',
-      source_id: '43334443',
-      page: 2,
-      limit: 50,
-    });
+    expect(postMock).toHaveBeenCalledWith(
+      'details',
+      {
+        type: 'album',
+        source_type: 'yandex_music',
+        source_id: '43334443',
+        page: 2,
+        limit: 50,
+      },
+      undefined,
+    );
   });
 
   it('без params — только конверт', async () => {
     postMock.mockResolvedValue({ entity: null } as never);
     await fetchEntityDetails({ type: 'artist', source_type: 'yandex_music', source_id: '6964' });
-    expect(postMock).toHaveBeenCalledWith('details', {
-      type: 'artist',
-      source_type: 'yandex_music',
-      source_id: '6964',
-    });
+    expect(postMock).toHaveBeenCalledWith(
+      'details',
+      {
+        type: 'artist',
+        source_type: 'yandex_music',
+        source_id: '6964',
+      },
+      undefined,
+    );
   });
 });

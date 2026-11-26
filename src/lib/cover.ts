@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { resolveUrl } from '@/lib/endpoints';
 import { entityKey } from '@/lib/download-keys';
 import type { AnySnapshot, SnapshotSource, TrackSnapshot } from '@/types';
 
@@ -35,19 +36,19 @@ export function trackCover(track: TrackSnapshot): string {
   void localCoverVersion.value;
   const own = localCover(entityKey(track));
   if (own) return own;
-  if (track.cover_url) return track.cover_url;
+  if (track.cover_url) return resolveUrl(track.cover_url);
   if (track.album?.source_id) {
     const album = localCover(`album:${track.source_type}:${track.album.source_id}`);
     if (album) return album;
   }
-  return track.album?.cover_url ?? '';
+  return resolveUrl(track.album?.cover_url);
 }
 
 /** Обложка снапшота: скачанный файл, иначе ссылка с сервера. */
 export function snapshotCover(snapshot: AnySnapshot): string {
   void localCoverVersion.value;
   if (snapshot.type === 'track') return trackCover(snapshot);
-  return localCover(entityKey(snapshot)) || snapshot.cover_url || '';
+  return localCover(entityKey(snapshot)) || resolveUrl(snapshot.cover_url);
 }
 
 export function sourceTitle(source: SnapshotSource): string {

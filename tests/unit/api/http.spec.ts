@@ -79,7 +79,7 @@ describe('api/http', () => {
 
   it('распаковывает data из обёртки ответа', async () => {
     const payload = { errors: null, data: { x: 1 }, pagination: null };
-    expect(successHandler({ data: payload })).toEqual({ x: 1 });
+    expect(successHandler({ data: payload, config: {} })).toEqual({ x: 1 });
   });
 
   it('прокидывает вызовы методов на инстанс', async () => {

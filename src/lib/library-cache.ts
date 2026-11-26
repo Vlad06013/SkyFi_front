@@ -46,6 +46,19 @@ class LibraryDatabase extends Dexie {
       uploads: '&userId',
       player: '&userId',
     });
+    // Ссылки в снапшотах стали относительными (api.md §1.7): кеши со старыми
+    // абсолютными URL выметаем — списки и стейт перезапишутся с сервера.
+    this.version(3)
+      .stores({
+        favorites: '&userId',
+        uploads: '&userId',
+        player: '&userId',
+      })
+      .upgrade(async (tx) => {
+        await tx.table('favorites').clear();
+        await tx.table('uploads').clear();
+        await tx.table('player').clear();
+      });
   }
 }
 

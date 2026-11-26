@@ -127,7 +127,7 @@
         entity-type="artist"
         :source="artist.source_type"
         :source-id="artist.source_id"
-        :cover="artist.cover_url ?? ''"
+        :cover="resolveUrl(artist.cover_url)"
         round
         @open="openArtist(artist)"
         @menu="openSnapshotMenu($event, artist, 'my-artists')"
@@ -144,7 +144,7 @@
         entity-type="video"
         :source="video.source_type"
         :source-id="video.source_id"
-        :cover="video.cover_url ?? ''"
+        :cover="resolveUrl(video.cover_url)"
         :playing="isPlayingVideo(video)"
         :duration-ms="video.duration_ms"
         @open="player.playOrToggle(video, playSourceFavorites, { contextItems: videos })"
