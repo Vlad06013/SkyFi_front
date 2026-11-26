@@ -1521,6 +1521,109 @@ describe('stores/player: позиционный репорт', () => {
     }
   });
 
+  it('пульт с грузящимся клипом: прогресс стоит, а не шагает вперёд звука', async () => {
+    vi.useFakeTimers();
+    try {
+      // resync в bindServerPlayback не должен приносить чужой стейт из
+      // протухшей реализации мока (clearAllMocks чистит вызовы, не реализации).
+      fetchPlayerStateMock.mockResolvedValue(undefined as never);
+      const player = usePlayerStore();
+      player.applyServerState(
+        {
+          state: {
+            ...player.state,
+            current_snapshot: track,
+            is_playing: true,
+            position_seconds: 0,
+            position_updated_at: new Date().toISOString(),
+            active_device_id: 'uuid-2',
+            devices: [me, { device_uuid: 'uuid-2', name: 'ТВ', type: 'tv', last_seen_at: null }],
+          },
+          queue: [],
+        } as never,
+        { force: true },
+      );
+      player.clipMode = true;
+      player.setClipResolved(track, clip, [{ quality: 720, url: 'https://cdn.test/720.mp4' }]);
+      player.bindServerPlayback();
+
+      expect(player.clipActive).toBe(true);
+      // Видео пульта ещё грузится (playing не было) — зеркало заморожено:
+      // активное устройство в это время молчит и репортит старую позицию.
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(player.positionSeconds).toBe(0);
+
+      // Своё видео заиграло (muted): обработчик playing пересаживает якорь
+      // на currentTime элемента (setPlaybackStalled) и метит звучание.
+      player.setPlaybackStalled(false, 0);
+      player.setAudioPlaying(true);
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(player.positionSeconds).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('пульт в окне резолва клипа: прогресс тоже стоит', async () => {
+    vi.useFakeTimers();
+    try {
+      fetchPlayerStateMock.mockResolvedValue(undefined as never);
+      const player = usePlayerStore();
+      player.applyServerState(
+        {
+          state: {
+            ...player.state,
+            current_snapshot: track,
+            is_playing: true,
+            position_seconds: 0,
+            position_updated_at: new Date().toISOString(),
+            active_device_id: 'uuid-2',
+            devices: [me],
+          },
+          queue: [],
+        } as never,
+        { force: true },
+      );
+      player.clipMode = true;
+      player.setClipResolving();
+      player.bindServerPlayback();
+
+      await vi.advanceTimersByTimeAsync(4_000);
+      expect(player.positionSeconds).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('пульт без клипа: зеркало аудио тикает по часам', async () => {
+    vi.useFakeTimers();
+    try {
+      fetchPlayerStateMock.mockResolvedValue(undefined as never);
+      const player = usePlayerStore();
+      player.applyServerState(
+        {
+          state: {
+            ...player.state,
+            current_snapshot: track,
+            is_playing: true,
+            position_seconds: 0,
+            position_updated_at: new Date().toISOString(),
+            active_device_id: 'uuid-2',
+            devices: [me],
+          },
+          queue: [],
+        } as never,
+        { force: true },
+      );
+      player.bindServerPlayback();
+
+      await vi.advanceTimersByTimeAsync(3_000);
+      expect(player.positionSeconds).toBe(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('пауза не сбрасывает позицию в 0: на сервер и в стейт уходит локальная', async () => {
     vi.useFakeTimers();
     try {

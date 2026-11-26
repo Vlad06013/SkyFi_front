@@ -1211,13 +1211,19 @@ export const usePlayerStore = defineStore('player', () => {
    *  счётчик от якоря. */
   const extrapolatedPosition = computed(() => {
     if (!state.value.is_playing) return anchor.value;
-    // Активное устройство: позиция идёт только когда звук реально идёт.
-    // Пока качается ссылка или ждём первый кадр, ползунок стоит — иначе
-    // полоска растёт на обложке со спиннером.
-    if (
-      isActiveDevice.value &&
-      (!audioPlaying.value || engineLoading.value || streamWarming.value || playbackStalled.value)
-    ) {
+    // Позиция идёт только когда звук реально идёт: пока качается ссылка или
+    // ждём первый кадр, ползунок стоит — иначе полоска растёт на обложке со
+    // спиннером. Пульт с клипом живёт по тому же правилу: своё видео он
+    // грузит параллельно с активным (клип рендерит каждое устройство), а
+    // активное в это время молчит и репортит старую позицию — тиканье по
+    // часам убегало вперёд звука пилой (тик вперёд, откат репортом). Резолв
+    // тоже держим: до его исхода неизвестно, будет видео или аудио.
+    const loading =
+      !audioPlaying.value || engineLoading.value || streamWarming.value || playbackStalled.value;
+    const clipLoading =
+      clipPlaybackVideo.value != null ||
+      (clipMode.value && clipStatus.value !== 'unavailable' && current.value?.type === 'track');
+    if ((isActiveDevice.value || clipLoading) && loading) {
       return anchor.value;
     }
     // Кламп снизу: между применением якоря и ближайшим тиком тикера
