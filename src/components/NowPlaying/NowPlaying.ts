@@ -190,6 +190,19 @@ export default defineComponent({
     /** Тап по нижнему плееру открывает этот слой и тот же click долетает сюда. */
     let openedAt = 0;
 
+    /**
+     * Тап по нижнему плееру открывает этот слой, а click от того же жеста,
+     * из-за pointer capture (см. trackPointer), диспатчится по координатам —
+     * на то, что оказалось под пальцем: кнопку play, лайк, очередь. Первые
+     * 400 мс после открытия такие попадания глушим (capture-фаза корня раньше
+     * цели, кнопка событие вообще не получит).
+     */
+    function onShellClickCapture(event: MouseEvent) {
+      if (Date.now() - openedAt >= 400) return;
+      event.stopPropagation();
+      event.preventDefault();
+    }
+
     /** HLS-манифест жив (высоты приехали) — селекты качества/дорожек работают в HLS-режиме. */
     const clipHlsActive = computed(() => clipHlsHeights.value.length > 0);
     /** Активная дорожка: выбранная, иначе default из манифеста, иначе первая. */
@@ -594,6 +607,7 @@ export default defineComponent({
       queueSheetStyle,
       topLabel,
       clipPoster,
+      onShellClickCapture,
       coverVar,
       artistsLine,
       trackCover,

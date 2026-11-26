@@ -242,8 +242,15 @@ export function useAudioPlayback() {
         void loadSnapshot(player.effectiveCurrent);
         return;
       }
-      if (shouldPlay) tryPlay(el);
-      else runOwned(() => el.pause());
+      if (shouldPlay) {
+        // Пока за новый трек ещё летит ссылка, элемент несёт прежний: play()
+        // здесь дал бы секунду старого звука до подмены src — старт доводит
+        // loadSnapshot, когда поток реально встал (appliedKey === key).
+        if (appliedKey !== snapshotKey(player.effectiveCurrent)) return;
+        tryPlay(el);
+        return;
+      }
+      runOwned(() => el.pause());
     },
   );
 
@@ -302,6 +309,26 @@ export function useAudioPlayback() {
       ensureAudio().volume = Math.min(1, Math.max(0, percent / 100));
     },
     { immediate: true },
+  );
+
+  // Возвращение сети после офлайн-периода: офлайн-ветка loadSnapshot глушит
+  // элемент (пауза + снятый src), а вотчеры потока при этом не стреляют —
+  // снапшот и роль не менялись. Без переподхвата плеер молчал бы до следующего
+  // действия пользователя. Скачанный трек глушения не дождался (appliedKey
+  // совпал) — его не трогаем.
+  watch(
+    () => useOnlineStore().isOnline,
+    (online, prev) => {
+      if (online !== true || prev !== false) return;
+      if (!player.isActiveDevice || !player.state.is_playing) return;
+      const snap = player.effectiveCurrent;
+      if (!snap || snap.type !== 'track') return;
+      const el = ensureAudio();
+      if (appliedKey === snapshotKey(snap) && !el.error) return;
+      loadedKey = null;
+      appliedKey = null;
+      void loadSnapshot(snap);
+    },
   );
 
   // События элемента — источник правды о реальном звучании: стор экстраполирует

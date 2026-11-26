@@ -39,6 +39,7 @@ vi.mock('@/api/auth', () => ({
 
 vi.mock('@/api/health', () => ({
   checkHealth: vi.fn(),
+  HEALTH_TIMEOUT_MS: 10_000,
 }));
 
 vi.mock('@/api/qr', () => ({

@@ -5,6 +5,7 @@ import { useOnlineStore } from '@/stores/online';
 
 vi.mock('@/api/health', () => ({
   checkHealth: vi.fn(),
+  HEALTH_TIMEOUT_MS: 10_000,
 }));
 
 const checkHealthMock = vi.mocked(checkHealth);
@@ -38,6 +39,30 @@ describe('stores/online', () => {
     await online.startPolling();
     expect(online.isOnline).toBe(false);
 
+    checkHealthMock.mockResolvedValue(true);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(online.isOnline).toBe(true);
+    await online.stopPolling();
+  });
+
+  it('одиночный таймаут не уводит в офлайн — только два подряд', async () => {
+    checkHealthMock.mockResolvedValue(true);
+    const online = useOnlineStore();
+
+    await online.startPolling();
+    expect(online.isOnline).toBe(true);
+
+    // Один промах (холодный LTE-зонд) — состояние держим.
+    checkHealthMock.mockRejectedValueOnce(new Error('slow lte'));
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(online.isOnline).toBe(true);
+
+    // Второй подряд — уходим в офлайн.
+    checkHealthMock.mockRejectedValueOnce(new Error('still down'));
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(online.isOnline).toBe(false);
+
+    // Один успех возвращает онлайн сразу, без серии.
     checkHealthMock.mockResolvedValue(true);
     await vi.advanceTimersByTimeAsync(10_000);
     expect(online.isOnline).toBe(true);

@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth';
 
 vi.mock('@/api/health', () => ({
   checkHealth: vi.fn(),
+  HEALTH_TIMEOUT_MS: 10_000,
 }));
 
 vi.mock('@/api/auth', () => ({

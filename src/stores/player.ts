@@ -357,8 +357,32 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   /** Сокет-ивент playback.state.updated (эхо и дедуп уже отсеял роутер):
-   *  пейлоад — тот же JSON, что GET /player (state + queue, api.md §17). */
+   *  пейлоад — тот же JSON, что GET /player (state + queue, api.md §17).
+   *  Активное устройство — источник истины воспроизведения: координацию
+   *  (версию, очередь, режимы, активное устройство) берём с сервера, а свой
+   *  трек/позицию/is_playing протухшим замером не подменяем — ивент шлётся
+   *  и по регистрации устройства, с позицией последнего репорта, и её
+   *  применение дёргало бы звук назад. Свежий штамп позиции (пульт seek'нул,
+   *  транспорт не совпал) — признак чужой команды: такой стейт целиком. */
   function applySocketState(payload: PlayerStatePayload) {
+    if (!payload?.state) return;
+    if (serverStateApplied && payload.state.version <= state.value.version) return;
+    if (serverStateApplied && isActiveDevice.value) {
+      const mine = state.value;
+      const theirs = payload.state;
+      const sameTransport =
+        theirs.is_playing === mine.is_playing &&
+        (theirs.current_snapshot ? snapshotKey(theirs.current_snapshot) : '') ===
+          (mine.current_snapshot ? snapshotKey(mine.current_snapshot) : '');
+      if (sameTransport) {
+        const mineStamp = Date.parse(mine.position_updated_at ?? '') || 0;
+        const theirsStamp = Date.parse(theirs.position_updated_at ?? '') || 0;
+        if (theirsStamp <= mineStamp + 1000) {
+          applyServerStateMerged(payload);
+          return;
+        }
+      }
+    }
     applyServerState(payload);
   }
 
@@ -687,6 +711,23 @@ export const usePlayerStore = defineStore('player', () => {
     }
     // «Играть будет это устройство»: без онлайн-активного активируемся сами.
     if (!isActiveDevice.value) await ensureActiveForPlayback();
+    // Оптимистичный старт: на LTE ответ /play едет секунды, а тап уже выбрал
+    // трек. Применяем его сразу (движки параллельно идут за потоком — звук
+    // стартует раньше), при ошибке откатываемся. Пульт не оптимизируем: его
+    // resync/активация выше переписали бы стейт до ответа дважды.
+    const optimistic = isActiveDevice.value;
+    const prevState = state.value;
+    if (optimistic) {
+      state.value = {
+        ...state.value,
+        current_snapshot: snapshot,
+        position_seconds: 0,
+        is_playing: true,
+        play_source: playbackSource,
+        position_updated_at: new Date().toISOString(),
+      };
+      anchorPosition();
+    }
     try {
       const extra: { context_ref?: string | null; shuffle_seed?: string | null } = {
         shuffle_seed: opts.rollSeed === false ? undefined : crypto.randomUUID(),
@@ -694,11 +735,19 @@ export const usePlayerStore = defineStore('player', () => {
       if (contextRef !== undefined) extra.context_ref = contextRef;
       const payload = await withDevice((fields) => playerApi.playSnapshot(snapshot, playbackSource, fields, extra));
       if (!payload) {
+        if (optimistic) {
+          state.value = prevState;
+          anchorPosition();
+        }
         toast.show('Устройство ещё не зарегистрировано', '', true);
         return;
       }
       applyServerState(payload, { force: true });
     } catch (cause) {
+      if (optimistic) {
+        state.value = prevState;
+        anchorPosition();
+      }
       toast.show(errorText(cause, 'Не удалось включить'), '', true);
       void resync();
     }
@@ -910,16 +959,22 @@ export const usePlayerStore = defineStore('player', () => {
 
   /** Периодический репорт позиции — намеренно бродкастит пультам (сверка А, 2026-11-23). */
   let lastReportAt = 0;
+  /** Свой ориентир для периодичности: слияние по владению position_seconds не
+   *  пересаживает, сравнивать с ним было бы «отставанием от протухшего замера». */
+  let lastReportedSeconds = 0;
 
   async function reportPosition() {
     const now = Date.now();
     if (now - lastReportAt < POSITION_REPORT_INTERVAL_MS) return;
     const seconds = Math.round(extrapolatedPosition.value);
-    if (Math.abs(seconds - state.value.position_seconds) < 3) return;
+    if (Math.abs(seconds - lastReportedSeconds) < POSITION_REPORT_INTERVAL_MS / 1000) return;
     lastReportAt = now;
+    lastReportedSeconds = seconds;
     try {
+      // Ответ на свой репорт применяем слиянием: округлённая серверная копия
+      // протухает на RTT, force-подмена дёргала бы элемент назад вотчером seek.
       const payload = await withDevice((fields) => playerApi.seekTo(seconds, fields));
-      if (payload) applyServerState(payload, { force: true });
+      if (payload) applyServerStateMerged(payload);
     } catch {
       /* следующий тик повторит */
     }

@@ -6,6 +6,7 @@
     tabindex="-1"
     :class="{ 'is-dragging': playerDragging, 'is-clip': clipActive, 'is-clip-idle': clipIdle, 'has-frame': expandedFrame }"
     :style="playerDragStyle"
+    @click.capture="onShellClickCapture"
     @pointerdown="onPlayerDragStart"
     @pointermove="onClipPointerMove"
   >

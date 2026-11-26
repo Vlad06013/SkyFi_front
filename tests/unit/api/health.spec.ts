@@ -20,11 +20,11 @@ describe('api/health', () => {
     await expect(checkHealth()).resolves.toBe(true);
   });
 
-  it('передаёт таймаут 5 с', async () => {
+  it('передаёт таймаут 10 с', async () => {
     getMock.mockResolvedValue({ status: 'ok', server_time: 't' });
     await checkHealth();
     expect(getMock).toHaveBeenCalledWith('health', { timeout: HEALTH_TIMEOUT_MS });
-    expect(HEALTH_TIMEOUT_MS).toBe(5_000);
+    expect(HEALTH_TIMEOUT_MS).toBe(10_000);
   });
 
   it('false на 200 без status ok', async () => {
