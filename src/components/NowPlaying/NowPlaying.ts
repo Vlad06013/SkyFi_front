@@ -187,21 +187,6 @@ export default defineComponent({
     let idleTimer: ReturnType<typeof setTimeout> | null = null;
     /** pointerdown уже снял простой — клик не должен в ту же жесту ставить паузу. */
     let revealOnly = false;
-    /** Тап по нижнему плееру открывает этот слой и тот же click долетает сюда. */
-    let openedAt = 0;
-
-    /**
-     * Тап по нижнему плееру открывает этот слой, а click от того же жеста,
-     * из-за pointer capture (см. trackPointer), диспатчится по координатам —
-     * на то, что оказалось под пальцем: кнопку play, лайк, очередь. Первые
-     * 400 мс после открытия такие попадания глушим (capture-фаза корня раньше
-     * цели, кнопка событие вообще не получит).
-     */
-    function onShellClickCapture(event: MouseEvent) {
-      if (Date.now() - openedAt >= 400) return;
-      event.stopPropagation();
-      event.preventDefault();
-    }
 
     /** HLS-манифест жив (высоты приехали) — селекты качества/дорожек работают в HLS-режиме. */
     const clipHlsActive = computed(() => clipHlsHeights.value.length > 0);
@@ -320,10 +305,6 @@ export default defineComponent({
       }
       void rootEl.value.requestFullscreen();
     }
-
-    watch(expanded, (open) => {
-      if (open) openedAt = Date.now();
-    });
 
     watch([clipBuffering, playing], wake);
 
@@ -504,10 +485,6 @@ export default defineComponent({
           // решаем здесь. Свайп вниз уже обработан выше.
           if (!clip || layer.value !== 'now') return;
           if (Math.abs(lastDx) > 10 || Math.abs(lastDy) > 10) return;
-          if (Date.now() - openedAt < 400) {
-            revealOnly = false;
-            return;
-          }
           const onlyReveal = revealOnly;
           revealOnly = false;
           if (onlyReveal) return;
@@ -607,7 +584,6 @@ export default defineComponent({
       queueSheetStyle,
       topLabel,
       clipPoster,
-      onShellClickCapture,
       coverVar,
       artistsLine,
       trackCover,

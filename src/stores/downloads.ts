@@ -50,7 +50,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
   const trackRows = ref<TrackRecord[]>([]);
   const collections = ref<CollectionRecord[]>([]);
   const links = ref<LinkRecord[]>([]);
-  const bulk = ref<{ kind: BulkKind; total: number; done: number } | null>(null);
+  const bulk = ref<{ kind: BulkKind; total: number; done: number; current: string | null } | null>(null);
   /** Процент одного файла: loaded / Content-Length. К кнопке «скачать всё» не относится. */
   const filePct = ref<Record<string, number>>({});
   let bulkAbort: AbortController | null = null;
@@ -146,7 +146,7 @@ export const useDownloadsStore = defineStore('downloads', () => {
     cancelBulk();
     const controller = new AbortController();
     bulkAbort = controller;
-    bulk.value = { kind, total: 0, done: 0 };
+    bulk.value = { kind, total: 0, done: 0, current: null };
     return controller;
   }
 
@@ -270,6 +270,9 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
   async function saveTrack(snapshot: TrackSnapshot, ownerKey: string, signal: AbortSignal, report: boolean) {
     if (signal.aborted) aborted();
+    // «Что сейчас качается» для плашки библиотеки: без неё прогон уже
+    // скачанного (проверка связей/обложек) выглядел мёртвым зависанием.
+    if (report && bulk.value) bulk.value = { ...bulk.value, current: snapshot.title };
     await storeFile(snapshot, signal);
     await addLink(entityKey(snapshot), ownerKey);
     await ensureCover(snapshot, signal);

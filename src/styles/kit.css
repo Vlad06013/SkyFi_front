@@ -262,6 +262,12 @@
   object-fit: cover; display: block;
   background: #000;
 }
+/* Кадра ещё нет — элемент прячем совсем: пустой <video> Android WebView
+   рисует серой заглушкой с чёрным треугольником. Готовность (is-ready на
+   элементе) ставит движок по videoWidth/readyState — opacity декодирование
+   не останавливает. */
+.clip-video { opacity: 0; }
+.clip-video.is-ready { opacity: 1; }
 /* Кадр есть — видео выше превью. До этого превью закрывает чёрный буфер. */
 .is-clip.has-frame .clip-video { z-index: 3; }
 .is-clip.has-frame .clip-spinner { z-index: 4; }
@@ -538,7 +544,12 @@
   color: var(--color-text-secondary);
   font-feature-settings: "tnum" 1, "lnum" 1;
   padding-left: 4px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+.dl-count.is-live { color: var(--color-accent); }
 .dl-all {
   width: 36px; height: 36px; border-radius: 50%;
   display: inline-grid; place-items: center;

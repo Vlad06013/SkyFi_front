@@ -1,10 +1,10 @@
-import { computed, defineComponent } from 'vue';
+import { computed, defineComponent, nextTick, onActivated } from 'vue';
 import { usePageRefresh } from '@/composables/usePageRefresh';
 import { storeToRefs } from 'pinia';
 import { usePlayerStore } from '@/stores/player';
 import { useNotificationsStore } from '@/stores/notifications';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
-import { clipBuffering, clipFrameReady, clipSurface, setHomeClipHost } from '@/composables/useVideoPlayback';
+import { clipBuffering, clipFrameReady, clipSurface, resyncClipAttachment, setHomeClipHost } from '@/composables/useVideoPlayback';
 import { coverVar, trackCover } from '@/lib/cover';
 import { resolveUrl } from '@/lib/endpoints';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
@@ -39,6 +39,13 @@ export default defineComponent({
     function onHomeClipHost(el: unknown) {
       setHomeClipHost(el instanceof HTMLElement ? el : null);
     }
+
+    // Вкладка в keep-alive: при возврате ref'ы не меняются, вотчер хостов
+    // молчит — видео оставалось в парковке, и диск залипал превью при
+    // играющем звуке. После активации и раскладки синкаем привязку заново.
+    onActivated(() => {
+      void nextTick(() => requestAnimationFrame(resyncClipAttachment));
+    });
 
     usePageRefresh(async () => {
       await player.resync();

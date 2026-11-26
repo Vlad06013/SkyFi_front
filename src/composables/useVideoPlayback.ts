@@ -213,14 +213,32 @@ setHlsHooks({
 
 export function setClipHost(el: HTMLElement | null) {
   clipHost.value = el;
+  if (el) syncAttachmentSoon();
 }
 
 export function setMiniClipHost(el: HTMLElement | null) {
   miniClipHost.value = el;
+  if (el) syncAttachmentSoon();
 }
 
 export function setHomeClipHost(el: HTMLElement | null) {
   homeClipHost.value = el;
+  if (el) syncAttachmentSoon();
+}
+
+/**
+ * Пересинхронизация видимости хостов снаружи: keep-alive возвращает страницу
+ * без смены ref'ов (элементы те же), вотчер молчит, и видео остаётся
+ * в парковке — диск главной показывал застывшее превью при играющем звуке.
+ */
+export function resyncClipAttachment() {
+  syncAttachment();
+}
+
+/** Хост только что встал в DOM: раскладка ещё не посчитана, getClientRects
+ *  пуст — немедленный синк парковал элемент. Повторяем после кадра. */
+function syncAttachmentSoon() {
+  requestAnimationFrame(() => requestAnimationFrame(syncAttachment));
 }
 
 function parkEl(): HTMLElement {

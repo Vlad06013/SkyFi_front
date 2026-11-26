@@ -30,7 +30,7 @@
     </div>
 
     <div v-if="showDownloadAll" class="dl-all-bar">
-      <span class="dl-count">{{ counts[tab] }}</span>
+      <span class="dl-count" :class="{ 'is-live': dlAllActive }">{{ dlAllStatusText }}</span>
       <div v-if="tab === 'tracks' || tab === 'playlists' || tab === 'albums'" class="dl-bar-side">
         <button v-if="tab === 'playlists'" class="icon-btn ghost" type="button" aria-label="новый плейлист" @click="openCreate">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">

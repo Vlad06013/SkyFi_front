@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { http } from '@/api/http';
+import { ApiError, http } from '@/api/http';
 import type { HealthPayload } from '@/types';
 
 /** Поллеру — с запасом: на нестабильном LTE рукопожатие легко съедает 5–10 с. */
@@ -18,15 +18,18 @@ export interface HealthProbeResult {
 }
 
 function classify(error: unknown): { miss: HealthMissKind; detail: string } {
-  if (axios.isAxiosError(error)) {
-    const status = error.response?.status;
-    if (typeof status === 'number') return { miss: 'http', detail: `HTTP ${status}` };
-    if (error.code === 'ECONNABORTED') return { miss: 'timeout', detail: error.message || 'timeout' };
-    // Сброс/обрыв соединения на сетевом стеке («Software connection abort» и т.п.).
-    if (error.code === 'ERR_NETWORK') return { miss: 'network', detail: error.message || 'network error' };
-    return { miss: 'unknown', detail: [error.code, error.message].filter(Boolean).join(': ') || 'axios error' };
-  }
-  return { miss: 'unknown', detail: error instanceof Error ? error.message : String(error) };
+  // http-слой конвертирует axios-ошибки в ApiError — код смотрим сначала там,
+  // иначе таймаут и обрыв сливаются в безликое «Нет соединения.».
+  const apiError = error instanceof ApiError ? error : null;
+  const axiosError = !apiError && axios.isAxiosError(error) ? error : null;
+  const status = apiError?.status ?? axiosError?.response?.status ?? null;
+  const code = apiError?.code ?? axiosError?.code ?? null;
+  const message = error instanceof Error ? error.message : String(error);
+  if (typeof status === 'number') return { miss: 'http', detail: `HTTP ${status}` };
+  if (code === 'ECONNABORTED') return { miss: 'timeout', detail: message };
+  // Сброс/обрыв соединения на сетевом стеке («Software connection abort» и т.п.).
+  if (code === 'ERR_NETWORK') return { miss: 'network', detail: message };
+  return { miss: 'unknown', detail: [code, message].filter(Boolean).join(': ') || 'network error' };
 }
 
 /**

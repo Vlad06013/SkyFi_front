@@ -52,10 +52,9 @@
       <path d="M12 20s-7-4.3-9-9c-1.2-2.8.6-6 3.8-6C9 5 12 8 12 8s3-3 5.2-3C20.4 5 22.2 8.2 21 11c-2 4.7-9 9-9 9z" />
     </svg>
     <div v-if="downloadPct !== null" class="dl-ind" :aria-label="`скачивается ${downloadPct}%`">
-      <svg viewBox="0 0 36 36" aria-hidden="true">
+      <svg viewBox="0 0 36 36" aria-hidden="true" :class="{ spin: downloadArc === 0 }">
         <circle class="track" cx="18" cy="18" r="15" fill="none" stroke="currentColor" stroke-width="3" opacity=".28" />
         <circle
-          v-if="downloadArc > 0"
           class="arc"
           cx="18"
           cy="18"
@@ -65,7 +64,7 @@
           stroke-width="3"
           stroke-linecap="round"
           transform="rotate(-90 18 18)"
-          :style="{ strokeDasharray: `${downloadArc} 94` }"
+          :style="{ strokeDasharray: downloadArc > 0 ? `${downloadArc} 94` : '22 94' }"
         />
       </svg>
     </div>

@@ -246,17 +246,19 @@ export default defineComponent({
           tracks.value.some((track) => downloads.trackFilePct(track.source_type, track.source_id) !== null)),
     );
     const dlAllPct = computed(() => {
+      const total = dlAllList.value.length;
+      const overall = total ? Math.round((dlAllDoneCount.value / total) * 100) : 0;
       const job = downloads.bulk;
       if (job && bulkKind.value && job.kind === bulkKind.value && job.total > 0) {
         const raw = Math.round((job.done / job.total) * 100);
-        if (job.done > 0 && job.done < job.total) return Math.max(1, Math.min(99, raw));
-        return Math.min(100, raw);
+        const jobPct = job.done > 0 && job.done < job.total ? Math.max(1, Math.min(99, raw)) : Math.min(100, raw);
+        // Повторный прогон: счётчик задания с нуля, а часть списка уже
+        // скачана — берём большую из долей, иначе процент падал с 7% на 1%.
+        return Math.max(jobPct, Math.min(99, overall));
       }
-      const total = dlAllList.value.length;
       if (!total) return 0;
-      const raw = Math.round((dlAllDoneCount.value / total) * 100);
-      if (dlAllDoneCount.value > 0 && dlAllDoneCount.value < total) return Math.max(1, raw);
-      return raw;
+      if (dlAllDoneCount.value > 0 && dlAllDoneCount.value < total) return Math.max(1, overall);
+      return overall;
     });
     const dlAllStatus = computed(() => {
       const list = dlAllList.value;
@@ -265,6 +267,17 @@ export default defineComponent({
       return 'idle' as const;
     });
     const dlAllArc = computed(() => Math.round((dlAllPct.value / 100) * 94));
+
+    /** Левая подпись плашки: во время прогона — что качается прямо сейчас. */
+    const dlAllStatusText = computed(() => {
+      const job = downloads.bulk;
+      if (dlAllActive.value && job && bulkKind.value && job.kind === bulkKind.value) {
+        const counter = job.total > 0 ? `${Math.min(job.done + 1, job.total)}/${job.total}` : '';
+        const text = [counter, job.current].filter(Boolean).join(' · ');
+        if (text) return text;
+      }
+      return counts.value[tab.value];
+    });
 
     function downloadAllTab() {
       if (isOffline.value) return;
@@ -455,6 +468,7 @@ export default defineComponent({
       dlAllDoneCount,
       dlAllPct,
       dlAllArc,
+      dlAllStatusText,
       isOffline,
       downloadAllTab,
       onSort,

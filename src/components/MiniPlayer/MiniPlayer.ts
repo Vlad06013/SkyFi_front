@@ -154,7 +154,12 @@ export default defineComponent({
         up: () => {
           dragging.value = false;
           if (Math.abs(lastDx) < tapSlop) {
-            openExpanded();
+            // Click этого же жеста диспатчится после pointerup по координатам
+            // пальца (preventDefault на pointerdown глушит mousedown/mouseup,
+            // но не click). Открываем слой макротаском позже: click достаётся
+            // мини-бару без обработчиков, а не кнопке play уже открытого
+            // плеера — она визуально «нажималась», а раньше ещё и тоглилась.
+            setTimeout(() => openExpanded(), 0);
             return;
           }
           if (lastDx <= -swipeThreshold) scrollToSlot(2);

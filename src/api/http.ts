@@ -9,15 +9,24 @@ export type ApiErrorKind = 'auth' | 'validation' | 'not-found' | 'rate-limit' | 
 export class ApiError extends Error {
   readonly status: number | null;
   readonly kind: ApiErrorKind;
+  /** Код axios (ECONNABORTED/ERR_NETWORK/…) — иначе тип сетевого сбоя теряется. */
+  readonly code: string | null;
   /** Ошибки полей (422): ключ поля → список сообщений. */
   readonly fields?: Record<string, string[]>;
 
-  constructor(status: number | null, kind: ApiErrorKind, message: string, fields?: Record<string, string[]>) {
+  constructor(
+    status: number | null,
+    kind: ApiErrorKind,
+    message: string,
+    fields?: Record<string, string[]>,
+    code: string | null = null,
+  ) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.kind = kind;
     this.fields = fields;
+    this.code = code;
   }
 }
 
@@ -52,6 +61,7 @@ function toApiError(error: unknown): ApiError {
   if (!axios.isAxiosError(error)) return new ApiError(null, 'network', 'Нет соединения.');
 
   const status = error.response?.status ?? null;
+  const code = typeof error.code === 'string' ? error.code : null;
   const errors = (error.response?.data as Partial<ApiResponse<unknown>> | undefined)?.errors;
   const rawMessage = typeof errors === 'string' && errors.length > 0 ? errors : null;
   const message = rawMessage ? localizeServerMessage(rawMessage) : null;
@@ -72,7 +82,7 @@ function toApiError(error: unknown): ApiError {
   if (status === 429) return new ApiError(429, 'rate-limit', message ?? 'Слишком часто. Подождите немного.');
   if (status === 404 || status === 403) return new ApiError(status, 'not-found', message ?? 'Не найдено.');
   if (typeof status === 'number' && status >= 500) return new ApiError(status, 'server', message ?? 'Сервер недоступен. Попробуйте позже.');
-  if (status === null) return new ApiError(null, 'network', 'Нет соединения.');
+  if (status === null) return new ApiError(null, 'network', 'Нет соединения.', undefined, code);
   return new ApiError(status, 'server', message ?? 'Ошибка запроса.');
 }
 
