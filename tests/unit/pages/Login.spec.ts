@@ -182,6 +182,24 @@ describe('pages/Login', () => {
     expect(wrapper.find('input[type="email"]').exists()).toBe(true);
   });
 
+  it('после конца сессии офлайн-заглушка снимается и «Войти» снова живая', async () => {
+    loginMock.mockResolvedValue(payload);
+    const wrapper = mountLogin();
+    const online = useOnlineStore();
+    online.noteSocketConnected();
+    online.noteSocketDisconnected();
+    online.noteSessionEnded();
+    await flushPromises();
+
+    expect(wrapper.find('.auth-offline').exists()).toBe(false);
+    expect(wrapper.find('button.btn-primary').attributes('disabled')).toBeUndefined();
+
+    await wrapper.find('input[type="email"]').setValue('a@b.c');
+    await wrapper.find('input[type="password"]').setValue('secret');
+    await submit(wrapper);
+    expect(loginMock).toHaveBeenCalledWith('a@b.c', 'secret');
+  });
+
   it('офлайн: баннер, сабмит заблокирован', async () => {
     const wrapper = mountLogin();
     useOnlineStore().isOnline = false;

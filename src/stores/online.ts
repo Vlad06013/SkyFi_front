@@ -75,6 +75,23 @@ export const useOnlineStore = defineStore('online', () => {
   }
 
   /**
+   * Сессия кончилась (logout, 401): сокет остановлен намеренно.
+   * Это не обрыв сети — флаг возвращается в null, иначе грейс от
+   * disconnect оставлял «Офлайн-режим» и блокировал «Войти» до перезагрузки.
+   */
+  function noteSessionEnded() {
+    socketConnected = false;
+    consecutiveFails = 0;
+    if (graceTimer) {
+      clearTimeout(graceTimer);
+      graceTimer = null;
+    }
+    if (isOnline.value === null) return;
+    isOnline.value = null;
+    recordNetEvent('disconnect', 'сессия закрыта');
+  }
+
+  /**
    * Сокет не достучался (unavailable/failed): тот же грейс, что и у
    * разрыва (pusher шлёт unavailable между ретраями — мгновенный офлайн
    * рисовал бы баннер на каждый чих), плюс сразу переспрос адреса.
@@ -122,6 +139,7 @@ export const useOnlineStore = defineStore('online', () => {
     isOnline,
     noteSocketConnected,
     noteSocketDisconnected,
+    noteSessionEnded,
     noteSocketFailed,
     setReconnectHandler,
     onOnline,

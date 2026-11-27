@@ -128,9 +128,13 @@ export function startRealtime(userId: number) {
     status.value = 'idle';
     return;
   }
-  const connection = echo.connector.pusher.connection;
+  const instance = echo;
+  const connection = instance.connector.pusher.connection;
   const online = useOnlineStore();
+  // События уже остановленного сокета (logout/restart) не трогают онлайн-стейт.
+  const alive = () => echo === instance;
   connection.bind('connected', () => {
+    if (!alive()) return;
     console.info(`[realtime] соединение установлено (user ${userId})`);
     if (!wasConnected) subscribeOwnChannel(userId);
     subscribeDeviceChannel();
@@ -141,16 +145,19 @@ export function startRealtime(userId: number) {
     online.noteSocketConnected();
   });
   connection.bind('disconnected', () => {
+    if (!alive()) return;
     console.warn('[realtime] соединение разорвано');
     status.value = wasConnected ? 'reconnecting' : 'offline';
     online.noteSocketDisconnected();
   });
   connection.bind('unavailable', () => {
+    if (!alive()) return;
     console.warn('[realtime] сервер недоступен (unavailable)');
     status.value = 'offline';
     void online.noteSocketFailed('unavailable');
   });
   connection.bind('failed', () => {
+    if (!alive()) return;
     console.error('[realtime] соединение не удалось (failed)');
     status.value = 'offline';
     void online.noteSocketFailed('failed');
@@ -169,7 +176,9 @@ export function restartRealtime() {
 
 export function stopRealtime() {
   if (!echo) return;
-  echo.disconnect();
+  const dying = echo;
+  // Сначала отвязываем инстанс: disconnect шлёт disconnected синхронно,
+  // и это событие не должно планировать офлайн (см. alive() в startRealtime).
   echo = null;
   wasConnected = false;
   deviceChannelUuid = null;
@@ -178,7 +187,7 @@ export function stopRealtime() {
     deviceSubscribeRetry = null;
   }
   status.value = 'idle';
-  useOnlineStore().noteSocketDisconnected('stop');
+  dying.disconnect();
 }
 
 /**
@@ -193,7 +202,11 @@ export function bindSessionRealtime() {
     (authed) => {
       const userId = auth.user?.id;
       if (authed && userId != null) startRealtime(userId);
-      else stopRealtime();
+      else {
+        stopRealtime();
+        // Намеренный стоп — не обрыв: иначе логин остаётся в офлайне.
+        useOnlineStore().noteSessionEnded();
+      }
     },
     { immediate: true },
   );

@@ -145,6 +145,29 @@ describe('stores/online — детект на сокете', () => {
     expect(online.isOnline).toBe(true);
   });
 
+  it('конец сессии сбрасывает офлайн и отменяет грейс — это не обрыв', () => {
+    const online = useOnlineStore();
+    online.noteSocketConnected();
+
+    online.noteSocketDisconnected();
+    online.noteSessionEnded();
+    vi.advanceTimersByTime(GRACE_MS * 2);
+
+    expect(online.isOnline).toBeNull();
+    expect(netLog.value.at(-1)).toMatchObject({ event: 'disconnect', detail: 'сессия закрыта', transition: null });
+  });
+
+  it('конец сессии из уже офлайна тоже возвращает null', () => {
+    const online = useOnlineStore();
+    online.noteSocketConnected();
+    online.noteSocketDisconnected();
+    vi.advanceTimersByTime(GRACE_MS);
+    expect(online.isOnline).toBe(false);
+
+    online.noteSessionEnded();
+    expect(online.isOnline).toBeNull();
+  });
+
   it('onOnline: хендлер вызывается на каждый переход в онлайн', () => {
     const online = useOnlineStore();
     const calls: string[] = [];
