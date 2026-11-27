@@ -4,6 +4,7 @@ import * as devicesApi from '@/api/devices';
 import * as identity from '@/lib/device';
 import { useAuthStore } from '@/stores/auth';
 import { useDevicesStore } from '@/stores/devices';
+import { useLayoutStore } from '@/stores/layout';
 import { useOnlineStore } from '@/stores/online';
 import type { PlayerDevice } from '@/types';
 
@@ -30,6 +31,13 @@ vi.mock('@capacitor/device', () => ({
 
 vi.mock('@capacitor/app', () => ({
   App: { addListener: vi.fn() },
+}));
+
+vi.mock('@capacitor/preferences', () => ({
+  Preferences: {
+    get: vi.fn(async () => ({ value: null })),
+    set: vi.fn(async () => undefined),
+  },
 }));
 
 const registerDeviceMock = vi.mocked(devicesApi.registerDevice);
@@ -133,6 +141,26 @@ describe('stores/devices', () => {
       expect(fetchDevicesMock).toHaveBeenCalled();
       expect(store.devices.map((d) => d.device_uuid)).toEqual([uuid(5), uuid(6)]);
       expect(store.loaded).toBe(true);
+    });
+
+    it('смена профиля перерегистрирует устройство новым type', async () => {
+      registerDeviceMock.mockResolvedValue(device(5));
+      const auth = useAuthStore();
+      const online = useOnlineStore();
+      auth.user = { id: 1, name: 'Влад', email: 'v@mail.ru', avatar_url: null };
+      online.isOnline = true;
+
+      const store = useDevicesStore();
+      store.bindPresence();
+      await flush();
+      expect(registerDeviceMock).toHaveBeenCalledWith(expect.objectContaining({ type: 'computer' }));
+
+      registerDeviceMock.mockClear();
+      await useLayoutStore().setProfile('car');
+      await flush();
+      expect(registerDeviceMock).toHaveBeenCalledWith(expect.objectContaining({ type: 'car' }));
+      expect(document.documentElement.dataset.layout).toBe('car');
+      delete document.documentElement.dataset.layout;
     });
 
     it('registerPresence: бэк недоступен — false, список не сидится', async () => {

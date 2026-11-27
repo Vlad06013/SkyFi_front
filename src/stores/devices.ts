@@ -6,7 +6,9 @@ import { Device } from '@capacitor/device';
 import * as devicesApi from '@/api/devices';
 import { ApiError } from '@/api/http';
 import * as identity from '@/lib/device';
+import { deviceTypeForLayout } from '@/lib/layout-profile';
 import { useAuthStore } from '@/stores/auth';
+import { useLayoutStore } from '@/stores/layout';
 import { useOnlineStore } from '@/stores/online';
 import type { PlayerDevice } from '@/types';
 
@@ -21,7 +23,7 @@ async function resolveDeviceName(): Promise<string> {
 }
 
 function deviceType(): PlayerDevice['type'] {
-  return Capacitor.isNativePlatform() ? 'phone' : 'computer';
+  return deviceTypeForLayout(useLayoutStore().profile);
 }
 
 /** 404 «устройство не найдено»: uuid есть локально, на сервере presence уже нет. */
@@ -141,8 +143,9 @@ export const useDevicesStore = defineStore('devices', () => {
   function bindPresence() {
     const auth = useAuthStore();
     const online = useOnlineStore();
+    const layout = useLayoutStore();
     watch(
-      [() => auth.isAuthed, () => online.isOnline],
+      [() => auth.isAuthed, () => online.isOnline, () => layout.profile],
       ([authed, isOnline]) => {
         if (authed && isOnline === true) {
           void registerPresence();

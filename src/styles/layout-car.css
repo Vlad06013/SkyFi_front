@@ -1,0 +1,134 @@
+/*
+ * Автомагнитола: ландшафт, короткий экран, палец. Колонка на всю ширину,
+ * строки и меню выше телефонных. Ширина окна тут ни при чём — профиль
+ * выбирается в настройках (html[data-layout=car]).
+ */
+
+html[data-layout='car'] {
+  --layout: car;
+  --app-max: 100%;
+  --app-pad-x: 20px;
+  --app-pad-top: 12px;
+  --app-pad-bottom: 10px;
+  --thumb-size: 72px;
+  --hero-size: 280px;
+  --hero-round: 200px;
+  --wave-cover-size: min(46dvh, 360px);
+  --title-size: 18px;
+  --meta-size: 15px;
+  --tab-label: 13px;
+  --tab-icon: 32px;
+  --appbar-logo: 26px;
+  --hero-name-size: 32px;
+  --wave-fab: 88px;
+  --auth-max: 520px;
+}
+
+html[data-layout='car'] .sky-shell:not(.is-wave) {
+  border-left: 0;
+  border-right: 0;
+}
+
+html[data-layout='car'] .tab-label {
+  display: block;
+}
+
+html[data-layout='car'] .tabbar {
+  padding: 12px 10px 14px;
+  border-radius: 20px;
+}
+
+html[data-layout='car'] .tab {
+  font-size: var(--tab-label);
+}
+
+html[data-layout='car'] .tab svg {
+  width: var(--tab-icon);
+  height: var(--tab-icon);
+  margin-bottom: 6px;
+}
+
+html[data-layout='car'] .track-row,
+html[data-layout='car'] .pl-row {
+  padding: 14px 8px;
+  gap: 14px;
+}
+
+html[data-layout='car'] .track-row .icon-btn,
+html[data-layout='car'] .pl-row .icon-btn,
+html[data-layout='car'] .friend-row .icon-btn {
+  width: 40px;
+  height: 40px;
+}
+
+html[data-layout='car'] .track-row .icon-btn svg,
+html[data-layout='car'] .pl-row .icon-btn svg,
+html[data-layout='car'] .friend-row .icon-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+html[data-layout='car'] .track-dur {
+  font-size: 15px;
+}
+
+html[data-layout='car'] .mini-player {
+  padding: 12px 14px;
+}
+
+html[data-layout='car'] .mini-player .fab.small {
+  width: 56px;
+  height: 56px;
+}
+
+html[data-layout='car'] .mini-player .fab.small svg {
+  width: 26px;
+  height: 26px;
+}
+
+html[data-layout='car'] .wave-disc.is-idle {
+  --wave-cover: 220px;
+}
+
+html[data-layout='car'] .now-playing-inner {
+  max-width: none;
+  padding-inline: 28px;
+}
+
+html[data-layout='car'] .now-playing .p-title {
+  font-size: 28px;
+}
+
+html[data-layout='car'] .now-playing .p-artist {
+  font-size: 18px;
+}
+
+html[data-layout='car'] .now-playing .p-times {
+  font-size: 14px;
+}
+
+html[data-layout='car'] .now-playing .p-controls .side svg {
+  width: 36px;
+  height: 36px;
+}
+
+html[data-layout='car'] .now-playing .p-controls > .plain svg {
+  width: 44px;
+  height: 44px;
+}
+
+html[data-layout='car'] .now-playing .p-controls .fab {
+  width: 84px;
+  height: 84px;
+}
+
+html[data-layout='car'] .now-playing .p-controls .fab svg {
+  width: 36px;
+  height: 36px;
+}
+
+html[data-layout='car'] .now-playing .p-actions svg,
+html[data-layout='car'] .now-playing .p-actions .plain svg {
+  width: 32px;
+  height: 32px;
+}

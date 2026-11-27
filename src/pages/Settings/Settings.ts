@@ -15,6 +15,8 @@ import QrScannerSheet from '@/components/QrScannerSheet/QrScannerSheet.vue';
 import { useApkBuildStore } from '@/stores/apk-build';
 import { useAppUpdateStore } from '@/stores/app-update';
 import { useAuthStore } from '@/stores/auth';
+import { useLayoutStore } from '@/stores/layout';
+import type { LayoutProfile } from '@/lib/layout-profile';
 import { resolveUrl } from '@/lib/endpoints';
 import { useDownloadsStore } from '@/stores/downloads';
 import { usePlayerStore } from '@/stores/player';
@@ -58,6 +60,12 @@ export default defineComponent({
     onActivated(() => {
       void updates.check();
     });
+    const layout = useLayoutStore();
+    const { profile: layoutProfile, options: layoutOptions } = storeToRefs(layout);
+    async function setLayout(next: LayoutProfile) {
+      await layout.setProfile(next);
+    }
+
     const downloads = useDownloadsStore();
     const { items: downloadedItems, downloadedBytes } = storeToRefs(downloads);
     const hasDownloads = computed(() => downloadedItems.value.length > 0);
@@ -194,6 +202,9 @@ export default defineComponent({
       clearDownloads,
       logout,
       onScanned,
+      layoutProfile,
+      layoutOptions,
+      setLayout,
       netlog,
       netlogTime,
       netlogStatus,

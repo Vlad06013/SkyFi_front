@@ -46,6 +46,20 @@
       <SeekBar v-model="volume" label="громкость" />
     </div>
 
+    <div class="sec-label">Интерфейс</div>
+    <div class="layout-pick">
+      <button
+        v-for="option in layoutOptions"
+        :key="option.id"
+        class="chip"
+        type="button"
+        :class="{ active: layoutProfile === option.id }"
+        @click="setLayout(option.id)"
+      >
+        {{ option.label }}
+      </button>
+    </div>
+
     <div class="sec-label">Приложение</div>
     <SettingRow title="Сканировать QR" idle="вход на ТВ или магнитолу" clickable @open="scanOpen = true">
       <template #icon>

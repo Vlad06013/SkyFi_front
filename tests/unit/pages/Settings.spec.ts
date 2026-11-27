@@ -158,4 +158,17 @@ describe('pages/Settings', () => {
       'noopener',
     );
   });
+
+  it('интерфейс: автомагнитола ставит data-layout, «Как сейчас» снимает', async () => {
+    const wrapper = mountSettings();
+    const car = wrapper.findAll('button').find((button) => button.text() === 'Автомагнитола');
+    await car!.trigger('click');
+    await flushPromises();
+    expect(document.documentElement.dataset.layout).toBe('car');
+
+    const auto = wrapper.findAll('button').find((button) => button.text() === 'Как сейчас');
+    await auto!.trigger('click');
+    await flushPromises();
+    expect(document.documentElement.dataset.layout).toBeUndefined();
+  });
 });

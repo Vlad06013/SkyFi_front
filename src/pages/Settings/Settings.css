@@ -1,3 +1,16 @@
+.layout-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 2px 16px;
+}
+
+.layout-pick .chip {
+  cursor: pointer;
+  font-family: inherit;
+  appearance: none;
+}
+
 .logout-wrap {
   display: flex;
   justify-content: center;
