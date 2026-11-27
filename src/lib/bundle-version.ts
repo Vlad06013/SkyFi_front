@@ -1,6 +1,6 @@
 /** Версия веб-бандла. Совпадает с версией, которую публикуют
  *  `php artisan app:release`. Перед сборкой релиза её поднимают здесь. */
-export const BUNDLE_VERSION = '1.0.23';
+export const BUNDLE_VERSION = '1.0.24';
 
 /** `App.getInfo().version` бывает `1.0`. Бэк сравнивает semver `X.Y.Z`. */
 export function shellSemver(versionName: string): string {
