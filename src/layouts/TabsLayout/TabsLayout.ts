@@ -1,4 +1,4 @@
-import { computed, defineComponent, onMounted, ref, watch } from 'vue';
+import { computed, defineComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import MiniPlayer from '@/components/MiniPlayer/MiniPlayer.vue';
 import TabBar from '@/components/TabBar/TabBar.vue';
@@ -6,6 +6,9 @@ import NotificationPanel from '@/components/NotificationPanel/NotificationPanel.
 import NowPlaying from '@/components/NowPlaying/NowPlaying.vue';
 import { refreshActivePage } from '@/composables/usePageRefresh';
 import { useAppUpdateStore } from '@/stores/app-update';
+import { useLayoutStore } from '@/stores/layout';
+import { usePlayerStore } from '@/stores/player';
+import { bindTvRemote } from '@/lib/tv-remote';
 
 export default defineComponent({
   name: 'TabsLayout',
@@ -13,6 +16,7 @@ export default defineComponent({
   setup() {
     const route = useRoute();
     const isHome = computed(() => route.path === '/home');
+    const isTv = computed(() => useLayoutStore().profile === 'tv');
     const bodyEl = ref<HTMLElement | null>(null);
     const pull = ref(0);
     const refreshing = ref(false);
@@ -88,6 +92,22 @@ export default defineComponent({
     onMounted(() => {
       bodyEl.value?.addEventListener('touchmove', onPullMove, { passive: false });
     });
+
+    const player = usePlayerStore();
+    let unbindRemote: (() => void) | null = null;
+    onMounted(() => {
+      unbindRemote = bindTvRemote(
+        () => useLayoutStore().profile === 'tv',
+        {
+          get expanded() {
+            return player.expanded;
+          },
+          openExpanded: () => player.openExpanded(),
+          closeExpanded: () => player.closeExpanded(),
+        },
+      );
+    });
+    onBeforeUnmount(() => unbindRemote?.());
     // Скролл один на все вкладки. Позицию запоминаем до смены страницы,
     // возвращаем после: иначе «Моё», уехавшее вниз, сдвигает и главную.
     const scrollTops = new Map<string, number>();
@@ -111,6 +131,6 @@ export default defineComponent({
       { flush: 'post' },
     );
 
-    return { isHome, bodyEl, pull, pullReady, refreshing, pullLabel, onPullStart, onPullEnd };
+    return { isHome, isTv, bodyEl, pull, pullReady, refreshing, pullLabel, onPullStart, onPullEnd };
   },
 });

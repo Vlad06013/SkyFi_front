@@ -9,7 +9,8 @@ import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import { fetchSearchV2 } from '@/api/search';
 import { isOfflineError } from '@/api/http';
-import { artistsLine, snapshotCover, trackCover } from '@/lib/cover';
+import { artistsLine, coverVar, snapshotCover, trackCover } from '@/lib/cover';
+import { formatTime } from '@/lib/time';
 import { resolveUrl } from '@/lib/endpoints';
 import { getSearchHistory, pushSearchHistory, clearSearchHistory } from '@/lib/search-history';
 import {
@@ -53,6 +54,12 @@ function snapshotMenuContext(snapshot: AnySnapshot): MenuContext {
   if (snapshot.type === 'album') return 'my-albums';
   if (snapshot.type === 'artist') return 'my-artists';
   return 'my-playlists';
+}
+
+function videoDuration(video: { duration_ms: number | null }): string {
+  const ms = video.duration_ms;
+  if (ms == null || !Number.isFinite(ms) || ms < 0) return '';
+  return formatTime(ms / 1000);
 }
 
 function albumLine(album: AlbumSnapshot): string {
@@ -451,6 +458,8 @@ export default defineComponent({
       contextRef,
       downloads,
       artistsLine,
+      coverVar,
+      videoDuration,
       trackCover,
       resolveUrl,
       albumLine,

@@ -1,5 +1,7 @@
 <template>
-  <div class="sky-shell" :class="{ 'is-wave': isHome }">
+  <div class="sky-shell" :class="{ 'is-wave': isHome, 'is-tv': isTv }">
+    <TabBar v-if="isTv" />
+    <div class="sky-column">
     <div ref="bodyEl" class="sky-body" @touchstart.passive="onPullStart" @touchend="onPullEnd" @touchcancel="onPullEnd">
       <div class="pull-refresh" :class="{ 'is-ready': pullReady, 'is-busy': refreshing }" :style="{ height: pull + 'px' }">
         <span class="pull-refresh-mark" aria-hidden="true">
@@ -20,9 +22,10 @@
         </keep-alive>
       </router-view>
     </div>
-    <div class="sky-dock">
+    <div v-if="!isTv || !isHome" class="sky-dock">
       <MiniPlayer v-if="!isHome" />
-      <TabBar />
+      <TabBar v-if="!isTv" />
+    </div>
     </div>
     <NotificationPanel />
     <NowPlaying />

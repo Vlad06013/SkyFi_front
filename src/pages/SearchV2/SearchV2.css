@@ -1,12 +1,13 @@
 .src-rail {
   display: flex;
-  gap: 4px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 8px 12px;
   margin: 2px 0 8px;
 }
 
 .src-ico {
-  flex: 1;
-  min-width: 0;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -45,10 +46,10 @@
 
 .src-ico .nm {
   max-width: 100%;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 500;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
+  letter-spacing: 0;
+  line-height: 1.15;
   white-space: nowrap;
 }
 
@@ -67,6 +68,181 @@
 
 .sec-row {
   margin-top: 0;
+}
+
+.field {
+  margin-bottom: 22px;
+}
+
+html[data-layout='car'] .chip,
+html[data-layout='tv'] .chip,
+html[data-layout='car'] .src-ico .nm,
+html[data-layout='tv'] .src-ico .nm {
+  font-size: var(--title-size);
+}
+
+html[data-layout='car'] .src-ico .bubble,
+html[data-layout='tv'] .src-ico .bubble {
+  width: 44px;
+  height: 44px;
+}
+
+html[data-layout='car'] .src-ico :deep(.src),
+html[data-layout='tv'] .src-ico :deep(.src) {
+  width: 20px;
+  height: 20px;
+}
+
+html[data-layout='car'] .src-ico :deep(.src svg),
+html[data-layout='tv'] .src-ico :deep(.src svg) {
+  width: 20px;
+  height: 20px;
+}
+
+.vid-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 12px;
+  margin-top: 4px;
+}
+
+html[data-layout='car'] .vid-grid {
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 18px 16px;
+}
+
+html[data-layout='tv'] .vid-grid {
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px 18px;
+}
+
+html[data-layout='tv'] .search-page :deep(.thumb),
+html[data-layout='tv'] .search-page :deep(.pl-row .cover) {
+  width: 92px;
+  height: 92px;
+}
+
+.vid-tile {
+  position: relative;
+  min-width: 0;
+}
+
+.vid-open {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.vid-open:focus {
+  outline: none;
+}
+
+.vid-face {
+  display: block;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.vid-face img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.vid-time {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  z-index: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.72);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  font-feature-settings: "tnum" 1;
+}
+
+.vid-copy {
+  display: block;
+  min-width: 0;
+  padding: 8px 28px 0 0;
+}
+
+.vid-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: var(--title-size, 14px);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.vid-sub {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+html[data-layout='car'] .vid-sub,
+html[data-layout='tv'] .vid-sub {
+  font-size: var(--meta-size);
+}
+
+.vid-tile.is-on .vid-title {
+  color: var(--color-accent);
+}
+
+.vid-tile.is-on .vid-face {
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+
+.vid-open:focus .vid-face,
+.vid-tile.is-on .vid-open:focus .vid-face {
+  box-shadow: 0 0 0 2px #1ed760, 0 0 14px 2px rgba(30, 215, 96, 0.55);
+}
+
+.vid-more {
+  position: absolute;
+  right: -6px;
+  bottom: 10px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.vid-more svg {
+  width: 16px;
+  height: 16px;
+}
+
+.vid-more:hover,
+.vid-more:focus-visible {
+  color: var(--color-text-primary);
 }
 
 .field-clear {

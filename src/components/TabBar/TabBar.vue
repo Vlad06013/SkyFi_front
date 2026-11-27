@@ -1,5 +1,9 @@
 <template>
   <nav class="tabbar">
+    <svg v-if="isTv" class="rail-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+      <path d="M4.2 10.6a8.4 8.4 0 0 1 15.6 0" />
+      <path d="M9 12.4v8.1l7.7-4.05z" fill="currentColor" stroke="none" />
+    </svg>
     <router-link
       v-for="item in tabs"
       :key="item.to"

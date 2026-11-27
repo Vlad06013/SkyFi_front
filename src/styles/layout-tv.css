@@ -1,0 +1,169 @@
+/*
+ * Телевизор: меню слева, кадр на всю ширину. Ширина окна ни при чём —
+ * профиль выбирается в настройках (html[data-layout=tv]).
+ */
+
+html[data-layout='tv'] {
+  --layout: tv;
+  --app-max: none;
+  --app-pad-x: 36px;
+  --app-pad-top: 18px;
+  --app-pad-bottom: 16px;
+  --thumb-size: 56px;
+  --title-size: 18px;
+  --meta-size: 14px;
+  --tab-icon: 26px;
+  --auth-max: 480px;
+}
+
+html[data-layout='tv'] .sky-shell {
+  max-width: none;
+  flex-direction: row;
+  align-items: stretch;
+  padding: 0;
+  border: 0;
+}
+
+html[data-layout='tv'] .sky-column {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+html[data-layout='tv'] .sky-shell.is-wave {
+  padding: 0;
+}
+
+html[data-layout='tv'] .sky-shell.is-wave .sky-body {
+  padding: 0;
+}
+
+html[data-layout='tv'] .tabbar {
+  width: 88px;
+  height: 100%;
+  flex-shrink: 0;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 22px 0 18px;
+  border: 0;
+  border-radius: 0;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+}
+
+html[data-layout='tv'] .rail-logo {
+  width: 28px;
+  height: 28px;
+  color: var(--color-accent);
+  margin-bottom: 14px;
+  flex-shrink: 0;
+}
+
+html[data-layout='tv'] .tab {
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0;
+}
+
+html[data-layout='tv'] .tab svg {
+  width: 26px;
+  height: 26px;
+  margin: 0;
+}
+
+html[data-layout='tv'] .tab-label {
+  display: none;
+}
+
+html[data-layout='tv'] .tab.on {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-weight: 600;
+}
+
+html[data-layout='tv'] .tabbar a[href='/settings'] {
+  margin-top: auto;
+}
+
+html[data-layout='tv'] .sky-dock {
+  padding: 0 28px 16px 16px;
+}
+
+html[data-layout='tv'] .sky-shell:not(.is-wave) {
+  border: 0;
+}
+
+html[data-layout='tv'] .now-playing-inner {
+  max-width: none;
+  padding-inline: 56px;
+}
+
+html[data-layout='tv'] .now-playing .transport {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: fit-content;
+  margin: 16px auto 0;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+html[data-layout='tv'] .now-playing .p-controls,
+html[data-layout='tv'] .now-playing .p-actions {
+  margin: 0;
+  padding: 0;
+  width: auto;
+  justify-content: center;
+  gap: 4px;
+}
+
+html[data-layout='tv'] .now-playing .p-controls .side {
+  display: contents;
+}
+
+html[data-layout='tv'] .now-playing .p-controls .fab {
+  width: 64px;
+  height: 64px;
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+
+html[data-layout='tv'] .now-playing .p-controls .fab svg {
+  width: 28px;
+  height: 28px;
+}
+
+html[data-layout='tv'] .now-playing .clip-top-side {
+  display: none;
+}
+
+html[data-layout='tv'] .now-playing .transport .q-chip {
+  height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  font: 700 13px/1 Inter, system-ui, sans-serif;
+  cursor: pointer;
+}
+
+html[data-layout='tv'] .now-playing .clip-quality {
+  top: auto;
+  bottom: 120px;
+}
+
+html[data-layout='tv'] .ym-stats {
+  grid-template-columns: 1fr 1fr;
+}

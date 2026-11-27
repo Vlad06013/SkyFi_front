@@ -104,3 +104,346 @@
 .sky-shell.is-wave .wave-stage.is-video > .wave-controls {
   z-index: 2;
 }
+
+.tv-home {
+  --tv-tile: 156px;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+}
+
+.tv-home.is-clip-idle {
+  --tv-tile: 109px;
+}
+
+.tv-hero {
+  flex: 1.2;
+  min-height: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 28px 48px 18px 16px;
+  position: relative;
+  background:
+    radial-gradient(90% 120% at 78% 40%, rgba(30, 215, 96, 0.28), transparent 58%),
+    linear-gradient(180deg, #07140c 0%, #000 78%);
+}
+
+.tv-hero.is-clip {
+  overflow: hidden;
+  background: #000;
+  align-items: flex-end;
+}
+
+.tv-clip-host,
+.tv-clip-poster,
+.tv-clip-shade {
+  position: absolute;
+  inset: 0;
+}
+
+.tv-clip-host { z-index: 1; }
+.tv-clip-host.is-frame { background: #000; }
+.tv-clip-host :deep(.clip-video) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.tv-clip-poster { z-index: 0; width: 100%; height: 100%; object-fit: cover; }
+.tv-clip-shade {
+  z-index: 1;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 30%, rgba(0, 0, 0, 0.82));
+  pointer-events: none;
+  transition: opacity .4s ease;
+}
+
+.tv-home.is-clip-idle .tv-clip-shade {
+  opacity: 0;
+}
+
+.tv-hero-copy {
+  position: relative;
+  z-index: 2;
+  max-width: 640px;
+  padding-bottom: 6px;
+  transition: opacity .35s ease;
+}
+
+.tv-home.is-clip-idle .tv-hero-copy {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.tv-kicker {
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.tv-hero h2 {
+  margin: 10px 0 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 52px;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+}
+
+.tv-meta {
+  margin-top: 12px;
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.tv-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.tv-play,
+.tv-ghost,
+.tv-icon {
+  border: 0;
+  cursor: pointer;
+  font: 700 16px/1 var(--font-body);
+}
+
+.tv-play,
+.tv-ghost {
+  height: 48px;
+  padding: 0 22px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tv-play {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  box-shadow: 0 8px 26px rgba(30, 215, 96, 0.28);
+}
+
+.tv-play svg { width: 18px; height: 18px; }
+
+.tv-ghost {
+  background: #0a0a0a;
+  color: var(--color-accent);
+  box-shadow: inset 0 0 0 1.5px rgba(30, 215, 96, 0.75);
+}
+
+.tv-ghost.is-on {
+  background: rgba(30, 215, 96, 0.16);
+}
+
+.tv-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #0a0a0a;
+  color: #fff;
+  box-shadow: inset 0 0 0 1.5px rgba(30, 215, 96, 0.45);
+  display: grid;
+  place-items: center;
+}
+
+.tv-icon.liked { color: var(--color-accent); }
+.tv-icon svg { width: 18px; height: 18px; }
+
+.tv-disc {
+  width: 210px;
+  height: 210px;
+  margin-right: 12px;
+  border-radius: 50%;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.tv-disc::before {
+  content: "";
+  position: absolute;
+  inset: -26px;
+  border-radius: 50%;
+  background: conic-gradient(from 40deg, #ffe566, #ff9f1a 25%, #1ed760 48%, transparent 62%, #1ed760 82%, #ffe566);
+  filter: blur(14px) saturate(1.35);
+  opacity: 0.4;
+  transform-origin: center;
+}
+
+.tv-disc.is-on::before {
+  opacity: 1;
+  animation:
+    tv-aura-spin 7s linear infinite,
+    tv-aura-pulse 1.7s ease-in-out infinite alternate;
+}
+
+@keyframes tv-aura-spin { to { transform: rotate(360deg); } }
+@keyframes tv-aura-pulse {
+  from { opacity: 0.55; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tv-disc.is-on::before,
+  .tv-poster:focus::before { animation: none; }
+}
+
+.tv-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+.tv-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.tv-face :deep(.src) {
+  left: auto;
+  right: 16px;
+  top: 16px;
+  bottom: auto;
+  z-index: 2;
+}
+
+.tv-shelf {
+  flex: 0 0 auto;
+  min-height: 0;
+  padding: 8px 36px 18px 16px;
+  background: #000;
+  transition: padding .4s ease;
+}
+
+.tv-home.is-clip-idle .tv-shelf {
+  padding-top: 4px;
+  padding-bottom: 10px;
+}
+
+.tv-shelf h3 {
+  margin: 0 0 10px;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.tv-shelf-empty {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 15px;
+  padding: 12px 0 8px;
+}
+
+.tv-posters {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding: 14px 8px 12px;
+  margin: -6px -8px 0;
+  scroll-snap-type: x mandatory;
+}
+
+.tv-posters::-webkit-scrollbar { height: 0; }
+
+.tv-poster {
+  width: var(--tv-tile);
+  flex: 0 0 var(--tv-tile);
+  transition: width .4s ease, flex-basis .4s ease;
+  scroll-snap-align: start;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  position: relative;
+}
+
+.tv-poster:focus {
+  outline: none;
+}
+
+.tv-poster:focus::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  left: -7px;
+  right: -7px;
+  top: -7px;
+  height: calc(var(--tv-tile) + 14px);
+  border-radius: 14px;
+  pointer-events: none;
+  background: conic-gradient(
+    from 40deg,
+    #1ed760,
+    transparent 26%,
+    #d8ffe8 46%,
+    #1ed760 64%,
+    transparent 80%,
+    #1ed760
+  );
+  filter: blur(7px) saturate(1.35);
+  opacity: 0.9;
+  animation:
+    tv-aura-spin 7s linear infinite,
+    tv-aura-pulse 1.7s ease-in-out infinite alternate;
+}
+
+.tv-poster .art {
+  display: block;
+  height: var(--tv-tile);
+  transition: height .4s ease;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+
+.tv-poster .art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.tv-poster.is-on .art { box-shadow: inset 0 0 0 3px var(--color-accent); }
+
+.poster-title,
+.poster-sub {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.poster-title {
+  position: relative;
+  z-index: 1;
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.poster-sub {
+  position: relative;
+  z-index: 1;
+  margin-top: 2px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.tv-shelf-more {
+  flex: 0 0 1px;
+  width: 1px;
+}

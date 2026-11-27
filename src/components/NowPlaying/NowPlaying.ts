@@ -20,6 +20,7 @@ import { pushBackOverlay } from '@/lib/hardware-back';
 import { trackPointer } from '@/lib/pointer-drag';
 import { formatTime } from '@/lib/time';
 import { usePlayerStore } from '@/stores/player';
+import { useLayoutStore } from '@/stores/layout';
 
 /** Пульт в простое: эти клавиши только поднимают кнопки, не жмут спрятанную. */
 export function isPlayerWakeKey(event: { key: string; keyCode?: number }): boolean {
@@ -350,7 +351,7 @@ export default defineComponent({
       if (!playerDragY.value) return undefined;
       return {
         transform: `translateY(${playerDragY.value}px)`,
-        opacity: String(Math.max(0.45, 1 - playerDragY.value / 520)),
+        '--drag-opacity': String(Math.max(0.45, 1 - playerDragY.value / 520)),
       };
     });
 
@@ -365,7 +366,6 @@ export default defineComponent({
       layer.value = 'now';
       playerDragging.value = false;
       queueDragging.value = false;
-      playerDragY.value = 0;
       queueDragY.value = 0;
       closeExpanded();
     }
@@ -397,6 +397,7 @@ export default defineComponent({
       stopPlayerBack?.();
       stopPlayerBack = null;
       if (!open) return;
+      playerDragY.value = 0;
       // Поверх уже открытых шитов: «назад» сначала разбирает плеер.
       stopPlayerBack = pushBackOverlay(() => {
         if (document.fullscreenElement) {
@@ -530,6 +531,7 @@ export default defineComponent({
 
     return {
       expanded,
+      isTv: computed(() => useLayoutStore().profile === 'tv'),
       current,
       title,
       artist,

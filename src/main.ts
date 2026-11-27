@@ -34,6 +34,7 @@ import './styles/base.css';
 import './styles/app.css';
 import './styles/adaptive.css';
 import './styles/layout-phone.css';
+import './styles/layout-tv.css';
 import './styles/layout-car.css';
 
 if (Capacitor.isNativePlatform()) {

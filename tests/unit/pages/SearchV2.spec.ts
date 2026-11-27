@@ -6,7 +6,7 @@ import * as searchApi from '@/api/search';
 import { getSearchHistory, pushSearchHistory, clearSearchHistory } from '@/lib/search-history';
 import { useOnlineStore } from '@/stores/online';
 import SearchV2 from '@/pages/SearchV2/SearchV2.vue';
-import type { ArtistSnapshot, SearchSourcePagePayload, TrackSnapshot } from '@/types';
+import type { ArtistSnapshot, SearchSourcePagePayload, TrackSnapshot, VideoSnapshot } from '@/types';
 
 const routerMocks = vi.hoisted(() => ({
   push: vi.fn(),
@@ -49,6 +49,19 @@ function makeTrack(id: string, patch: Partial<TrackSnapshot> = {}): TrackSnapsho
     album: null,
     stream_url: null,
     ...patch,
+  };
+}
+
+function makeVideo(id: string): VideoSnapshot {
+  return {
+    type: 'video',
+    source_type: 'youtube',
+    source_id: id,
+    title: `Ролик ${id}`,
+    artists: [{ name: 'Канал' }],
+    duration_ms: 125000,
+    cover_url: null,
+    watch_url: null,
   };
 }
 
@@ -165,6 +178,28 @@ describe('pages/SearchV2', () => {
       { q: 'sum 41', resource: 'yandex_music', type: 'audio', section: 'tracks', limit: 20, page: 1 },
       expect.any(AbortSignal),
     );
+  });
+
+  it('YouTube рисует ролики плитками, не списком', async () => {
+    fetchMock.mockResolvedValue(
+      makePayload({
+        resource: 'youtube',
+        sections: {
+          videos: {
+            items: [{ ...makeVideo('v1'), is_favorite: false }],
+            total: 1,
+            has_more: false,
+          },
+        },
+      }),
+    );
+    const wrapper = mountPage();
+    await clickResource(wrapper, 'YouTube');
+    await typeAndSearch(wrapper, 'sum 41');
+    expect(wrapper.findAll('.vid-tile')).toHaveLength(1);
+    expect(wrapper.find('.vid-tile').text()).toContain('Ролик v1');
+    expect(wrapper.find('.vid-time').text()).toBe('2:05');
+    expect(wrapper.find('.vid-row').exists()).toBe(false);
   });
 
   it('YouTube — одна пилюля Видео и type=video', async () => {

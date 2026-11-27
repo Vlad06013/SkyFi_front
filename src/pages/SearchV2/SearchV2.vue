@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="search-page">
     <AppBar title="Поиск" badge />
     <div class="src-rail">
       <button
@@ -174,24 +174,40 @@
           />
         </template>
 
-        <template v-else-if="section === 'videos'">
-          <SnapshotRow
+        <div v-else-if="section === 'videos'" class="vid-grid">
+          <div
             v-for="video in videoResults"
             :key="`${video.source_type}:${video.source_id}`"
-            kind="video"
-            :title="video.title"
-            :subtitle="`${artistsLine(video.artists)} · клип`"
-            entity-type="video"
-            :source="video.source_type"
-            :source-id="video.source_id"
-            :cover="resolveUrl(video.cover_url)"
-            :liked="video.is_favorite"
-            :playing="isPlaying(video)"
-            :duration-ms="video.duration_ms"
-            @open="openResult(video, { playbackSource: playSourceSearch, contextItems: videoResults, contextRef })"
-            @menu="openSnapshotMenu($event, video, 'my-videos')"
-          />
-        </template>
+            class="vid-tile"
+            :class="{ 'is-on': isPlaying(video) }"
+          >
+            <button
+              class="vid-open"
+              type="button"
+              @click="openResult(video, { playbackSource: playSourceSearch, contextItems: videoResults, contextRef })"
+            >
+              <span class="vid-face" :style="{ background: coverVar(video.source_type) }">
+                <img v-if="resolveUrl(video.cover_url)" :src="resolveUrl(video.cover_url)" alt="">
+                <SourceBadge :source="video.source_type" />
+                <span v-if="videoDuration(video)" class="vid-time">{{ videoDuration(video) }}</span>
+              </span>
+              <span class="vid-copy">
+                <span class="vid-title">{{ video.title }}</span>
+                <span class="vid-sub">{{ artistsLine(video.artists) }}</span>
+              </span>
+            </button>
+            <button
+              class="vid-more"
+              type="button"
+              aria-label="ещё"
+              @click.stop="openSnapshotMenu($event, video, 'my-videos')"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="5.5" cy="12" r="1.55" /><circle cx="12" cy="12" r="1.55" /><circle cx="18.5" cy="12" r="1.55" />
+              </svg>
+            </button>
+          </div>
+        </div>
 
         <div
           v-if="section !== 'best' && sectionItems.length === 0"

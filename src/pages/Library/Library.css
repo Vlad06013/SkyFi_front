@@ -1,0 +1,37 @@
+.chip-search {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 12px;
+}
+
+.chip-search svg {
+  width: 1.15em;
+  height: 1.15em;
+}
+
+.lib-search {
+  margin: 2px 0 18px;
+}
+
+html[data-layout='car'] .chip,
+html[data-layout='tv'] .chip {
+  font-size: var(--title-size);
+  padding: 8px 16px;
+}
+
+html[data-layout='car'] .chip-search,
+html[data-layout='tv'] .chip-search {
+  padding-inline: 14px;
+}
+
+html[data-layout='car'] .lib-search,
+html[data-layout='tv'] .lib-search {
+  font-size: var(--title-size);
+  padding: 12px 18px;
+}
+
+.lib-search svg {
+  width: 1.1em;
+  height: 1.1em;
+}

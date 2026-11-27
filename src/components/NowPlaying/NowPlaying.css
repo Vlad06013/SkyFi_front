@@ -8,6 +8,7 @@
   overflow: hidden;
   overscroll-behavior: none;
   touch-action: none;
+  opacity: var(--drag-opacity, 1);
   transition: transform .2s ease, opacity .2s ease;
   user-select: none;
   outline: none;
@@ -15,6 +16,23 @@
 
 .now-playing.is-dragging {
   transition: none;
+}
+
+.now-playing.now-fade-enter-active,
+.now-playing.now-fade-leave-active {
+  transition: opacity .28s ease;
+}
+
+.now-playing.now-fade-enter-from,
+.now-playing.now-fade-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .now-playing.now-fade-enter-active,
+  .now-playing.now-fade-leave-active {
+    transition: none;
+  }
 }
 
 .now-playing-inner {

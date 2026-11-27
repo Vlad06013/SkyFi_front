@@ -1,12 +1,10 @@
 /*
- * Явный профиль «телефон» и пока ещё «телевизор».
- * Перебивает ширины планшета и десктопа: выбранный телефон на широком
- * окне остаётся телефонной колонкой. Телевизор выглядит так же, пока
- * нет своего файла. auto (data-layout нет) эти правила не трогают.
+ * Явный профиль «телефон». Перебивает ширины планшета и десктопа:
+ * выбранный телефон на широком окне остаётся телефонной колонкой.
+ * auto (data-layout нет) эти правила не трогают.
  */
 
-html[data-layout='phone'],
-html[data-layout='tv'] {
+html[data-layout='phone'] {
   --layout: phone;
   --app-max: 480px;
   --app-pad-x: 10px;
@@ -26,19 +24,16 @@ html[data-layout='tv'] {
   --auth-max: 100%;
 }
 
-html[data-layout='phone'] .sky-shell:not(.is-wave),
-html[data-layout='tv'] .sky-shell:not(.is-wave) {
+html[data-layout='phone'] .sky-shell:not(.is-wave) {
   border-left: 0;
   border-right: 0;
 }
 
-html[data-layout='phone'] .now-playing-inner,
-html[data-layout='tv'] .now-playing-inner {
+html[data-layout='phone'] .now-playing-inner {
   max-width: 520px;
   padding-inline: 16px;
 }
 
-html[data-layout='phone'] .ym-stats,
-html[data-layout='tv'] .ym-stats {
+html[data-layout='phone'] .ym-stats {
   grid-template-columns: 1fr 1fr;
 }

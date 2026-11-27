@@ -1,4 +1,4 @@
-import { computed, defineComponent, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, defineComponent, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { usePageRefresh } from '@/composables/usePageRefresh';
 import { useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
@@ -94,6 +94,13 @@ export default defineComponent({
      */
     const query = ref('');
     const searchFocused = ref(false);
+    const searchOpen = ref(false);
+    const searchInput = ref<HTMLInputElement | null>(null);
+
+    function toggleSearch() {
+      searchOpen.value = !searchOpen.value;
+      if (searchOpen.value) void nextTick(() => searchInput.value?.focus());
+    }
     const needle = computed(() => fold(query.value));
 
     function textHit(...parts: Array<string | null | undefined>): boolean {
@@ -506,6 +513,9 @@ export default defineComponent({
       visibleDownloaded,
       query,
       searchFocused,
+      searchOpen,
+      searchInput,
+      toggleSearch,
       clearQuery,
       listHasMore,
       listEmpty,

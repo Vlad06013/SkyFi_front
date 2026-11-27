@@ -1,18 +1,23 @@
 import { computed, defineComponent } from 'vue';
 import { useRoute } from 'vue-router';
 import { useFriendsStore } from '@/stores/friends';
+import { useLayoutStore } from '@/stores/layout';
 
 export default defineComponent({
   name: 'TabBar',
   setup() {
     const friends = useFriendsStore();
-    const tabs = computed(() => [
-      { id: 'home', to: '/home', label: 'Главная', badge: false },
-      { id: 'search', to: '/search', label: 'Поиск', badge: false },
-      { id: 'library', to: '/library', label: 'Моё', badge: false },
-      { id: 'friends', to: '/friends', label: 'Друзья', badge: friends.incoming.length > 0 },
-      { id: 'settings', to: '/settings', label: 'Настройки', badge: false },
-    ]);
+    const isTv = computed(() => useLayoutStore().profile === 'tv');
+    const tabs = computed(() => {
+      const items = [
+        { id: 'home', to: '/home', label: 'Главная', badge: false },
+        { id: 'search', to: '/search', label: 'Поиск', badge: false },
+        { id: 'library', to: '/library', label: 'Моё', badge: false },
+        { id: 'friends', to: '/friends', label: 'Друзья', badge: friends.incoming.length > 0 },
+        { id: 'settings', to: '/settings', label: 'Настройки', badge: false },
+      ];
+      return isTv.value ? items.filter((item) => item.id !== 'friends') : items;
+    });
 
     const route = useRoute();
 
@@ -28,6 +33,6 @@ export default defineComponent({
       return route.path === to || route.path.startsWith(`${to}/`);
     }
 
-    return { tabs, isOn };
+    return { tabs, isOn, isTv };
   },
 });

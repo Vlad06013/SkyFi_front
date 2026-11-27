@@ -3,6 +3,19 @@
     <AppBar title="Моё" badge />
     <div class="chip-scroll">
       <button
+        class="chip chip-search"
+        :class="{ active: searchOpen || Boolean(query) }"
+        type="button"
+        aria-label="поиск"
+        :aria-pressed="searchOpen"
+        @click="toggleSearch"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <circle cx="11" cy="11" r="7" />
+          <path d="M16.5 16.5 21 21" />
+        </svg>
+      </button>
+      <button
         v-for="chip in chips"
         :key="chip.id"
         class="chip"
@@ -14,12 +27,13 @@
       </button>
     </div>
 
-    <div class="field" :class="{ 'is-focus': searchFocused }">
+    <div v-if="searchOpen" class="field lib-search" :class="{ 'is-focus': searchFocused }">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
         <circle cx="11" cy="11" r="7" />
         <path d="M16.5 16.5 21 21" />
       </svg>
       <input
+        ref="searchInput"
         v-model="query"
         placeholder="поиск по моему"
         @focus="searchFocused = true"
@@ -260,3 +274,5 @@
 </template>
 
 <script src="./Library.ts" lang="ts"></script>
+
+<style scoped src="./Library.css"></style>

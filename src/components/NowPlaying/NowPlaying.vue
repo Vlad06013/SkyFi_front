@@ -1,4 +1,5 @@
 <template>
+  <Transition name="now-fade">
   <div
     v-if="expanded && current"
     ref="rootEl"
@@ -271,7 +272,8 @@
         <span>{{ formatTime(durationSeconds) }}</span>
       </div>
 
-      <div class="p-controls" @click.stop>
+      <div class="transport" @click.stop>
+      <div class="p-controls">
         <div class="side">
           <button
             class="plain"
@@ -358,6 +360,25 @@
             <circle cx="18" cy="12" r="1.4" fill="currentColor" />
           </svg>
         </button>
+        <button
+          v-if="isTv && clipActive && clipAudioTracks.length > 1"
+          class="q-chip"
+          type="button"
+          aria-label="звуковая дорожка"
+          @click.stop="onAudioChip"
+        >
+          {{ activeAudioLabel }}
+        </button>
+        <button
+          v-if="isTv && clipActive"
+          class="q-chip"
+          type="button"
+          aria-label="качество клипа"
+          @click.stop="onQualityChip"
+        >
+          {{ clipHlsActive && clipHlsAuto ? 'авто' : clipQuality }}
+        </button>
+      </div>
       </div>
       </div>
     </div>
@@ -374,6 +395,7 @@
       @update:sheet="sheet = $event"
     />
   </div>
+  </Transition>
 </template>
 
 <script src="./NowPlaying.ts" lang="ts"></script>
