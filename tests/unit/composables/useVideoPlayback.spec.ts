@@ -184,13 +184,17 @@ describe('useVideoPlayback: транспорт чистого видео', () =>
       useVideoPlayback();
     });
 
+    // Свои id: кеши потоков/резолва модульные и живут между тестами.
+    const subTrack: TrackSnapshot = { ...track, source_id: 't-sub' };
+    const subClip: VideoSnapshot = { ...video, source_id: 'v-sub' };
+
     // Трек играет через аудио-движок.
     playSnapshotMock.mockResolvedValue({
-      state: { ...player.state, current_snapshot: { ...track }, is_playing: true, active_device_id: 'uuid-1' },
+      state: { ...player.state, current_snapshot: { ...subTrack }, is_playing: true, active_device_id: 'uuid-1' },
       queue: [],
     } as never);
-    fetchAudioUrlMock.mockResolvedValue({ url: 'https://cdn.test/t.mp3', ttlSec: 300 } as never);
-    await player.playSnapshot(track);
+    fetchAudioUrlMock.mockResolvedValue({ url: 'https://cdn.test/t-sub.mp3', ttlSec: 300 } as never);
+    await player.playSnapshot(subTrack);
     await vi.advanceTimersByTimeAsync(0);
     expect(player.audioPlaying).toBe(true);
 
@@ -200,14 +204,14 @@ describe('useVideoPlayback: транспорт чистого видео', () =>
     patchPlaybackOptionsMock.mockResolvedValue({
       state: {
         ...player.state,
-        current_snapshot: { ...track },
+        current_snapshot: { ...subTrack },
         is_playing: true,
         active_device_id: 'uuid-1',
         clips_enabled: true,
       },
       queue: [],
     } as never);
-    resolveVideoMock.mockResolvedValue({ video: { ...video }, streams: [], ttl_sec: 300 } as never);
+    resolveVideoMock.mockResolvedValue({ video: { ...subClip }, streams: [], ttl_sec: 300 } as never);
     fetchVideoStreamsMock.mockResolvedValue({ streams: [], hls: null, ttl_sec: 300 } as never);
 
     await player.toggleClips();
@@ -337,5 +341,61 @@ describe('useVideoPlayback: транспорт чистого видео', () =>
     await player.playSnapshot(brokenVideo, 'search');
     await vi.advanceTimersByTimeAsync(0);
     expect(useToastStore().toast?.title).toBe('Видео не найдено');
+  });
+
+  it('клип переживает потерю и возврат роли активного: поток поднимается заново', async () => {
+    const scope = effectScope();
+    const player = usePlayerStore();
+    player.state = { ...player.state, active_device_id: 'uuid-1' };
+    scope.run(() => {
+      useAudioPlayback();
+      useVideoPlayback();
+    });
+
+    const flapTrack: TrackSnapshot = { ...track, source_id: 't-flap' };
+    const flapClip: VideoSnapshot = { ...video, source_id: 'v-flap' };
+    playSnapshotMock.mockResolvedValue({
+      state: { ...player.state, current_snapshot: { ...flapTrack }, is_playing: true, active_device_id: 'uuid-1' },
+      queue: [],
+    } as never);
+    fetchAudioUrlMock.mockResolvedValue({ url: 'https://cdn.test/t-flap.mp3', ttlSec: 300 } as never);
+    await player.playSnapshot(flapTrack);
+    await vi.advanceTimersByTimeAsync(0);
+
+    patchPlaybackOptionsMock.mockResolvedValue({
+      state: {
+        ...player.state,
+        current_snapshot: { ...flapTrack },
+        is_playing: true,
+        active_device_id: 'uuid-1',
+        clips_enabled: true,
+      },
+      queue: [],
+    } as never);
+    resolveVideoMock.mockResolvedValue({
+      video: { ...flapClip },
+      streams: [{ quality: 720, url: 'https://cdn.test/v-flap.mp4' }],
+      ttl_sec: 300,
+    } as never);
+    fetchVideoStreamsMock.mockResolvedValue({
+      streams: [{ quality: 720, url: 'https://cdn.test/v-flap.mp4' }],
+      hls: null,
+      ttl_sec: 300,
+    } as never);
+
+    await player.toggleClips();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(player.clipActive).toBe(true);
+    expect(player.audioPlaying).toBe(true);
+
+    // Бэк прислал чужое/пустое активное: поток снесён, элемент на паузе.
+    player.state = { ...player.state, active_device_id: 'uuid-2' };
+    await vi.advanceTimersByTimeAsync(0);
+    expect(player.audioPlaying).toBe(false);
+
+    // Активация вернулась: клип обязан заиграть снова, а не молчать до смены трека.
+    player.state = { ...player.state, active_device_id: 'uuid-1' };
+    await vi.advanceTimersByTimeAsync(0);
+    expect(player.audioPlaying).toBe(true);
   });
 });

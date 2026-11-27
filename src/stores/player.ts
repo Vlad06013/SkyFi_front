@@ -23,7 +23,7 @@ import {
   type NextReason,
 } from '@/lib/playback-engine';
 import { feedbackOnFavorite, feedbackOnLeave, feedbackOnProgress, type WaveListen } from '@/lib/wave-feedback';
-import { registerNetActivity } from '@/lib/net-log';
+import { recordNetEvent, registerNetActivity } from '@/lib/net-log';
 import { unlockMediaPlayback } from '@/lib/media-unlock';
 import { clearPlayerCache, loadPlayerCache, savePlayerCache } from '@/lib/library-cache';
 import { readPlayerDevicePrefs, writePlayerDevicePrefs } from '@/lib/player-prefs';
@@ -1823,6 +1823,19 @@ export const usePlayerStore = defineStore('player', () => {
     if (pendingSeekSeconds != null) parts.push('seek');
     return parts.length ? parts.join(' · ') : null;
   });
+
+  // Переходы активного устройства — в журнал сети: «активация слетела»
+  // в поле иначе не отличить от команды пульта (источник виден по соседним
+  // записям: presence/disconnect/коннекты).
+  watch(
+    () => state.value.active_device_id,
+    (active, prev) => {
+      if (active === prev) return;
+      const mine = useDevicesStore().myDeviceUuid;
+      const mark = (uuid: string | null) => (uuid == null ? '—' : uuid === mine ? 'это устройство' : uuid);
+      recordNetEvent('active-device', `${mark(prev)} → ${mark(active)}`);
+    },
+  );
 
   return {
     state,

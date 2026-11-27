@@ -356,6 +356,10 @@ function applyStream(resumePosition?: number) {
     syncAttachment();
     if (!openingArmed()) armOpening();
     armFirstFrame(el);
+    // Элемент мог остаться на паузе после teardown'а (потеря роли активного):
+    // is_playing при возврате роли не менялся — будим здесь. tryPlay сам
+    // отсечёт лишнее (уже играет, пауза, не активное).
+    tryPlay(el);
     return;
   }
   // Свежий клип на треке стартует с серверной позиции трека; смена качества
@@ -630,7 +634,13 @@ export function useVideoPlayback() {
     }
     // Клип на треке: потоки приехали вместе с resolve — только применяем.
     // Позиция общая с треком: клип стартует с неё (0 — тоже валидная позиция).
-    if (player.clipVideo && snapshotKey(player.clipVideo) === key) {
+    // Потоков нет (снесены teardown'ом при потере роли активного) — шорткат
+    // не берём: ниже честный get-url/кеш, иначе клип молчал бы до смены трека.
+    if (
+      player.clipVideo &&
+      snapshotKey(player.clipVideo) === key &&
+      (player.clipStreams.length > 0 || player.clipHls != null)
+    ) {
       loadedKey = key;
       appliedKey = key;
       beginOpening();

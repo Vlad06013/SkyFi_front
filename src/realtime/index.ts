@@ -1,6 +1,7 @@
 import { readonly, ref, watch } from 'vue';
 import Echo from 'laravel-echo';
 import { endpointKind } from '@/lib/endpoints';
+import { recordNetEvent } from '@/lib/net-log';
 import { createEcho } from '@/realtime/echo';
 import { createRouter } from '@/realtime/router';
 import {
@@ -84,13 +85,35 @@ function subscribeOwnChannel(userId: number) {
  * подписки = привязка сокета к устройству (presence, api.md §17).
  * Подписываемся только после регистрации устройства (registered) —
  * иначе канала у юзера ещё нет. Событий в канал не шлётся.
+ * Провал подписки (auth/сеть) = бэк не видит устройство и через грейс
+ * сам ставит стоп: гард сбрасываем, ретрай по таймеру и на следующем
+ * коннекте; исход пишем в журнал сети — на телефоне это единственный
+ * способ увидеть, что presence не встал.
  */
+let deviceSubscribeRetry: ReturnType<typeof setTimeout> | null = null;
+
 function subscribeDeviceChannel() {
   if (!echo) return;
   const uuid = useDevicesStore().myDeviceUuid;
   if (!uuid || deviceChannelUuid === uuid) return;
   deviceChannelUuid = uuid;
-  echo.private(`device.${uuid}`);
+  const channel = echo.private(`device.${uuid}`);
+  channel.subscribed(() => {
+    if (deviceSubscribeRetry) {
+      clearTimeout(deviceSubscribeRetry);
+      deviceSubscribeRetry = null;
+    }
+    recordNetEvent('presence', `device.${uuid} подписан`);
+  });
+  channel.error((cause: unknown) => {
+    deviceChannelUuid = null;
+    recordNetEvent('presence', `device.${uuid} подписка не удалась: ${cause instanceof Error ? cause.message : String(cause)}`);
+    if (deviceSubscribeRetry) clearTimeout(deviceSubscribeRetry);
+    deviceSubscribeRetry = setTimeout(() => {
+      deviceSubscribeRetry = null;
+      subscribeDeviceChannel();
+    }, 10_000);
+  });
 }
 
 /** Подключение и подписка на свой канал. Повторный вызов — no-op. */
@@ -150,6 +173,10 @@ export function stopRealtime() {
   echo = null;
   wasConnected = false;
   deviceChannelUuid = null;
+  if (deviceSubscribeRetry) {
+    clearTimeout(deviceSubscribeRetry);
+    deviceSubscribeRetry = null;
+  }
   status.value = 'idle';
   useOnlineStore().noteSocketDisconnected('stop');
 }

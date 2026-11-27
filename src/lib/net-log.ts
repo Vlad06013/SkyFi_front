@@ -15,7 +15,11 @@ export type NetEvent =
   | 'online'
   | 'offline'
   /** Серия сетевых/5xx фейлов при живом сокете — принудительный офлайн. */
-  | 'force-offline';
+  | 'force-offline'
+  /** Presence устройства: подписка/отписка device.{uuid}, device.disconnected. */
+  | 'presence'
+  /** Смена active_device_id в стейте плеера (кто активный — видно по деталям). */
+  | 'active-device';
 
 export interface NetLogEntry {
   /** Момент события (Date.now()). */
@@ -92,6 +96,8 @@ const EVENT_LABELS: Record<NetEvent, string> = {
   online: 'онлайн',
   offline: 'офлайн',
   'force-offline': 'офлайн (фейлы запросов)',
+  presence: 'presence',
+  'active-device': 'активное устройство',
 };
 
 export function netEventLabel(event: NetEvent): string {

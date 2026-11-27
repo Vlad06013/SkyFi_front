@@ -1,6 +1,7 @@
 import { useDevicesStore } from '@/stores/devices';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
+import { recordNetEvent } from '@/lib/net-log';
 import type {
   PlaybackDeviceChangedPayload,
   PlaybackDeviceConnectedPayload,
@@ -32,5 +33,7 @@ export function handleDeviceDisconnected(payload: PlaybackDeviceDisconnectedPayl
   if (payload?.device_uuid == null) return;
   useDevicesStore().applyDisconnected(payload.device_uuid);
   const player = usePlayerStore();
-  if (player.state.active_device_id === payload.device_uuid) player.applyActiveDevice(null);
+  const wasActive = player.state.active_device_id === payload.device_uuid;
+  recordNetEvent('presence', `устройство офлайн: ${payload.device_uuid}${wasActive ? ' (было активным)' : ''}`);
+  if (wasActive) player.applyActiveDevice(null);
 }
