@@ -62,6 +62,13 @@ export function createEcho(): Echo<'reverb'> {
     forceTLS: useTls,
     enabledTransports: ['ws', 'wss'],
     disableStats: true,
+    // Мёртвый сокет без FIN (контейнер реверба остановлен за DNAT докера —
+    // соединение «подвисает» наполовину) дефолтный activity_timeout pusher'а
+    // (~2 мин) замечает слишком поздно: бэк через 60 с тишины сокета сам
+    // ставит стоп (api.md §4). Пингуем чаще: детект за ~20 с, реконнект
+    // успевает в серверный грейс.
+    activity_timeout: 15_000,
+    pong_timeout: 5_000,
 
     authEndpoint: target.authUrl,
 

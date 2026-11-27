@@ -9,11 +9,10 @@ import { clipBuffering, clipFrameReady, clipSurface, resyncClipAttachment, setHo
 import { coverVar, trackCover } from '@/lib/cover';
 import { resolveUrl } from '@/lib/endpoints';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
-import OfflineBanner from '@/components/OfflineBanner/OfflineBanner.vue';
 
 export default defineComponent({
   name: 'HomePage',
-  components: { SourceBadge, OfflineBanner },
+  components: { SourceBadge },
   setup() {
     const player = usePlayerStore();
     const online = useOnlineStore();

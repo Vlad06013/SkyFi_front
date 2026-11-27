@@ -6,10 +6,11 @@ import { recordNetEvent } from '@/lib/net-log';
 
 /**
  * Онлайн-детект на сокете (optimizations.md «Онлайн-детект на сокете»):
- * `connected` → онлайн мгновенно; разрыв → офлайн с грейс-периодом
- * против краткого флапа WiFi. HTTP-зонд не используется. Единственный
- * источник флага — события Echo-соединения (realtime/index.ts шлёт
- * сюда noteSocket*). Дополнительно: серия сетевых/5xx фейлов при живом
+ * `connected` → онлайн мгновенно; разрыв (`disconnected`/`unavailable`/
+ * `failed`) → офлайн с грейс-периодом против краткого флапа WiFi и
+ * ретраев сокета. HTTP-зонд не используется. Единственный источник
+ * флага — события Echo-соединения (realtime/index.ts шлёт сюда
+ * noteSocket*). Дополнительно: серия сетевых/5xx фейлов при живом
  * сокете («сокет онлайн, а HTTP бэка умер») → принудительный офлайн и
  * рестарт сокета.
  */
@@ -54,24 +55,33 @@ export const useOnlineStore = defineStore('online', () => {
     setOnline(true, 'connect');
   }
 
-  /** Сокет разорвался (realtime): офлайн после грейса. */
-  function noteSocketDisconnected(detail = '') {
-    socketConnected = false;
-    if (graceTimer) clearTimeout(graceTimer);
+  /**
+   * Офлайн после грейса: краткий флап WiFi и ретраи сокета не дёргают
+   * плеер и баннер. Таймер не перезапускаем: офлайн наступает через
+   * грейс от ПЕРВОГО события серии, а не уезжает от каждого ретрая.
+   */
+  function scheduleOffline(event: 'disconnect' | 'unavailable' | 'failed', detail = '') {
+    if (graceTimer || isOnline.value === false) return;
     graceTimer = setTimeout(() => {
       graceTimer = null;
-      setOnline(false, 'disconnect', detail);
+      setOnline(false, event, detail);
     }, OFFLINE_GRACE_MS);
   }
 
-  /** Сокет не достучался (unavailable/failed): офлайн сразу + переспрос адреса. */
+  /** Сокет разорвался (realtime): офлайн после грейса. */
+  function noteSocketDisconnected(detail = '') {
+    socketConnected = false;
+    scheduleOffline('disconnect', detail);
+  }
+
+  /**
+   * Сокет не достучался (unavailable/failed): тот же грейс, что и у
+   * разрыва (pusher шлёт unavailable между ретраями — мгновенный офлайн
+   * рисовал бы баннер на каждый чих), плюс сразу переспрос адреса.
+   */
   async function noteSocketFailed(event: 'unavailable' | 'failed', detail = '') {
     socketConnected = false;
-    if (graceTimer) {
-      clearTimeout(graceTimer);
-      graceTimer = null;
-    }
-    setOnline(false, event, detail);
+    scheduleOffline(event, detail);
     const now = Date.now();
     if (now - lastResolveAt < RESOLVE_COOLDOWN_MS) return;
     lastResolveAt = now;

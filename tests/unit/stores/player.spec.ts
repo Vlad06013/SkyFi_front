@@ -1665,3 +1665,53 @@ describe('stores/player: позиционный репорт', () => {
     }
   });
 });
+
+describe('stores/player: регистрация устройства при команде', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    pausePlaybackMock.mockReset();
+  });
+
+  function playingWithUnknownDevice() {
+    const auth = useAuthStore();
+    auth.user = { id: 1 } as never;
+    const devices = useDevicesStore();
+    // uuid ещё нет: команда пойдёт через регистрацию (ensurePresence).
+    devices.myDeviceUuid = null;
+    devices.registered = false;
+    const player = usePlayerStore();
+    player.state = {
+      ...player.state,
+      current_snapshot: track,
+      is_playing: true,
+      active_device_id: null,
+    };
+    player.setAudioPlaying(true);
+    return player;
+  }
+
+  it('регистрация не прошла: человеческий тост, команда на бэк не уходит', async () => {
+    const player = playingWithUnknownDevice();
+    vi.mocked(devicesApi.registerDevice).mockRejectedValue(new Error('boom'));
+
+    await player.togglePlay();
+
+    expect(pausePlaybackMock).not.toHaveBeenCalled();
+    expect(useToastStore().toast?.title).toBe('Нет соединения с сервером');
+    // Откат оптимистичной паузы: серверное «играем» не тронули.
+    expect(player.state.is_playing).toBe(true);
+  });
+
+  it('регистрация упала вместе с сетью (офлайн-флаг уже встал) — молчим', async () => {
+    const player = playingWithUnknownDevice();
+    vi.mocked(devicesApi.registerDevice).mockImplementation(async () => {
+      useOnlineStore().isOnline = false;
+      throw new Error('network');
+    });
+
+    await player.togglePlay();
+
+    expect(pausePlaybackMock).not.toHaveBeenCalled();
+    expect(useToastStore().toast).toBeNull();
+  });
+});

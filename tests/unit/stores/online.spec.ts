@@ -75,17 +75,46 @@ describe('stores/online — детект на сокете', () => {
     expect(netLog.value.at(-1)).toMatchObject({ event: 'disconnect', transition: 'offline' });
   });
 
-  it('failed: офлайн сразу + переспрос адреса (resolveEndpoint)', async () => {
+  it('failed: офлайн после грейса + переспрос адреса сразу (resolveEndpoint)', async () => {
     const online = useOnlineStore();
     online.noteSocketConnected();
 
     await online.noteSocketFailed('failed');
-    expect(online.isOnline).toBe(false);
+    // Баннер не мигает на ретраях: офлайн только после грейса.
+    expect(online.isOnline).toBe(true);
     expect(hoisted.resolveEndpointMock).toHaveBeenCalledTimes(1);
 
-    // Повторный failed сразу — кулдаун resolveEndpoint, зонд не дёргаем.
+    vi.advanceTimersByTime(GRACE_MS);
+    expect(online.isOnline).toBe(false);
+
+    // Повторный failed — кулдаун resolveEndpoint, зонд не дёргаем.
     await online.noteSocketFailed('failed');
     expect(hoisted.resolveEndpointMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('unavailable между ретраями сокета: reconnect внутри грейса — офлайна не было', async () => {
+    const online = useOnlineStore();
+    online.noteSocketConnected();
+
+    online.noteSocketDisconnected();
+    await online.noteSocketFailed('unavailable');
+    vi.advanceTimersByTime(GRACE_MS - 1);
+    expect(online.isOnline).toBe(true);
+
+    online.noteSocketConnected();
+    vi.advanceTimersByTime(GRACE_MS * 2);
+    expect(online.isOnline).toBe(true);
+  });
+
+  it('серия разрывов не растягивает грейс: офлайн от первого события', async () => {
+    const online = useOnlineStore();
+    online.noteSocketConnected();
+
+    online.noteSocketDisconnected();
+    vi.advanceTimersByTime(GRACE_MS - 500);
+    await online.noteSocketFailed('unavailable');
+    vi.advanceTimersByTime(500);
+    expect(online.isOnline).toBe(false);
   });
 
   it('серия сетевых фейлов при живом сокете: force-offline + рестарт сокета', () => {

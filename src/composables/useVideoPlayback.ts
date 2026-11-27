@@ -1,7 +1,7 @@
 import { ref, watch } from 'vue';
 import { fetchVideoStreams, resolveVideo } from '@/api/videos';
 import type { VideoHls, VideoStream } from '@/api/videos';
-import { ApiError } from '@/api/http';
+import { ApiError, isOfflineError } from '@/api/http';
 import { getCachedClipResolve, cacheClipResolve, invalidateClipResolve } from '@/lib/clip-resolve-cache';
 import { bufferAheadSeconds } from '@/lib/buffer-ranges';
 import { resolveUrl } from '@/lib/endpoints';
@@ -683,7 +683,8 @@ export function useVideoPlayback() {
         loadedKey = null;
         releaseBuffering();
       }
-      if (!(await maybeHintCookies(cause, key))) {
+      // Офлайн-фейлы молчат (optimizations.md «Офлайн-гейт»): обрыв виден баннером.
+      if (!isOfflineError(cause) && !(await maybeHintCookies(cause, key))) {
         toast.show(cause instanceof Error ? cause.message : 'Не удалось загрузить видео', '', true);
       }
     } finally {
@@ -746,7 +747,8 @@ export function useVideoPlayback() {
       if (controller.signal.aborted) return;
       if (gen === resolveGen) clipBuffering.value = false;
       if (player.current && snapshotKey(player.current) === key) player.setClipUnavailable();
-      if (!(await maybeHintCookies(cause, key))) {
+      // Офлайн-фейлы молчат (optimizations.md «Офлайн-гейт»): обрыв виден баннером.
+      if (!isOfflineError(cause) && !(await maybeHintCookies(cause, key))) {
         toast.show(cause instanceof Error ? cause.message : 'Не удалось найти клип', '', true);
       }
     } finally {

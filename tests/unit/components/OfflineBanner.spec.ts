@@ -1,31 +1,16 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { mount } from '@vue/test-utils';
-import Home from '@/pages/Home/Home.vue';
+import OfflineBanner from '@/components/OfflineBanner/OfflineBanner.vue';
 import { useOnlineStore } from '@/stores/online';
 
-vi.mock('vue-router', async () => {
-  const actual = await vi.importActual<typeof import('vue-router')>('vue-router');
-  return {
-    ...actual,
-    useRoute: () => ({ name: 'home' }),
-    useRouter: () => ({ push: vi.fn() }),
-  };
-});
-
-function mountPage() {
-  const pinia = createPinia();
-  setActivePinia(pinia);
-  return mount(Home, { global: { plugins: [pinia] } });
-}
-
-describe('pages/Home — офлайн-баннер', () => {
+describe('components/OfflineBanner', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
   });
 
   it('показывает «Офлайн-режим» только когда isOnline === false', async () => {
-    const wrapper = mountPage();
+    const wrapper = mount(OfflineBanner);
     const online = useOnlineStore();
 
     online.isOnline = null;

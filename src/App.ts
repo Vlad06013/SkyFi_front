@@ -4,6 +4,7 @@ import { IonApp } from '@ionic/vue';
 import AppConfirm from '@/components/AppConfirm/AppConfirm.vue';
 import AppSplash from '@/components/AppSplash/AppSplash.vue';
 import AppToast from '@/components/AppToast/AppToast.vue';
+import OfflineBanner from '@/components/OfflineBanner/OfflineBanner.vue';
 import { useAppStore } from '@/stores/app';
 import { useOnlineRestoreToast } from '@/composables/useOnlineRestoreToast';
 import { useAppUpdateStore } from '@/stores/app-update';
@@ -11,7 +12,7 @@ import { bindHardwareBack, confirmExit, exitPromptOpen, pushBackOverlay } from '
 
 export default defineComponent({
   name: 'App',
-  components: { IonApp, AppConfirm, AppSplash, AppToast },
+  components: { IonApp, AppConfirm, AppSplash, AppToast, OfflineBanner },
   setup() {
     const app = useAppStore();
     // Тост «Соединение восстановлено» при переходе офлайн → онлайн.

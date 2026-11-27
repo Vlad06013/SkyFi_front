@@ -1,6 +1,7 @@
 <template>
   <ion-app>
     <router-view />
+    <offline-banner />
     <app-splash v-if="app.phase !== 'ready'" />
     <app-toast />
     <AppConfirm

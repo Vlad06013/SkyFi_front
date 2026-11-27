@@ -199,6 +199,16 @@ export const usePlayerStore = defineStore('player', () => {
     toast.show(cause instanceof Error ? cause.message : fallback, '', true);
   }
 
+  /**
+   * Команда не ушла: регистрация устройства не прошла. Почти всегда это тот
+   * же обрыв сети/бэка — в офлайне молчим (обрыв виден баннером), служебные
+   * формулировки про регистрацию юзеру не показываем.
+   */
+  function toastUnregistered() {
+    if (offlinePlayback()) return;
+    toast.show('Нет соединения с сервером', 'команда не выполнена — повторите', true);
+  }
+
   async function resync() {
     if (offlinePlayback()) return;
     try {
@@ -271,7 +281,7 @@ export const usePlayerStore = defineStore('player', () => {
       const payload = await withDevice((fields) => devicesApi.activateDevice(deviceUuid, fields));
       if (!payload) {
         applyActiveDevice(prevActive);
-        toast.show('Устройство ещё не зарегистрировано', '', true);
+        toastUnregistered();
         return false;
       }
       // Само-реактивация посреди воспроизведения: серверная позиция в ответе
@@ -766,7 +776,7 @@ export const usePlayerStore = defineStore('player', () => {
           state.value = prevState;
           anchorPosition();
         }
-        toast.show('Устройство ещё не зарегистрировано', '', true);
+        toastUnregistered();
         return;
       }
       applyServerState(payload, { force: true });
@@ -928,7 +938,7 @@ export const usePlayerStore = defineStore('player', () => {
           is_playing: wasPlaying,
         };
         anchorPosition();
-        toast.show('Устройство ещё не зарегистрировано', '', true);
+        toastUnregistered();
         return;
       }
       applyServerState(payload, { force: true });
@@ -1566,7 +1576,7 @@ export const usePlayerStore = defineStore('player', () => {
       if (!payload) {
         clipMode.value = prev;
         if (!prev) clearClip();
-        toast.show('Устройство ещё не зарегистрировано', '', true);
+        toastUnregistered();
         return;
       }
       applyServerState(payload, { force: true });

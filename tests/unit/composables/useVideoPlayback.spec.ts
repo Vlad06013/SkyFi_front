@@ -9,6 +9,8 @@ import { useVideoPlayback } from '@/composables/useVideoPlayback';
 import { useAuthStore } from '@/stores/auth';
 import { useDevicesStore } from '@/stores/devices';
 import { usePlayerStore } from '@/stores/player';
+import { useToastStore } from '@/stores/toast';
+import { ApiError } from '@/api/http';
 import type { TrackSnapshot, VideoSnapshot } from '@/types';
 
 vi.mock('@/api/player', () => ({
@@ -292,5 +294,48 @@ describe('useVideoPlayback: транспорт чистого видео', () =>
     expect(player.clipActive).toBe(true);
     expect(fetchVideoStreamsMock).not.toHaveBeenCalled();
     expect(player.audioPlaying).toBe(false);
+  });
+
+  it('офлайн-фейл get-url молчит; обычная ошибка — тост', async () => {
+    const scope = effectScope();
+    const player = usePlayerStore();
+    player.state = { ...player.state, active_device_id: 'uuid-1' };
+    scope.run(() => {
+      useAudioPlayback();
+      useVideoPlayback();
+    });
+
+    const offlineVideo: VideoSnapshot = { ...video, source_id: 'v-offline' };
+    playSnapshotMock.mockResolvedValue({
+      state: {
+        ...player.state,
+        current_snapshot: { ...offlineVideo },
+        is_playing: true,
+        active_device_id: 'uuid-1',
+      },
+      queue: [],
+    } as never);
+    fetchVideoStreamsMock.mockRejectedValue(new ApiError(null, 'offline', 'Нет соединения.'));
+
+    await player.playSnapshot(offlineVideo, 'search');
+    await vi.advanceTimersByTimeAsync(0);
+    // Обрыв виден баннером — тоста «Нет соединения.» быть не должно.
+    expect(useToastStore().toast).toBeNull();
+
+    const brokenVideo: VideoSnapshot = { ...video, source_id: 'v-broken' };
+    playSnapshotMock.mockResolvedValue({
+      state: {
+        ...player.state,
+        current_snapshot: { ...brokenVideo },
+        is_playing: true,
+        active_device_id: 'uuid-1',
+      },
+      queue: [],
+    } as never);
+    fetchVideoStreamsMock.mockRejectedValue(new ApiError(404, 'not-found', 'Видео не найдено'));
+
+    await player.playSnapshot(brokenVideo, 'search');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(useToastStore().toast?.title).toBe('Видео не найдено');
   });
 });
