@@ -241,7 +241,7 @@
           class="cover-big"
           :style="{ background: coverVar(current.source_type) }"
         >
-          <img v-if="current.type === 'track'" :src="trackCover(current)" alt="">
+          <img v-if="current.type === 'track'" :src="trackCover(current, 1000)" alt="">
           <SourceBadge :source="current.source_type" />
           <div v-if="audioLoading || clipBuffering" class="clip-spinner" aria-hidden="true">
             <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">

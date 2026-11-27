@@ -11,11 +11,19 @@ import type { UserSearchItem } from '@/types';
 
 const SEARCH_DEBOUNCE_MS = 350;
 
-/** Статус заявки из search-users в нормализованный вид (допустимые строки бэком не зафиксированы). */
-function statusKind(item: UserSearchItem): 'friends' | 'incoming' | 'outgoing' | 'none' {
-  if (item.friendship_status === 'friends') return 'friends';
-  if (item.friendship_status === 'incoming') return 'incoming';
-  if (item.friendship_status === 'outgoing' || item.friendship_status === 'pending') return 'outgoing';
+type FoundKind = 'friends' | 'incoming' | 'outgoing' | 'none';
+
+/**
+ * Сырой статус search-users → нормализованный вид. Бэк шлёт enum БД
+ * в верхнем регистре (PENDING/ACCEPTED — проверено curl'ом 2026-11-27),
+ * направление заявки статус не кодирует: PENDING одинаков у обеих сторон.
+ */
+function baseKind(item: UserSearchItem): FoundKind | 'pending' {
+  const status = item.friendship_status?.toLowerCase() ?? '';
+  if (status === 'friends' || status === 'accepted') return 'friends';
+  if (status === 'incoming') return 'incoming';
+  if (status === 'outgoing') return 'outgoing';
+  if (status === 'pending') return 'pending';
   return 'none';
 }
 
@@ -34,6 +42,17 @@ export default defineComponent({
     const searchingUsers = ref(false);
     let generation = 0;
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    /**
+     * Вид строки выдачи. Направление PENDING-заявки бэк не кодирует —
+     * берём из загруженных списков стора: без них безопасный фолбэк —
+     * «исходящая» (отмена), а не «Добавить» с гарантированным 422.
+     */
+    function statusKind(item: UserSearchItem): FoundKind {
+      const kind = baseKind(item);
+      if (kind !== 'pending') return kind;
+      return friendsStore.incoming.some((entry) => entry.user.id === item.user_id) ? 'incoming' : 'outgoing';
+    }
 
     watch(query, () => {
       const q = query.value.trim();

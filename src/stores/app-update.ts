@@ -4,6 +4,7 @@ import { CapacitorUpdater } from '@capgo/capacitor-updater';
 import { defineStore } from 'pinia';
 import { computed, ref, watch } from 'vue';
 import { fetchAppUpdate } from '@/api/app-updates';
+import { isOfflineError } from '@/api/http';
 import { BUNDLE_VERSION, shellSemver } from '@/lib/bundle-version';
 import { useAuthStore } from '@/stores/auth';
 import { useOnlineStore } from '@/stores/online';
@@ -116,6 +117,10 @@ export const useAppUpdateStore = defineStore('app-update', () => {
       if (manual) useToastStore().show('Проверка уже идёт');
       return;
     }
+    // Автопроверка (заход в настройки, pull-refresh) в офлайне бессмысленна
+    // и шумит тостом «Не удалось проверить обновление» — офлайн и так виден
+    // баннером. Ручная проверка кнопкой отвечает честно и в офлайне.
+    if (!manual && useOnlineStore().isOnline === false) return;
     checking.value = true;
     try {
       const update = await fetchAppUpdate(BUNDLE_VERSION, await shellVersion());
@@ -130,7 +135,7 @@ export const useAppUpdateStore = defineStore('app-update', () => {
       pending.value = update;
       promptOpen.value = true;
     } catch (error) {
-      fail('Не удалось проверить обновление', error);
+      if (manual || !isOfflineError(error)) fail('Не удалось проверить обновление', error);
     } finally {
       checking.value = false;
     }

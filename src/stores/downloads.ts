@@ -1,9 +1,9 @@
 import axios from 'axios';
 import { defineStore } from 'pinia';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { fetchAudioFile } from '@/api/audio';
 import { fetchEntityDetails } from '@/api/details';
-import { clearLocalCover, setLocalCover } from '@/lib/cover';
+import { clearLocalCover, coverSize, setLocalCover } from '@/lib/cover';
 import { resolveUrl } from '@/lib/endpoints';
 import {
   deleteCollectionRecord,
@@ -22,6 +22,7 @@ import { collectionPercent, savedCollection } from '@/lib/collection-progress';
 import { collectionSearchQuery, searchDownloads, trackSearchQuery } from '@/lib/download-search';
 import { coverFilePath, entityKey, isCollection, linkId, trackFilePath, type CollectionSnapshot } from '@/lib/download-keys';
 import { registerNetActivity } from '@/lib/net-log';
+import { useOnlineStore } from '@/stores/online';
 import { useToastStore } from '@/stores/toast';
 import type { AnySnapshot, TrackSnapshot } from '@/types';
 
@@ -54,6 +55,8 @@ export const useDownloadsStore = defineStore('downloads', () => {
   /** Процент одного файла: loaded / Content-Length. К кнопке «скачать всё» не относится. */
   const filePct = ref<Record<string, number>>({});
   let bulkAbort: AbortController | null = null;
+  /** Докачка обложек (repairCovers): один прогон за раз, отменяется cancelActive. */
+  let repairAbort: AbortController | null = null;
   const fileStops = new Set<AbortController>();
   const inflight = new Map<string, Promise<void>>();
 
@@ -125,6 +128,8 @@ export const useDownloadsStore = defineStore('downloads', () => {
   /** Обрыв и «скачать всё», и отдельного трека: кольцо на кнопке в этот момент крутится. */
   function cancelActive() {
     cancelBulk();
+    repairAbort?.abort();
+    repairAbort = null;
     for (const stop of fileStops) stop.abort();
     fileStops.clear();
   }
@@ -183,9 +188,43 @@ export const useDownloadsStore = defineStore('downloads', () => {
     if (src) setLocalCover(key, src);
   }
 
+  /**
+   * Докачка обложек, которые не скачались ранее: закачки до появления
+   * coverPath (2026-11-25) и треки, чья обложка оборвалась при скачивании.
+   * Без ремонта такие треки в офлайне остаются без картинок — локального
+   * файла нет, а сетевой URL не грузится. Тихо, по одной, только онлайн;
+   * повторный вызов во время прогона — no-op.
+   */
+  async function repairCovers() {
+    if (repairAbort) return;
+    if (useOnlineStore().isOnline !== true) return;
+    const controller = new AbortController();
+    repairAbort = controller;
+    try {
+      const rows = [
+        ...trackRows.value.filter((row) => !row.coverPath),
+        ...collections.value.filter((row) => !row.coverPath),
+      ];
+      for (const row of rows) {
+        if (controller.signal.aborted) return;
+        if (useOnlineStore().isOnline !== true) return;
+        if (!coverUrlOf(row.snapshot)) continue;
+        try {
+          await ensureCover(row.snapshot, controller.signal);
+        } catch {
+          /* обложка не критична — следующая */
+        }
+      }
+    } finally {
+      repairAbort = null;
+    }
+  }
+
   async function ensureCover(snapshot: AnySnapshot, signal: AbortSignal) {
     // Ссылка с бэка относительная (api.md §1.7) — хост подставляем перед fetch.
-    const url = resolveUrl(coverUrlOf(snapshot)) || null;
+    // Бэк шлёт 200x200 — для офлайн-плеера мыльно, качаем 600x600 (coverSize).
+    const raw = resolveUrl(coverUrlOf(snapshot));
+    const url = raw ? coverSize(raw, 600) : null;
     if (!url) return;
     const key = entityKey(snapshot);
     const track = trackRows.value.find((row) => row.key === key);
@@ -270,6 +309,16 @@ export const useDownloadsStore = defineStore('downloads', () => {
 
   async function saveTrack(snapshot: TrackSnapshot, ownerKey: string, signal: AbortSignal, report: boolean) {
     if (signal.aborted) aborted();
+    // Повторная загрузка: трек с файлом, связью и обложкой пропускаем
+    // целиком — без файловых/сетевых проверок на каждый из 500+ треков
+    // (publishCover/openDownload на трек растягивал прогон на минуты).
+    const key = entityKey(snapshot);
+    const row = trackRows.value.find((item) => item.key === key);
+    const linked = links.value.some((link) => link.trackKey === key && link.ownerKey === ownerKey);
+    if (row && linked && (row.coverPath || !coverUrlOf(snapshot))) {
+      if (report) finishFile();
+      return;
+    }
     // «Что сейчас качается» для плашки библиотеки: без неё прогон уже
     // скачанного (проверка связей/обложек) выглядел мёртвым зависанием.
     if (report && bulk.value) bulk.value = { ...bulk.value, current: snapshot.title };
@@ -500,6 +549,14 @@ export const useDownloadsStore = defineStore('downloads', () => {
     return parts.length ? parts.join(' · ') : null;
   });
 
+  // Появление сети — повод долечить обложки скачанного (см. repairCovers).
+  watch(
+    () => useOnlineStore().isOnline,
+    (online, prev) => {
+      if (online === true && prev !== true) void repairCovers();
+    },
+  );
+
   return {
     items,
     downloadedBytes,
@@ -523,5 +580,6 @@ export const useDownloadsStore = defineStore('downloads', () => {
     removeCollection,
     clearDownloads,
     localUrl,
+    repairCovers,
   };
 });

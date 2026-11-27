@@ -9,7 +9,7 @@ export interface DownloadSearchHit {
   best: TrackSnapshot | AlbumSnapshot | PlaylistSnapshot | null;
 }
 
-function fold(value: string): string {
+export function fold(value: string): string {
   return value.trim().toLowerCase().replaceAll('ё', 'е');
 }
 

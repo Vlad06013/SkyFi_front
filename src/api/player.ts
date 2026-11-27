@@ -22,6 +22,7 @@ export function playSnapshot(
   playbackSource: PlaySource,
   echo: EchoFields,
   extra?: { context_ref?: string | null; shuffle_seed?: string | null },
+  signal?: AbortSignal,
 ) {
   return http.post<PlayerStatePayload>('player/play', {
     snapshot,
@@ -29,7 +30,7 @@ export function playSnapshot(
     origin_device_id: echo.origin_device_id,
     command_id: echo.command_id,
     ...extra,
-  });
+  }, { signal });
 }
 
 export function pausePlayback(echo: EchoFields, positionSeconds: number) {

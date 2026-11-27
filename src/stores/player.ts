@@ -1,6 +1,6 @@
 import { acceptHMRUpdate, defineStore } from 'pinia';
 import { computed, ref, watch } from 'vue';
-import { isOfflineError } from '@/api/http';
+import { ApiError, isOfflineError } from '@/api/http';
 import * as devicesApi from '@/api/devices';
 import * as playerApi from '@/api/player';
 import * as queueApi from '@/api/queue';
@@ -48,24 +48,28 @@ export const usePlayerStore = defineStore('player', () => {
 
   // --- Состояние (источник истины — сервер; до ответа плеера нет)
 
-  const state = ref<PlayerStateView>({
-    id: 0,
-    current_snapshot: null,
-    position_seconds: 0,
-    is_playing: false,
-    repeat_mode: 'off',
-    shuffle_enabled: false,
-    version: 0,
-    play_source: 'single',
-    previous_play_source: 'single',
-    previous_play_source_snapshot: null,
-    context_ref: null,
-    clips_enabled: false,
-    shuffle_seed: null,
-    position_updated_at: null,
-    active_device_id: null,
-    devices: [],
-  });
+  function freshPlayerState(): PlayerStateView {
+    return {
+      id: 0,
+      current_snapshot: null,
+      position_seconds: 0,
+      is_playing: false,
+      repeat_mode: 'off',
+      shuffle_enabled: false,
+      version: 0,
+      play_source: 'single',
+      previous_play_source: 'single',
+      previous_play_source_snapshot: null,
+      context_ref: null,
+      clips_enabled: false,
+      shuffle_seed: null,
+      position_updated_at: null,
+      active_device_id: null,
+      devices: [],
+    };
+  }
+
+  const state = ref<PlayerStateView>(freshPlayerState());
   /** Серверный стейт уже применялся. До этого version-gate не работает. */
   let serverStateApplied = false;
   /** Пока кеш не поднят, пустой стартовый стейт в базу не пишем. */
@@ -196,16 +200,20 @@ export const usePlayerStore = defineStore('player', () => {
   /** Тост ошибки сети/бэка; офлайн-ошибки молчат (optimizations.md «Офлайн-гейт»). */
   function toastError(cause: unknown, fallback: string) {
     if (isOfflineError(cause)) return;
+    // 401 — сессия уже сбрасывается (unauthorizedHandler → /login): тосты
+    // команд в этот момент — шум на пустом экране.
+    if (cause instanceof ApiError && cause.kind === 'auth') return;
     toast.show(cause instanceof Error ? cause.message : fallback, '', true);
   }
 
   /**
    * Команда не ушла: регистрация устройства не прошла. Почти всегда это тот
    * же обрыв сети/бэка — в офлайне молчим (обрыв виден баннером), служебные
-   * формулировки про регистрацию юзеру не показываем.
+   * формулировки про регистрацию юзеру не показываем. Разлогиненному —
+   * тоже: его команды уже никому не нужны.
    */
   function toastUnregistered() {
-    if (offlinePlayback()) return;
+    if (offlinePlayback() || !canCommand.value) return;
     toast.show('Нет соединения с сервером', 'команда не выполнена — повторите', true);
   }
 
@@ -222,7 +230,10 @@ export const usePlayerStore = defineStore('player', () => {
       // обнулил active_device_id (presence протухло, пока сеть душила
       // heartbeat): force-подмена серверным замером отматывала бы песню.
       const playingHere = mine != null && audioPlaying.value && canCommand.value;
-      if (stillActive || playingHere) applyServerStateMerged(payload);
+      // Офлайн-сессия (играли/паузили без сети): локальный транспорт —
+      // правда, серверный стейт протух ещё до офлайна (баг 10).
+      const offlineLocal = offlineSession && mine != null && canCommand.value;
+      if (stillActive || playingHere || offlineLocal) applyServerStateMerged(payload);
       else applyServerState(payload, { force: true });
     } catch {
       /* resync — лучшее, что могли */
@@ -346,6 +357,9 @@ export const usePlayerStore = defineStore('player', () => {
     serverStateApplied = true;
     applyingServer = true;
     state.value = payload.state;
+    // Полная подмена — серверный стейт теперь локальная правда: офлайн-
+    // расхождение (если было) закрыто, resync снова может подменять.
+    offlineSession = false;
     // Полная подмена — результат чужой команды (или холодного старта):
     // позиция сервера теперь такая, следующие broadcast'ы будут нести её же.
     lastPositionPushSeconds = payload.state.position_seconds;
@@ -374,6 +388,20 @@ export const usePlayerStore = defineStore('player', () => {
           item.id === b[index].id && item.position === b[index].position && item.status === b[index].status,
       )
     );
+  }
+
+  /**
+   * Ответ своей команды, не меняющей транспорт (repeat/shuffle/clips), на
+   * активном устройстве: координация (версия, режимы, очередь) — из сервера,
+   * а трек/позиция/is_playing — локальные. Force-подмена пересаживала якорь
+   * на серверный замер позиции (последний репорт, до 10 с назад) — движок
+   * отматывал элемент, и каждый клик shuffle дёргал звук (баг 11). Свои
+   * команды по сокету и так глушатся эхо-фильтром роутера. Пульт — зеркало:
+   * полная подмена.
+   */
+  function applyCommandState(payload: PlayerStatePayload) {
+    if (serverStateApplied && isActiveDevice.value) applyServerStateMerged(payload);
+    else applyServerState(payload, { force: true });
   }
 
   /** Сокет-ивент playback.state.updated (эхо и дедуп уже отсеял роутер):
@@ -506,7 +534,25 @@ export const usePlayerStore = defineStore('player', () => {
     };
   }
 
-  let transitioning = false;
+  /**
+   * Токен транспортной команды (play/restart): быстрое листание шлёт
+   * команды подряд, а применяет ответ только последняя — поздний ответ
+   * прежней команды не откатывает уже выбранный трек. Летящий /play
+   * прежнего токена отменяем совсем: на бэк дожидается только последний.
+   */
+  let playToken = 0;
+  let playAbort: AbortController | null = null;
+
+  /**
+   * Локальная офлайн-сессия: транспортные действия без сети (play/pause/
+   * seek/restart) разошлись с сервером. Пока флаг стоит, resync на
+   * reconnect сливает стейт по владению (локальный трек/позиция/is_playing —
+   * правда), а не подменяет force'ом: серверный стейт протух ещё до офлайна,
+   * и его применение воскрешало старый трек, отматывало позицию или
+   * включало воспроизведение (баг 10). Снимается любой полной подменой
+   * стейта (команда онлайн, чужой seek с пульта) и logout'ом.
+   */
+  let offlineSession = false;
 
   /**
    * Соседи виртуального потока для предзагрузки stream URL
@@ -514,6 +560,43 @@ export const usePlayerStore = defineStore('player', () => {
    */
   function adjacentSnapshots(aheadCount: number, backCount: number) {
     return peekAdjacent(engineContext(), aheadCount, backCount);
+  }
+
+  /**
+   * Летящая догрузка страницы контекста: быстрое листание у края ждёт
+   * один и тот же запрос, а не стреляет страницей на каждый тап.
+   */
+  let contextExpandInflight: { key: string; promise: Promise<boolean> } | null = null;
+
+  /** Следующая страница пагинированного контекста; true — список вырос. */
+  function expandContextPage(source: 'search' | 'playlist'): Promise<boolean> {
+    const key = contextKeyOf(source, state.value.context_ref);
+    if (contextExpandInflight?.key === key) return contextExpandInflight.promise;
+    const promise = (async () => {
+      try {
+        const page = await fetchContextPage(
+          {
+            playSource: source,
+            contextRef: state.value.context_ref,
+            currentType: state.value.current_snapshot?.type ?? null,
+          },
+          contextNextPage,
+        );
+        if (!page || contextKeyLoaded !== key) return false;
+        const known = new Set(contextItems.value.map((item) => snapshotKey(item)));
+        const fresh = page.items.filter((item) => !known.has(snapshotKey(item)));
+        contextItems.value = [...contextItems.value, ...fresh];
+        contextHasMore = page.hasMore;
+        contextNextPage += 1;
+        return fresh.length > 0;
+      } catch {
+        return false;
+      }
+    })().finally(() => {
+      if (contextExpandInflight?.key === key) contextExpandInflight = null;
+    });
+    contextExpandInflight = { key, promise };
+    return promise;
   }
 
   /**
@@ -525,26 +608,8 @@ export const usePlayerStore = defineStore('player', () => {
     if (action.action !== 'fallback_favorites') return action;
     const source = state.value.play_source;
     if ((source !== 'search' && source !== 'playlist') || !contextHasMore) return action;
-    try {
-      const page = await fetchContextPage(
-        {
-          playSource: source,
-          contextRef: state.value.context_ref,
-          currentType: state.value.current_snapshot?.type ?? null,
-        },
-        contextNextPage,
-      );
-      if (!page || contextKeyLoaded !== contextKeyOf(source, state.value.context_ref)) return action;
-      const known = new Set(contextItems.value.map((item) => snapshotKey(item)));
-      const fresh = page.items.filter((item) => !known.has(snapshotKey(item)));
-      contextItems.value = [...contextItems.value, ...fresh];
-      contextHasMore = page.hasMore;
-      contextNextPage += 1;
-      if (!fresh.length) return action;
-      return resolveNext(engineContext(), reason);
-    } catch {
-      return action;
-    }
+    if (!(await expandContextPage(source))) return action;
+    return resolveNext(engineContext(), reason);
   }
 
   async function runAction(action: EngineAction) {
@@ -626,9 +691,10 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   function skipNext(reason: 'manual' | 'ended' = 'manual') {
-    if (transitioning) return;
     cancelPendingSeek();
-    transitioning = true;
+    // Без блокировки «переход уже идёт»: каждый тап считается от текущего
+    // (уже оптимистичного) стейта, поэтому быстрое листание идёт подряд,
+    // а гонки ответов разруливает playToken в playSnapshot.
     void (async () => {
       if (offlinePlayback()) {
         const action = offlineNext(reason);
@@ -641,9 +707,7 @@ export const usePlayerStore = defineStore('player', () => {
       }
       const action = await expandContextFor(resolveNext(engineContext(), reason), reason);
       await runAction(action);
-    })().finally(() => {
-      transitioning = false;
-    });
+    })();
   }
 
   /** Автопереход по `ended` с аудио-элемента. */
@@ -652,12 +716,8 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   async function skipPrevious() {
-    if (transitioning) return;
     cancelPendingSeek();
-    transitioning = true;
-    void runAction(offlinePlayback() ? offlinePrevious() : resolvePrevious(engineContext(), positionSeconds.value)).finally(() => {
-      transitioning = false;
-    });
+    await runAction(offlinePlayback() ? offlinePrevious() : resolvePrevious(engineContext(), positionSeconds.value));
   }
 
   /** Рестарт текущего трека: позиция 0, воспроизведение продолжается. */
@@ -672,17 +732,22 @@ export const usePlayerStore = defineStore('player', () => {
     // Серверная позиция часто ещё 0, а элемент уже ушёл вперёд — вотч по
     // position_seconds тогда не стреляет, и сброс не доходит до звука.
     mediaSeek.value += 1;
+    if (offlinePlayback()) offlineSession = true;
     if (!canCommand.value || offlinePlayback()) return;
+    // Рестарт владеет транспортом: поздний ответ прежнего /play его не откатывает.
+    const token = ++playToken;
     const prevPush = lastPositionPushSeconds;
     lastPositionPushSeconds = 0;
     try {
       const payload = await withDevice((fields) => playerApi.seekTo(0, fields));
+      if (token !== playToken) return;
       if (!payload) {
         lastPositionPushSeconds = prevPush;
         return;
       }
       applyServerState(payload, { force: true });
     } catch (cause) {
+      if (token !== playToken) return;
       lastPositionPushSeconds = prevPush;
       toastError(cause, 'Не удалось перезапустить трек');
     }
@@ -732,6 +797,7 @@ export const usePlayerStore = defineStore('player', () => {
       contextNextPage = 2;
     }
     if (!canCommand.value || offlinePlayback()) {
+      if (offlinePlayback()) offlineSession = true;
       state.value = {
         ...state.value,
         current_snapshot: snapshot,
@@ -742,8 +808,18 @@ export const usePlayerStore = defineStore('player', () => {
       anchorPosition();
       return;
     }
+    // Быстрое листание: каждый запуск — новый токен. Летящий /play прежнего
+    // тапа отменяем, а его поздний ответ/ошибку отбрасываем — актуален
+    // только последний запуск, где остановились.
+    const token = ++playToken;
+    playAbort?.abort();
+    const controller = new AbortController();
+    playAbort = controller;
     // «Играть будет это устройство»: без онлайн-активного активируемся сами.
-    if (!isActiveDevice.value) await ensureActiveForPlayback();
+    if (!isActiveDevice.value) {
+      await ensureActiveForPlayback();
+      if (token !== playToken) return;
+    }
     // Оптимистичный старт: на LTE ответ /play едет секунды, а тап уже выбрал
     // трек. Применяем его сразу (движки параллельно идут за потоком — звук
     // стартует раньше), при ошибке откатываемся. Пульт не оптимизируем: его
@@ -769,7 +845,10 @@ export const usePlayerStore = defineStore('player', () => {
         shuffle_seed: opts.rollSeed === false ? undefined : crypto.randomUUID(),
       };
       if (contextRef !== undefined) extra.context_ref = contextRef;
-      const payload = await withDevice((fields) => playerApi.playSnapshot(snapshot, playbackSource, fields, extra));
+      const payload = await withDevice((fields) =>
+        playerApi.playSnapshot(snapshot, playbackSource, fields, extra, controller.signal),
+      );
+      if (token !== playToken) return;
       if (!payload) {
         lastPositionPushSeconds = prevPush;
         if (optimistic) {
@@ -781,6 +860,8 @@ export const usePlayerStore = defineStore('player', () => {
       }
       applyServerState(payload, { force: true });
     } catch (cause) {
+      // Отменён следующим тапом или уже неактуален — не ошибка, молча выходим.
+      if (token !== playToken || controller.signal.aborted) return;
       lastPositionPushSeconds = prevPush;
       if (optimistic) {
         state.value = prevState;
@@ -788,6 +869,8 @@ export const usePlayerStore = defineStore('player', () => {
       }
       toastError(cause, 'Не удалось включить');
       void resync();
+    } finally {
+      if (playAbort === controller) playAbort = null;
     }
   }
 
@@ -831,6 +914,7 @@ export const usePlayerStore = defineStore('player', () => {
       // Перед остановкой локальную позицию кладём в стейт: иначе сырое
       // position_seconds (последний seek/репорт) протухало, и пауза
       // прыгала прогрессом назад, часто в 0.
+      if (offlinePlayback()) offlineSession = true;
       writeLocalPosition();
       state.value = {
         ...state.value,
@@ -905,6 +989,7 @@ export const usePlayerStore = defineStore('player', () => {
       // Играть нескачанное в офлайне нечем — иначе «play» без звука,
       // с бегущим ползунком (то же, что закрыли в togglePlay).
       if (wantPlaying && (!state.value.current_snapshot || !offlinePlayable(state.value.current_snapshot))) return;
+      if (offlinePlayback()) offlineSession = true;
       writeLocalPosition();
       state.value = {
         ...state.value,
@@ -964,7 +1049,7 @@ export const usePlayerStore = defineStore('player', () => {
     try {
       const payload = await withDevice((fields) => playerApi.patchPlaybackOptions({ repeat_mode: next }, fields));
       if (!payload) return;
-      applyServerState(payload, { force: true });
+      applyCommandState(payload);
     } catch (cause) {
       toastError(cause, 'Не удалось сменить повтор');
     }
@@ -985,7 +1070,7 @@ export const usePlayerStore = defineStore('player', () => {
     try {
       const payload = await withDevice((fields) => playerApi.patchPlaybackOptions({ shuffle_enabled: next }, fields, seed));
       if (!payload) return;
-      applyServerState(payload, { force: true });
+      applyCommandState(payload);
     } catch (cause) {
       toastError(cause, 'Не удалось переключить shuffle');
     }
@@ -1524,6 +1609,7 @@ export const usePlayerStore = defineStore('player', () => {
       position_seconds: Math.round(Math.min(max, Math.max(0, seconds))),
     };
     anchorPosition();
+    if (offlinePlayback()) offlineSession = true;
     // Локальный seek обязан доехать до элемента даже < 2.5 с: мы источник
     // правды своего звука. Без бампа вотчер подгонки глушил мелкие seeks.
     mediaSeek.value += 1;
@@ -1579,7 +1665,7 @@ export const usePlayerStore = defineStore('player', () => {
         toastUnregistered();
         return;
       }
-      applyServerState(payload, { force: true });
+      applyCommandState(payload);
     } catch (cause) {
       clipMode.value = prev;
       if (!prev) clearClip();
@@ -1729,6 +1815,42 @@ export const usePlayerStore = defineStore('player', () => {
 
   let unbindReconnect: (() => void) | null = null;
 
+  /**
+   * Полный локальный стоп по выходу из аккаунта (и по 401): звук, летящие
+   * команды, очередь, контекст, тикер позиции, закачки. Без него после
+   * logout продолжала играть песня (офлайн-ветка isActiveDevice не глушит,
+   * медиасессия могла возобновить), а догоняющие запросы с мёртвым токеном
+   * сыпали тостами ошибок.
+   */
+  function teardownLocalPlayback() {
+    cancelPendingSeek();
+    playAbort?.abort();
+    playAbort = null;
+    playToken += 1;
+    stopPositionTicker();
+    waveListen = null;
+    nextShuffleSeed = null;
+    offlineSession = false;
+    lastPositionPushSeconds = null;
+    lastReportedSeconds = 0;
+    lastReportAt = 0;
+    state.value = freshPlayerState();
+    anchorPosition();
+    queue.value = [];
+    queueLoaded.value = false;
+    contextItems.value = [];
+    contextKeyLoaded = null;
+    contextHasMore = false;
+    contextNextPage = 2;
+    contextToken += 1;
+    expanded.value = false;
+    clipMode.value = false;
+    clearClip();
+    audioPlaying.value = false;
+    playbackStalled.value = false;
+    useDownloadsStore().cancelActive();
+  }
+
   /** Первичная загрузка состояния и рефетч на reconnect (полная подмена зеркала). */
   function persistPlayer() {
     if (!persistReady) return;
@@ -1758,7 +1880,6 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   function bindServerPlayback() {
-    startPositionTicker();
     const auth = useAuthStore();
     // Сервер обнуляет active_device_id, когда presence активного протухает
     // (api.md §4, планировщик раз в минуту): сеть могла задушить heartbeat
@@ -1783,6 +1904,7 @@ export const usePlayerStore = defineStore('player', () => {
       () => [auth.isAuthed, useOnlineStore().isOnline] as const,
       ([authed, online]) => {
         if (authed) {
+          startPositionTicker();
           unbindReconnect ??= onRealtimeReconnect(() => {
             void refreshQueue();
             void resync();
@@ -1800,6 +1922,7 @@ export const usePlayerStore = defineStore('player', () => {
           persistReady = false;
           hydratedUserId = null;
           serverStateApplied = false;
+          teardownLocalPlayback();
           void clearPlayerCache();
           unbindReconnect?.();
           unbindReconnect = null;

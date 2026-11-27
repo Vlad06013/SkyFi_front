@@ -157,6 +157,22 @@
 
 .field input::placeholder { color: var(--color-text-faint); }
 
+.field-clear {
+  display: flex;
+  flex-shrink: 0;
+  padding: 2px;
+  margin-right: -4px;
+  border-radius: 50%;
+  color: var(--color-text-faint);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.field-clear:hover {
+  color: var(--color-text-primary);
+}
+
 /* Chrome/Android вебвью красят автофилл своим фоном поверх страницы —
    перебиваем цветом поля (inset-тень рисуется поверх их подсветки). */
 .field input:-webkit-autofill,

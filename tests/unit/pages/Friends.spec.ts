@@ -3,6 +3,8 @@ import { createPinia, setActivePinia } from 'pinia';
 import { flushPromises, mount } from '@vue/test-utils';
 import * as friendsApi from '@/api/friends';
 import Friends from '@/pages/Friends/Friends.vue';
+import { useAuthStore } from '@/stores/auth';
+import { useFriendsStore } from '@/stores/friends';
 import type { FriendshipPayload, UserSearchItem } from '@/types';
 
 const routerMocks = vi.hoisted(() => ({
@@ -60,10 +62,12 @@ function makeFriendship(id: number, senderId: number, receiverId: number): Frien
   };
 }
 
+// Реальные значения бэка (curl 2026-11-27): enum БД в верхнем регистре,
+// направление PENDING не кодируется — его дают списки стора.
 const FOUND: UserSearchItem[] = [
-  searchItem({ user_id: 2, name: 'Катя', email: 'katya@mail.ru', friendship_status: 'outgoing' }),
-  searchItem({ user_id: 3, name: 'Никита', email: 'nikita@mail.ru', friendship_status: 'incoming' }),
-  searchItem({ user_id: 4, name: 'Аня', email: 'anya@mail.ru', friendship_status: 'friends' }),
+  searchItem({ user_id: 2, name: 'Катя', email: 'katya@mail.ru', friendship_status: 'PENDING' }),
+  searchItem({ user_id: 3, name: 'Никита', email: 'nikita@mail.ru', friendship_status: 'PENDING' }),
+  searchItem({ user_id: 4, name: 'Аня', email: 'anya@mail.ru', friendship_status: 'ACCEPTED' }),
   searchItem({ user_id: 7, name: 'Макс', email: 'max@mail.ru' }),
 ];
 
@@ -82,7 +86,11 @@ describe('pages/Friends', () => {
     sendMock.mockReset();
     acceptMock.mockReset();
     removeMock.mockReset();
-    overviewMock.mockResolvedValue({ friends: [], incoming: [], outgoing: [] } as never);
+    overviewMock.mockResolvedValue({
+      friends: [],
+      incoming: [makeFriendship(9, 3, 1)],
+      outgoing: [makeFriendship(10, 1, 2)],
+    } as never);
     searchUsersMock.mockResolvedValue(FOUND as never);
   });
 
@@ -90,14 +98,22 @@ describe('pages/Friends', () => {
     vi.useRealTimers();
   });
 
-  function mountPage() {
+  function authAsMe() {
+    const auth = useAuthStore();
+    auth.user = { id: 1, name: 'Я', email: 'me@skyfi.app', avatar_url: null };
+  }
+
+  async function mountPage(populate = true) {
     const pinia = createPinia();
     setActivePinia(pinia);
-    return mount(Friends, { global: { plugins: [pinia] } });
+    authAsMe();
+    const wrapper = mount(Friends, { global: { plugins: [pinia] } });
+    if (populate) await useFriendsStore().fetchAll();
+    return wrapper;
   }
 
   async function typeAndSearch(value: string) {
-    const wrapper = mountPage();
+    const wrapper = await mountPage();
     await wrapper.find('input').setValue(value);
     await vi.advanceTimersByTimeAsync(400);
     await flushPromises();
@@ -168,5 +184,16 @@ describe('pages/Friends', () => {
     expect(acceptMock).toHaveBeenCalledWith(3);
     const nikita = rowByName(wrapper, 'Никита');
     expect(nikita.text()).toContain('Друзья');
+  });
+
+  it('PENDING без загруженных списков стора — фолбэк «Отменить», а не «Добавить» с 422', async () => {
+    const wrapper = await mountPage(false);
+    await wrapper.find('input').setValue('а');
+    await vi.advanceTimersByTimeAsync(400);
+    await flushPromises();
+
+    const katya = rowByName(wrapper, 'Катя');
+    expect(katya.text()).toContain('заявка отправлена');
+    expect(katya.find('.btn').text()).toBe('Отменить');
   });
 });

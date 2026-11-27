@@ -17,6 +17,7 @@ import { plural } from '@/lib/plural';
 import { openSnapshot } from '@/lib/open-snapshot';
 import { PLAY_SOURCE_FAVORITES, PLAY_SOURCE_SINGLE, PLAY_SOURCE_UPLOADS } from '@/lib/play-sources';
 import { artistsLine, snapshotCover, trackCover } from '@/lib/cover';
+import { fold } from '@/lib/download-search';
 import { resolveUrl } from '@/lib/endpoints';
 import { usePlayerStore } from '@/stores/player';
 import { useFavoritesStore } from '@/stores/favorites';
@@ -86,34 +87,81 @@ export default defineComponent({
     const listSentinel = ref<HTMLElement | null>(null);
     let listObserver: IntersectionObserver | null = null;
 
+    /**
+     * Поиск по своему (избранное, загрузки, скачанное): списки целиком на
+     * клиенте, поэтому фильтр локальный и работает офлайн. Серверный поиск
+     * по избранному не нужен — бэк его и не умеет.
+     */
+    const query = ref('');
+    const searchFocused = ref(false);
+    const needle = computed(() => fold(query.value));
+
+    function textHit(...parts: Array<string | null | undefined>): boolean {
+      const q = needle.value;
+      if (!q) return true;
+      return parts.some((part) => part && fold(part).includes(q));
+    }
+
+    function trackHit(track: TrackSnapshot): boolean {
+      return textHit(track.title, track.album?.title, ...track.artists.map((artist) => artist.name));
+    }
+
+    const filteredTracks = computed(() => (needle.value ? tracks.value.filter(trackHit) : tracks.value));
+    const filteredPlaylists = computed(() =>
+      needle.value
+        ? playlists.value.filter((item) => textHit(item.title, item.owner_name, ...item.artists.map((a) => a.name)))
+        : playlists.value,
+    );
+    const filteredAlbums = computed(() =>
+      needle.value
+        ? albums.value.filter((item) => textHit(item.title, ...item.artists.map((a) => a.name)))
+        : albums.value,
+    );
+    const filteredArtists = computed(() =>
+      needle.value ? artists.value.filter((item) => textHit(item.title)) : artists.value,
+    );
+    const filteredVideos = computed(() =>
+      needle.value
+        ? videos.value.filter((item) => textHit(item.title, ...item.artists.map((a) => a.name)))
+        : videos.value,
+    );
+    const filteredUploads = computed(() => (needle.value ? uploads.value.filter(trackHit) : uploads.value));
+    const filteredDownloaded = computed(() =>
+      needle.value ? downloaded.value.filter(trackHit) : downloaded.value,
+    );
+
     function activeListLength(): number {
       switch (tab.value) {
         case 'tracks':
-          return tracks.value.length;
+          return filteredTracks.value.length;
         case 'playlists':
-          return playlists.value.length;
+          return filteredPlaylists.value.length;
         case 'albums':
-          return albums.value.length;
+          return filteredAlbums.value.length;
         case 'artists':
-          return artists.value.length;
+          return filteredArtists.value.length;
         case 'videos':
-          return videos.value.length;
+          return filteredVideos.value.length;
         case 'uploads':
-          return uploads.value.length;
+          return filteredUploads.value.length;
         case 'downloaded':
-          return downloaded.value.length;
+          return filteredDownloaded.value.length;
       }
     }
 
     const listHasMore = computed(() => shown.value < activeListLength());
     const listEmpty = computed(() => activeListLength() === 0);
-    const visibleTracks = computed(() => tracks.value.slice(0, shown.value));
-    const visiblePlaylists = computed(() => playlists.value.slice(0, shown.value));
-    const visibleAlbums = computed(() => albums.value.slice(0, shown.value));
-    const visibleArtists = computed(() => artists.value.slice(0, shown.value));
-    const visibleVideos = computed(() => videos.value.slice(0, shown.value));
-    const visibleUploads = computed(() => uploads.value.slice(0, shown.value));
-    const visibleDownloaded = computed(() => downloaded.value.slice(0, shown.value));
+    const visibleTracks = computed(() => filteredTracks.value.slice(0, shown.value));
+    const visiblePlaylists = computed(() => filteredPlaylists.value.slice(0, shown.value));
+    const visibleAlbums = computed(() => filteredAlbums.value.slice(0, shown.value));
+    const visibleArtists = computed(() => filteredArtists.value.slice(0, shown.value));
+    const visibleVideos = computed(() => filteredVideos.value.slice(0, shown.value));
+    const visibleUploads = computed(() => filteredUploads.value.slice(0, shown.value));
+    const visibleDownloaded = computed(() => filteredDownloaded.value.slice(0, shown.value));
+
+    function clearQuery() {
+      query.value = '';
+    }
 
     function loadMoreList() {
       if (shown.value >= activeListLength()) return;
@@ -131,6 +179,11 @@ export default defineComponent({
     }
 
     watch(tab, () => {
+      shown.value = LIST_PAGE;
+      requestAnimationFrame(fillList);
+    });
+
+    watch(query, () => {
       shown.value = LIST_PAGE;
       requestAnimationFrame(fillList);
     });
@@ -451,6 +504,9 @@ export default defineComponent({
       visiblePlaylists,
       visibleUploads,
       visibleDownloaded,
+      query,
+      searchFocused,
+      clearQuery,
       listHasMore,
       listEmpty,
       listSentinel,

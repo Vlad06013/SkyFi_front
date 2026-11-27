@@ -905,7 +905,16 @@ export function useVideoPlayback() {
     el.addEventListener('ended', () => {
       releaseBuffering();
       const store = usePlayerStore();
-      if (store.isActiveDevice && store.clipActive) store.handleTrackEnded();
+      // Гейт по факту (appliedKey): 'ended' ещё старого ролика во время
+      // подгрузки нового не должен давать лишний скип (быстрое листание).
+      if (
+        store.isActiveDevice &&
+        store.clipActive &&
+        store.effectiveCurrent &&
+        snapshotKey(store.effectiveCurrent) === appliedKey
+      ) {
+        store.handleTrackEnded();
+      }
     });
     el.addEventListener('loadedmetadata', () => {
       if (resumeAt != null) {

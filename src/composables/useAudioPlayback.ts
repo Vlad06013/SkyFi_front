@@ -384,7 +384,15 @@ export function useAudioPlayback() {
     el.addEventListener('ended', () => {
       const store = usePlayerStore();
       // Клип активен — переходом управляет видео-элемент, аудио лишь замолчало.
-      if (store.isActiveDevice && store.effectiveCurrent?.type === 'track') store.handleTrackEnded();
+      // Гейт по факту (appliedKey): 'ended' ещё старого трека во время
+      // подгрузки нового не должен давать лишний скип (быстрое листание).
+      if (
+        store.isActiveDevice &&
+        store.effectiveCurrent?.type === 'track' &&
+        snapshotKey(store.effectiveCurrent) === appliedKey
+      ) {
+        store.handleTrackEnded();
+      }
     });
     el.addEventListener('loadedmetadata', () => {
       if (resumeAt != null) {

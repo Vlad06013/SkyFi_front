@@ -1,11 +1,14 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
+import { nextTick } from 'vue';
+import { flushPromises } from '@vue/test-utils';
 import * as devicesApi from '@/api/devices';
 import * as playerApi from '@/api/player';
 import * as queueApi from '@/api/queue';
 import * as searchApi from '@/api/search';
 import { useAuthStore } from '@/stores/auth';
 import { useDevicesStore } from '@/stores/devices';
+import { useDownloadsStore } from '@/stores/downloads';
 import { useOnlineStore } from '@/stores/online';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
@@ -1446,6 +1449,57 @@ describe('stores/player: позиционный репорт', () => {
     }
   });
 
+  it('shuffle на играющем устройстве не дёргает позицию (ответ своей команды — слияние)', async () => {
+    vi.useFakeTimers();
+    try {
+      const player = usePlayerStore();
+      player.applyServerState(
+        {
+          state: {
+            ...player.state,
+            current_snapshot: track,
+            is_playing: true,
+            position_seconds: 0,
+            position_updated_at: new Date().toISOString(),
+            active_device_id: 'uuid-1',
+            devices: [me],
+          },
+          queue: [],
+        } as never,
+        { force: true },
+      );
+      player.setAudioPlaying(true);
+      player.bindServerPlayback();
+      fetchPlayerStateMock.mockResolvedValue(undefined as never);
+      seekToMock.mockResolvedValue({ state: null, queue: [] } as never);
+
+      // 30 секунд играем: локальная позиция ~30, серверный замер в ответе — 0.
+      await vi.advanceTimersByTimeAsync(30_000);
+      const before = player.positionSeconds;
+      expect(before).toBeGreaterThanOrEqual(29);
+
+      patchPlaybackOptionsMock.mockResolvedValue({
+        state: {
+          ...player.state,
+          shuffle_enabled: true,
+          shuffle_seed: 'seed-2',
+          position_seconds: 0,
+          version: player.state.version + 1,
+        },
+        queue: [],
+      } as never);
+      await player.toggleShuffle();
+
+      // Раньше force-подмена пересаживала якорь на серверный замер (0) —
+      // движок отматывал элемент, клик shuffle дёргал звук.
+      expect(player.positionSeconds).toBeGreaterThanOrEqual(before - 1);
+      expect(player.state.shuffle_enabled).toBe(true);
+      expect(player.state.shuffle_seed).toBe('seed-2');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('сокет-ивент с чужой позицией применяется целиком (seek с пульта)', async () => {
     vi.useFakeTimers();
     try {
@@ -1713,5 +1767,185 @@ describe('stores/player: регистрация устройства при ко
 
     expect(pausePlaybackMock).not.toHaveBeenCalled();
     expect(useToastStore().toast).toBeNull();
+  });
+});
+
+describe('stores/player: выход из аккаунта', () => {
+  const me: PlayerDevice = {
+    device_uuid: 'uuid-1',
+    name: 'Мой телефон',
+    type: 'phone',
+    last_seen_at: null,
+  };
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    const auth = useAuthStore();
+    auth.user = { id: 1 } as never;
+    auth.token = 't';
+    useOnlineStore().isOnline = true;
+    useDevicesStore().myDeviceUuid = 'uuid-1';
+    fetchPlayerStateMock.mockResolvedValue({ state: null, queue: [] } as never);
+    fetchQueueMock.mockResolvedValue([] as never);
+  });
+
+  it('logout останавливает воспроизведение и чистит стейт/очередь/контекст', async () => {
+    const player = usePlayerStore();
+    player.applyServerState(
+      {
+        state: {
+          ...player.state,
+          current_snapshot: track,
+          is_playing: true,
+          position_seconds: 42,
+          active_device_id: 'uuid-1',
+          devices: [me],
+        },
+        queue: [makeItem(1, 1)],
+      } as never,
+      { force: true },
+    );
+    player.setAudioPlaying(true);
+    player.bindServerPlayback();
+    expect(player.state.is_playing).toBe(true);
+
+    useAuthStore().user = null;
+    await nextTick();
+
+    expect(player.state.current_snapshot).toBeNull();
+    expect(player.state.is_playing).toBe(false);
+    expect(player.state.position_seconds).toBe(0);
+    expect(player.queue).toEqual([]);
+    expect(player.audioPlaying).toBe(false);
+    expect(player.expanded).toBe(false);
+  });
+
+  it('после logout команды не уходят на бэк и не тостят', async () => {
+    const player = usePlayerStore();
+    player.bindServerPlayback();
+    useAuthStore().user = null;
+    await nextTick();
+
+    await player.togglePlay();
+    await player.playSnapshot(track, 'single');
+
+    expect(playSnapshotMock).not.toHaveBeenCalled();
+    expect(resumePlaybackMock).not.toHaveBeenCalled();
+    expect(useToastStore().toast).toBeNull();
+  });
+});
+
+describe('stores/player: восстановление соединения после офлайн-сессии', () => {
+  const me: PlayerDevice = {
+    device_uuid: 'uuid-1',
+    name: 'Мой телефон',
+    type: 'phone',
+    last_seen_at: null,
+  };
+  const trackB: TrackSnapshot = { ...track, source_id: 't2', title: 'офлайн-трек' };
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    const auth = useAuthStore();
+    auth.user = { id: 1 } as never;
+    auth.token = 't';
+    useOnlineStore().isOnline = true;
+    useDevicesStore().myDeviceUuid = 'uuid-1';
+    fetchQueueMock.mockResolvedValue([] as never);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('reconnect не подменяет локальные трек/паузу протухшим серверным стейтом', async () => {
+    const player = usePlayerStore();
+    // Онлайн-стейт до офлайна: трек A играет на этом устройстве.
+    player.applyServerState(
+      {
+        state: {
+          ...player.state,
+          current_snapshot: track,
+          is_playing: true,
+          position_seconds: 100,
+          active_device_id: 'uuid-1',
+          devices: [me],
+        },
+        queue: [],
+      } as never,
+      { force: true },
+    );
+    player.bindServerPlayback();
+
+    // Офлайн: пользователь включил скачанный трек B и поставил его на паузу.
+    vi.spyOn(useDownloadsStore(), 'isDownloaded').mockReturnValue(true);
+    useOnlineStore().isOnline = false;
+    await player.playSnapshot(trackB, 'single');
+    player.setAudioPlaying(true);
+    await player.togglePlay();
+    expect(player.state.current_snapshot?.source_id).toBe('t2');
+    expect(player.state.is_playing).toBe(false);
+
+    // Reconnect: сервер помнит доофлайновый стейт (трек A, играет, 100 с,
+    // активное устройство протухло). Раньше force-подмена воскрешала его:
+    // трек A «включался», позиция отматывалась, локальная пауза слетала.
+    fetchPlayerStateMock.mockResolvedValue({
+      state: {
+        ...player.state,
+        current_snapshot: track,
+        is_playing: true,
+        position_seconds: 100,
+        active_device_id: null,
+        version: player.state.version + 5,
+      },
+      queue: [],
+    } as never);
+    useOnlineStore().isOnline = true;
+    await flushPromises();
+
+    expect(player.state.current_snapshot?.source_id).toBe('t2');
+    expect(player.state.is_playing).toBe(false);
+    expect(player.state.position_seconds).toBeLessThan(5);
+  });
+
+  it('reconnect без офлайн-сессии (пульт): стейт подменяется серверным', async () => {
+    const player = usePlayerStore();
+    player.applyServerState(
+      {
+        state: {
+          ...player.state,
+          current_snapshot: track,
+          is_playing: true,
+          position_seconds: 100,
+          active_device_id: 'uuid-2',
+          devices: [me, { device_uuid: 'uuid-2', name: 'ТВ', type: 'tv', last_seen_at: null }],
+        },
+        queue: [],
+      } as never,
+      { force: true },
+    );
+    player.bindServerPlayback();
+
+    useOnlineStore().isOnline = false;
+    useOnlineStore().isOnline = true;
+    fetchPlayerStateMock.mockResolvedValue({
+      state: {
+        ...player.state,
+        current_snapshot: trackB,
+        is_playing: false,
+        position_seconds: 7,
+        active_device_id: 'uuid-2',
+        version: player.state.version + 5,
+      },
+      queue: [],
+    } as never);
+    await flushPromises();
+
+    // Пульт — зеркало: серверный стейт применяется целиком.
+    expect(player.state.current_snapshot?.source_id).toBe('t2');
+    expect(player.state.is_playing).toBe(false);
+    expect(player.state.position_seconds).toBe(7);
   });
 });

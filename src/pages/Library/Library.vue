@@ -14,6 +14,30 @@
       </button>
     </div>
 
+    <div class="field" :class="{ 'is-focus': searchFocused }">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <circle cx="11" cy="11" r="7" />
+        <path d="M16.5 16.5 21 21" />
+      </svg>
+      <input
+        v-model="query"
+        placeholder="поиск по моему"
+        @focus="searchFocused = true"
+        @blur="searchFocused = false"
+      >
+      <button
+        v-if="query"
+        class="field-clear"
+        type="button"
+        aria-label="очистить поиск"
+        @click="clearQuery"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <path d="M6.5 6.5 17.5 17.5M17.5 6.5 6.5 17.5" />
+        </svg>
+      </button>
+    </div>
+
     <div v-if="tab === 'uploads'" class="dl-all-bar">
       <span class="dl-count">{{ counts.uploads }}</span>
       <div class="dl-bar-side">

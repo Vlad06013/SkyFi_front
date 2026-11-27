@@ -34,7 +34,7 @@ export function bindMediaSession() {
     () => player.effectiveCurrent,
     (snap) => {
       if (!snap) return;
-      const artwork = snapshotCover(snap);
+      const artwork = snapshotCover(snap, 600);
       void MediaSession.setMetadata({
         title: snap.title,
         artist: artistsLine(snap.artists),

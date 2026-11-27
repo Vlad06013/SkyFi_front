@@ -17,6 +17,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useAppStore } from '@/stores/app';
 import { useDevicesStore } from '@/stores/devices';
 import { useOnlineStore } from '@/stores/online';
+import { bindImageRetry } from '@/lib/image-retry';
 import { endpointReady } from '@/lib/endpoints';
 import { hydrateStreamCache } from '@/lib/stream-url-cache';
 import { useDownloadsStore } from '@/stores/downloads';
@@ -90,6 +91,8 @@ void endpointReady().finally(() => {
     useVideoPlayback();
     // Предзагрузка stream URL: 2 трека вперёд/назад, только на активном (§9).
     useStreamPrefetch();
+    // Картинки, упавшие в офлайне, догружаем на возврате сети.
+    bindImageRetry();
     // DEV-диагностика: доступ из консоли (window.__player/__devices/__clipVideo).
     if (import.meta.env.DEV) {
       (window as unknown as { __player: ReturnType<typeof usePlayerStore> }).__player = usePlayerStore(pinia);

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, watch } from 'vue';
-import { isOfflineError } from '@/api/http';
+import { ApiError, isOfflineError } from '@/api/http';
 import {
   acceptFriendRequest,
   fetchFriendshipOverview,
@@ -35,7 +35,10 @@ function toEntry(friendship: FriendshipPayload, myId: number | undefined): Frien
 /** Тост ошибки; офлайн-ошибки молчат (optimizations.md «Офлайн-гейт»). */
 function toastError(cause: unknown, fallback: string) {
   if (isOfflineError(cause)) return;
-  useToastStore().show(cause instanceof Error ? cause.message : fallback, '', true);
+  // 422 без общего сообщения: показываем первую ошибку поля («Вы уже
+  // друзья.»), а не служебное «Проверьте поля формы.».
+  const fieldMessage = cause instanceof ApiError ? Object.values(cause.fields ?? {})[0]?.[0] : undefined;
+  useToastStore().show(fieldMessage ?? (cause instanceof Error ? cause.message : fallback), '', true);
 }
 
 /** Друзья по API (api.md §12). Секции одним обзорным GET; мутации дёргают

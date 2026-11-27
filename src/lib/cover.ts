@@ -9,7 +9,10 @@ const localCoverVersion = ref(0);
 
 export function setLocalCover(key: string, url: string) {
   const prev = localCovers.get(key);
-  if (prev && prev !== url && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
+  // Та же обложка уже опубликована (повторная загрузка, hydrate) —
+  // без бампа версии: иначе каждый прогон перерисовывал все списки.
+  if (prev === url) return;
+  if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
   localCovers.set(key, url);
   localCoverVersion.value += 1;
 }
@@ -31,24 +34,51 @@ export function coverVar(source: SnapshotSource): string {
   return 'var(--gradient-cover-2)';
 }
 
+/** Хосты CDN Яндекса: размер обложки — последний сегмент URL. */
+const YANDEX_COVER_HOSTS = new Set(['avatars.yandex.net', 'avatars.mds.yandex.net']);
+
+/**
+ * Размер обложки Яндекса — последний сегмент пути (200x200, 600x600, orig…).
+ * Бэк шлёт 200x200 (в большом плеере мыло), а CDN отдаёт любой размер по
+ * тому же пути (проверено curl'ом 2026-11-27) — переписываем под контекст.
+ * Чужие URL и нестандартные пути не трогаем.
+ */
+export function coverSize(url: string, size: number): string {
+  if (!url) return url;
+  try {
+    const parsed = new URL(url);
+    if (!YANDEX_COVER_HOSTS.has(parsed.hostname)) return url;
+    if (!/\/(\d+x\d+|orig)$/.test(parsed.pathname)) return url;
+    parsed.pathname = parsed.pathname.replace(/\/(\d+x\d+|orig)$/, `/${size}x${size}`);
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
+function sized(url: string | null | undefined, size?: number): string {
+  const resolved = resolveUrl(url);
+  return size ? coverSize(resolved, size) : resolved;
+}
+
 /** Обложка трека: скачанный файл, своё поле, затем обложка альбома. */
-export function trackCover(track: TrackSnapshot): string {
+export function trackCover(track: TrackSnapshot, size?: number): string {
   void localCoverVersion.value;
   const own = localCover(entityKey(track));
   if (own) return own;
-  if (track.cover_url) return resolveUrl(track.cover_url);
+  if (track.cover_url) return sized(track.cover_url, size);
   if (track.album?.source_id) {
     const album = localCover(`album:${track.source_type}:${track.album.source_id}`);
     if (album) return album;
   }
-  return resolveUrl(track.album?.cover_url);
+  return sized(track.album?.cover_url, size);
 }
 
 /** Обложка снапшота: скачанный файл, иначе ссылка с сервера. */
-export function snapshotCover(snapshot: AnySnapshot): string {
+export function snapshotCover(snapshot: AnySnapshot, size?: number): string {
   void localCoverVersion.value;
-  if (snapshot.type === 'track') return trackCover(snapshot);
-  return localCover(entityKey(snapshot)) || resolveUrl(snapshot.cover_url);
+  if (snapshot.type === 'track') return trackCover(snapshot, size);
+  return localCover(entityKey(snapshot)) || sized(snapshot.cover_url, size);
 }
 
 export function sourceTitle(source: SnapshotSource): string {

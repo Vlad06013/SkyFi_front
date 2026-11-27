@@ -81,7 +81,7 @@ export default defineComponent({
       if (videoCover) return resolveUrl(videoCover);
       const snap = current.value;
       if (!snap) return '';
-      if (snap.type === 'track') return trackCover(snap);
+      if (snap.type === 'track') return trackCover(snap, 600);
       return resolveUrl(snap.cover_url);
     });
     const { liked, toggleLike } = useSnapshotLike(() => player.current);
