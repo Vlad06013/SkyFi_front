@@ -271,6 +271,7 @@ export default defineComponent({
       clipWatch,
       clipBuffering,
       homeFrame: computed(() => clipFrameReady.value && clipSurface.value === 'home'),
+      showHomePoster: computed(() => clipActive.value && !player.expanded && !(clipFrameReady.value && clipSurface.value === 'home') && coverSrc.value !== ''),
       coverSrc,
       discCover,
       heroMeta,

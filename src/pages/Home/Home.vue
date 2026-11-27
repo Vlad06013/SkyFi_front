@@ -6,7 +6,7 @@
       class="tv-clip-host"
       :class="{ 'is-frame': homeFrame }"
     />
-    <img v-if="clipActive && coverSrc && !homeFrame" class="tv-clip-poster" :src="coverSrc" alt="">
+    <img v-if="showHomePoster" class="tv-clip-poster" :src="coverSrc" alt="">
     <section class="tv-hero" :class="{ 'is-clip': clipActive }">
       <div v-if="clipActive" class="tv-clip-shade" />
       <div class="tv-hero-copy" :inert="clipWatch || undefined">

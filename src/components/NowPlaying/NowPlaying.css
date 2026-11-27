@@ -28,6 +28,16 @@
   opacity: 0;
 }
 
+/* Клип не растворяем: opacity на оболочке снимает кадр с быстрого слоя
+   и смешивает его с обложкой под ним. Кнопки растворяются отдельно. */
+.now-playing.is-clip.now-fade-enter-active,
+.now-playing.is-clip.now-fade-leave-active,
+.now-playing.is-clip.now-fade-enter-from,
+.now-playing.is-clip.now-fade-leave-to {
+  opacity: 1;
+  transition: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .now-playing.now-fade-enter-active,
   .now-playing.now-fade-leave-active {
@@ -250,6 +260,7 @@
 
 .now-playing.is-clip {
   background: #000;
+  transition: none;
 }
 
 .now-playing.is-clip .clip-host {

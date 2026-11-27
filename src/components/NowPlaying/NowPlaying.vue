@@ -10,7 +10,7 @@
     @pointerdown="onPlayerDragStart"
     @pointermove="onClipPointerMove"
   >
-    <img v-if="clipActive && clipPoster" class="clip-bg" :src="clipPoster" alt="">
+    <img v-if="clipActive && clipPoster && !expandedFrame" class="clip-bg" :src="clipPoster" alt="">
     <div v-if="clipActive" class="clip-scrim" />
     <div v-if="clipActive" ref="clipHostEl" class="clip-host" />
     <!-- Раскадровка выключена для проверки тормозов на телевизоре.

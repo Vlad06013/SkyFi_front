@@ -131,9 +131,6 @@ html[data-layout='tv'] .now-playing.is-clip .clip-scrim {
   height: 28%;
 }
 
-html[data-layout='tv'] .now-playing.is-clip:not(.is-dragging) {
-  overflow: visible;
-}
 
 html[data-layout='tv'] .now-playing .transport {
   display: flex;
