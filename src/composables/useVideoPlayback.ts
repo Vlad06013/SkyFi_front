@@ -29,10 +29,12 @@ import type { TrackSnapshot, VideoSnapshot } from '@/types';
  * её в мини-плеер — воспроизведение не прерывается (нет хоста — элемент
  * остаётся без родителя и поёт дальше, из DOM его не выкидываем).
  * Тап по видео — пауза/плей, двойной тап — полный экран.
- * Клип резолвит и показывает КАЖДОЕ устройство (пульт — в mute, звук только
- * с активного, иначе двойной звук): режим клипов — серверный флаг, а картинка
- * локальная подмена потока на каждом экране. Переходы (ended) двигает только
- * активное; пульт подгоняет позицию к зеркалу сервера.
+ * Клип резолвит КАЖДОЕ устройство (пульту резолв даёт название и обложку),
+ * но потоки тянет и показывает только активное (optimizations.md «Клипы
+ * только на активном»): N устройств ≠ N видео-потоков и N get-url. Пульт
+ * показывает обложку; «играть здесь» активирует устройство — вотчер
+ * поднимает поток с общей позиции. Переходы (ended) двигает только
+ * активное; пульт живёт по зеркалу сервера.
  */
 
 let video: HTMLVideoElement | null = null;
@@ -544,6 +546,8 @@ function scheduleTtlRefresh(ttlSec: number, snapshot: VideoSnapshot) {
 
 async function refreshStreams(snapshot: VideoSnapshot) {
   const store = usePlayerStore();
+  // Пульт потоки не тянет (обложка вместо ролика) — get-url только с активного.
+  if (!store.isActiveDevice) return;
   store.setEngineLoading(true);
   try {
     // Тёплый ответ из кеша (предзагрузка): применяем без сети.
@@ -581,6 +585,10 @@ export function useVideoPlayback() {
 
   async function loadVideo(snapshot: VideoSnapshot | null) {
     const el = ensureVideo();
+    // Потоки — только на активном устройстве: пульт показывает обложку,
+    // get-url не зовёт. Активация перезапускает вотчер (isActiveDevice в
+    // зависимостях) — поток поднимется с общей позиции.
+    if (!player.isActiveDevice) snapshot = null;
     if (ttlTimer && !snapshot) {
       clearTimeout(ttlTimer);
       ttlTimer = null;
@@ -755,8 +763,9 @@ export function useVideoPlayback() {
   );
 
   // Режим клипов на треке: резолвим, пока трек тот же и режим включён.
-  // Каждое устройство резолвит себе само: пульт тоже показывает видео (в mute),
-  // серверный current_snapshot при этом не трогаем — клип локальная подмена.
+  // Резолвят все устройства: пульту он даёт название/обложку клипа (поток
+  // пульт не тянет — loadVideo/refreshStreams гейтованы на активное).
+  // Серверный current_snapshot при этом не трогаем — клип локальная подмена.
   watch(
     [() => player.clipMode, () => player.current, () => useOnlineStore().isOnline],
     ([clipModeOn, snapshot, online]) => {
@@ -772,11 +781,12 @@ export function useVideoPlayback() {
     { immediate: true },
   );
 
-  // is_playing с сервера: активное устройство подчиняется.
+  // is_playing с сервера: активное устройство подчиняется. Пульт элемент не
+  // трогает: своего потока у него нет, паузу/плей видео делает активное.
   watch(
     () => player.state.is_playing,
     (shouldPlay) => {
-      if (player.clipPlaybackVideo == null) return;
+      if (player.clipPlaybackVideo == null || !player.isActiveDevice) return;
       const el = ensureVideo();
       // Мёртвая ссылка (протухший поток): play() не оживит — перезагружаем.
       if (shouldPlay && el.error) {
@@ -795,7 +805,7 @@ export function useVideoPlayback() {
   watch(
     () => player.engineKick,
     () => {
-      if (!player.state.is_playing || !player.clipActive) return;
+      if (!player.state.is_playing || !player.clipActive || !player.isActiveDevice) return;
       tryPlay(ensureVideo());
     },
   );
@@ -857,8 +867,9 @@ export function useVideoPlayback() {
     { immediate: true },
   );
 
-  // Звук видео — только с активного устройства; пульт смотрит в mute,
-  // иначе при клипе на двух экранах был бы двойной звук.
+  // Звук видео — только с активного устройства. Пульт своего потока не
+  // поднимает, но на переходе активности элемент ещё догоняет teardown —
+  // до него глушим, иначе мгновение двойного звука.
   watch(
     () => player.isActiveDevice,
     (active) => {

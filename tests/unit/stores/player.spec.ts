@@ -1522,7 +1522,7 @@ describe('stores/player: позиционный репорт', () => {
     }
   });
 
-  it('пульт с грузящимся клипом: прогресс стоит, а не шагает вперёд звука', async () => {
+  it('пульт с клипом: своего видео нет — зеркало тикает по часам', async () => {
     vi.useFakeTimers();
     try {
       // resync в bindServerPlayback не должен приносить чужой стейт из
@@ -1549,23 +1549,16 @@ describe('stores/player: позиционный репорт', () => {
       player.bindServerPlayback();
 
       expect(player.clipActive).toBe(true);
-      // Видео пульта ещё грузится (playing не было) — зеркало заморожено:
-      // активное устройство в это время молчит и репортит старую позицию.
+      // Потоки — только на активном устройстве: пульт показывает обложку,
+      // локального видео нет — позиция идёт по часам, как аудио-зеркало.
       await vi.advanceTimersByTimeAsync(5_000);
-      expect(player.positionSeconds).toBe(0);
-
-      // Своё видео заиграло (muted): обработчик playing пересаживает якорь
-      // на currentTime элемента (setPlaybackStalled) и метит звучание.
-      player.setPlaybackStalled(false, 0);
-      player.setAudioPlaying(true);
-      await vi.advanceTimersByTimeAsync(2_000);
-      expect(player.positionSeconds).toBe(2);
+      expect(player.positionSeconds).toBe(5);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it('пульт в окне резолва клипа: прогресс тоже стоит', async () => {
+  it('пульт в окне резолва клипа: зеркало тикает по часам', async () => {
     vi.useFakeTimers();
     try {
       fetchPlayerStateMock.mockResolvedValue(undefined as never);
@@ -1590,7 +1583,7 @@ describe('stores/player: позиционный репорт', () => {
       player.bindServerPlayback();
 
       await vi.advanceTimersByTimeAsync(4_000);
-      expect(player.positionSeconds).toBe(0);
+      expect(player.positionSeconds).toBe(4);
     } finally {
       vi.useRealTimers();
     }
