@@ -50,7 +50,19 @@ describe('tv remote', () => {
 
   it('вниз при спрятанных кнопках клипа закрывает плеер', () => {
     expect(act('ArrowDown', { expanded: true, player: [] })).toEqual({ type: 'close-player' });
-    expect(act('ArrowLeft', { expanded: true, player: [] })).toEqual({ type: 'ignore' });
+    expect(act('ArrowLeft', { expanded: true, player: [] })).toEqual({ type: 'seek', dir: -1 });
+  });
+
+  it('влево и вправо в плеере перематывают, а не двигают фокус', () => {
+    const play = el(200, 300, 'fab');
+    expect(act('ArrowRight', { expanded: true, active: play, player: [play] })).toEqual({
+      type: 'seek',
+      dir: 1,
+    });
+    const item = el(200, 80);
+    expect(act('ArrowLeft', { expanded: true, active: item, player: [play], menu: [item] })).toEqual({
+      type: 'ignore',
+    });
   });
 
   it('вниз из-под кнопок плеера закрывает его', () => {

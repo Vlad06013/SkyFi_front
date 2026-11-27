@@ -104,6 +104,9 @@ export default defineComponent({
           },
           openExpanded: () => player.openExpanded(),
           closeExpanded: () => player.closeExpanded(),
+          position: () => player.state.position_seconds,
+          duration: () => player.durationSeconds,
+          seek: (seconds: number) => player.seek(seconds),
         },
       );
     });

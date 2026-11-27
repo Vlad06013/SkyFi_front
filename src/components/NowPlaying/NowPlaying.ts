@@ -1,4 +1,6 @@
 import { computed, defineComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useScrubPreview, scrubStyle } from '@/composables/useScrubPreview';
+import { scheduleHideScrub, scrubSeconds, showScrub } from '@/lib/scrub-preview';
 import { storeToRefs } from 'pinia';
 import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
 import SeekBar from '@/components/SeekBar/SeekBar.vue';
@@ -181,6 +183,29 @@ export default defineComponent({
     const swipeThreshold = 88;
     const sortDrag = ref<ListSortState | null>(null);
     const rootEl = ref<HTMLElement | null>(null);
+    const scrubVideo = ref<HTMLVideoElement | null>(null);
+    const scrubBox = ref({ left: '50%', top: '40%' });
+    useScrubPreview(scrubVideo);
+
+    function placeScrub(ratio: number) {
+      const bar = rootEl.value?.querySelector('.seek-bar');
+      scrubBox.value = scrubStyle(ratio, bar instanceof HTMLElement ? bar : null, rootEl.value);
+    }
+
+    function onScrub(ratio: number) {
+      if (!clipActive.value || !durationSeconds.value) return;
+      showScrub(ratio * durationSeconds.value);
+      placeScrub(ratio);
+    }
+
+    function onScrubEnd() {
+      scheduleHideScrub(500);
+    }
+
+    watch(scrubSeconds, (seconds) => {
+      if (seconds == null || !durationSeconds.value) return;
+      placeScrub(seconds / durationSeconds.value);
+    });
     const qualityOpen = ref(false);
     const audioOpen = ref(false);
     const clipIdle = ref(false);
@@ -580,6 +605,11 @@ export default defineComponent({
       queueDragY,
       sortDrag,
       rootEl,
+      scrubVideo,
+      scrubSeconds,
+      scrubBox,
+      onScrub,
+      onScrubEnd,
       playerDragStyle,
       queueSheetStyle,
       topLabel,

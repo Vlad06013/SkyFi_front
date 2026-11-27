@@ -13,6 +13,15 @@
     <img v-if="clipActive && clipPoster" class="clip-bg" :src="clipPoster" alt="">
     <div v-if="clipActive" class="clip-scrim" />
     <div v-if="clipActive" ref="clipHostEl" class="clip-host" />
+    <div
+      v-if="clipActive"
+      class="scrub-pop"
+      :class="{ 'is-on': scrubSeconds != null }"
+      :style="scrubBox"
+    >
+      <video ref="scrubVideo" muted playsinline preload="none" />
+      <span v-if="scrubSeconds != null">{{ formatTime(scrubSeconds) }}</span>
+    </div>
     <div v-if="clipActive && clipBuffering" class="clip-spinner" aria-hidden="true">
       <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
         <circle cx="12" cy="12" r="8" opacity=".25" />
@@ -264,8 +273,11 @@
         :model-value="progress"
         :buffered="bufferedRanges"
         :duration="durationSeconds"
+        :tab-index="isTv ? -1 : 0"
         label="позиция"
         @update:model-value="seekRatio($event / 100)"
+        @scrub="onScrub"
+        @scrubend="onScrubEnd"
       />
       <div class="p-times">
         <span>{{ formatTime(positionSeconds) }}</span>

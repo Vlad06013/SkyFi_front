@@ -32,8 +32,9 @@ export default defineComponent({
     buffered: { type: Array as PropType<BufferedRange[]>, default: () => [] },
     /** Длительность в секундах. 0 — шкала сама по себе проценты (громкость). */
     duration: { type: Number, default: 0 },
+    tabIndex: { type: [Number, String] as PropType<number | string>, default: 0 },
   },
-  emits: ['update:modelValue'],
+  emits: ['update:modelValue', 'scrub', 'scrubend'],
   setup(props, { emit }) {
     function setFromEvent(event: PointerEvent, el: HTMLElement) {
       emit('update:modelValue', ratioFromClientX(event.clientX, el) * 100);
@@ -43,11 +44,36 @@ export default defineComponent({
       if (event.pointerType === 'mouse' && event.button !== 0) return;
       event.stopPropagation();
       const el = event.currentTarget as HTMLElement;
+      dragging = true;
       setFromEvent(event, el);
+      emitScrub(event, el);
       trackPointer(event, {
-        move: (next) => setFromEvent(next, el),
-        up: () => undefined,
+        move: (next) => {
+          setFromEvent(next, el);
+          emitScrub(next, el);
+        },
+        up: () => {
+          dragging = false;
+          emit('scrubend');
+        },
       });
+    }
+
+    function onPointerMove(event: PointerEvent) {
+      if (dragging) return;
+      emitScrub(event, event.currentTarget as HTMLElement);
+    }
+
+    function onPointerLeave() {
+      if (dragging) return;
+      emit('scrubend');
+    }
+
+    let dragging = false;
+
+    function emitScrub(event: PointerEvent, el: HTMLElement) {
+      if (props.duration <= 0) return;
+      emit('scrub', ratioFromClientX(event.clientX, el));
     }
 
     let holdDir = 0;
@@ -118,6 +144,6 @@ export default defineComponent({
 
     onBeforeUnmount(stopHold);
 
-    return { onPointerDown, onKeydown };
+    return { onPointerDown, onPointerMove, onPointerLeave, onKeydown };
   },
 });

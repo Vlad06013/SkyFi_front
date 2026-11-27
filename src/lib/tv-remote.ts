@@ -1,3 +1,6 @@
+import { REMOTE_HOLD_GRACE_MS, remoteScrubVelocity } from '@/components/SeekBar/SeekBar';
+import { scheduleHideScrub, showScrub } from '@/lib/scrub-preview';
+
 /** Пульт телевизора: стрелки двигают фокус, крайние жесты открывают и закрывают плеер. */
 
 export type TvArrow = 'ArrowUp' | 'ArrowDown' | 'ArrowLeft' | 'ArrowRight';
@@ -6,7 +9,11 @@ export type TvRemoteAction =
   | { type: 'focus'; el: HTMLElement }
   | { type: 'open-player' }
   | { type: 'close-player' }
+  | { type: 'seek'; dir: -1 | 1 }
   | { type: 'ignore' };
+
+/** Короткое нажатие влево/вправо в плеере телевизора. */
+export const TV_NUDGE_SEC = 10;
 
 export function isTvArrow(key: string): key is TvArrow {
   return key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight';
@@ -62,6 +69,10 @@ export function tvRemoteAction(input: {
 
   const inRail = active != null && rail.includes(active);
   const inPlayer = active != null && player.includes(active);
+
+  if (expanded && !menu.length && (key === 'ArrowLeft' || key === 'ArrowRight')) {
+    return { type: 'seek', dir: key === 'ArrowRight' ? 1 : -1 };
+  }
 
   if (expanded) {
     if (!player.length) return key === 'ArrowDown' ? { type: 'close-player' } : { type: 'ignore' };
@@ -126,8 +137,75 @@ function isTyping(target: EventTarget | null) {
   return target instanceof HTMLElement && !!target.closest('input, textarea, select, [contenteditable="true"]');
 }
 
+export interface TvRemotePlayer {
+  expanded: boolean;
+  openExpanded: () => void;
+  closeExpanded: () => void;
+  position: () => number;
+  duration: () => number;
+  seek: (seconds: number) => void;
+}
+
+/** Удержание влево/вправо: сначала скачок, потом разгон. */
+export function bindRemoteHold(player: Pick<TvRemotePlayer, 'position' | 'duration' | 'seek'>) {
+  let dir: -1 | 1 | 0 = 0;
+  let started = 0;
+  let last = 0;
+  let cursor = 0;
+  let raf = 0;
+  let stopUp: (() => void) | null = null;
+
+  function stop() {
+    dir = 0;
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+    stopUp?.();
+    stopUp = null;
+    scheduleHideScrub();
+  }
+
+  function tick(now: number) {
+    raf = requestAnimationFrame(tick);
+    if (!dir) return;
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    const held = now - started;
+    if (held < REMOTE_HOLD_GRACE_MS) return;
+    const duration = player.duration();
+    if (!duration) return;
+    const speed = remoteScrubVelocity(held - REMOTE_HOLD_GRACE_MS, duration);
+    cursor = Math.min(duration, Math.max(0, cursor + dir * speed * dt));
+    player.seek(cursor);
+    showScrub(cursor);
+  }
+
+  return {
+    stop,
+    down(next: -1 | 1) {
+      if (dir === next) return;
+      stop();
+      const duration = player.duration();
+      if (!duration) return;
+      dir = next;
+      started = performance.now();
+      last = started;
+      cursor = Math.min(duration, Math.max(0, player.position() + next * TV_NUDGE_SEC));
+      player.seek(cursor);
+      showScrub(cursor);
+      const onUp = (event: KeyboardEvent) => {
+        const left = event.key === 'ArrowLeft' || event.keyCode === 21;
+        const right = event.key === 'ArrowRight' || event.keyCode === 22;
+        if ((next < 0 && left) || (next > 0 && right)) stop();
+      };
+      stopUp = () => window.removeEventListener('keyup', onUp, true);
+      window.addEventListener('keyup', onUp, true);
+      raf = requestAnimationFrame(tick);
+    },
+  };
+}
+
 /** Слушает стрелки, пока профиль — телевизор. */
-export function bindTvRemote(isActive: () => boolean, player: { expanded: boolean; openExpanded: () => void; closeExpanded: () => void }) {
+export function bindTvRemote(isActive: () => boolean, player: TvRemotePlayer) {
   function arrowOf(event: KeyboardEvent): TvArrow | null {
     if (isTvArrow(event.key)) return event.key;
     if (event.keyCode === 19) return 'ArrowUp';
@@ -137,11 +215,11 @@ export function bindTvRemote(isActive: () => boolean, player: { expanded: boolea
     return null;
   }
 
+  const hold = bindRemoteHold(player);
+
   function onKey(event: KeyboardEvent) {
     const key = arrowOf(event);
-    const onSeek = event.target instanceof HTMLElement && !!event.target.closest('.seek-bar');
     if (!isActive() || event.repeat || !key || isTyping(event.target)) return;
-    if (onSeek && (key === 'ArrowLeft' || key === 'ArrowRight')) return;
     const menuRoot = document.querySelector('.clip-quality, .select-menu, .sheet, .ctx');
     const menuOpen = menuRoot instanceof HTMLElement && menuRoot.getBoundingClientRect().height > 0;
     const home = !!document.querySelector('.tv-home');
@@ -153,7 +231,9 @@ export function bindTvRemote(isActive: () => boolean, player: { expanded: boolea
       active: active && active !== document.body && active !== document.documentElement ? active : null,
       page: visibleFocusables(document.querySelector('.sky-column')),
       rail: visibleFocusables(document.querySelector('.tabbar')),
-      player: visibleFocusables(document.querySelector('.now-playing')),
+      player: visibleFocusables(document.querySelector('.now-playing')).filter(
+        (el) => !el.classList.contains('seek-bar') && !el.closest('.seek-bar'),
+      ),
       menu: menuOpen && menuRoot instanceof HTMLElement ? visibleFocusables(menuRoot) : [],
     });
     if (action.type === 'ignore') return;
@@ -167,9 +247,16 @@ export function bindTvRemote(isActive: () => boolean, player: { expanded: boolea
       player.closeExpanded();
       return;
     }
+    if (action.type === 'seek') {
+      hold.down(action.dir);
+      return;
+    }
     action.el.focus();
   }
 
   window.addEventListener('keydown', onKey, true);
-  return () => window.removeEventListener('keydown', onKey, true);
+  return () => {
+    hold.stop();
+    window.removeEventListener('keydown', onKey, true);
+  };
 }
