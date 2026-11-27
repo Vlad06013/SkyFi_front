@@ -8,13 +8,13 @@
   overflow: hidden;
   overscroll-behavior: none;
   touch-action: none;
-  opacity: var(--drag-opacity, 1);
-  transition: transform .2s ease, opacity .2s ease;
+  transition: transform .2s ease;
   user-select: none;
   outline: none;
 }
 
 .now-playing.is-dragging {
+  opacity: var(--drag-opacity, 1);
   transition: none;
 }
 
@@ -256,6 +256,12 @@
   position: absolute;
   inset: 0;
   z-index: 1;
+}
+
+/* Пустая сцена клипа не должна мерить размер контейнером: на телевизоре
+   это почти весь экран и лишняя раскладка поверх видео. */
+.now-playing.is-clip .now-stage {
+  container-type: normal;
 }
 
 .now-playing.is-clip .now-top,

@@ -114,8 +114,14 @@
   color: #fff;
 }
 
-.tv-home.is-clip-idle {
-  --tv-tile: 76px;
+.tv-home.is-clip {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 32vh);
+  transition: grid-template-rows .7s cubic-bezier(.22, .7, .2, 1);
+}
+
+.tv-home.is-clip.is-clip-idle {
+  grid-template-rows: minmax(0, 1fr) minmax(0, 20vh);
 }
 
 .tv-hero {
@@ -133,32 +139,41 @@
 }
 
 .tv-hero.is-clip {
-  overflow: hidden;
-  background: #000;
+  background: transparent;
   align-items: flex-end;
 }
 
-.tv-clip-host,
-.tv-clip-poster,
-.tv-clip-shade {
-  position: absolute;
+/* Кадр на весь экран и не меняет размер, когда полка и меню сжимаются.
+   Иначе каждый кадр анимации заново раскладывает <video>. */
+.tv-home.is-clip .tv-clip-host,
+.tv-home.is-clip .tv-clip-poster {
+  position: fixed;
   inset: 0;
+  z-index: 0;
+  width: auto;
+  height: auto;
+  pointer-events: none;
 }
 
-.tv-clip-host { z-index: 1; }
 .tv-clip-host.is-frame { background: #000; }
 .tv-clip-host :deep(.clip-video) {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
-}
-.tv-clip-poster { z-index: 0; width: 100%; height: 100%; object-fit: cover; }
-.tv-clip-shade {
-  z-index: 1;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 30%, rgba(0, 0, 0, 0.82));
   pointer-events: none;
-  transition: opacity .4s ease;
+}
+.tv-clip-poster { object-fit: cover; }
+.tv-clip-shade {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  height: 42%;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.72));
+  pointer-events: none;
+  transition: opacity .7s cubic-bezier(.22, .7, .2, 1);
 }
 
 .tv-home.is-clip-idle .tv-clip-shade {
@@ -170,7 +185,8 @@
   z-index: 2;
   max-width: 640px;
   padding-bottom: 6px;
-  transition: opacity .35s ease;
+  transition: opacity .7s cubic-bezier(.22, .7, .2, 1);
+  text-shadow: 0 1px 18px rgba(0, 0, 0, 0.65);
 }
 
 .tv-home.is-clip-idle .tv-hero-copy {
@@ -320,18 +336,20 @@
 }
 
 .tv-shelf {
+  position: relative;
+  z-index: 1;
   flex: 0 0 auto;
   max-height: 32%;
   min-height: 0;
   overflow: hidden;
   padding: 6px 36px 12px 16px;
   background: #000;
-  transition: padding .4s ease;
 }
 
-.tv-home.is-clip-idle .tv-shelf {
-  padding-top: 4px;
-  padding-bottom: 10px;
+.tv-home.is-clip .tv-shelf {
+  max-height: none;
+  height: 100%;
+  min-height: 0;
 }
 
 .tv-shelf h3 {
@@ -353,6 +371,12 @@
   padding: 14px 8px 12px;
   margin: -6px -8px 0;
   scroll-snap-type: x mandatory;
+  transform-origin: left center;
+  transition: transform .7s cubic-bezier(.22, .7, .2, 1);
+}
+
+.tv-home.is-clip-idle .tv-posters {
+  transform: scale(0.7);
 }
 
 .tv-posters::-webkit-scrollbar { height: 0; }
@@ -370,6 +394,7 @@
   cursor: pointer;
   font: inherit;
   position: relative;
+  transition: none;
 }
 
 .tv-poster:focus {
@@ -405,7 +430,6 @@
 .tv-poster .art {
   display: block;
   height: var(--tv-tile);
-  transition: height .4s ease;
   border-radius: 8px;
   overflow: hidden;
   position: relative;

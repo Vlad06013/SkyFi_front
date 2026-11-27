@@ -192,7 +192,8 @@ export default defineComponent({
       scrubBox.value = scrubStyle(ratio, bar instanceof HTMLElement ? bar : null, rootEl.value);
     }
 
-    /** Кадр уже играет в основном ролике — копируем его, второй поток не поднимаем. */
+    /** Раскадровка выключена: drawImage с видео на телевизоре снимает кадр
+     *  с быстрого слоя. Окошко в шаблоне тоже закомментировано. */
     function paintScrub() {
       if (scrubBlocked) return;
       const video = getClipVideoElement();
@@ -201,7 +202,7 @@ export default defineComponent({
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       try {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        // ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       } catch {
         scrubBlocked = true;
       }
@@ -220,11 +221,8 @@ export default defineComponent({
     watch(scrubSeconds, (seconds) => {
       if (seconds == null || !durationSeconds.value) return;
       placeScrub(seconds / durationSeconds.value);
-      if (scrubPaint) return;
-      scrubPaint = requestAnimationFrame(() => {
-        scrubPaint = 0;
-        paintScrub();
-      });
+      // paintScrub(); — выключено вместе с окошком раскадровки.
+      void scrubPaint;
     });
     const qualityOpen = ref(false);
     const audioOpen = ref(false);

@@ -1,13 +1,13 @@
 <template>
   <div v-if="isTv" class="tv-home" :class="{ 'is-clip': clipActive, 'is-clip-idle': clipWatch }">
+    <div
+      v-if="clipActive"
+      :ref="onHomeClipHost"
+      class="tv-clip-host"
+      :class="{ 'is-frame': homeFrame }"
+    />
+    <img v-if="clipActive && coverSrc && !homeFrame" class="tv-clip-poster" :src="coverSrc" alt="">
     <section class="tv-hero" :class="{ 'is-clip': clipActive }">
-      <div
-        v-if="clipActive"
-        :ref="onHomeClipHost"
-        class="tv-clip-host"
-        :class="{ 'is-frame': homeFrame }"
-      />
-      <img v-if="clipActive && coverSrc && !homeFrame" class="tv-clip-poster" :src="coverSrc" alt="">
       <div v-if="clipActive" class="tv-clip-shade" />
       <div class="tv-hero-copy" :inert="clipWatch || undefined">
         <div class="tv-kicker">{{ clipActive ? 'Клип' : (current ? 'Сейчас играет' : 'Волна') }}</div>

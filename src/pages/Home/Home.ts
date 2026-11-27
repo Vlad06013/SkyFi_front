@@ -215,7 +215,12 @@ export default defineComponent({
       { immediate: true },
     );
 
+    function syncIdleChrome(idle: boolean) {
+      document.documentElement.classList.toggle('tv-clip-idle', idle);
+    }
+
     watch(clipWatch, (idle) => {
+      syncIdleChrome(idle);
       if (!idle) return;
       const active = document.activeElement;
       if (active instanceof HTMLElement && active.closest('.tv-hero-copy')) active.blur();
@@ -232,8 +237,11 @@ export default defineComponent({
     onDeactivated(() => {
       homeActive.value = false;
       clipWatch.value = false;
+      syncIdleChrome(false);
       clearIdleTimer();
     });
+
+    onBeforeUnmount(() => syncIdleChrome(false));
 
     onMounted(() => {
       window.addEventListener('keydown', onHomeKey, true);

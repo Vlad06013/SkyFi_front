@@ -25,6 +25,8 @@ html[data-layout='tv'] .sky-shell {
 }
 
 html[data-layout='tv'] .sky-column {
+  position: relative;
+  z-index: 1;
   flex: 1;
   min-width: 0;
   height: 100%;
@@ -41,6 +43,8 @@ html[data-layout='tv'] .sky-shell.is-wave .sky-body {
 }
 
 html[data-layout='tv'] .tabbar {
+  position: relative;
+  z-index: 2;
   width: 88px;
   height: 100%;
   flex-shrink: 0;
@@ -53,6 +57,20 @@ html[data-layout='tv'] .tabbar {
   border: 0;
   border-radius: 0;
   background: linear-gradient(90deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+  transition:
+    opacity .7s cubic-bezier(.22, .7, .2, 1),
+    width .7s cubic-bezier(.22, .7, .2, 1),
+    padding .7s cubic-bezier(.22, .7, .2, 1);
+}
+
+html.tv-clip-idle[data-layout='tv'] .tabbar {
+  opacity: 0;
+  width: 0;
+  min-width: 0;
+  padding-left: 0;
+  padding-right: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 html[data-layout='tv'] .rail-logo {
@@ -105,6 +123,16 @@ html[data-layout='tv'] .sky-shell:not(.is-wave) {
 html[data-layout='tv'] .now-playing-inner {
   max-width: none;
   padding-inline: 56px;
+}
+
+/* Полный градиент на весь кадр заставляет смешивать каждый пиксель видео. */
+html[data-layout='tv'] .now-playing.is-clip .clip-scrim {
+  top: auto;
+  height: 28%;
+}
+
+html[data-layout='tv'] .now-playing.is-clip:not(.is-dragging) {
+  overflow: visible;
 }
 
 html[data-layout='tv'] .now-playing .transport {

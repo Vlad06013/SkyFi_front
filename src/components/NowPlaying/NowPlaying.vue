@@ -13,6 +13,7 @@
     <img v-if="clipActive && clipPoster" class="clip-bg" :src="clipPoster" alt="">
     <div v-if="clipActive" class="clip-scrim" />
     <div v-if="clipActive" ref="clipHostEl" class="clip-host" />
+    <!-- Раскадровка выключена для проверки тормозов на телевизоре.
     <div
       v-if="clipActive && scrubSeconds != null"
       class="scrub-pop is-on"
@@ -21,6 +22,7 @@
       <canvas ref="scrubCanvas" width="168" height="94" />
       <span>{{ formatTime(scrubSeconds) }}</span>
     </div>
+    -->
     <div v-if="clipActive && clipBuffering" class="clip-spinner" aria-hidden="true">
       <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
         <circle cx="12" cy="12" r="8" opacity=".25" />

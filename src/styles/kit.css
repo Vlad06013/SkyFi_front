@@ -266,8 +266,9 @@
    рисует серой заглушкой с чёрным треугольником. Готовность (is-ready на
    элементе) ставит движок по videoWidth/readyState — opacity декодирование
    не останавливает. */
-.clip-video { opacity: 0; }
-.clip-video.is-ready { opacity: 1; }
+/* opacity только пока кадра нет. Постоянный opacity: 1 на готовом
+   ролике на телевизоре снимает картинку с быстрого слоя. */
+.clip-video:not(.is-ready) { opacity: 0; }
 /* Кадр есть — видео выше превью. До этого превью закрывает чёрный буфер. */
 .is-clip.has-frame .clip-video { z-index: 3; }
 .is-clip.has-frame .clip-spinner { z-index: 4; }
