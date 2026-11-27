@@ -9,7 +9,7 @@
 
 ```ts
 export type SnapshotType = 'track' | 'video' | 'album' | 'playlist' | 'artist';
-export type SnapshotSource = 'yandex_music' | 'upload' | 'vk' | 'skyfi' | 'mock';
+export type SnapshotSource = 'yandex_music' | 'upload' | 'skyfi' | 'dzen' | 'youtube';
 
 export interface ArtistRef {
   name: string;
@@ -164,6 +164,8 @@ export interface PlayerDevice {
   name: string;
   type: DeviceType;
   last_seen_at: string | null;
+  /** Авторитетный онлайн: живой сокет (presence) или свежий heartbeat. */
+  is_online: boolean;
 }
 
 export interface QueueItem {
@@ -391,6 +393,25 @@ export interface SearchPagePayload {
   playlists: SearchSection<WithFavorite<PlaylistSnapshot>>;
   videos: SearchSection<WithFavorite<VideoSnapshot>>;
 }
+
+/** Поиск v2 (GET /search/v2): один источник, секции — только
+ * его набора (api.md §9.1). Ключи sections зависят от resource:
+ * yandex_music — tracks/albums/artists/playlists, upload —
+ * tracks, skyfi — playlists, dzen/youtube — videos. */
+export interface SearchSourcePagePayload {
+  query: string;
+  page: number;
+  resource: SnapshotSource;
+  /** Только у yandex_music и только без фильтра section. */
+  best: WithFavorite<AnySnapshot> | null;
+  sections: Partial<{
+    tracks: SearchSection<WithFavorite<TrackSnapshot>>;
+    albums: SearchSection<WithFavorite<AlbumSnapshot>>;
+    artists: SearchSection<WithFavorite<ArtistSnapshot>>;
+    playlists: SearchSection<WithFavorite<PlaylistSnapshot>>;
+    videos: SearchSection<WithFavorite<VideoSnapshot>>;
+  }>;
+}
 ```
 
 ## Избранное, плейлисты, волна
@@ -569,13 +590,13 @@ export const mockTrack: TrackSnapshot = {
 
 export const mockVideo: VideoSnapshot = {
   type: 'video',
-  source_type: 'mock',
-  source_id: 'mock-big-buck-bunny',
+  source_type: 'youtube',
+  source_id: 'aqz-KE-bpKQ',
   title: 'Big Buck Bunny (mock video)',
   duration_ms: 10000,
   artists: [{ name: 'Blender Foundation' }],
   cover_url: 'https://archive.org/download/BigBuckBunny_124/__ia_thumb.jpg',
-  watch_url: 'https://test-videos.co.uk/',
+  watch_url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ',
 };
 
 export const mockVideoStreams: VideoStreamsPayload = {
@@ -616,7 +637,7 @@ export const mockPlayerState: PlayerStatePayload = {
     position_updated_at: new Date().toISOString(),
     active_device_id: '9f1c7a2e-4b3d-4c8a-9e5f-2d6b0a1c4f77',
     devices: [
-      { device_uuid: '9f1c7a2e-4b3d-4c8a-9e5f-2d6b0a1c4f77', name: 'Pixel 7', type: 'phone', last_seen_at: new Date().toISOString() },
+      { device_uuid: '9f1c7a2e-4b3d-4c8a-9e5f-2d6b0a1c4f77', name: 'Pixel 7', type: 'phone', last_seen_at: new Date().toISOString(), is_online: true },
     ],
   },
   queue: [

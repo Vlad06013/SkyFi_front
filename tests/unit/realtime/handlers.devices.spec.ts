@@ -15,7 +15,6 @@ vi.mock('@/api/devices', () => ({
   registerDevice: vi.fn(),
   activateDevice: vi.fn(),
   removeDevice: vi.fn(),
-  sendHeartbeat: vi.fn(),
 }));
 
 const uuid = (n: number) => `9f1c7a2e-4b3d-4c8a-9e5f-2d6b0a1c4f7${n}`;

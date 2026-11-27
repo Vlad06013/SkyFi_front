@@ -34,10 +34,3 @@ export function removeDevice(deviceUuid: string, echo: EchoFields) {
   return http.delete<{ message: string }>(`player/devices/${deviceUuid}`, { data: echo });
 }
 
-/**
- * Продление presence (api.md §4). Тело — `{origin_device_id}` с постоянным
- * uuid устройства; неизвестный uuid — 404.
- */
-export function sendHeartbeat(deviceUuid: string) {
-  return http.post<{ message: string }>('player/devices/heartbeat', { origin_device_id: deviceUuid });
-}

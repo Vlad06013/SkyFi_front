@@ -49,6 +49,8 @@ export type MenuItem = {
   icon: string;
   danger?: boolean;
   liked?: boolean;
+  /** Офлайн-гейт (optimizations.md «Контекстное меню строки в офлайне»): пункт неактивен. */
+  disabled?: boolean;
 };
 
 export type MenuItemState = {
@@ -58,7 +60,7 @@ export type MenuItemState = {
 
 type MatrixEntry = MenuAtomId | { id: MenuAtomId; when: (entity: MenuEntity) => boolean };
 
-/** Матрица «контекст → набор атомов». docs/menus.md — источник истины. */
+/** Матрица «контекст → набор атомов» — источник истины по пунктам меню. */
 const menuMatrix: Record<MenuContext, MatrixEntry[]> = {
   'my-tracks': ['queue', 'friend-queue', 'like', 'playlist', 'download', 'share'],
   'my-playlists': [
@@ -136,10 +138,22 @@ function toMenuItem(id: MenuAtomId, state: MenuItemState): MenuItem {
   return { id, label: labels[id], icon: menuIcons[id], danger };
 }
 
-export function buildMenuItems(context: MenuContext, entity: MenuEntity, state: MenuItemState): MenuItem[] {
+/**
+ * Собрать пункты меню для контекста. В офлайне (offline=true) активны
+ * только «сердечко» (отмена буферного удаления — на избранном) и
+ * «удалить скачанное»; всё остальное disabled. Правило — «разрешены
+ * существующие», новых атомов не добавляем.
+ */
+export function buildMenuItems(context: MenuContext, entity: MenuEntity, state: MenuItemState, offline = false): MenuItem[] {
   return menuMatrix[context]
     .filter((entry) => (typeof entry === 'string' ? true : entry.when(entity)))
-    .map((entry) => toMenuItem(typeof entry === 'string' ? entry : entry.id, state));
+    .map((entry) => toMenuItem(typeof entry === 'string' ? entry : entry.id, state))
+    .map((item) => {
+      if (!offline) return item;
+      if (item.id === 'like') return { ...item, disabled: !state.liked };
+      if (item.id === 'download') return { ...item, disabled: !state.downloaded };
+      return { ...item, disabled: true };
+    });
 }
 
 export function entityFromSnapshot(snapshot: AnySnapshot, artist = artistsLine(snapshot.artists)): MenuEntity {

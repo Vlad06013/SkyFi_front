@@ -4,7 +4,8 @@
       v-for="item in items"
       :key="item.id"
       type="button"
-      :class="{ liked: item.liked, danger: item.danger }"
+      :disabled="item.disabled"
+      :class="{ liked: item.liked, danger: item.danger, disabled: item.disabled }"
       @click="emit('action', item.id)"
     >
       <svg

@@ -1,106 +1,128 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
-import { probeHealth } from '@/api/health';
-import { clearHealthLog, healthLog } from '@/lib/health-log';
 import { useOnlineStore } from '@/stores/online';
 
-vi.mock('@/api/health', () => ({
-  probeHealth: vi.fn(),
-  HEALTH_TIMEOUT_MS: 10_000,
+const hoisted = vi.hoisted(() => {
+  return {
+    resolveEndpointMock: vi.fn(async () => false),
+    /** Хендлер исходов запросов, который стор регистрирует в http. */
+    outcome: null as null | ((ok: boolean) => void),
+  };
+});
+
+vi.mock('@/lib/endpoints', () => ({
+  resolveEndpoint: hoisted.resolveEndpointMock,
 }));
 
-const probeHealthMock = vi.mocked(probeHealth);
+// Подменяем регистрацию хендлера исходов: оригинал отрабатывает (стор
+// ставит свой обработчик), а тест дёргает захваченный напрямую.
+vi.mock('@/api/http', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/api/http')>();
+  return {
+    ...original,
+    setNetworkOutcomeHandler: (handler: (ok: boolean) => void) => {
+      hoisted.outcome = handler;
+      original.setNetworkOutcomeHandler(handler);
+    },
+  };
+});
 
-const okProbe = { ok: true, durationMs: 5, miss: null, detail: '' } as const;
-const missProbe = { ok: false, durationMs: 10_000, miss: 'timeout', detail: 'timeout of 10000ms exceeded' } as const;
+import { clearNetLog, netLog } from '@/lib/net-log';
 
-describe('stores/online', () => {
+const GRACE_MS = 3_000;
+
+describe('stores/online — детект на сокете', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
-    clearHealthLog();
+    clearNetLog();
+    hoisted.resolveEndpointMock.mockClear();
+    hoisted.outcome = null;
     vi.useFakeTimers();
   });
 
-  it('первая проверка сразу, далее раз в 10 с', async () => {
-    probeHealthMock.mockResolvedValue(okProbe);
+  it('connect: онлайн мгновенно, переход записан в журнал', () => {
     const online = useOnlineStore();
+    expect(online.isOnline).toBeNull();
 
-    await online.startPolling();
+    online.noteSocketConnected();
     expect(online.isOnline).toBe(true);
-    expect(probeHealthMock).toHaveBeenCalledTimes(1);
-
-    await vi.advanceTimersByTimeAsync(10_000);
-    expect(probeHealthMock).toHaveBeenCalledTimes(2);
-
-    await vi.advanceTimersByTimeAsync(10_000);
-    expect(probeHealthMock).toHaveBeenCalledTimes(3);
-    await online.stopPolling();
+    expect(netLog.value.at(-1)).toMatchObject({ event: 'connect', transition: 'online' });
   });
 
-  it('сбой → offline, после восстановления снова online', async () => {
-    probeHealthMock.mockRejectedValueOnce(new Error('down'));
+  it('disconnect: офлайн только после грейса; reconnect внутри грейса отменяет', () => {
     const online = useOnlineStore();
+    online.noteSocketConnected();
 
-    await online.startPolling();
+    online.noteSocketDisconnected();
+    expect(online.isOnline).toBe(true);
+
+    vi.advanceTimersByTime(GRACE_MS - 1);
+    expect(online.isOnline).toBe(true);
+
+    // Вернулось соединение внутри грейса — офлайна не было.
+    online.noteSocketConnected();
+    vi.advanceTimersByTime(GRACE_MS * 2);
+    expect(online.isOnline).toBe(true);
+  });
+
+  it('disconnect: после грейса — офлайн с записью перехода', () => {
+    const online = useOnlineStore();
+    online.noteSocketConnected();
+
+    online.noteSocketDisconnected();
+    vi.advanceTimersByTime(GRACE_MS);
     expect(online.isOnline).toBe(false);
-
-    probeHealthMock.mockResolvedValue(okProbe);
-    await vi.advanceTimersByTimeAsync(10_000);
-    expect(online.isOnline).toBe(true);
-    await online.stopPolling();
+    expect(netLog.value.at(-1)).toMatchObject({ event: 'disconnect', transition: 'offline' });
   });
 
-  it('одиночный таймаут не уводит в офлайн — только два подряд', async () => {
-    probeHealthMock.mockResolvedValue(okProbe);
+  it('failed: офлайн сразу + переспрос адреса (resolveEndpoint)', async () => {
     const online = useOnlineStore();
+    online.noteSocketConnected();
 
-    await online.startPolling();
-    expect(online.isOnline).toBe(true);
-
-    // Один промах (холодный LTE-зонд) — состояние держим.
-    probeHealthMock.mockResolvedValueOnce(missProbe);
-    await vi.advanceTimersByTimeAsync(10_000);
-    expect(online.isOnline).toBe(true);
-
-    // Второй подряд — уходим в офлайн.
-    probeHealthMock.mockResolvedValueOnce(missProbe);
-    await vi.advanceTimersByTimeAsync(10_000);
+    await online.noteSocketFailed('failed');
     expect(online.isOnline).toBe(false);
+    expect(hoisted.resolveEndpointMock).toHaveBeenCalledTimes(1);
 
-    // Один успех возвращает онлайн сразу, без серии.
-    probeHealthMock.mockResolvedValue(okProbe);
-    await vi.advanceTimersByTimeAsync(10_000);
+    // Повторный failed сразу — кулдаун resolveEndpoint, зонд не дёргаем.
+    await online.noteSocketFailed('failed');
+    expect(hoisted.resolveEndpointMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('серия сетевых фейлов при живом сокете: force-offline + рестарт сокета', () => {
+    const online = useOnlineStore();
+    const reconnects: string[] = [];
+    online.setReconnectHandler(() => reconnects.push('restart'));
+    online.noteSocketConnected();
+
+    hoisted.outcome?.(false);
+    hoisted.outcome?.(false);
     expect(online.isOnline).toBe(true);
-    await online.stopPolling();
+
+    hoisted.outcome?.(false);
+    expect(online.isOnline).toBe(false);
+    expect(netLog.value.at(-1)).toMatchObject({ event: 'force-offline', transition: 'offline' });
+    expect(reconnects).toEqual(['restart']);
   });
 
-  it('stopPolling останавливает тиканье', async () => {
-    probeHealthMock.mockResolvedValue(okProbe);
+  it('успешный ответ сбрасывает серию фейлов', () => {
     const online = useOnlineStore();
+    online.noteSocketConnected();
 
-    await online.startPolling();
-    await online.stopPolling();
-    await vi.advanceTimersByTimeAsync(30_000);
-    expect(probeHealthMock).toHaveBeenCalledTimes(1);
+    hoisted.outcome?.(false);
+    hoisted.outcome?.(false);
+    hoisted.outcome?.(true);
+    hoisted.outcome?.(false);
+    hoisted.outcome?.(false);
+    expect(online.isOnline).toBe(true);
   });
 
-  it('журнал: промах пишется с типом, длительностью и переходом в офлайн', async () => {
-    probeHealthMock.mockResolvedValue(missProbe);
+  it('onOnline: хендлер вызывается на каждый переход в онлайн', () => {
     const online = useOnlineStore();
+    const calls: string[] = [];
+    online.onOnline(() => calls.push('online'));
 
-    await online.startPolling();
-    expect(healthLog.value).toHaveLength(1);
-    expect(healthLog.value[0]).toMatchObject({
-      ok: false,
-      miss: 'timeout',
-      durationMs: 10_000,
-      transition: 'offline',
-    });
-
-    // Повторный промах — запись есть, перехода уже нет (офлайн держится).
-    await vi.advanceTimersByTimeAsync(10_000);
-    expect(healthLog.value).toHaveLength(2);
-    expect(healthLog.value[1].transition).toBeNull();
-    await online.stopPolling();
+    online.noteSocketConnected();
+    online.noteSocketConnected(); // повторный connect — перехода нет
+    expect(calls).toEqual(['online']);
   });
 });

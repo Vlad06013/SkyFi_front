@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, watch } from 'vue';
+import { isOfflineError } from '@/api/http';
 import {
   acceptFriendRequest,
   fetchFriendshipOverview,
@@ -31,14 +32,15 @@ function toEntry(friendship: FriendshipPayload, myId: number | undefined): Frien
   };
 }
 
-function errorMessage(cause: unknown, fallback: string): string {
-  return cause instanceof Error ? cause.message : fallback;
+/** Тост ошибки; офлайн-ошибки молчат (optimizations.md «Офлайн-гейт»). */
+function toastError(cause: unknown, fallback: string) {
+  if (isOfflineError(cause)) return;
+  useToastStore().show(cause instanceof Error ? cause.message : fallback, '', true);
 }
 
 /** Друзья по API (api.md §12). Секции одним обзорным GET; мутации дёргают
  * эндпоинты и правят списки локально (сервер — источник истины для загрузки). */
 export const useFriendsStore = defineStore('friends', () => {
-  const toast = useToastStore();
   const auth = useAuthStore();
 
   const friends = ref<FriendEntry[]>([]);
@@ -71,7 +73,7 @@ export const useFriendsStore = defineStore('friends', () => {
       incoming.value = incoming.value.filter((entry) => entry.user.id !== userId);
       friends.value = [toEntry(friendship, auth.user?.id), ...friends.value];
     } catch (cause) {
-      toast.show(errorMessage(cause, 'Не удалось принять заявку'), '', true);
+      toastError(cause, 'Не удалось принять заявку');
     }
   }
 
@@ -81,7 +83,7 @@ export const useFriendsStore = defineStore('friends', () => {
       await removeFriendApi(userId);
       incoming.value = incoming.value.filter((entry) => entry.user.id !== userId);
     } catch (cause) {
-      toast.show(errorMessage(cause, 'Не удалось отклонить заявку'), '', true);
+      toastError(cause, 'Не удалось отклонить заявку');
     }
   }
 
@@ -92,7 +94,7 @@ export const useFriendsStore = defineStore('friends', () => {
       friends.value = friends.value.filter((entry) => entry.user.id !== userId);
       return true;
     } catch (cause) {
-      toast.show(errorMessage(cause, 'Не удалось удалить друга'), '', true);
+      toastError(cause, 'Не удалось удалить друга');
       return false;
     }
   }
@@ -103,7 +105,7 @@ export const useFriendsStore = defineStore('friends', () => {
       await removeFriendApi(userId);
       outgoing.value = outgoing.value.filter((entry) => entry.user.id !== userId);
     } catch (cause) {
-      toast.show(errorMessage(cause, 'Не удалось отменить заявку'), '', true);
+      toastError(cause, 'Не удалось отменить заявку');
     }
   }
 
@@ -114,7 +116,7 @@ export const useFriendsStore = defineStore('friends', () => {
       outgoing.value = [toEntry(friendship, auth.user?.id), ...outgoing.value];
       return true;
     } catch (cause) {
-      toast.show(errorMessage(cause, 'Не удалось отправить заявку'), '', true);
+      toastError(cause, 'Не удалось отправить заявку');
       return false;
     }
   }

@@ -19,7 +19,7 @@ import { resolveUrl } from '@/lib/endpoints';
 import { useDownloadsStore } from '@/stores/downloads';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
-import { clearHealthLog, formatHealthLog, healthLog, healthMissLabel, type HealthLogEntry } from '@/lib/health-log';
+import { clearNetLog, formatNetLog, netEventLabel, netLog, type NetLogEntry } from '@/lib/net-log';
 
 export default defineComponent({
   name: 'SettingsPage',
@@ -138,9 +138,10 @@ export default defineComponent({
       void router.push({ path: '/qr-confirm', query: { code } });
     }
 
-    // Журнал зондов — новые сверху (bugs-player.md: офлайн-флап ловим
-    // на устройстве, консоль WebView недоступна).
-    const netlog = computed(() => [...healthLog.value].reverse());
+    // Журнал сетевых событий (коннекты/разрывы сокета, переходы
+    // онлайн-стейта) — новые сверху: флап ловим на устройстве,
+    // консоль WebView недоступна.
+    const netlog = computed(() => [...netLog.value].reverse());
 
     function netlogTime(at: number) {
       const date = new Date(at);
@@ -148,13 +149,13 @@ export default defineComponent({
       return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
     }
 
-    function netlogStatus(entry: HealthLogEntry) {
-      return entry.ok ? 'ок' : healthMissLabel(entry.miss);
+    function netlogStatus(entry: NetLogEntry) {
+      return entry.transition ?? netEventLabel(entry.event);
     }
 
     async function copyNetlog() {
       try {
-        await navigator.clipboard.writeText(formatHealthLog(healthLog.value));
+        await navigator.clipboard.writeText(formatNetLog(netLog.value));
         toast.show('Диагностика', 'журнал скопирован');
       } catch {
         toast.show('Не удалось скопировать журнал', '', true);
@@ -162,7 +163,7 @@ export default defineComponent({
     }
 
     function clearNetlog() {
-      clearHealthLog();
+      clearNetLog();
     }
 
     return {

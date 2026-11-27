@@ -1,4 +1,5 @@
 import { computed, defineComponent } from 'vue';
+import { isOfflineError } from '@/api/http';
 import AppBar from '@/components/AppBar/AppBar.vue';
 import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
 import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
@@ -44,10 +45,15 @@ export default defineComponent({
       if (!target) return;
       favorites
         .toggle(target)
-        .then((added) => toast.show(target.title, added ? 'добавлено в избранное' : 'убрано из избранного'))
-        .catch((cause: unknown) =>
-          toast.show(cause instanceof Error ? cause.message : 'Не удалось обновить избранное', '', true),
-        );
+        .then((added) => {
+          // null — действие подавлено (новый лайк в офлайне): тихо.
+          if (added === null) return;
+          toast.show(target.title, added ? 'добавлено в избранное' : 'убрано из избранного');
+        })
+        .catch((cause: unknown) => {
+          if (isOfflineError(cause)) return;
+          toast.show(cause instanceof Error ? cause.message : 'Не удалось обновить избранное', '', true);
+        });
     }
 
     return {

@@ -1,7 +1,7 @@
 import type { PlaySource } from '@/types';
 
 /**
- * Статичные playback_source по экранам (plan-player.md §2): страница
+ * Статичные playback_source по экранам: страница
  * берёт свою константу вместо литерала. Значения — строгий enum
  * PlaySource (api.md §5).
  */

@@ -7,6 +7,7 @@ import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
 import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import { useMediaMenu } from '@/composables/useMediaMenu';
 import { fetchSearch } from '@/api/search';
+import { isOfflineError } from '@/api/http';
 import { artistsLine, snapshotCover, trackCover } from '@/lib/cover';
 import { resolveUrl } from '@/lib/endpoints';
 import { getSearchHistory, pushSearchHistory, clearSearchHistory } from '@/lib/search-history';
@@ -349,9 +350,12 @@ export default defineComponent({
       if (!entity.snapshot) return;
       try {
         const added = await favorites.toggle(entity.snapshot);
+        // null — действие подавлено (новый лайк в офлайне): тихо.
+        if (added === null) return;
         patchFavorite(entity.snapshot, added);
         toast.show(entity.title, added ? 'добавлено в избранное' : 'убрано из избранного');
       } catch (cause) {
+        if (isOfflineError(cause)) return;
         toast.show(cause instanceof Error ? cause.message : 'Не удалось обновить избранное', '', true);
       }
     }

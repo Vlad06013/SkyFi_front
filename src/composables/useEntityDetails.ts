@@ -2,6 +2,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { usePageRefresh } from '@/composables/usePageRefresh';
 import { useRoute } from 'vue-router';
 import { fetchEntityDetails, type DetailsEntityType } from '@/api/details';
+import { isOfflineError } from '@/api/http';
 import { useDownloadsStore } from '@/stores/downloads';
 import { useToastStore } from '@/stores/toast';
 import type {
@@ -40,7 +41,7 @@ export function useEntityDetails(type: DetailsEntityType) {
   const sourceId = computed(() => String(route.params.id ?? ''));
 
   async function load(page: number) {
-    // ПРОБЛЕМА (не решена, см. docs/unthoughtout.md «Keep-alive всех
+    // ПРОБЛЕМА (не решена, см. docs/optimizations.md «Keep-alive всех
     // страниц»): TabsLayout держит под keep-alive ВСЕ страницы
     // (семантика мобильного стека навигации: ушедшие экраны живы), а
     // страницы читают живой глобальный useRoute() (SPA-стиль). Живая
@@ -88,7 +89,8 @@ export function useEntityDetails(type: DetailsEntityType) {
       tracks.value = page === 1 ? payload.tracks.items : [...tracks.value, ...payload.tracks.items];
       albums.value = payload.albums.items;
       hasMore.value = payload.tracks.has_more;
-    } catch {
+    } catch (cause) {
+      if (isOfflineError(cause)) return;
       if (gen !== generation) return;
       toast.show(loadFailedTitle, '', true);
       error.value = loadFailedTitle;

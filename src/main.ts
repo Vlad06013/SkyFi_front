@@ -7,7 +7,7 @@ import { IonicVue } from '@ionic/vue';
 import App from './App.vue';
 import router from './router';
 import { onUnauthorized } from '@/api/http';
-import { bindSessionRealtime } from '@/realtime';
+import { bindSessionRealtime, restartRealtime } from '@/realtime';
 import { useAudioPlayback } from '@/composables/useAudioPlayback';
 import { bindMediaKeys } from '@/lib/media-keys';
 import { bindMediaSession } from '@/lib/media-session';
@@ -65,14 +65,22 @@ const appStore = useAppStore(pinia);
 // До первого запроса: домашний Wi‑Fi не открывает внешний адрес бэка.
 void resolveEndpoint().finally(() => {
   void appStore.bootstrap().finally(async () => {
-    void useOnlineStore(pinia).startPolling();
-    // Session-scoped сервисы: presence устройства + сокеты (docs/plan-sockets.md).
+    // Session-scoped сервисы: presence устройства + сокеты (сокет же — источник онлайн-стейта).
     useDevicesStore(pinia).bindPresence();
     bindSessionRealtime();
+    const online = useOnlineStore(pinia);
+    online.setReconnectHandler(restartRealtime);
+    // Свежесть сессии проверяем первым коннектом сокета (здоровье бэка не зондируем).
+    let sessionRefreshed = false;
+    online.onOnline(() => {
+      if (sessionRefreshed) return;
+      sessionRefreshed = true;
+      void useAuthStore(pinia).restoreSession({ refresh: true });
+    });
     // Ссылки get-url из прошлой сессии — до движка, иначе он запросит текущий трек заново.
     await hydrateStreamCache();
     await useDownloadsStore(pinia).hydrate();
-    // Плеер: серверное состояние + реконнект-рефетч + аудио-движок (docs/plan-player.md).
+    // Плеер: серверное состояние + реконнект-рефетч + аудио-движок.
     usePlayerStore(pinia).bindServerPlayback();
     useAudioPlayback();
     bindMediaKeys();

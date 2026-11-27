@@ -10,8 +10,10 @@ import {
   type MenuEntity,
   type MenuItem,
 } from '@/lib/media-menu';
+import { isOfflineError } from '@/api/http';
 import { usePlayerStore } from '@/stores/player';
 import { useFavoritesStore } from '@/stores/favorites';
+import { useOnlineStore } from '@/stores/online';
 import { isDownloadAbort, useDownloadsStore } from '@/stores/downloads';
 import { useToastStore } from '@/stores/toast';
 import type { AnySnapshot } from '@/types';
@@ -48,10 +50,15 @@ export function useMediaMenu(hooks: {
   const right = computed(() => menu.value?.right ?? 12);
 
   function resolveItems(context: MenuContext, target: MenuEntity): MenuItem[] {
-    return buildMenuItems(context, target, {
-      liked: favorites.has(target.snapshot),
-      downloaded: target.snapshot ? downloads.isDownloaded(target.snapshot) : false,
-    });
+    return buildMenuItems(
+      context,
+      target,
+      {
+        liked: favorites.has(target.snapshot),
+        downloaded: target.snapshot ? downloads.isDownloaded(target.snapshot) : false,
+      },
+      useOnlineStore().isOnline === false,
+    );
   }
 
   const items = computed(() => (menu.value ? resolveItems(menu.value.context, menu.value.entity) : []));
@@ -96,8 +103,11 @@ export function useMediaMenu(hooks: {
 
   function run(action: MenuAction) {
     const target = menu.value?.entity ?? entity.value;
+    const item = items.value.find((entry) => entry.id === action);
     menu.value = null;
     entity.value = target;
+    // Офлайн-гейт: disabled-пункты (см. buildMenuItems) не исполняем.
+    if (item?.disabled) return;
     if (action === 'queue' && target.snapshot) {
       void enqueue(target.snapshot);
       return;
@@ -111,9 +121,12 @@ export function useMediaMenu(hooks: {
         void favorites
           .toggle(target.snapshot)
           .then((added) => {
+            // null — действие подавлено (новый лайк в офлайне): тихо.
+            if (added === null) return;
             toast.show(target.title, added ? 'добавлено в избранное' : 'убрано из избранного');
           })
           .catch((error: unknown) => {
+            if (isOfflineError(error)) return;
             toast.show(error instanceof Error ? error.message : 'Не удалось обновить избранное', '', true);
           });
         return;
@@ -137,7 +150,7 @@ export function useMediaMenu(hooks: {
       void job
         .then(() => toast.show(target.title, 'скачано'))
         .catch((error: unknown) => {
-          if (isDownloadAbort(error)) return;
+          if (isDownloadAbort(error) || isOfflineError(error)) return;
           toast.show(error instanceof Error ? error.message : 'Не удалось скачать', '', true);
         });
       return;

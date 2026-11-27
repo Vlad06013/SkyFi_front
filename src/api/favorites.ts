@@ -16,7 +16,7 @@ export function removeFavorite(snapshot: AnySnapshot) {
   return http.delete<{ message: string }>('favorites', { data: snapshot });
 }
 
-/** Новый порядок вкладки целиком: sort = вес позиции, больший вес — выше в списке. */
-export function sortFavorites(type: SnapshotType, items: { source_type: string; source_id: string; sort: number }[]) {
-  return http.patch('favorites/sort', { type, items });
+/** Перенос одного элемента вкладки на позицию: бэк переписывает только затронутый диапазон весов (api.md §10). */
+export function moveFavorite(type: SnapshotType, item: { source_type: string; source_id: string }, toIndex: number) {
+  return http.patch('favorites/sort', { type, item, to_index: toIndex });
 }

@@ -3,6 +3,7 @@ import AppSheet from '@/components/AppSheet/AppSheet.vue';
 import SnapshotRow from '@/components/SnapshotRow/SnapshotRow.vue';
 import SourceBadge from '@/components/SourceBadge/SourceBadge.vue';
 import { addToFriendQueue, shareWithFriend } from '@/api/friends';
+import { isOfflineError } from '@/api/http';
 import { fetchShareUrl } from '@/api/shares';
 import { coverVar, trackCover } from '@/lib/cover';
 import { resolveUrl } from '@/lib/endpoints';
@@ -71,7 +72,7 @@ export default defineComponent({
           return payload.url;
         })
         .catch((cause) => {
-          toast.show(cause instanceof Error ? cause.message : 'Не удалось получить ссылку', '', true);
+          if (!isOfflineError(cause)) toast.show(cause instanceof Error ? cause.message : 'Не удалось получить ссылку', '', true);
           return null;
         })
         .finally(() => {
@@ -116,6 +117,7 @@ export default defineComponent({
         toast.show(`${props.entity.title} — ${friend.user.name} в очередь`, 'отправили другу');
         close();
       } catch (cause) {
+        if (isOfflineError(cause)) return;
         toast.show(cause instanceof Error ? cause.message : 'Не удалось отправить', '', true);
       }
     }
@@ -127,6 +129,7 @@ export default defineComponent({
         toast.show(`${props.entity.title} — ${props.entity.artist}`, `поделились с ${friend.user.name}`);
         close();
       } catch (cause) {
+        if (isOfflineError(cause)) return;
         toast.show(cause instanceof Error ? cause.message : 'Не удалось поделиться', '', true);
       }
     }

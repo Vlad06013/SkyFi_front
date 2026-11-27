@@ -3,7 +3,7 @@ import { PLAY_SOURCE_SINGLE } from '@/lib/play-sources';
 import { usePlayerStore } from '@/stores/player';
 import type { AnySnapshot, PlaySource } from '@/types';
 
-/** Как запускать трек/видео из списка (plan-player.md §2). */
+/** Как запускать трек/видео из списка. */
 export interface OpenPlayOptions {
   playbackSource?: PlaySource;
   /** Контекст целиком: движок строит переходы сразу, без resolver. */

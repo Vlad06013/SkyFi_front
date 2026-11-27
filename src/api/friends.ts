@@ -63,9 +63,9 @@ export function fetchFriendQueue(userId: number) {
   return http.get<QueueItem[]>(`friends/${userId}/queue`);
 }
 
-/** Перестановка очереди друга (api.md §12). */
-export function reorderFriendQueue(userId: number, items: number[]) {
-  return http.patch<QueueItem[]>(`friends/${userId}/queue/reorder`, { items });
+/** Перестановка очереди друга — перенос одного элемента, как в своей очереди (api.md §12). */
+export function moveFriendQueueItem(userId: number, itemId: number, toIndex: number) {
+  return http.patch<QueueItem[]>(`friends/${userId}/queue/reorder`, { item: itemId, to_index: toIndex });
 }
 
 /** Добавить снапшот в очередь друга (api.md §12). Ответ не используем. */

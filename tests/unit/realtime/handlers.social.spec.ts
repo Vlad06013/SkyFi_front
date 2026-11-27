@@ -17,7 +17,7 @@ vi.mock('@/api/queue', () => ({
   fetchQueue: vi.fn(),
   addToQueue: vi.fn(),
   removeFromQueue: vi.fn(),
-  reorderPending: vi.fn(),
+  movePending: vi.fn(),
 }));
 
 const fetchQueueMock = vi.mocked(queueApi.fetchQueue);

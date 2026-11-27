@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { http } from '@/api/http';
-import { fetchQueue, addToQueue, removeFromQueue, reorderPending } from '@/api/queue';
+import { fetchQueue, addToQueue, removeFromQueue, movePending } from '@/api/queue';
 import type { QueueItem, TrackSnapshot } from '@/types';
 
 vi.mock('@/api/http', () => ({
@@ -66,10 +66,10 @@ describe('api/queue', () => {
     expect(deleteMock).toHaveBeenCalledWith('player/queue/7');
   });
 
-  it('PATCH player/queue/reorder: список id в новом порядке', async () => {
+  it('PATCH player/queue/reorder: перенос одного элемента на позицию', async () => {
     patchMock.mockResolvedValue([makeItem(3, 1), makeItem(1, 2)] as never);
-    const result = await reorderPending([3, 1]);
-    expect(patchMock).toHaveBeenCalledWith('player/queue/reorder', { items: [3, 1] });
+    const result = await movePending(3, 0);
+    expect(patchMock).toHaveBeenCalledWith('player/queue/reorder', { item: 3, to_index: 0 });
     expect(result).toHaveLength(2);
   });
 });

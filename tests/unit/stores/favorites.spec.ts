@@ -12,13 +12,13 @@ vi.mock('@/api/favorites', () => ({
   fetchFavorites: vi.fn(),
   addFavorite: vi.fn(),
   removeFavorite: vi.fn(),
-  sortFavorites: vi.fn(),
+  moveFavorite: vi.fn(),
 }));
 
 const fetchMock = vi.mocked(favoritesApi.fetchFavorites);
 const addMock = vi.mocked(favoritesApi.addFavorite);
 const removeMock = vi.mocked(favoritesApi.removeFavorite);
-const sortMock = vi.mocked(favoritesApi.sortFavorites);
+const moveMock = vi.mocked(favoritesApi.moveFavorite);
 
 function makeTrack(id: string): TrackSnapshot {
   return {
@@ -54,11 +54,11 @@ describe('stores/favorites', () => {
     fetchMock.mockReset();
     addMock.mockReset();
     removeMock.mockReset();
-    sortMock.mockReset();
+    moveMock.mockReset();
     fetchMock.mockResolvedValue(PAYLOAD);
     addMock.mockResolvedValue({ message: 'ок', is_favorite: true });
     removeMock.mockResolvedValue({ message: 'ок' });
-    sortMock.mockResolvedValue({ updated: 2 });
+    moveMock.mockResolvedValue({ updated: 1 });
   });
 
   it('автозагрузка: авторизован + онлайн → вкладки с сервера', async () => {
@@ -158,7 +158,7 @@ describe('stores/favorites', () => {
     expect(favorites.has(track)).toBe(false);
   });
 
-  it('reorder: локальный порядок + PATCH sort весами (больший вес = выше)', async () => {
+  it('reorder: локальный порядок + PATCH sort — перенос одного элемента', async () => {
     loginAsUser();
     useOnlineStore().isOnline = true;
     const favorites = useFavoritesStore();
@@ -167,9 +167,82 @@ describe('stores/favorites', () => {
     favorites.reorder(0, 1);
     expect(favorites.tracks.map((t) => t.source_id)).toEqual(['t2', 't1']);
     await flushPromises();
-    expect(sortMock).toHaveBeenCalledWith('track', [
-      { source_type: 'yandex_music', source_id: 't2', sort: 1 },
-      { source_type: 'yandex_music', source_id: 't1', sort: 0 },
-    ]);
+    expect(moveMock).toHaveBeenCalledWith('track', { source_type: 'yandex_music', source_id: 't1' }, 1);
+  });
+
+  it('офлайн-снятие лайка: локально убрано, в буфере с позицией, сети не было', async () => {
+    loginAsUser();
+    useOnlineStore().isOnline = true;
+    const favorites = useFavoritesStore();
+    await flushPromises();
+
+    useOnlineStore().isOnline = false;
+    const first = favorites.tracks[0];
+    await expect(favorites.toggle(first)).resolves.toBe(false);
+
+    expect(favorites.has(first)).toBe(false);
+    expect(removeMock).not.toHaveBeenCalled();
+    expect(favorites.removalBuffer).toHaveLength(1);
+    expect(favorites.removalBuffer[0]).toMatchObject({ index: 0 });
+  });
+
+  it('офлайн: повторное сердечко отменяет удаление и возвращает трек на позицию', async () => {
+    loginAsUser();
+    useOnlineStore().isOnline = true;
+    const favorites = useFavoritesStore();
+    await flushPromises();
+
+    useOnlineStore().isOnline = false;
+    const first = favorites.tracks[0];
+    await favorites.toggle(first);
+    expect(favorites.has(first)).toBe(false);
+
+    await expect(favorites.toggle(first)).resolves.toBe(true);
+    expect(favorites.has(first)).toBe(true);
+    expect(favorites.tracks[0]).toEqual(first);
+    expect(favorites.removalBuffer).toHaveLength(0);
+  });
+
+  it('офлайн: новый лайк подавлен (null), сети не было', async () => {
+    loginAsUser();
+    useOnlineStore().isOnline = true;
+    const favorites = useFavoritesStore();
+    await flushPromises();
+
+    useOnlineStore().isOnline = false;
+    const fresh = makeTrack('t9');
+    await expect(favorites.toggle(fresh)).resolves.toBeNull();
+    expect(favorites.has(fresh)).toBe(false);
+    expect(addMock).not.toHaveBeenCalled();
+  });
+
+  it('коннект: буфер уходит DELETE-ами, список сходится с сервером', async () => {
+    // Сервер-side состояние: DELETE реально убирает трек из выдачи.
+    const server = { ...PAYLOAD, tracks: [makeTrack('t1'), makeTrack('t2')] };
+    fetchMock.mockResolvedValue(server);
+    removeMock.mockImplementation(async (snapshot) => {
+      server.tracks = server.tracks.filter((track) => track.source_id !== snapshot.source_id);
+      return { message: 'ок' };
+    });
+
+    loginAsUser();
+    useOnlineStore().isOnline = true;
+    const favorites = useFavoritesStore();
+    await flushPromises();
+
+    useOnlineStore().isOnline = false;
+    const first = favorites.tracks[0];
+    await favorites.toggle(first);
+    expect(removeMock).not.toHaveBeenCalled();
+
+    // Сеть вернулась: flush буфера + повторный fetch для конвергенции.
+    useOnlineStore().noteSocketConnected();
+    await flushPromises();
+    await flushPromises();
+
+    expect(removeMock).toHaveBeenCalledWith(first);
+    expect(favorites.removalBuffer).toHaveLength(0);
+    expect(favorites.has(first)).toBe(false);
+    expect(favorites.tracks.map((t) => t.source_id)).toEqual(['t2']);
   });
 });

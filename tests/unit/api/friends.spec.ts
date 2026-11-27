@@ -8,7 +8,7 @@ import {
   fetchFriendNowPlaying,
   fetchFriendQueue,
   removeFriend,
-  reorderFriendQueue,
+  moveFriendQueueItem,
   searchUsers,
   sendFriendRequest,
   shareWithFriend,
@@ -95,10 +95,10 @@ describe('api/friends', () => {
     expect(getMock).toHaveBeenCalledWith('friends/2/queue');
   });
 
-  it('PATCH reorder очереди друга: items в теле', async () => {
+  it('PATCH reorder очереди друга: перенос одного элемента', async () => {
     patchMock.mockResolvedValue([] as never);
-    await reorderFriendQueue(2, [3, 1]);
-    expect(patchMock).toHaveBeenCalledWith('friends/2/queue/reorder', { items: [3, 1] });
+    await moveFriendQueueItem(2, 3, 0);
+    expect(patchMock).toHaveBeenCalledWith('friends/2/queue/reorder', { item: 3, to_index: 0 });
   });
 
   it('POST в очередь друга и шара: снапшот в теле', async () => {

@@ -2,7 +2,7 @@ import { watch } from 'vue';
 import { fetchAudioUrl } from '@/api/audio';
 import { bufferAheadSeconds } from '@/lib/buffer-ranges';
 import { isLocalPlaybackUrl } from '@/lib/download-files';
-import { registerHealthActivity } from '@/lib/health-log';
+import { registerNetActivity } from '@/lib/net-log';
 import { afterMediaUnlock, isAutoplayBlocked, markAutoplayBlocked } from '@/lib/media-unlock';
 import { resolveUrl } from '@/lib/endpoints';
 import { isOwnApiStream } from '@/lib/own-stream';
@@ -16,7 +16,7 @@ import { usePlayerStore } from '@/stores/player';
 import type { AnySnapshot } from '@/types';
 
 /**
- * Аудио-движок (plan-player.md §7 п.4): поток через `/audio/get-url`,
+ * Аудио-движок: поток через `/audio/get-url`,
  * `ended` → движок → `/play`. Звучит только активное устройство;
  * пульт синхронизирует UI и молчит.
  */
@@ -116,9 +116,9 @@ export function getAudioElement(): HTMLAudioElement | null {
   return audio;
 }
 
-// Диагностика запаса буфера трека (bugs-player.md) — пара к пробе 'клип':
+// Диагностика запаса буфера трека — пара к пробе 'клип':
 // в логе зондов видно, сколько секунд звука реально лежит впереди плейхеда.
-registerHealthActivity('звук', () => {
+registerNetActivity('звук', () => {
   const store = usePlayerStore();
   if (store.clipActive || store.effectiveCurrent?.type !== 'track') return null;
   if (!audio || !audio.hasAttribute('src')) return null;

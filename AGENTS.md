@@ -16,8 +16,12 @@ Vue 3 + TypeScript SPA для бэка SkyFi (Laravel, API в `docs/api.md`).
 - `docs/frontend.md` — **твой файл**: конвенции кода, экраны,
   UI-решения. Правь свободно в этой копии; бэк-агент подтягивает
   её к себе сам.
-- Свои рабочие файлы (`fixes.md`, `status.md`, `menus.md`,
-  `plan-auth.md`, `unthoughtout.md`) — только здесь.
+- Свои рабочие файлы — только здесь: `optimizations.md`
+  (журнал решений и план оптимизаций, включая открытые
+  вопросы). Старые планы и журналы (plan-*, fixes, status,
+  menus, bugs-player, unthoughtout) удалены 2026-11-27:
+  источник истины по текущему состоянию — код, `frontend.md`
+  и `optimizations.md`.
 
 ## Как брать контракт
 

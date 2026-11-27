@@ -1,25 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
-import { checkHealth } from '@/api/health';
 import { fetchUser } from '@/api/auth';
 import { getSession } from '@/lib/session';
 import { useAppStore } from '@/stores/app';
 import { useAuthStore } from '@/stores/auth';
-
-vi.mock('@/api/health', () => {
-  const checkHealth = vi.fn();
-  return {
-    checkHealth,
-    // Поллер ходит через probeHealth — деривируем из того же мока,
-    // чтобы сценарии checkHealth работали без изменений.
-    probeHealth: vi.fn(async (timeoutMs?: number) =>
-      (await checkHealth(timeoutMs))
-        ? { ok: true, durationMs: 1, miss: null, detail: '' }
-        : { ok: false, durationMs: 1, miss: 'unknown', detail: 'mock miss' },
-    ),
-    HEALTH_TIMEOUT_MS: 10_000,
-  };
-});
 
 vi.mock('@/api/auth', () => ({
   login: vi.fn(),
@@ -39,7 +23,6 @@ vi.mock('@/lib/session', () => ({
   clearSession: vi.fn(),
 }));
 
-const checkHealthMock = vi.mocked(checkHealth);
 const fetchUserMock = vi.mocked(fetchUser);
 const getSessionMock = vi.mocked(getSession);
 
@@ -48,17 +31,14 @@ const stored = {
   user: { id: 1, name: 'Влад', email: 'vlad@mail.ru', avatar_url: null },
 };
 
-const freshUser = { ...stored.user, name: 'Свежий' };
-
 describe('stores/app — bootstrap', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
   });
 
-  it('онлайн + токен: сессия восстановлена, профиль освежён', async () => {
-    checkHealthMock.mockResolvedValue(true);
+  it('токен: сессия восстановлена из хранилища, GET /user на старте не дёргается', async () => {
     getSessionMock.mockResolvedValue(stored);
-    fetchUserMock.mockResolvedValue(freshUser);
+    fetchUserMock.mockResolvedValue({ ...stored.user, name: 'Свежий' });
 
     const appStore = useAppStore();
     expect(appStore.phase).toBe('splash');
@@ -68,12 +48,12 @@ describe('stores/app — bootstrap', () => {
     expect(appStore.phase).toBe('ready');
     const auth = useAuthStore();
     expect(auth.isAuthed).toBe(true);
-    expect(auth.user?.name).toBe('Свежий');
-    expect(fetchUserMock).toHaveBeenCalledTimes(1);
+    expect(auth.user?.name).toBe('Влад');
+    // Свежесть токена проверяет первый коннект сокета (main.ts), не bootstrap.
+    expect(fetchUserMock).not.toHaveBeenCalled();
   });
 
-  it('онлайн без токена: гость', async () => {
-    checkHealthMock.mockResolvedValue(true);
+  it('без токена: гость', async () => {
     getSessionMock.mockResolvedValue(null);
 
     await useAppStore().bootstrap();
@@ -83,48 +63,24 @@ describe('stores/app — bootstrap', () => {
     expect(fetchUserMock).not.toHaveBeenCalled();
   });
 
-  it('офлайн + токен: входим по сохранённому профилю без GET /user', async () => {
-    checkHealthMock.mockResolvedValue(false);
-    getSessionMock.mockResolvedValue(stored);
-
-    await useAppStore().bootstrap();
-
-    const auth = useAuthStore();
-    expect(auth.isAuthed).toBe(true);
-    expect(auth.user).toEqual(stored.user);
-    expect(fetchUserMock).not.toHaveBeenCalled();
-  });
-
-  it('офлайн без токена: гость (гвард уведёт на /login)', async () => {
-    checkHealthMock.mockResolvedValue(false);
-    getSessionMock.mockResolvedValue(null);
-
-    await useAppStore().bootstrap();
-
-    expect(useAuthStore().isAuthed).toBe(false);
-  });
-
   it('bootstrap выполняется один раз при повторных await', async () => {
-    checkHealthMock.mockResolvedValue(true);
     getSessionMock.mockResolvedValue(null);
 
     const appStore = useAppStore();
     await Promise.all([appStore.bootstrap(), appStore.bootstrap()]);
 
-    expect(checkHealthMock).toHaveBeenCalledTimes(1);
+    expect(getSessionMock).toHaveBeenCalledTimes(1);
   });
 
-  it('recheck после офлайна: онлайн → рефреш сессии', async () => {
-    checkHealthMock.mockResolvedValue(false);
+  it('recheck: повтор входа со свежим GET /user', async () => {
     getSessionMock.mockResolvedValue(stored);
+    fetchUserMock.mockResolvedValue({ ...stored.user, name: 'Свежий' });
     const appStore = useAppStore();
     await appStore.bootstrap();
-    expect(useAuthStore().user?.name).toBe('Влад');
 
-    checkHealthMock.mockResolvedValue(true);
-    fetchUserMock.mockResolvedValue(freshUser);
     await appStore.recheck();
 
+    expect(fetchUserMock).toHaveBeenCalledTimes(1);
     expect(useAuthStore().user?.name).toBe('Свежий');
   });
 });

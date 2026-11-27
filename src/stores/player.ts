@@ -1,5 +1,6 @@
 import { acceptHMRUpdate, defineStore } from 'pinia';
 import { computed, ref, watch } from 'vue';
+import { isOfflineError } from '@/api/http';
 import * as devicesApi from '@/api/devices';
 import * as playerApi from '@/api/player';
 import * as queueApi from '@/api/queue';
@@ -22,8 +23,7 @@ import {
   type NextReason,
 } from '@/lib/playback-engine';
 import { feedbackOnFavorite, feedbackOnLeave, feedbackOnProgress, type WaveListen } from '@/lib/wave-feedback';
-import { registerHealthActivity } from '@/lib/health-log';
-import { moveItem } from '@/lib/list-sort';
+import { registerNetActivity } from '@/lib/net-log';
 import { unlockMediaPlayback } from '@/lib/media-unlock';
 import { clearPlayerCache, loadPlayerCache, savePlayerCache } from '@/lib/library-cache';
 import { readPlayerDevicePrefs, writePlayerDevicePrefs } from '@/lib/player-prefs';
@@ -128,7 +128,7 @@ export const usePlayerStore = defineStore('player', () => {
   const queue = ref<QueueItem[]>([]);
   const queueLoaded = ref(false);
 
-  /** Материализованный контекст (plan-player.md §2); для волны — серверное окно. */
+  /** Материализованный контекст; для волны — серверное окно. */
   const contextItems = ref<AnySnapshot[]>([]);
   /**
    * Ключ загруженного контекста: источник + ref. Смена плейлиста без смены
@@ -154,7 +154,7 @@ export const usePlayerStore = defineStore('player', () => {
     return snapshot.type === 'track' && useDownloadsStore().isDownloaded(snapshot);
   }
 
-  /** Активное устройство = источник истины воспроизведения (plan-player.md §5). */
+  /** Активное устройство = источник истины воспроизведения. */
   const isActiveDevice = computed(() => {
     if (offlinePlayback()) return true;
     const uuid = useDevicesStore().myDeviceUuid;
@@ -193,9 +193,10 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
-  /** Текст ошибки сети/бэка для тоста. */
-  function errorText(cause: unknown, fallback: string) {
-    return cause instanceof Error ? cause.message : fallback;
+  /** Тост ошибки сети/бэка; офлайн-ошибки молчат (optimizations.md «Офлайн-гейт»). */
+  function toastError(cause: unknown, fallback: string) {
+    if (isOfflineError(cause)) return;
+    toast.show(cause instanceof Error ? cause.message : fallback, '', true);
   }
 
   async function resync() {
@@ -256,7 +257,7 @@ export const usePlayerStore = defineStore('player', () => {
     void syncContextWithSource();
   }
 
-  // --- Активное устройство: активация и авто-активация (api.md §4, plan-player.md §5)
+  // --- Активное устройство: активация и авто-активация (api.md §4)
 
   /**
    * Активация устройства (api.md §4). Ответ — полный стейт плеера: применяем
@@ -282,7 +283,7 @@ export const usePlayerStore = defineStore('player', () => {
       return true;
     } catch (cause) {
       applyActiveDevice(prevActive);
-      toast.show(errorText(cause, 'Не удалось переключить устройство'), '', true);
+      toastError(cause, 'Не удалось переключить устройство');
       return false;
     }
   }
@@ -404,7 +405,7 @@ export const usePlayerStore = defineStore('player', () => {
     applyServerState(payload);
   }
 
-  // --- Контекст (resolver, plan-player.md §2/§7): favorites/uploads/волна —
+  // --- Контекст (resolver): favorites/uploads/волна —
   // --- одним запросом; search/playlist по context_ref постранично
 
   /** Ключ контекста из серверного стейта: источник + ref — указатель, не содержимое. */
@@ -455,7 +456,7 @@ export const usePlayerStore = defineStore('player', () => {
         contextItems: window.map(waveApi.waveSnapshot),
       });
     } catch (cause) {
-      toast.show(errorText(cause, 'Не удалось включить волну'), '', true);
+      toastError(cause, 'Не удалось включить волну');
     }
   }
 
@@ -673,7 +674,7 @@ export const usePlayerStore = defineStore('player', () => {
       applyServerState(payload, { force: true });
     } catch (cause) {
       lastPositionPushSeconds = prevPush;
-      toast.show(errorText(cause, 'Не удалось перезапустить трек'), '', true);
+      toastError(cause, 'Не удалось перезапустить трек');
     }
   }
 
@@ -695,7 +696,7 @@ export const usePlayerStore = defineStore('player', () => {
    * Прямой запуск (api.md §5). Пользовательский тап — rollSeed: ролл сида
    * детерминированного shuffle; переходы движка ключ не трогают. Тап из
    * списка передаёт contextItems — движок строит переходы сразу, без
-   * ожидания resolver (plan-player.md §2).
+   * ожидания resolver.
    */
   async function playSnapshot(
     snapshot: AnySnapshot,
@@ -775,7 +776,7 @@ export const usePlayerStore = defineStore('player', () => {
         state.value = prevState;
         anchorPosition();
       }
-      toast.show(errorText(cause, 'Не удалось включить'), '', true);
+      toastError(cause, 'Не удалось включить');
       void resync();
     }
   }
@@ -903,7 +904,7 @@ export const usePlayerStore = defineStore('player', () => {
       return;
     }
     const wasPlaying = !wantPlaying;
-    // Оптимистично, с откатом по ошибке (plan-player.md §5). Пауза сама
+    // Оптимистично, с откатом по ошибке. Пауза сама
     // увозит позицию — висящий seek отменяем, чтобы не дёргать бэк дважды.
     if (wasPlaying) cancelPendingSeek();
     writeLocalPosition();
@@ -938,7 +939,7 @@ export const usePlayerStore = defineStore('player', () => {
         is_playing: wasPlaying,
       };
       anchorPosition();
-      toast.show(errorText(cause, 'Не удалось переключить воспроизведение'), '', true);
+      toastError(cause, 'Не удалось переключить воспроизведение');
       void resync();
     }
   }
@@ -955,7 +956,7 @@ export const usePlayerStore = defineStore('player', () => {
       if (!payload) return;
       applyServerState(payload, { force: true });
     } catch (cause) {
-      toast.show(errorText(cause, 'Не удалось сменить повтор'), '', true);
+      toastError(cause, 'Не удалось сменить повтор');
     }
   }
 
@@ -969,14 +970,14 @@ export const usePlayerStore = defineStore('player', () => {
       };
       return;
     }
-    // Включение — ролл ключа («перемешать заново»); выключение — seed: null (plan-player.md §2).
+    // Включение — ролл ключа («перемешать заново»); выключение — seed: null.
     const seed = next ? crypto.randomUUID() : null;
     try {
       const payload = await withDevice((fields) => playerApi.patchPlaybackOptions({ shuffle_enabled: next }, fields, seed));
       if (!payload) return;
       applyServerState(payload, { force: true });
     } catch (cause) {
-      toast.show(errorText(cause, 'Не удалось переключить shuffle'), '', true);
+      toastError(cause, 'Не удалось переключить shuffle');
     }
   }
 
@@ -1270,7 +1271,7 @@ export const usePlayerStore = defineStore('player', () => {
       queue.value = sortQueue(await queueApi.addToQueue(snapshot));
       return true;
     } catch (cause) {
-      toast.show(errorText(cause, 'Не удалось добавить в очередь'), '', true);
+      toastError(cause, 'Не удалось добавить в очередь');
       return false;
     }
   }
@@ -1279,18 +1280,19 @@ export const usePlayerStore = defineStore('player', () => {
     try {
       queue.value = sortQueue(await queueApi.removeFromQueue(id));
     } catch (cause) {
-      toast.show(errorText(cause, 'Не удалось убрать из очереди'), '', true);
+      toastError(cause, 'Не удалось убрать из очереди');
     }
   }
 
-  /** Перестановка по индексам: бэку уходит список id ожидающих элементов в новом порядке. */
+  /** Перенос по индексам: бэку уходит id переносимого элемента и целевая позиция (api.md §6). */
   async function reorderQueue(from: number, to: number) {
     if (from === to) return;
-    const items = moveItem(queue.value, from, to).map((item) => item.id);
+    const moved = queue.value[from];
+    if (!moved) return;
     try {
-      queue.value = sortQueue(await queueApi.reorderPending(items));
+      queue.value = sortQueue(await queueApi.movePending(moved.id, to));
     } catch (cause) {
-      toast.show(errorText(cause, 'Не удалось изменить порядок'), '', true);
+      toastError(cause, 'Не удалось изменить порядок');
     }
   }
 
@@ -1503,7 +1505,7 @@ export const usePlayerStore = defineStore('player', () => {
       // Позиция на бэк не доехала: метка «наша позиция у сервера» неверна,
       // иначе следующий housekeeping-ивент снялся бы как чужой seek.
       lastPositionPushSeconds = prevPush;
-      toast.show(errorText(cause, 'Не удалось перемотать'), '', true);
+      toastError(cause, 'Не удалось перемотать');
     });
   }
 
@@ -1576,7 +1578,7 @@ export const usePlayerStore = defineStore('player', () => {
     } catch (cause) {
       clipMode.value = prev;
       if (!prev) clearClip();
-      toast.show(errorText(cause, 'Не удалось переключить режим клипов'), '', true);
+      toastError(cause, 'Не удалось переключить режим клипов');
       void resync();
     }
   }
@@ -1718,7 +1720,7 @@ export const usePlayerStore = defineStore('player', () => {
     volume.value = Math.round(Math.min(100, Math.max(0, percent)));
   }
 
-  // --- Жизненный цикл: старт/реконнект (plan-player.md §5)
+  // --- Жизненный цикл: старт/реконнект
 
   let unbindReconnect: (() => void) | null = null;
 
@@ -1802,12 +1804,12 @@ export const usePlayerStore = defineStore('player', () => {
     );
   }
 
-  // Диагностика офлайн-флапа (bugs-player.md): журнал зондов на экране
+  // Диагностика офлайн-флапа: журнал зондов на экране
   // настроек показывает, что делало приложение в момент промаха health.
   // «get-url» и «ждёт playing» разделены: это разные узкие места (запрос
   // ссылки против ожидания первого кадра); запас буфера и ступень HLS
   // добавляют пробы движков ('клип'/'звук').
-  registerHealthActivity('player', () => {
+  registerNetActivity('player', () => {
     const parts: string[] = [];
     if (state.value.is_playing) parts.push(audioPlaying.value ? 'играет' : 'play без звука');
     if (engineLoading.value) parts.push('get-url');

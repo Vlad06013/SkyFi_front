@@ -21,6 +21,7 @@ import {
 } from '@/realtime/handlers/social';
 import { useAuthStore } from '@/stores/auth';
 import { useDevicesStore } from '@/stores/devices';
+import { useOnlineStore } from '@/stores/online';
 import type {
   FriendQueueItemAddedPayload,
   FriendshipEventPayload,
@@ -41,6 +42,8 @@ let echo: Echo<'reverb'> | null = null;
 let wasConnected = false;
 /** Смена домашняя/внешка рвёт сокет: после нового connect плеер должен забрать стейт. */
 let resyncOnConnect = false;
+/** Какой device.{uuid} канал уже подписан (presence-привязка, api.md §17). */
+let deviceChannelUuid: string | null = null;
 const reconnectHandlers = new Set<() => void>();
 
 export const realtimeStatus = readonly(status);
@@ -76,6 +79,20 @@ function subscribeOwnChannel(userId: number) {
   router.listen<WaveUpdatedPayload>(channel, '.playback.wave.updated', {}, handleWaveUpdated);
 }
 
+/**
+ * Подписка на персональный канал устройства `device.{uuid}`: факт
+ * подписки = привязка сокета к устройству (presence, api.md §17).
+ * Подписываемся только после регистрации устройства (registered) —
+ * иначе канала у юзера ещё нет. Событий в канал не шлётся.
+ */
+function subscribeDeviceChannel() {
+  if (!echo) return;
+  const uuid = useDevicesStore().myDeviceUuid;
+  if (!uuid || deviceChannelUuid === uuid) return;
+  deviceChannelUuid = uuid;
+  echo.private(`device.${uuid}`);
+}
+
 /** Подключение и подписка на свой канал. Повторный вызов — no-op. */
 export function startRealtime(userId: number) {
   if (echo) return;
@@ -89,26 +106,42 @@ export function startRealtime(userId: number) {
     return;
   }
   const connection = echo.connector.pusher.connection;
+  const online = useOnlineStore();
   connection.bind('connected', () => {
     console.info(`[realtime] соединение установлено (user ${userId})`);
     if (!wasConnected) subscribeOwnChannel(userId);
+    subscribeDeviceChannel();
     if (wasConnected || resyncOnConnect) reconnectHandlers.forEach((handler) => handler());
     resyncOnConnect = false;
     wasConnected = true;
     status.value = 'connected';
+    online.noteSocketConnected();
   });
   connection.bind('disconnected', () => {
     console.warn('[realtime] соединение разорвано');
     status.value = wasConnected ? 'reconnecting' : 'offline';
+    online.noteSocketDisconnected();
   });
   connection.bind('unavailable', () => {
     console.warn('[realtime] сервер недоступен (unavailable)');
     status.value = 'offline';
+    void online.noteSocketFailed('unavailable');
   });
   connection.bind('failed', () => {
     console.error('[realtime] соединение не удалось (failed)');
     status.value = 'offline';
+    void online.noteSocketFailed('failed');
   });
+}
+
+/** Рестарт соединения (force-offline детектор, смена endpoint уже через watch ниже). */
+export function restartRealtime() {
+  const auth = useAuthStore();
+  const userId = auth.user?.id;
+  if (!auth.isAuthed || userId == null || !echo) return;
+  resyncOnConnect = wasConnected;
+  stopRealtime();
+  startRealtime(userId);
 }
 
 export function stopRealtime() {
@@ -116,7 +149,9 @@ export function stopRealtime() {
   echo.disconnect();
   echo = null;
   wasConnected = false;
+  deviceChannelUuid = null;
   status.value = 'idle';
+  useOnlineStore().noteSocketDisconnected('stop');
 }
 
 /**
@@ -135,11 +170,17 @@ export function bindSessionRealtime() {
     },
     { immediate: true },
   );
+  // Регистрация устройства доходит асинхронно: как только uuid известен
+  // серверу — привязываем сокет к устройству (presence).
+  const devices = useDevicesStore();
+  watch(
+    () => [devices.myDeviceUuid, devices.registered] as const,
+    ([uuid, registered]) => {
+      if (uuid && registered) subscribeDeviceChannel();
+    },
+    { immediate: true },
+  );
   watch(endpointKind, () => {
-    const userId = auth.user?.id;
-    if (!auth.isAuthed || userId == null || !echo) return;
-    resyncOnConnect = wasConnected;
-    stopRealtime();
-    startRealtime(userId);
+    restartRealtime();
   });
 }

@@ -29,7 +29,7 @@ vi.mock('@/api/favorites', () => ({
   fetchFavorites: vi.fn(),
   addFavorite: vi.fn(),
   removeFavorite: vi.fn(),
-  sortFavorites: vi.fn(),
+  moveFavorite: vi.fn(),
 }));
 
 const fetchMock = vi.mocked(detailsApi.fetchEntityDetails);

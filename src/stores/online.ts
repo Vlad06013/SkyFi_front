@@ -1,120 +1,119 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { App } from '@capacitor/app';
-import { Capacitor } from '@capacitor/core';
-import { probeHealth, HEALTH_TIMEOUT_MS, type HealthProbeResult } from '@/api/health';
 import { resolveEndpoint } from '@/lib/endpoints';
-import { collectHealthActivity, recordHealth } from '@/lib/health-log';
+import { setNetworkOutcomeHandler, setOfflineGate } from '@/api/http';
+import { recordNetEvent } from '@/lib/net-log';
 
-const POLL_INTERVAL_MS = 10_000;
-/** Бутстрэп и кнопка «повторить» — короткий ответ, сплэш не ждёт. */
-const FAST_HEALTH_TIMEOUT_MS = 5_000;
-/** Не чаще раза в минуту: ipify при флапе не должен уходить на каждый тик. */
+/**
+ * Онлайн-детект на сокете (optimizations.md «Онлайн-детект на сокете»):
+ * `connected` → онлайн мгновенно; разрыв → офлайн с грейс-периодом
+ * против краткого флапа WiFi. HTTP-зонд не используется. Единственный
+ * источник флага — события Echo-соединения (realtime/index.ts шлёт
+ * сюда noteSocket*). Дополнительно: серия сетевых/5xx фейлов при живом
+ * сокете («сокет онлайн, а HTTP бэка умер») → принудительный офлайн и
+ * рестарт сокета.
+ */
+
+/** Разрыв → офлайн с задержкой: краткий флап WiFi не дёргает плеер. */
+const OFFLINE_GRACE_MS = 3_000;
+/** Повторный resolveEndpoint (ipify) — не чаще раза в минуту. */
 const RESOLVE_COOLDOWN_MS = 60_000;
-/** Офлайн — только после двух подряд неудачных тиков: на LTE зонд после
- *  простоя регулярно не укладывается даже в 10 с, и каждый такой таймаут
- *  уводил весь плеер в офлайн-режим (поток глушился и не перезапускался). */
-const OFFLINE_AFTER_MISSES = 2;
+/** Столько сетевых/5xx фейлов подряд при живом сокете = принудительный офлайн. */
+const FAILS_TO_FORCE_OFFLINE = 3;
 
 export const useOnlineStore = defineStore('online', () => {
-  /** null — первой проверки ещё не было (сплэш). */
+  /** null — первого коннекта сокета ещё не было (сплэш не решился). */
   const isOnline = ref<boolean | null>(null);
 
-  let timer: ReturnType<typeof setInterval> | null = null;
-  let stateListener: { remove: () => Promise<void> } | null = null;
-  let missCount = 0;
+  let socketConnected = false;
+  let graceTimer: ReturnType<typeof setTimeout> | null = null;
   let lastResolveAt = 0;
+  let consecutiveFails = 0;
+  let reconnectHandler: (() => void) | null = null;
+  const onlineHandlers = new Set<() => void>();
 
-  async function probe(timeoutMs: number): Promise<HealthProbeResult & { retried: boolean }> {
-    try {
-      let result = await probeHealth(timeoutMs);
-      // С домашней сети внешний адрес бэка не открывается. Зонд молчит —
-      // переспрашиваем внешний IP и, если сеть домашняя, бьём в локальный адрес.
-      const retried = !result.ok && (await resolveEndpointCached());
-      if (retried) result = await probeHealth(timeoutMs);
-      return { ...result, retried };
-    } catch {
-      // probeHealth по контракту не бросает, но поллер не должен падать
-      // от любой неожиданной ошибки.
-      return { ok: false, durationMs: 0, miss: 'unknown', detail: 'probe crashed', retried: false };
-    }
+  // Гейт и детектор фейлов ставим при создании стора — раньше любых запросов.
+  setOfflineGate(() => isOnline.value === false);
+  setNetworkOutcomeHandler((ok) => (ok ? noteHttpOk() : noteHttpFail()));
+
+  function setOnline(value: boolean, event: Parameters<typeof recordNetEvent>[0], detail = '') {
+    if (isOnline.value === value) return;
+    isOnline.value = value;
+    recordNetEvent(event, detail, value ? 'online' : 'offline');
+    if (value) onlineHandlers.forEach((handler) => handler());
   }
 
-  /** resolveEndpoint из зонда: не чаще кулдауна — повторный health оправдан
-   *  только когда пара адресов реально могла смениться. */
-  async function resolveEndpointCached(): Promise<boolean> {
+  /** Сокет соединился (realtime). */
+  function noteSocketConnected() {
+    socketConnected = true;
+    consecutiveFails = 0;
+    if (graceTimer) {
+      clearTimeout(graceTimer);
+      graceTimer = null;
+    }
+    setOnline(true, 'connect');
+  }
+
+  /** Сокет разорвался (realtime): офлайн после грейса. */
+  function noteSocketDisconnected(detail = '') {
+    socketConnected = false;
+    if (graceTimer) clearTimeout(graceTimer);
+    graceTimer = setTimeout(() => {
+      graceTimer = null;
+      setOnline(false, 'disconnect', detail);
+    }, OFFLINE_GRACE_MS);
+  }
+
+  /** Сокет не достучался (unavailable/failed): офлайн сразу + переспрос адреса. */
+  async function noteSocketFailed(event: 'unavailable' | 'failed', detail = '') {
+    socketConnected = false;
+    if (graceTimer) {
+      clearTimeout(graceTimer);
+      graceTimer = null;
+    }
+    setOnline(false, event, detail);
     const now = Date.now();
-    if (now - lastResolveAt < RESOLVE_COOLDOWN_MS) return false;
+    if (now - lastResolveAt < RESOLVE_COOLDOWN_MS) return;
     lastResolveAt = now;
-    return resolveEndpoint();
+    // Смена endpointKind перезапустит сокет (watch в realtime/index.ts).
+    await resolveEndpoint();
   }
 
-  /**
-   * Проверка сети. fast (бутстрэп, кнопка «повторить») отвечает сразу —
-   * сплэш не ждёт второго круга. Фоновые проверки требуют двух промахов
-   * подряд перед переводом в офлайн; успех возвращает онлайн сразу.
-   */
-  async function check(opts: { fast?: boolean } = {}) {
-    const startedAt = Date.now();
-    const result = await probe(opts.fast ? FAST_HEALTH_TIMEOUT_MS : HEALTH_TIMEOUT_MS);
-    const was = isOnline.value;
-    if (result.ok) {
-      missCount = 0;
-      isOnline.value = true;
-    } else {
-      missCount += 1;
-      if (opts.fast || missCount >= OFFLINE_AFTER_MISSES) isOnline.value = false;
-    }
-    // Журнал для экрана «Диагностика сети»: на устройстве консоль
-    // недоступна, тип промаха и активность смотрим там (bugs-player.md).
-    const detail = result.retried ? [result.detail, 'повтор после смены адреса'].filter(Boolean).join(' · ') : result.detail;
-    recordHealth({
-      at: startedAt,
-      ok: result.ok,
-      durationMs: result.durationMs,
-      miss: result.miss,
-      detail,
-      activity: collectHealthActivity(),
-      transition: isOnline.value === was ? null : isOnline.value ? 'online' : 'offline',
-    });
+  function noteHttpOk() {
+    consecutiveFails = 0;
   }
 
-  function startInterval() {
-    stopInterval();
-    timer = setInterval(() => void check(), POLL_INTERVAL_MS);
-  }
-
-  function stopInterval() {
-    if (timer) {
-      clearInterval(timer);
-      timer = null;
+  function noteHttpFail() {
+    if (!socketConnected) return; // офлайн уже по сокету, счётчик не нужен
+    consecutiveFails += 1;
+    if (consecutiveFails >= FAILS_TO_FORCE_OFFLINE && isOnline.value !== false) {
+      setOnline(false, 'force-offline', `фейлов подряд: ${consecutiveFails}`);
+      // Рвём сокет принудительно: реконнект либо лечит (гейт снова
+      // пропустит запросы), либо подтвердит офлайн. Иначе при живом
+      // сокете и умершем HTTP гейт молчал бы вечно.
+      reconnectHandler?.();
     }
   }
 
-  /**
-   * Глобальный поллер на весь жизненный цикл, в том числе в фоне.
-   * Иначе свёрнутое приложение застывает в прошлом «онлайн» или,
-   * наоборот, не видит, что сеть жива. При возврате на экран
-   * проверяем сразу, не дожидаясь следующего тика.
-   */
-  async function startPolling() {
-    await check({ fast: true });
-    startInterval();
-    if (!Capacitor.isNativePlatform() || stateListener) return;
-    stateListener = await App.addListener('appStateChange', ({ isActive }) => {
-      if (!isActive) return;
-      void check();
-      if (!timer) startInterval();
-    });
+  /** main.ts: рестарт realtime по force-offline (stop/start Echo). */
+  function setReconnectHandler(handler: () => void): void {
+    reconnectHandler = handler;
   }
 
-  async function stopPolling() {
-    stopInterval();
-    if (stateListener) {
-      await stateListener.remove();
-      stateListener = null;
-    }
+  /** Подписка на переход в онлайн (флаш буфера избранного и т.п.). */
+  function onOnline(handler: () => void): () => void {
+    onlineHandlers.add(handler);
+    return () => {
+      onlineHandlers.delete(handler);
+    };
   }
 
-  return { isOnline, check, startPolling, stopPolling };
+  return {
+    isOnline,
+    noteSocketConnected,
+    noteSocketDisconnected,
+    noteSocketFailed,
+    setReconnectHandler,
+    onOnline,
+  };
 });

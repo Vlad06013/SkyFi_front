@@ -15,7 +15,7 @@ vi.mock('@/api/queue', () => ({
   fetchQueue: vi.fn(),
   addToQueue: vi.fn(),
   removeFromQueue: vi.fn(),
-  reorderPending: vi.fn(),
+  movePending: vi.fn(),
 }));
 
 vi.mock('@/api/search', () => ({
@@ -42,7 +42,7 @@ vi.mock('@/api/devices', () => ({
 const fetchQueueMock = vi.mocked(queueApi.fetchQueue);
 const addToQueueMock = vi.mocked(queueApi.addToQueue);
 const removeFromQueueMock = vi.mocked(queueApi.removeFromQueue);
-const reorderPendingMock = vi.mocked(queueApi.reorderPending);
+const movePendingMock = vi.mocked(queueApi.movePending);
 const fetchSearchMock = vi.mocked(searchApi.fetchSearch);
 const patchPlaybackOptionsMock = vi.mocked(playerApi.patchPlaybackOptions);
 const fetchPlayerStateMock = vi.mocked(playerApi.fetchPlayerState);
@@ -80,7 +80,7 @@ describe('stores/player: очередь', () => {
     fetchQueueMock.mockReset();
     addToQueueMock.mockReset();
     removeFromQueueMock.mockReset();
-    reorderPendingMock.mockReset();
+    movePendingMock.mockReset();
   });
 
   it('ensureQueue: грузит один раз и сортирует по position', async () => {
@@ -138,22 +138,22 @@ describe('stores/player: очередь', () => {
     expect(player.queue.map((item) => item.id)).toEqual([2]);
   });
 
-  it('reorderQueue: шлёт id ожидающих в новом порядке', async () => {
+  it('reorderQueue: переносит один элемент — id и целевая позиция', async () => {
     fetchQueueMock.mockResolvedValue([makeItem(1, 1), makeItem(2, 2), makeItem(3, 3)] as never);
-    reorderPendingMock.mockResolvedValue([makeItem(3, 1), makeItem(1, 2), makeItem(2, 3)] as never);
+    movePendingMock.mockResolvedValue([makeItem(3, 1), makeItem(1, 2), makeItem(2, 3)] as never);
     const player = usePlayerStore();
     await player.ensureQueue();
 
     await player.reorderQueue(0, 2);
 
-    expect(reorderPendingMock).toHaveBeenCalledWith([2, 3, 1]);
+    expect(movePendingMock).toHaveBeenCalledWith(1, 2);
     expect(player.queue.map((item) => item.id)).toEqual([3, 1, 2]);
   });
 
   it('reorderQueue: from === to — запроса нет', async () => {
     const player = usePlayerStore();
     await player.reorderQueue(1, 1);
-    expect(reorderPendingMock).not.toHaveBeenCalled();
+    expect(movePendingMock).not.toHaveBeenCalled();
   });
 
   it('previewNext: первый элемент очереди', async () => {

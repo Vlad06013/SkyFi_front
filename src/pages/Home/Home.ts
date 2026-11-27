@@ -3,6 +3,7 @@ import { usePageRefresh } from '@/composables/usePageRefresh';
 import { storeToRefs } from 'pinia';
 import { usePlayerStore } from '@/stores/player';
 import { useNotificationsStore } from '@/stores/notifications';
+import { useOnlineStore } from '@/stores/online';
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { clipBuffering, clipFrameReady, clipSurface, resyncClipAttachment, setHomeClipHost } from '@/composables/useVideoPlayback';
 import { coverVar, trackCover } from '@/lib/cover';
@@ -15,6 +16,7 @@ export default defineComponent({
   components: { SourceBadge, OfflineBanner },
   setup() {
     const player = usePlayerStore();
+    const online = useOnlineStore();
     const { current, title, artist, progress, progressSmooth, audioLoading, clipActive, clipPlaybackVideo } =
       storeToRefs(player);
     /** Фактическое воспроизведение (не мнение сервера) — для иконки и пламени. */
@@ -25,7 +27,8 @@ export default defineComponent({
     // Волна — отдельный режим с серверной ротацией (api.md §14). Кнопка
     // входа висит, пока плеер не в волне; любое включение трека вне волны
     // снова её показывает (play_source меняется с 'wave').
-    const showJoinWave = computed(() => player.state.play_source !== 'wave');
+    // В офлайне волны нет — кнопка «В волну» не показывается (optimizations.md).
+    const showJoinWave = computed(() => player.state.play_source !== 'wave' && online.isOnline !== false);
     const joinWave = player.joinWave;
 
     const coverSrc = computed(() => {

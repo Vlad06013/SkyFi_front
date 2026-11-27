@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { http } from '@/api/http';
-import { addFavorite, fetchFavorites, removeFavorite, sortFavorites } from '@/api/favorites';
+import { addFavorite, fetchFavorites, moveFavorite, removeFavorite } from '@/api/favorites';
 import type { TrackSnapshot } from '@/types';
 
 vi.mock('@/api/http', () => ({
@@ -56,13 +56,10 @@ describe('api/favorites', () => {
     expect(deleteMock).toHaveBeenCalledWith('favorites', { data: track });
   });
 
-  it('sortFavorites: PATCH favorites/sort с индексами', async () => {
-    const items = [
-      { source_type: 'yandex_music', source_id: 't1', sort: 0 },
-      { source_type: 'yandex_music', source_id: 't2', sort: 1 },
-    ];
-    patchMock.mockResolvedValue({ updated: 2 });
-    await sortFavorites('track', items);
-    expect(patchMock).toHaveBeenCalledWith('favorites/sort', { type: 'track', items });
+  it('moveFavorite: PATCH favorites/sort — перенос одного элемента на позицию', async () => {
+    const item = { source_type: 'yandex_music', source_id: 't2' };
+    patchMock.mockResolvedValue({ updated: 1 });
+    await moveFavorite('track', item, 0);
+    expect(patchMock).toHaveBeenCalledWith('favorites/sort', { type: 'track', item, to_index: 0 });
   });
 });

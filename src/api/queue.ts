@@ -19,7 +19,7 @@ export function removeFromQueue(id: number) {
   return http.delete<QueuePayload>(`player/queue/${id}`);
 }
 
-/** Перестановка id ожидающих элементов в новом порядке (api.md §6, PATCH /player/queue/reorder). */
-export function reorderPending(items: number[]) {
-  return http.patch<QueuePayload>('player/queue/reorder', { items });
+/** Перенос одного ожидающего элемента на позицию: бэк сдвигает только затронутый диапазон (api.md §6, PATCH /player/queue/reorder). */
+export function movePending(itemId: number, toIndex: number) {
+  return http.patch<QueuePayload>('player/queue/reorder', { item: itemId, to_index: toIndex });
 }

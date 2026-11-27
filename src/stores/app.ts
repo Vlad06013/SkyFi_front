@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { useOnlineStore } from '@/stores/online';
 import { useAuthStore } from '@/stores/auth';
 
 export type AppPhase = 'splash' | 'ready';
@@ -11,15 +10,14 @@ export const useAppStore = defineStore('app', () => {
   let bootPromise: Promise<void> | null = null;
 
   /**
-   * Старт приложения: сначала офлайн-чек (до 5 с), потом
-   * сессия. Офлайн — входим по сохранённому профилю без сети
-   * (frontend.md §8), без токена гвард сам уведёт на /login.
+   * Старт приложения: сессия гидрируется сразу из хранилища,
+   * онлайн-стейт решает сокет (realtime стартует в main.ts после
+   * bootstrap), свежесть токена проверяем по первому коннекту.
+   * Без токена гвард сам уведёт на /login.
    */
   async function doBootstrap() {
-    const online = useOnlineStore();
-    await online.check();
     const auth = useAuthStore();
-    await auth.restoreSession({ refresh: online.isOnline === true });
+    await auth.restoreSession({ refresh: false });
     phase.value = 'ready';
   }
 
@@ -29,13 +27,9 @@ export const useAppStore = defineStore('app', () => {
     return bootPromise;
   }
 
-  /** Кнопка «Повторить» на офлайн-заглушке: перепроверка без рестарта. */
+  /** Кнопка «Повторить» на офлайн-заглушке: повтор входа, когда сеть появилась. */
   async function recheck() {
-    const online = useOnlineStore();
-    await online.check();
-    if (online.isOnline) {
-      await useAuthStore().restoreSession({ refresh: true });
-    }
+    await useAuthStore().restoreSession({ refresh: true });
   }
 
   return { phase, bootstrap, recheck };

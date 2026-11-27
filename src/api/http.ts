@@ -4,7 +4,12 @@ import type { ApiResponse } from '@/types';
 import { getSession } from '@/lib/session';
 import { localizeServerMessage } from '@/lib/error-messages';
 
-export type ApiErrorKind = 'auth' | 'validation' | 'not-found' | 'rate-limit' | 'server' | 'network';
+export type ApiErrorKind = 'auth' | 'validation' | 'not-found' | 'rate-limit' | 'server' | 'network' | 'offline';
+
+/** Ошибки kind 'offline' молчат: ни тостов, ни реакций — офлайн и так виден баннером. */
+export function isOfflineError(error: unknown): boolean {
+  return error instanceof ApiError && error.kind === 'offline';
+}
 
 export class ApiError extends Error {
   readonly status: number | null;
@@ -39,6 +44,29 @@ export function onUnauthorized(handler: UnauthorizedHandler): void {
   unauthorizedHandler = handler;
 }
 
+/**
+ * Офлайн-гейт (optimizations.md «Офлайн-гейт»): пока колбэк true, все
+ * запросы режутся до сети с ApiError kind 'offline'. Предикат ставит
+ * стор онлайна — циклического импорта http↔stores нет.
+ */
+let offlineGate: () => boolean = () => false;
+
+export function setOfflineGate(gate: () => boolean): void {
+  offlineGate = gate;
+}
+
+/**
+ * Исходы запросов для стора онлайна: серия сетевых/5xx фейлов при
+ * живом сокете = «сокет онлайн, а HTTP бэка умер» → принудительный
+ * офлайн; успех возвращает онлайн.
+ */
+type NetworkOutcomeHandler = (ok: boolean) => void;
+let networkOutcomeHandler: NetworkOutcomeHandler = () => undefined;
+
+export function setNetworkOutcomeHandler(handler: NetworkOutcomeHandler): void {
+  networkOutcomeHandler = handler;
+}
+
 const instance: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
   timeout: 15_000,
@@ -50,6 +78,7 @@ export function setApiBaseUrl(url: string): void {
 }
 
 instance.interceptors.request.use(async (config) => {
+  if (offlineGate()) throw new ApiError(null, 'offline', 'Нет соединения.');
   const stored = await getSession();
   if (stored?.token) {
     config.headers.Authorization = `Bearer ${stored.token}`;
@@ -88,6 +117,7 @@ function toApiError(error: unknown): ApiError {
 
 instance.interceptors.response.use(
   (response) => {
+    networkOutcomeHandler(true);
     // POST /audio/file отдаёт байты, не конверт { data }.
     if (response.config.responseType === 'arraybuffer' || response.config.responseType === 'blob') {
       return response.data;
@@ -96,7 +126,15 @@ instance.interceptors.response.use(
   },
   (error) => {
     if (axios.isAxiosError(error) && error.code === 'ERR_CANCELED') throw error;
-    const apiError = toApiError(error);
+    // Сетевой/5xx фейл считаем для детектора «сокет жив, HTTP умер»;
+    // любой HTTP-ответ (даже 4xx) — признак живого HTTP: счётчик сброс.
+    const status = axios.isAxiosError(error) ? (error.response?.status ?? null) : null;
+    const networkish = status === null || status >= 500;
+    networkOutcomeHandler(!networkish);
+    // Улетевший в момент разрыва запрос: сетевой фейл при уже
+    // офлайн-флаге мапим в тихий 'offline', чтобы не дублировать тосты.
+    const apiError =
+      networkish && offlineGate() ? new ApiError(null, 'offline', 'Нет соединения.') : toApiError(error);
     // 401 без Authorization в запросе (неверный пароль на входе) —
     // не повод рвать сессию: ошибку разбирает форма.
     if (apiError.status === 401 && error.config?.headers?.Authorization) {

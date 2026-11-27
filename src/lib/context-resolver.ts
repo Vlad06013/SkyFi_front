@@ -9,7 +9,7 @@ import { snapshotKey } from '@/lib/playback-engine';
 import type { AnySnapshot, PlaySource, SnapshotSource, SnapshotType } from '@/types';
 
 /**
- * Resolver контекста воспроизведения (plan-player.md §2/§7): по паре
+ * Resolver контекста воспроизведения: по паре
  * `play_source` + `context_ref` из серверного стейта каждое устройство
  * само материализует список обычными API (они идемпотентны). Содержимое
  * по сокетам не гоняем — только указатель. Пульт без resolver не строит
@@ -45,7 +45,7 @@ export interface ResolvedContext {
 }
 
 /**
- * Opaque context_ref плейлиста (plan-player.md §2): «source_type:source_id».
+ * Opaque context_ref плейлиста: «source_type:source_id».
  * Составной: пульту для `/details` нужна пара источника, одного id мало.
  * source_type из enum без двоеточия — парсим по первому разделителю.
  */
@@ -115,7 +115,7 @@ export async function fetchContextPage(req: ContextRequest, page: number): Promi
  * Полный резолв: грузит страницы, пока current не окажется в списке
  * или лист не кончится. current не найден (протух/убран с другого
  * устройства) — весь загруженный список: движок возьмёт начало
- * (fallback plan-player.md §2). hasMore остаётся на краю загруженного —
+ * (fallback — начало списка). hasMore остаётся на краю загруженного —
  * движок догружает следующую страницу, когда next упирается в край.
  */
 export async function resolveContext(req: ContextRequest, current: AnySnapshot | null): Promise<ResolvedContext> {

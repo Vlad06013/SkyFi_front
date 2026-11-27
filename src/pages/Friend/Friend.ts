@@ -2,6 +2,7 @@ import { computed, defineComponent, ref, watch } from 'vue';
 import { usePageRefresh } from '@/composables/usePageRefresh';
 import { useRoute, useRouter } from 'vue-router';
 import { storeToRefs } from 'pinia';
+import { isOfflineError } from '@/api/http';
 import AppBar from '@/components/AppBar/AppBar.vue';
 import AppConfirm from '@/components/AppConfirm/AppConfirm.vue';
 import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
@@ -13,13 +14,13 @@ import {
   fetchFriendNowPlaying,
   fetchFriendProfile,
   fetchFriendQueue,
-  reorderFriendQueue,
+  moveFriendQueueItem,
 } from '@/api/friends';
 import { coverVar, artistsLine, trackCover } from '@/lib/cover';
 import { resolveUrl } from '@/lib/endpoints';
 import { friendInitial, friendTone } from '@/lib/friends';
 import { PLAY_SOURCE_SINGLE } from '@/lib/play-sources';
-import { moveItem, sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
+import { sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
 import { useFriendsStore } from '@/stores/friends';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
@@ -139,7 +140,7 @@ export default defineComponent({
       return resolveUrl(row.cover_url);
     }
 
-    /** Контекст меню строки чужой очереди (docs/menus.md). */
+    /** Контекст меню строки чужой очереди. */
     function queueMenuContext(row: AnySnapshot): 'friend-queue-track' | 'friend-queue-video' {
       return row.type === 'video' ? 'friend-queue-video' : 'friend-queue-track';
     }
@@ -149,6 +150,7 @@ export default defineComponent({
         queue.value = byPosition(await fetchFriendQueue(userId.value));
         queueLoaded.value = true;
       } catch (cause) {
+        if (isOfflineError(cause)) return;
         toast.show(cause instanceof Error ? cause.message : 'Не удалось загрузить очередь', '', true);
       }
     }
@@ -160,10 +162,12 @@ export default defineComponent({
 
     async function applyReorder(from: number, to: number) {
       if (from === to) return;
-      const reorderedIds = moveItem(queue.value, from, to).map((item) => item.id);
+      const moved = queue.value[from];
+      if (!moved) return;
       try {
-        queue.value = byPosition(await reorderFriendQueue(userId.value, reorderedIds));
+        queue.value = byPosition(await moveFriendQueueItem(userId.value, moved.id, to));
       } catch (cause) {
+        if (isOfflineError(cause)) return;
         toast.show(cause instanceof Error ? cause.message : 'Не удалось изменить порядок', '', true);
       }
     }

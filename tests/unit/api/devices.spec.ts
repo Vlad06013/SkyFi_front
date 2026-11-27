@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { http } from '@/api/http';
-import { activateDevice, fetchDevices, registerDevice, removeDevice, sendHeartbeat } from '@/api/devices';
+import { activateDevice, fetchDevices, registerDevice, removeDevice } from '@/api/devices';
 import type { PlayerDevice } from '@/types';
 
 vi.mock('@/api/http', () => ({
@@ -24,6 +24,7 @@ const device: PlayerDevice = {
   name: 'Pixel 7',
   type: 'phone',
   last_seen_at: '2026-11-20T06:00:00.000000Z',
+  is_online: true,
 };
 
 describe('api/devices', () => {
@@ -65,11 +66,5 @@ describe('api/devices', () => {
     expect(deleteMock).toHaveBeenCalledWith(`player/devices/${UUID}`, {
       data: { origin_device_id: 'uuid-1', command_id: 'cmd-3' },
     });
-  });
-
-  it('sendHeartbeat шлёт origin_device_id (api.md §4)', async () => {
-    postMock.mockResolvedValue({ message: 'ok' });
-    await sendHeartbeat('uuid-1');
-    expect(postMock).toHaveBeenCalledWith('player/devices/heartbeat', { origin_device_id: 'uuid-1' });
   });
 });

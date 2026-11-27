@@ -1,27 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import type { Router } from 'vue-router';
-import { checkHealth } from '@/api/health';
 import { fetchUser } from '@/api/auth';
 import { getSession } from '@/lib/session';
 import { createAppRouter } from '@/router';
 import { useAppStore } from '@/stores/app';
 import { useAuthStore } from '@/stores/auth';
-
-vi.mock('@/api/health', () => {
-  const checkHealth = vi.fn();
-  return {
-    checkHealth,
-    // Поллер ходит через probeHealth — деривируем из того же мока,
-    // чтобы сценарии checkHealth работали без изменений.
-    probeHealth: vi.fn(async (timeoutMs?: number) =>
-      (await checkHealth(timeoutMs))
-        ? { ok: true, durationMs: 1, miss: null, detail: '' }
-        : { ok: false, durationMs: 1, miss: 'unknown', detail: 'mock miss' },
-    ),
-    HEALTH_TIMEOUT_MS: 10_000,
-  };
-});
 
 vi.mock('@/api/auth', () => ({
   login: vi.fn(),
@@ -41,7 +25,6 @@ vi.mock('@/lib/session', () => ({
   clearSession: vi.fn(),
 }));
 
-const checkHealthMock = vi.mocked(checkHealth);
 const fetchUserMock = vi.mocked(fetchUser);
 const getSessionMock = vi.mocked(getSession);
 
@@ -97,24 +80,23 @@ describe('router guard', () => {
     expect(route.path).toBe('/home');
   });
 
-  it('гвард ждёт бутстрэп: офлайн без токена → /login', async () => {
-    checkHealthMock.mockResolvedValue(false);
+  it('гвард ждёт бутстрэп: без токена → /login', async () => {
     getSessionMock.mockResolvedValue(null);
 
     const route = await goto(router, '/');
     expect(route.path).toBe('/login');
-    expect(checkHealthMock).toHaveBeenCalled();
     expect(useAppStore().phase).toBe('ready');
   });
 
-  it('гвард ждёт бутстрэп: онлайн + токен → /home', async () => {
-    checkHealthMock.mockResolvedValue(true);
+  it('гвард ждёт бутстрэп: токен → /home, сессия из хранилища без GET /user', async () => {
     getSessionMock.mockResolvedValue(stored);
     fetchUserMock.mockResolvedValue({ ...stored.user, name: 'Свежий' });
 
     const route = await goto(router, '/');
     expect(route.path).toBe('/home');
     expect(useAuthStore().isAuthed).toBe(true);
-    expect(useAuthStore().user?.name).toBe('Свежий');
+    expect(useAuthStore().user?.name).toBe('Влад');
+    // Свежесть сессии — по первому коннекту сокета, не бутстрэпом.
+    expect(fetchUserMock).not.toHaveBeenCalled();
   });
 });

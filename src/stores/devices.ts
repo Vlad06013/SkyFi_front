@@ -10,9 +10,6 @@ import { useAuthStore } from '@/stores/auth';
 import { useOnlineStore } from '@/stores/online';
 import type { PlayerDevice } from '@/types';
 
-/** Ритм heartbeat: заметно реже троттлинга роута (120/мин, api.md §4). */
-export const HEARTBEAT_INTERVAL_MS = 30_000;
-
 async function resolveDeviceName(): Promise<string> {
   try {
     const info = await Device.getInfo();
@@ -77,27 +74,16 @@ export const useDevicesStore = defineStore('devices', () => {
     devices.value = devices.value.filter((device) => device.device_uuid !== deviceUuid);
   }
 
-  // --- Presence: регистрация + heartbeat
+  // --- Presence: регистрация (онлайн держит сокет, не heartbeat —
+  // optimizations.md «Presence устройств на сокетах»; api.md §4/§17)
 
-  let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   let registerPromise: Promise<boolean> | null = null;
-
-  function startHeartbeat(uuid: string) {
-    stopHeartbeat();
-    heartbeatTimer = setInterval(() => beat(uuid), HEARTBEAT_INTERVAL_MS);
-  }
-
-  function stopHeartbeat() {
-    if (heartbeatTimer) {
-      clearInterval(heartbeatTimer);
-      heartbeatTimer = null;
-    }
-  }
 
   /**
    * Регистрация устройства. Идемпотентна: повторный вызов по тому же
    * uuid на бэке обновляет профиль. Ошибки глушим — presence не критична
-   * для UI. true — устройство зарегистрировано (можно слать heartbeat).
+   * для UI. true — устройство зарегистрировано (uuid известен серверу,
+   * realtime подпишется на device.{uuid}).
    */
   async function registerPresence(): Promise<boolean> {
     registerPromise ??= (async () => {
@@ -118,7 +104,7 @@ export const useDevicesStore = defineStore('devices', () => {
         return true;
       } catch {
         registered.value = false;
-        /* офлайн/бэк недоступен — heartbeat не нужен */
+        /* офлайн/бэк недоступен — регистрация повторится при коннекте */
         return false;
       }
     })().finally(() => {
@@ -136,32 +122,21 @@ export const useDevicesStore = defineStore('devices', () => {
     return registerPresence();
   }
 
-  function stopPresence() {
-    stopHeartbeat();
-  }
-
   /** Выход из сессии: чистим состояние, локальный uuid остаётся в Preferences. */
   function reset() {
     devices.value = [];
     loaded.value = false;
     myDeviceUuid.value = null;
     registered.value = false;
-    stopPresence();
-  }
-
-  function beat(uuid: string) {
-    void devicesApi.sendHeartbeat(uuid).catch((cause: unknown) => {
-      if (!isUnknownDevice(cause)) return;
-      registered.value = false;
-      void registerPresence();
-    });
   }
 
   /**
-   * Привязка к сессии и сети: регистрация и heartbeat живут, пока есть
-   * авторизация и онлайн. В фоне интервал не останавливаем: без отметок
-   * бэк считает устройство офлайн и снимает active_device_id. Уход в фон
-   * шлёт отметку сразу. Возврат на экран регистрирует заново.
+   * Привязка к сессии и сети. Онлайн устройства держит сокет: подписка
+   * realtime на `device.{uuid}` = presence (api.md §17). Регистрация
+   * нужна один раз и после потерь; в фоне интервалов нет — процесс убит,
+   * сокет мёртв, офлайн честный; процесс жив — ConnectionService держит
+   * сокет. Возврат на экран перепроверяет регистрацию (идемпотентный
+   * POST): пока приложение спало, отметка могла не доехать.
    */
   function bindPresence() {
     const auth = useAuthStore();
@@ -170,13 +145,9 @@ export const useDevicesStore = defineStore('devices', () => {
       [() => auth.isAuthed, () => online.isOnline],
       ([authed, isOnline]) => {
         if (authed && isOnline === true) {
-          void registerPresence().then((registered) => {
-            if (registered && myDeviceUuid.value) startHeartbeat(myDeviceUuid.value);
-          });
+          void registerPresence();
         } else if (!authed) {
           reset();
-        } else {
-          stopPresence();
         }
       },
       { immediate: true },
@@ -185,18 +156,9 @@ export const useDevicesStore = defineStore('devices', () => {
     if (!Capacitor.isNativePlatform()) return;
     // Листенер живёт весь жизненный цикл приложения — ссылку не храним.
     void App.addListener('appStateChange', ({ isActive }) => {
-      if (!isActive) {
-        if (useAuthStore().isAuthed && useOnlineStore().isOnline === true && myDeviceUuid.value) {
-          beat(myDeviceUuid.value);
-        }
-        return;
-      }
-      // Presence протухает в фоне, а регистрация при входе этого не чинит.
-      // Повторный POST по тому же uuid идемпотентен.
+      if (!isActive) return;
       if (!useAuthStore().isAuthed || useOnlineStore().isOnline !== true) return;
-      void registerPresence().then((ok) => {
-        if (ok && myDeviceUuid.value) startHeartbeat(myDeviceUuid.value);
-      });
+      void registerPresence();
     });
   }
 
@@ -211,7 +173,6 @@ export const useDevicesStore = defineStore('devices', () => {
     applyConnected,
     applyDisconnected,
     registerPresence,
-    stopPresence,
     reset,
     bindPresence,
   };

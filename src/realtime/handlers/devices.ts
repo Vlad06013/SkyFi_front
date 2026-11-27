@@ -27,7 +27,7 @@ export function handleDeviceChanged(payload: PlaybackDeviceChangedPayload) {
   usePlayerStore().applyActiveDevice(payload.device_uuid);
 }
 
-/** playback.device.disconnected (api.md §17): устройство удалено; было активным — активного больше нет. */
+/** playback.device.disconnected (api.md §17): устройство офлайн (разрыв сокета + грейс) или удалено; было активным — активного больше нет. */
 export function handleDeviceDisconnected(payload: PlaybackDeviceDisconnectedPayload) {
   if (payload?.device_uuid == null) return;
   useDevicesStore().applyDisconnected(payload.device_uuid);

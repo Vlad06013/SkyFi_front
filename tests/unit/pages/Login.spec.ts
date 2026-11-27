@@ -3,7 +3,6 @@ import { createPinia, setActivePinia } from 'pinia';
 import { flushPromises, mount } from '@vue/test-utils';
 import * as authApi from '@/api/auth';
 import * as qrApi from '@/api/qr';
-import { checkHealth } from '@/api/health';
 import { getSession } from '@/lib/session';
 import { ApiError } from '@/api/http';
 import { useAuthStore } from '@/stores/auth';
@@ -37,21 +36,6 @@ vi.mock('@/api/auth', () => ({
   deleteAvatar: vi.fn(),
 }));
 
-vi.mock('@/api/health', () => {
-  const checkHealth = vi.fn();
-  return {
-    checkHealth,
-    // Поллер ходит через probeHealth — деривируем из того же мока,
-    // чтобы сценарии checkHealth работали без изменений.
-    probeHealth: vi.fn(async (timeoutMs?: number) =>
-      (await checkHealth(timeoutMs))
-        ? { ok: true, durationMs: 1, miss: null, detail: '' }
-        : { ok: false, durationMs: 1, miss: 'unknown', detail: 'mock miss' },
-    ),
-    HEALTH_TIMEOUT_MS: 10_000,
-  };
-});
-
 vi.mock('@/api/qr', () => ({
   startQrLogin: vi.fn(),
   fetchQrStatus: vi.fn(),
@@ -69,7 +53,6 @@ const registerMock = vi.mocked(authApi.register);
 const forgotMock = vi.mocked(authApi.forgotPassword);
 const resetMock = vi.mocked(authApi.resetPassword);
 const fetchUserMock = vi.mocked(authApi.fetchUser);
-const checkHealthMock = vi.mocked(checkHealth);
 const getSessionMock = vi.mocked(getSession);
 const startQrMock = vi.mocked(qrApi.startQrLogin);
 const qrStatusMock = vi.mocked(qrApi.fetchQrStatus);
@@ -218,7 +201,6 @@ describe('pages/Login', () => {
     useOnlineStore().isOnline = false;
     await flushPromises();
 
-    checkHealthMock.mockResolvedValue(true);
     getSessionMock.mockResolvedValue(payload);
     fetchUserMock.mockResolvedValue(payload.user);
 

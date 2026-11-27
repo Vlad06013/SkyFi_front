@@ -730,6 +730,12 @@
   cursor: pointer; text-align: left;
 }
 .ctx button:hover { background: var(--color-surface-3); }
+.ctx button.disabled,
+.ctx button:disabled {
+  opacity: .38; cursor: default;
+}
+.ctx button.disabled:hover,
+.ctx button:disabled:hover { background: 0; }
 .ctx button svg { width: 18px; height: 18px; color: var(--color-text-secondary); flex-shrink: 0; }
 .ctx button.liked svg { color: var(--color-like); }
 .ctx button.danger,

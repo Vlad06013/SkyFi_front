@@ -71,8 +71,8 @@ Sanctum Bearer-токен: `Authorization: Bearer <token>`.
 - **item** — элемент смешанных списков (очередь, плейлист,
   избранное): snapshot любого типа.
 - **track** — только аудио; **video** — видео (клипы, фильмы).
-- Источники `source_type`: `yandex_music`, `upload`, `vk`,
-  `skyfi` (свой каталог), `mock` (временный мок видео).
+- Источники `source_type`: `yandex_music`, `upload`,
+  `skyfi` (свой каталог), `dzen`, `youtube`.
 
 ### 1.6. Эхо-поля команд
 
@@ -212,17 +212,32 @@ avatar_url}`. QR-поллинг при confirmed отдаёт полную мо�
 `device_uuid` (постоянный UUID клиента) и дальше адресуется
 только по нему: `{device}` в путях, `origin_device_id` в телах
 команд и `active_device_id` в состоянии плеера — это всегда
-`device_uuid`, int-id устройств на провод не уходит. Presence:
-устройство «живо», пока шлёт heartbeat чаще порога онлайна;
-активное устройство плеера (`active_device_id`) обнуляется,
-если оно перестало отмечаться (планировщик раз в минуту,
-клиенты получают `playback.state.updated` с null и свежей
-`version`). Признака «активности» у самого устройства нет —
+`device_uuid`, int-id устройств на провод не уходит.
+
+Presence — на сокетах: устройство после коннекта подписывается
+на свой приватный канал `device.{uuid}` (см. §17); подписка =
+онлайн (`is_online: true`, бродкаст `playback.device.connected`
+на переходе), разрыв = офлайн после грейса 60 с без
+переподключения (бродкаст `playback.device.disconnected`;
+краткий флап сокета молчит — ни connected, ни disconnected).
+Heartbeat (`POST /devices/heartbeat`) пока работает и тоже
+держит онлайн (`is_online` = живой сокет ИЛИ свежий heartbeat),
+но фронт его выключает — источник истины сокет.
+
+Потеря активного устройства останавливает воспроизведение:
+активное пропало из presence (сокет разорван, грейс 60 с прошёл
+без переподключения) или замолчало дольше порога heartbeat
+(90 с, подстраховка планировщиком раз в минуту) — бэк сам
+ставит стейт в stop (`is_playing: false`, позиция сохраняется),
+обнуляет `active_device_id` и шлёт `playback.state.updated` со
+свежей `version`. Авто-выбора нового активного и
+авто-возобновления нет: play с любого устройства сам делает его
+активным. Признака «активности» у самого устройства нет —
 активное определяется только `active_device_id` состояния.
 
 | Метод/путь | Тело → Ответ |
 |---|---|
-| `GET /` | → `{devices: [{device_uuid, name, type, last_seen_at}]}` (только онлайн; presence-модель) |
+| `GET /` | → `{devices: [{device_uuid, name, type, last_seen_at, is_online}]}` (только онлайн; presence-модель) |
 | `POST /` (30/мин) | `{name, type: phone\|computer\|car\|tv, origin_device_id: uuid, command_id}` → устройство; повторная регистрация по тому же uuid обновляет профиль |
 | `PATCH /{device}/activate` (30/мин) | `{origin_device_id, command_id}` → это устройство — активное (играет); `{device}` в пути — `device_uuid` |
 | `POST /player/devices/heartbeat` (120/мин) | `{origin_device_id: uuid}` → `{message: "ok"}` — продлить presence; неизвестный uuid — 404 |
@@ -284,7 +299,7 @@ status: pending|playing_now|played|skipped, snapshot|null}`.
 | `GET /` | → очередь целиком |
 | `POST /` (60/мин) | snapshot (плоский конверт любого типа) + `origin_device_id?`, `command_id?` → очередь целиком; бродкаст с item `{title, artists}` |
 | `DELETE /{queueItem}` | тело `origin_device_id?`, `command_id?` → очередь; бродкаст item=null |
-| `PATCH /reorder` (60/мин) | `{items: [id...] (перестановка id ожидающих), origin_device_id?, command_id?}` → очередь; бродкаст item=null |
+| `PATCH /reorder` (60/мин) | `{item: id, to_index: n (0-based; за пределами — клампится), origin_device_id?, command_id?}` — перенос одного элемента ожидающих на позицию (бэк сдвигает только затронутый диапазон) → очередь; бродкаст item=null. Нет такого элемента — 404 |
 | `PATCH /{queueItem}/status` (120/мин) | `{status}` — плеер помечает playing_now/played/skipped; бродкаста нет |
 
 ## 7. Аудио-потоки (`/audio`)
@@ -310,8 +325,9 @@ YouTube (Дзен-фолбэк временно отключён в коде), �
 
 | Метод/путь | Тело → Ответ |
 |---|---|
-| `POST /resolve` (60/мин) | track-снапшот → `{video: VideoSnapshot, streams: [{quality, url}], ttl_sec}` — режим клипов: матчинг «трек → видео» на бэке (YouTube; Дзен временно отключён). |
+| `POST /resolve` (60/мин) | track-снапшот → `{video: VideoSnapshot, streams: [{quality, url}], ttl_sec}` — режим клипов: матчинг «трек → видео» на бэке (YouTube; Дзен временно отключён). Результат кешируется маппингом «трек → видео» в базе: повторные резолвы того же трека идут без поиска источника, потоки всегда свежие. |
 | `POST /get-url` (120/мин) | video-снапшот → `{streams, ttl_sec, hls}` — свежие потоки по видео (source-независимый контракт). `hls: null` — HLS-адаптации нет (Дзен всегда, YouTube при деградации ответа). Подробности и схема воспроизведения — ниже. |
+| `POST /bind` (60/мин) | `{track: TrackSnapshot, video: VideoSnapshot}` → `{video}` — ручная привязка видео к треку (video — снапшот из резолва/поиска). Перезаписывает глобальный маппинг «трек → видео»: resolve отдаёт привязанное видео всем пользователям; снятия привязки нет — только перемэтч повторным bind. |
 | `GET /youtube-cookies` | → `{has_cookies: bool, updated_at: string\|null}` — статус привязки персональных cookies YouTube. |
 | `POST /youtube-cookies` (30/мин) | multipart, поле `cookies` (Netscape .txt, «Get cookies.txt LOCALLY» с youtube.com) → 201. Файл хранится зашифрованным и подставляется в YouTube-запросы пользователя (обход «Sign in to confirm you're not a bot»). Добровольно: без него запросы идут без куки (деградация качества/стабильности). Relay-ссылки потоков несут sha256-префикс файла (параметр `ch`) — браузеру заголовок не прикрепить. |
 | `DELETE /youtube-cookies` | → 200 — отвязать файл. |
@@ -410,6 +426,13 @@ YouTube (Дзен-фолбэк временно отключён в коде), �
 
 - `is_favorite` — пометка избранного текущего пользователя
   (всегда bool, только в поиске).
+- Выдача внешних источников (Яндекс, Дзен, YouTube) кешируется
+  на бэке per-user на 10 минут по ключу (источник, строка,
+  страница, лимит): повторные поиски, второе устройство и
+  догрузка страниц контекстом плеера источники не дёргают.
+  `is_favorite` ставится после чтения из кеша — лайки в выдаче
+  всегда свежие. Свои источники (загрузки, плейлисты) не
+  кешируются: новый контент виден в поиске сразу.
 - Порядок в секциях — порядок склейки источников: свои
   (загрузки, плейлисты пользователя) идут первыми, внешние
   результаты — после них.
@@ -429,6 +452,44 @@ YouTube (Дзен-фолбэк временно отключён в коде), �
   200 роликов на запрос): листаем `page`, пока секция не придёт
   пустой. Аудио-источники секцию отдают пустой.
 
+## 9.1. Поиск v2 (`GET /search/v2`, 30/мин)
+
+Один источник на запрос, без фан-аута и склейки (v1 `/search`
+при этом работает без изменений). Фильтры строгие, `all` нет.
+
+Параметры: `q` (2–500), `resource` (обязателен),
+`type` (`audio|video`, шлётся всегда; обязан совпадать
+с семейством ресурса — иначе 422), `section` (необязателен;
+нарезка ответа до одной секции — из кеша, апстрим не
+дёргается), `page` (с 1), `limit` (≤50).
+
+Источники и их секции (значения `resource` = `SnapshotSourceEnum`):
+
+| resource | type | секции | has_more |
+|---|---|---|---|
+| `yandex_music` | audio | `tracks`, `albums`, `artists`, `playlists` + `best` | честный (Яндекс) |
+| `upload` | audio | `tracks` | честный (своя база) |
+| `skyfi` | audio | `playlists` | честный (своя база) |
+| `dzen` | video | `videos` | advisory: терминатор листания — пустая страница |
+| `youtube` | video | `videos` | advisory: потолок глубины 200, терминатор — пустая страница |
+
+Секции «каналы»/«плейлисты из роликов» источники сейчас не
+отдают — в контракте зарезервированы, не наполняются.
+
+Ответ — только секции запрошенного источника (с `section` —
+ровно одна; `best` отдаётся только у Яндекса и только без
+фильтра `section`):
+
+```json
+{ "query": "...", "page": 1, "resource": "yandex_music",
+  "best": {...}|null,
+  "sections": { "tracks": { "items": [...], "total": n, "has_more": b } } }
+```
+
+Items — те же снапшоты с `is_favorite`, что в v1. Кеш общий
+с v1 (per-user, 10 минут, ключ: источник/строка/страница/лимит):
+прогретый v1 источник отвечает v2 без похода в сеть.
+
 ## 10. Избранное (`/favorites`)
 
 Лайк = upsert по тройке `(type, source_type, source_id)`.
@@ -439,7 +500,7 @@ YouTube (Дзен-фолбэк временно отключён в коде), �
 | `POST /` | snapshot → `{message, is_favorite: true}`; запись; повтор — no-op |
 | `DELETE /` | snapshot в теле → удалить; сообщение |
 | `POST /check` | snapshot → `{is_favorite}` |
-| `PATCH /sort` | `{type, items: [{source_type, source_id, sort}]}` — новый порядок вкладки. Только `type: "track"`; `sort` — вес позиции (больше = выше во вкладке), хранится и отдаётся как есть, выдача по убыванию |
+| `PATCH /sort` | `{type, item: {source_type, source_id}, to_index: n (0-based; за пределами — клампится)}` — перенос одного элемента вкладки на позицию (бэк переписывает только затронутый диапазон весов). Только `type: "track"`; `sort` — вес позиции (больше = выше во вкладке), выдача по убыванию. Нет такого элемента — 404 |
 
 ## 11. Плейлисты (`/playlists`)
 
@@ -455,9 +516,9 @@ YouTube (Дзен-фолбэк временно отключён в коде), �
 | `PATCH /` | `{<конверт playlist>, name?, visibility?}` |
 | `DELETE /` | `{<конверт playlist>}` |
 | `PUT /cover` | multipart `cover` + поля `playlist.*` |
-| `POST /items` | `{<конверт playlist>, item: {<snapshot track\|video>}}` → 201 `{playlist, snapshots}` |
+| `POST /items` | `{<конверт playlist>, item: {<snapshot track\|video>}}` → 201 `{playlist, snapshots}`. Дублей нет: тройка уже в составе — 422 |
 | `DELETE /items` | `{<конверт playlist>, index}` |
-| `PATCH /items/reorder` | `{<конверт playlist>, order: [index...]}` |
+| `PATCH /items/reorder` | `{<конверт playlist>, item: {type, source_type, source_id}, to_index: n (0-based; за пределами — клампится)}` — перенос одного элемента на позицию. Нет такого элемента — 404 |
 
 ### Детали сущностей: `POST /details`
 
@@ -488,7 +549,7 @@ YouTube (Дзен-фолбэк временно отключён в коде), �
 | `GET /{user}/now-playing` | → `{is_playing, snapshot\|null}` |
 | `GET /{user}/favorites` | → вкладки избранного друга |
 | `GET /{user}/queue` | → очередь друга (ожидающие) |
-| `PATCH /{user}/queue/reorder` | `{items: [id...]}` |
+| `PATCH /{user}/queue/reorder` | `{item: id, to_index: n (0-based)}` — перенос одного элемента, как в своей очереди; нет такого — 404 |
 | `POST /{user}/queue` (30/мин) | snapshot → добавить другу в очередь (друг получает `friend.queue.item.added`) |
 | `POST /{user}/share` (30/мин) | snapshot → шара другу (`share.sent`) |
 
@@ -595,18 +656,23 @@ handshake `POST /broadcasting/auth` — путь на корне origin, вне
   владелец).
 - `friends.{id}` — канал пользователя для друзей (подписаться
   может только друг; слушается для now-playing/очереди друга).
+- `device.{uuid}` — персональный канал устройства (только
+  владелец, `{uuid}` = `device_uuid`). Подписка на него —
+  привязка сокета к устройству (presence, см. §4): подписаться
+  сразу после коннекта; событий в канал не шлётся, важен сам
+  факт подписки/отписки.
 
 **Ивенты** (имена = `broadcastAs`, payload = `broadcastWith`):
 
 | Ивент | Каналы | Payload | Когда |
 |---|---|---|---|
-| `playback.state.updated` | User.{id}, friends.{id} | `{state, queue, origin_device_id, command_id}` | любая команда плеера, регистрация устройства, обнуление presence; `state`/`queue` — тот же JSON, что `GET /player` |
+| `playback.state.updated` | User.{id}, friends.{id} | `{state, queue, origin_device_id, command_id}` | любая команда плеера, регистрация устройства, стоп при потере активного устройства (presence, см. §4); `state`/`queue` — тот же JSON, что `GET /player` |
 | `playback.queue.updated` | User.{id}, friends.{id} | `{item: {title, artists}\|null, origin_device_id, command_id}` | add (item заполнен — тост «добавлено»), remove/reorder (null) |
 | `playback.wave.updated` | User.{id} | `{origin_device_id, command_id}` | окно волны выросло (холодный старт, догрузка): клиент делает `GET /wave` и заменяет локальную копию, воспроизведение не трогает. Эхо-поля информационные: глушение эха на этот ивент не распространяется — при догрузке от play-хука оба null, и инициатор play тоже обновляет копию |
 | `friend.queue.item.added` | User.{id} очередника | `{added_by: {id, name}, item: {source_id, title, artists}}` | друг добавил в мою очередь |
-| `playback.device.connected` | User.{id} | `{device, origin_device_id}` | регистрация устройства |
+| `playback.device.connected` | User.{id} | `{device, origin_device_id}` | регистрация устройства; переход устройства в онлайн по сокету (presence) |
 | `playback.device.changed` | User.{id} | `{device_uuid, origin_device_id}` | смена активного устройства |
-| `playback.device.disconnected` | User.{id} | `{device_uuid, device_name, origin_device_id, command_id}` | удаление устройства |
+| `playback.device.disconnected` | User.{id} | `{device_uuid, device_name, origin_device_id, command_id}` | удаление устройства; устройство офлайн по сокету (разрыв + грейс 60 с) |
 | `friendship.request.sent` | получатель | дружба целиком `{id, sender{...}, receiver{...}, status}` | заявка |
 | `friendship.request.accepted` | отправитель | то же | принята |
 | `share.sent` | получатель | `{share_id, sender: {id, name}, snapshot}` | шара |

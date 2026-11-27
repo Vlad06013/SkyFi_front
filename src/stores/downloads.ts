@@ -21,7 +21,7 @@ import { openDownload, removeDownload, saveCoverFromUrl, writeDownload } from '@
 import { collectionPercent, savedCollection } from '@/lib/collection-progress';
 import { collectionSearchQuery, searchDownloads, trackSearchQuery } from '@/lib/download-search';
 import { coverFilePath, entityKey, isCollection, linkId, trackFilePath, type CollectionSnapshot } from '@/lib/download-keys';
-import { registerHealthActivity } from '@/lib/health-log';
+import { registerNetActivity } from '@/lib/net-log';
 import { useToastStore } from '@/stores/toast';
 import type { AnySnapshot, TrackSnapshot } from '@/types';
 
@@ -490,9 +490,9 @@ export const useDownloadsStore = defineStore('downloads', () => {
     }
   }
 
-  // Диагностика офлайн-флапа (bugs-player.md): в момент промаха health-зонда
+  // Диагностика офлайн-флапа: в момент промаха health-зонда
   // журнал покажет, шла ли закачка — главный подозреваемый в загрузке бэка.
-  registerHealthActivity('downloads', () => {
+  registerNetActivity('downloads', () => {
     const parts: string[] = [];
     if (bulk.value) parts.push(`скачивание всё ${bulk.value.done}/${bulk.value.total}`);
     const pcts = Object.values(filePct.value);

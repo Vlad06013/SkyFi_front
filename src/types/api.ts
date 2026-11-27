@@ -3,6 +3,7 @@ import type {
   AnySnapshot,
   ArtistSnapshot,
   PlaylistSnapshot,
+  SnapshotSource,
   TrackSnapshot,
   VideoSnapshot,
 } from './snapshots';
@@ -65,6 +66,8 @@ export interface PlayerDevice {
   name: string;
   type: DeviceType;
   last_seen_at: string | null;
+  /** Авторитетный онлайн: живой сокет (presence) или свежий heartbeat (api.md §4). */
+  is_online: boolean;
 }
 
 export interface QueueItem {
@@ -123,6 +126,27 @@ export interface SearchPagePayload {
   artists: SearchSection<WithFavorite<ArtistSnapshot>>;
   playlists: SearchSection<WithFavorite<PlaylistSnapshot>>;
   videos: SearchSection<WithFavorite<VideoSnapshot>>;
+}
+
+/**
+ * Поиск v2 (GET /search/v2, api.md §9.1): один источник, секции — только
+ * его набора. Ключи sections зависят от resource: yandex_music —
+ * tracks/albums/artists/playlists, upload — tracks, skyfi — playlists,
+ * dzen/youtube — videos.
+ */
+export interface SearchSourcePagePayload {
+  query: string;
+  page: number;
+  resource: SnapshotSource;
+  /** Только у yandex_music и только без фильтра section. */
+  best: WithFavorite<AnySnapshot> | null;
+  sections: Partial<{
+    tracks: SearchSection<WithFavorite<TrackSnapshot>>;
+    albums: SearchSection<WithFavorite<AlbumSnapshot>>;
+    artists: SearchSection<WithFavorite<ArtistSnapshot>>;
+    playlists: SearchSection<WithFavorite<PlaylistSnapshot>>;
+    videos: SearchSection<WithFavorite<VideoSnapshot>>;
+  }>;
 }
 
 /** data ответа POST /details (api.md §11): entity + секции; пагинация — по трекам. */

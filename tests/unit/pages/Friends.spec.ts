@@ -28,7 +28,7 @@ vi.mock('@/api/friends', () => ({
   fetchFriendNowPlaying: vi.fn(),
   fetchFriendFavorites: vi.fn(),
   fetchFriendQueue: vi.fn(),
-  reorderFriendQueue: vi.fn(),
+  moveFriendQueueItem: vi.fn(),
   addToFriendQueue: vi.fn(),
   shareWithFriend: vi.fn(),
 }));

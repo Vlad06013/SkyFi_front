@@ -12,6 +12,7 @@ import { useMediaMenu } from '@/composables/useMediaMenu';
 import type { PlaylistDraft } from '@/components/PlaylistForm/PlaylistForm';
 import type { UploadDraft } from '@/components/UploadForm/UploadForm';
 import { sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
+import { isOfflineError } from '@/api/http';
 import { plural } from '@/lib/plural';
 import { openSnapshot } from '@/lib/open-snapshot';
 import { PLAY_SOURCE_FAVORITES, PLAY_SOURCE_SINGLE, PLAY_SOURCE_UPLOADS } from '@/lib/play-sources';
@@ -334,11 +335,17 @@ export default defineComponent({
         cover_url: draft.cover,
         item_count: 0,
       };
-      favorites.add(playlist).catch((error: unknown) => {
-        toast.show(error instanceof Error ? error.message : 'Не удалось сохранить плейлист', '', true);
-      });
+      favorites
+        .add(playlist)
+        .then(() => toast.show(draft.name, 'плейлист создан'))
+        .catch((error: unknown) => {
+          if (isOfflineError(error)) {
+            toast.show('Нет соединения', 'плейлист не создан', true);
+            return;
+          }
+          toast.show(error instanceof Error ? error.message : 'Не удалось сохранить плейлист', '', true);
+        });
       createOpen.value = false;
-      toast.show(draft.name, 'плейлист создан');
     }
 
     function savePlaylist(draft: PlaylistDraft) {

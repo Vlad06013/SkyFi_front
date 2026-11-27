@@ -6,7 +6,7 @@ import { getCachedClipResolve, cacheClipResolve, invalidateClipResolve } from '@
 import { bufferAheadSeconds } from '@/lib/buffer-ranges';
 import { resolveUrl } from '@/lib/endpoints';
 import { hlsDetach, hlsLoad, hlsResume, hlsSetAudioTrack, hlsSetQuality, hlsStatus, hlsSupported, setHlsHooks } from '@/lib/hls-engine';
-import { registerHealthActivity } from '@/lib/health-log';
+import { registerNetActivity } from '@/lib/net-log';
 import { noteExternalTransport, runOwned, runOwnedAsync } from '@/lib/media-keys';
 import { afterMediaUnlock, isAutoplayBlocked, markAutoplayBlocked } from '@/lib/media-unlock';
 import { snapshotKey } from '@/lib/playback-engine';
@@ -214,10 +214,10 @@ setHlsHooks({
   onAudioTracks: (tracks) => usePlayerStore().setClipAudioTracks(tracks),
 });
 
-// Диагностика буфера клипа (bugs-player.md): запас вперёд от плейхеда,
+// Диагностика буфера клипа: запас вперёд от плейхеда,
 // играющая ступень HLS, ретраи/фолбэк — видно в «Настройки → Диагностика
 // сети», что именно стоит за немым «буфер» в момент сталла.
-registerHealthActivity('клип', () => {
+registerNetActivity('клип', () => {
   const store = usePlayerStore();
   if (!store.clipActive) return null;
   const parts: string[] = [];

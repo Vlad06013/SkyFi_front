@@ -1,10 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import * as devicesApi from '@/api/devices';
-import { ApiError } from '@/api/http';
 import * as identity from '@/lib/device';
 import { useAuthStore } from '@/stores/auth';
-import { HEARTBEAT_INTERVAL_MS, useDevicesStore } from '@/stores/devices';
+import { useDevicesStore } from '@/stores/devices';
 import { useOnlineStore } from '@/stores/online';
 import type { PlayerDevice } from '@/types';
 
@@ -13,7 +12,6 @@ vi.mock('@/api/devices', () => ({
   registerDevice: vi.fn(),
   activateDevice: vi.fn(),
   removeDevice: vi.fn(),
-  sendHeartbeat: vi.fn(),
 }));
 
 vi.mock('@/lib/device', () => ({
@@ -36,7 +34,6 @@ vi.mock('@capacitor/app', () => ({
 
 const registerDeviceMock = vi.mocked(devicesApi.registerDevice);
 const fetchDevicesMock = vi.mocked(devicesApi.fetchDevices);
-const sendHeartbeatMock = vi.mocked(devicesApi.sendHeartbeat);
 const ensureDeviceMock = vi.mocked(identity.ensureDevice);
 
 const uuid = (n: number) => `9f1c7a2e-4b3d-4c8a-9e5f-2d6b0a1c4f7${n}`;
@@ -46,6 +43,7 @@ const device = (n: number): PlayerDevice => ({
   name: `dev-${n}`,
   type: 'phone',
   last_seen_at: null,
+  is_online: true,
 });
 
 /** Флаш микротасков под фейковыми таймерами. */
@@ -147,9 +145,8 @@ describe('stores/devices', () => {
       expect(fetchDevicesMock).not.toHaveBeenCalled();
     });
 
-    it('bindPresence: auth+online → регистрация + heartbeat раз в интервал', async () => {
+    it('bindPresence: auth+online → регистрация; heartbeat не шлём (presence на сокете)', async () => {
       registerDeviceMock.mockResolvedValue(device(5));
-      sendHeartbeatMock.mockResolvedValue({ message: 'ok' });
       const auth = useAuthStore();
       const online = useOnlineStore();
       auth.user = { id: 1, name: 'Влад', email: 'v@mail.ru', avatar_url: null };
@@ -160,19 +157,14 @@ describe('stores/devices', () => {
       await flush();
 
       expect(store.myDeviceUuid).toBe('uuid-1');
-      expect(sendHeartbeatMock).not.toHaveBeenCalled();
-
-      await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS);
-      expect(sendHeartbeatMock).toHaveBeenCalledTimes(1);
-      expect(sendHeartbeatMock).toHaveBeenCalledWith('uuid-1');
-
-      await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS);
-      expect(sendHeartbeatMock).toHaveBeenCalledTimes(2);
+      // Онлайн держит подписка realtime на device.{uuid} — сетевых
+      // интервалов нет (optimizations.md «Presence на сокетах»).
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(registerDeviceMock).toHaveBeenCalledTimes(1);
     });
 
-    it('logout → reset: список чистится, heartbeat останавливается', async () => {
+    it('logout → reset: список чистится', async () => {
       registerDeviceMock.mockResolvedValue(device(5));
-      sendHeartbeatMock.mockResolvedValue({ message: 'ok' });
       const auth = useAuthStore();
       const online = useOnlineStore();
       auth.user = { id: 1, name: 'Влад', email: 'v@mail.ru', avatar_url: null };
@@ -187,15 +179,10 @@ describe('stores/devices', () => {
       await flush();
       expect(store.myDeviceUuid).toBeNull();
       expect(store.devices).toHaveLength(0);
-
-      const calls = sendHeartbeatMock.mock.calls.length;
-      await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS * 3);
-      expect(sendHeartbeatMock).toHaveBeenCalledTimes(calls);
     });
 
-    it('heartbeat 404 регистрирует устройство заново', async () => {
+    it('онлайн моргнул: регистрация не повторяется (один POST на uuid)', async () => {
       registerDeviceMock.mockResolvedValue(device(5));
-      sendHeartbeatMock.mockRejectedValue(new ApiError(404, 'not-found', 'Устройство не найдено'));
       const auth = useAuthStore();
       const online = useOnlineStore();
       auth.user = { id: 1, name: 'Влад', email: 'v@mail.ru', avatar_url: null };
@@ -206,10 +193,11 @@ describe('stores/devices', () => {
       await flush();
       expect(registerDeviceMock).toHaveBeenCalledTimes(1);
 
-      await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MS);
+      online.isOnline = false;
+      await flush();
+      online.isOnline = true;
       await flush();
       expect(registerDeviceMock).toHaveBeenCalledTimes(2);
-      expect(store.registered).toBe(true);
     });
   });
 });

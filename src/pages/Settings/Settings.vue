@@ -131,12 +131,13 @@
           <button class="btn btn-ghost sm" type="button" :disabled="!netlog.length" @click="copyNetlog">Копировать</button>
           <button class="btn btn-ghost sm" type="button" :disabled="!netlog.length" @click="clearNetlog">Очистить</button>
         </div>
-        <div v-if="!netlog.length" class="idle netlog-empty">Пока пусто — проверки связи пишутся каждые 10 секунд.</div>
+        <div v-if="!netlog.length" class="idle netlog-empty">Пока пусто — события связи (коннекты и разрывы сокета) пишутся сюда.</div>
         <div v-for="(entry, index) in netlog" :key="index" class="netlog-row">
           <div class="netlog-head">
             <span class="numeric">{{ netlogTime(entry.at) }}</span>
-            <span :class="entry.ok ? 'netlog-ok' : 'netlog-bad'">{{ netlogStatus(entry) }}</span>
-            <span class="numeric">{{ (entry.durationMs / 1000).toFixed(1) }} с</span>
+            <span :class="entry.transition === 'offline' || entry.event === 'force-offline' || entry.event === 'unavailable' || entry.event === 'failed' ? 'netlog-bad' : 'netlog-ok'">
+              {{ netlogStatus(entry) }}
+            </span>
             <span v-if="entry.transition" class="netlog-transition">
               {{ entry.transition === 'offline' ? '→ офлайн' : '→ онлайн' }}
             </span>
