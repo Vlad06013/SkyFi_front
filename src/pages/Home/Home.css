@@ -108,7 +108,9 @@
 .tv-home {
   --tv-tile: 108px;
   flex: 1;
+  height: 100%;
   min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   color: #fff;
@@ -133,12 +135,16 @@
 }
 
 .tv-hero.is-clip {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
   background: transparent;
   align-items: flex-end;
   z-index: 1;
 }
 
-/* Кадр на всю главную, под полкой. Из потока вынут — плитки остаются внизу экрана. */
+/* Окно одно на все ролики: герой, обрезка cover. Свой размер кадра
+   сюда не протекает и полку вниз не толкает. */
 .tv-home.is-clip .tv-clip-host,
 .tv-home.is-clip .tv-clip-poster {
   position: absolute;
@@ -146,13 +152,18 @@
   z-index: 0;
   width: 100%;
   height: 100%;
+  overflow: hidden;
   pointer-events: none;
 }
 
 .tv-clip-host.is-frame { background: #000; }
 .tv-clip-host :deep(.clip-video) {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: cover;
   display: block;
   pointer-events: none;
@@ -333,6 +344,7 @@
   position: relative;
   z-index: 1;
   flex: 0 0 auto;
+  margin-top: auto;
   max-height: 32%;
   min-height: 0;
   overflow: hidden;

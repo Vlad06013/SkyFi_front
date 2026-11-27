@@ -74,10 +74,16 @@
 
 /* Хост под обложкой, пока нет кадра (обложка z-index выше). Thumb обрезает
    по скруглению. Видео-элемент создаётся императивно — стиль через :deep. */
+.mini-player .thumb {
+  position: relative;
+  overflow: hidden;
+}
+
 .mp-clip-host {
   position: absolute;
   inset: 0;
   z-index: 1;
+  overflow: hidden;
 }
 
 .mp-clip-host.is-frame {
@@ -85,6 +91,8 @@
 }
 
 .mp-clip-host :deep(.clip-video) {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;

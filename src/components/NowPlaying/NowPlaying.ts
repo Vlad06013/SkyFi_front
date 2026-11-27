@@ -352,11 +352,19 @@ export default defineComponent({
 
     watch([clipActive, expanded, qualityOpen, audioOpen, layer], wake);
 
+    function focusPlay() {
+      void nextTick(() => {
+        const play = rootEl.value?.querySelector('.transport .fab');
+        if (play instanceof HTMLElement) play.focus();
+      });
+    }
+
     function onIdleKey(event: KeyboardEvent) {
       if (!clipIdle.value || !isPlayerWakeKey(event)) return;
       event.preventDefault();
       event.stopPropagation();
       wake();
+      focusPlay();
     }
 
     watch(clipIdle, (idle) => {
@@ -368,13 +376,13 @@ export default defineComponent({
     onMounted(() => {
       wake();
       document.addEventListener('fullscreenchange', onFullscreenChange);
-      document.addEventListener('keydown', onIdleKey, true);
+      window.addEventListener('keydown', onIdleKey, true);
     });
 
     onBeforeUnmount(() => {
       if (idleTimer) clearTimeout(idleTimer);
       document.removeEventListener('fullscreenchange', onFullscreenChange);
-      document.removeEventListener('keydown', onIdleKey, true);
+      window.removeEventListener('keydown', onIdleKey, true);
     });
 
     const { open, items, top, right, sheet, entity, openMenu, closeMenu, run } = useMediaMenu({
@@ -441,6 +449,7 @@ export default defineComponent({
       stopPlayerBack = null;
       if (!open) return;
       playerDragY.value = 0;
+      focusPlay();
       // Поверх уже открытых шитов: «назад» сначала разбирает плеер.
       stopPlayerBack = pushBackOverlay(() => {
         if (document.fullscreenElement) {

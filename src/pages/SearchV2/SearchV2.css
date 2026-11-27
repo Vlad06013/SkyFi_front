@@ -111,9 +111,16 @@ html[data-layout='car'] .vid-grid {
   gap: 18px 16px;
 }
 
+html[data-layout='tv'] .search-page {
+  box-sizing: border-box;
+  max-width: 100%;
+  padding-inline: 28px;
+  overflow-x: hidden;
+}
+
 html[data-layout='tv'] .vid-grid {
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 20px 18px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px 14px;
 }
 
 html[data-layout='tv'] .search-page :deep(.thumb),

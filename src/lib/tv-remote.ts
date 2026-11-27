@@ -220,6 +220,8 @@ export function bindTvRemote(isActive: () => boolean, player: TvRemotePlayer) {
   function onKey(event: KeyboardEvent) {
     const key = arrowOf(event);
     if (!isActive() || event.repeat || !key || isTyping(event.target)) return;
+    /* Простой прячет кнопки. Вверх/вниз их будит, а не закрывает плеер. */
+    if (player.expanded && document.querySelector('.now-playing.is-clip-idle') && (key === 'ArrowUp' || key === 'ArrowDown')) return;
     const menuRoot = document.querySelector('.clip-quality, .select-menu, .sheet, .ctx');
     const menuOpen = menuRoot instanceof HTMLElement && menuRoot.getBoundingClientRect().height > 0;
     const home = !!document.querySelector('.tv-home');
