@@ -189,6 +189,19 @@ function applyEndpoint(next: EndpointKind): boolean {
   return changed;
 }
 
+let startupPromise: Promise<boolean> | null = null;
+
+/**
+ * Стартовый выбор пары — один на всех. Гвард роутера и main.ts ждут его
+ * до первого запроса: без этого монтирование стартовой страницы обгоняло
+ * ipify, и запросы улетали на WAN-адрес (в dev через прокси не попадали,
+ * https-страница резала их как mixed content).
+ */
+export function endpointReady(): Promise<boolean> {
+  startupPromise ??= resolveEndpoint();
+  return startupPromise;
+}
+
 /**
  * Выбирает пару адресов и ставит её в HTTP-клиент.
  * true — пара сменилась, сокет надо поднять заново.

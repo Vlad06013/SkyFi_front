@@ -17,7 +17,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useAppStore } from '@/stores/app';
 import { useDevicesStore } from '@/stores/devices';
 import { useOnlineStore } from '@/stores/online';
-import { resolveEndpoint } from '@/lib/endpoints';
+import { endpointReady } from '@/lib/endpoints';
 import { hydrateStreamCache } from '@/lib/stream-url-cache';
 import { useDownloadsStore } from '@/stores/downloads';
 import { usePlayerStore } from '@/stores/player';
@@ -63,7 +63,8 @@ app.mount('#app');
 
 const appStore = useAppStore(pinia);
 // До первого запроса: домашний Wi‑Fi не открывает внешний адрес бэка.
-void resolveEndpoint().finally(() => {
+// Гвард роутера ждёт ту же promise (endpointReady) — двойного ipify нет.
+void endpointReady().finally(() => {
   void appStore.bootstrap().finally(async () => {
     // Session-scoped сервисы: presence устройства + сокеты (сокет же — источник онлайн-стейта).
     useDevicesStore(pinia).bindPresence();

@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from '@ionic/vue-router';
 import type { RouteRecordRaw } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { useAppStore } from '@/stores/app';
+import { endpointReady } from '@/lib/endpoints';
 import TabsLayout from '@/layouts/TabsLayout/TabsLayout.vue';
 import Home from '@/pages/Home/Home.vue';
 import SearchV2 from '@/pages/SearchV2/SearchV2.vue';
@@ -59,6 +60,9 @@ export function createAppRouter() {
     // сессии мелькнёт на /login, а залогиненный — споткнётся о гвард.
     const appStore = useAppStore();
     if (appStore.phase !== 'ready') {
+      // Сначала пара адресов (main.ts ждёт её же): запросы страницы,
+      // свежесмонтированной гвардом, не должны уйти на дефолтный WAN.
+      await endpointReady();
       await appStore.bootstrap();
     }
 
