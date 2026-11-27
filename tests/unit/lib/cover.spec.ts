@@ -12,6 +12,13 @@ describe('lib/cover: coverSize', () => {
     );
   });
 
+  it('переписывает music-avatars.music.yandex.net — хост, который шлёт бэк', () => {
+    const url = 'https://music-avatars.music.yandex.net/get-music-content/113160/04620d87.a.4811970-5/200x200';
+    expect(coverSize(url, 1000)).toBe(
+      'https://music-avatars.music.yandex.net/get-music-content/113160/04620d87.a.4811970-5/1000x1000',
+    );
+  });
+
   it('принимает orig и mds-хост', () => {
     expect(coverSize('https://avatars.mds.yandex.net/get-music-content/1/abc/orig', 400)).toBe(
       'https://avatars.mds.yandex.net/get-music-content/1/abc/400x400',

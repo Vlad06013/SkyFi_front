@@ -34,20 +34,19 @@ export function coverVar(source: SnapshotSource): string {
   return 'var(--gradient-cover-2)';
 }
 
-/** Хосты CDN Яндекса: размер обложки — последний сегмент URL. */
-const YANDEX_COVER_HOSTS = new Set(['avatars.yandex.net', 'avatars.mds.yandex.net']);
-
 /**
  * Размер обложки Яндекса — последний сегмент пути (200x200, 600x600, orig…).
- * Бэк шлёт 200x200 (в большом плеере мыло), а CDN отдаёт любой размер по
- * тому же пути (проверено curl'ом 2026-11-27) — переписываем под контекст.
- * Чужие URL и нестандартные пути не трогаем.
+ * Бэк шлёт 200x200, CDN отдаёт любой размер по тому же пути. Хост не один:
+ * сейчас это music-avatars.music.yandex.net, раньше avatars.yandex.net и
+ * avatars.mds.yandex.net. Берём любой *.yandex.net с сегментом размера
+ * (проверено curl'ом 2026-11-27: 1000x1000 на music-avatars — JPEG ~300 КБ).
+ * Чужие хосты и пути без размера не трогаем.
  */
 export function coverSize(url: string, size: number): string {
   if (!url) return url;
   try {
     const parsed = new URL(url);
-    if (!YANDEX_COVER_HOSTS.has(parsed.hostname)) return url;
+    if (!parsed.hostname.endsWith('.yandex.net')) return url;
     if (!/\/(\d+x\d+|orig)$/.test(parsed.pathname)) return url;
     parsed.pathname = parsed.pathname.replace(/\/(\d+x\d+|orig)$/, `/${size}x${size}`);
     return parsed.toString();
