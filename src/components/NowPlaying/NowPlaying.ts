@@ -1,6 +1,5 @@
 import { computed, defineComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { useScrubPreview, scrubStyle } from '@/composables/useScrubPreview';
-import { scheduleHideScrub, scrubSeconds, showScrub } from '@/lib/scrub-preview';
+import { scheduleHideScrub, scrubSeconds, scrubStyle, showScrub } from '@/lib/scrub-preview';
 import { storeToRefs } from 'pinia';
 import MediaOverlays from '@/components/MediaOverlays/MediaOverlays.vue';
 import SeekBar from '@/components/SeekBar/SeekBar.vue';
@@ -183,13 +182,29 @@ export default defineComponent({
     const swipeThreshold = 88;
     const sortDrag = ref<ListSortState | null>(null);
     const rootEl = ref<HTMLElement | null>(null);
-    const scrubVideo = ref<HTMLVideoElement | null>(null);
+    const scrubCanvas = ref<HTMLCanvasElement | null>(null);
     const scrubBox = ref({ left: '50%', top: '40%' });
-    useScrubPreview(scrubVideo);
+    let scrubPaint = 0;
+    let scrubBlocked = false;
 
     function placeScrub(ratio: number) {
       const bar = rootEl.value?.querySelector('.seek-bar');
       scrubBox.value = scrubStyle(ratio, bar instanceof HTMLElement ? bar : null, rootEl.value);
+    }
+
+    /** Кадр уже играет в основном ролике — копируем его, второй поток не поднимаем. */
+    function paintScrub() {
+      if (scrubBlocked) return;
+      const video = getClipVideoElement();
+      const canvas = scrubCanvas.value;
+      if (!video || !canvas || video.readyState < 2) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      try {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      } catch {
+        scrubBlocked = true;
+      }
     }
 
     function onScrub(ratio: number) {
@@ -199,12 +214,17 @@ export default defineComponent({
     }
 
     function onScrubEnd() {
-      scheduleHideScrub(500);
+      scheduleHideScrub(400);
     }
 
     watch(scrubSeconds, (seconds) => {
       if (seconds == null || !durationSeconds.value) return;
       placeScrub(seconds / durationSeconds.value);
+      if (scrubPaint) return;
+      scrubPaint = requestAnimationFrame(() => {
+        scrubPaint = 0;
+        paintScrub();
+      });
     });
     const qualityOpen = ref(false);
     const audioOpen = ref(false);
@@ -605,7 +625,7 @@ export default defineComponent({
       queueDragY,
       sortDrag,
       rootEl,
-      scrubVideo,
+      scrubCanvas,
       scrubSeconds,
       scrubBox,
       onScrub,

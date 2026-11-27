@@ -14,13 +14,12 @@
     <div v-if="clipActive" class="clip-scrim" />
     <div v-if="clipActive" ref="clipHostEl" class="clip-host" />
     <div
-      v-if="clipActive"
-      class="scrub-pop"
-      :class="{ 'is-on': scrubSeconds != null }"
+      v-if="clipActive && scrubSeconds != null"
+      class="scrub-pop is-on"
       :style="scrubBox"
     >
-      <video ref="scrubVideo" muted playsinline preload="none" />
-      <span v-if="scrubSeconds != null">{{ formatTime(scrubSeconds) }}</span>
+      <canvas ref="scrubCanvas" width="168" height="94" />
+      <span>{{ formatTime(scrubSeconds) }}</span>
     </div>
     <div v-if="clipActive && clipBuffering" class="clip-spinner" aria-hidden="true">
       <svg class="spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">

@@ -59,11 +59,6 @@ export default defineComponent({
       });
     }
 
-    function onPointerMove(event: PointerEvent) {
-      if (dragging) return;
-      emitScrub(event, event.currentTarget as HTMLElement);
-    }
-
     function onPointerLeave() {
       if (dragging) return;
       emit('scrubend');
@@ -144,6 +139,6 @@ export default defineComponent({
 
     onBeforeUnmount(stopHold);
 
-    return { onPointerDown, onPointerMove, onPointerLeave, onKeydown };
+    return { onPointerDown, onPointerLeave, onKeydown };
   },
 });

@@ -294,9 +294,9 @@
   opacity: 1;
 }
 
-.scrub-pop video {
-  width: 100%;
-  aspect-ratio: 16 / 9;
+.scrub-pop canvas {
+  width: 168px;
+  height: 94px;
   object-fit: cover;
   display: block;
   border-radius: 8px;

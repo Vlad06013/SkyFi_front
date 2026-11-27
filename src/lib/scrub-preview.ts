@@ -26,3 +26,14 @@ export function hideScrub() {
   hideTimer = null;
   scrubSeconds.value = null;
 }
+
+export function scrubStyle(ratio: number, bar: HTMLElement | null, root: HTMLElement | null) {
+  if (!bar || !root) return { left: '50%', top: '40%' };
+  const box = bar.getBoundingClientRect();
+  const host = root.getBoundingClientRect();
+  const half = 84;
+  const raw = box.left - host.left + Math.min(1, Math.max(0, ratio)) * box.width;
+  const left = Math.min(host.width - half - 12, Math.max(half + 12, raw));
+  const top = box.top - host.top - 10;
+  return { left: `${left}px`, top: `${top}px` };
+}

@@ -8,7 +8,6 @@
     :aria-valuenow="Math.round(modelValue)"
     :aria-label="label"
     @pointerdown="onPointerDown"
-    @pointermove="onPointerMove"
     @pointerleave="onPointerLeave"
     @keydown="onKeydown"
   >
