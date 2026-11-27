@@ -16,13 +16,14 @@ import type { AnySnapshot, SearchPagePayload } from '@/types';
 
 vi.mock('@/api/details', () => ({ fetchEntityDetails: vi.fn() }));
 vi.mock('@/api/favorites', () => ({ fetchFavorites: vi.fn() }));
-vi.mock('@/api/search', () => ({ fetchSearch: vi.fn() }));
+vi.mock('@/api/search', () => ({ fetchSearch: vi.fn(), fetchSearchV2: vi.fn() }));
 vi.mock('@/api/uploads', () => ({ fetchUploads: vi.fn() }));
 vi.mock('@/api/wave', () => ({ fetchWaveWindow: vi.fn() }));
 
 const fetchEntityDetailsMock = vi.mocked(detailsApi.fetchEntityDetails);
 const fetchFavoritesMock = vi.mocked(favoritesApi.fetchFavorites);
 const fetchSearchMock = vi.mocked(searchApi.fetchSearch);
+const fetchSearchV2Mock = vi.mocked(searchApi.fetchSearchV2);
 const fetchUploadsMock = vi.mocked(uploadsApi.fetchUploads);
 const fetchWaveWindowMock = vi.mocked(waveApi.fetchWaveWindow);
 
@@ -142,6 +143,34 @@ describe('context-resolver: fetchContextPage', () => {
 
     expect(page?.items).toHaveLength(1);
     expect(page?.items[0].type).toBe('video');
+  });
+
+  it('search v2: ref с источником ходит в /search/v2 и берёт свою секцию', async () => {
+    const tracks = [track('s1')];
+    fetchSearchV2Mock.mockResolvedValue({
+      query: 'sum 41',
+      page: 1,
+      resource: 'yandex_music',
+      best: null,
+      sections: { tracks: { items: tracks, total: 1, has_more: false } },
+    } as never);
+
+    const page = await fetchContextPage(
+      { playSource: 'search', contextRef: 'v2/yandex_music/tracks/sum 41', currentType: 'track' },
+      1,
+    );
+
+    expect(fetchSearchMock).not.toHaveBeenCalled();
+    expect(fetchSearchV2Mock).toHaveBeenCalledWith({
+      q: 'sum 41',
+      resource: 'yandex_music',
+      type: 'audio',
+      section: 'tracks',
+      limit: CONTEXT_PAGE_LIMIT,
+      page: 1,
+    });
+    expect(page?.items).toBe(tracks);
+    expect(page?.hasMore).toBe(true);
   });
 
   it('search: пустой ref — пустой контекст без запроса', async () => {

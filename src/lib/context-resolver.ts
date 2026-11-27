@@ -2,7 +2,8 @@ import { fetchEntityDetails } from '@/api/details';
 import { getActivePinia } from 'pinia';
 import { useDownloadsStore } from '@/stores/downloads';
 import { fetchFavorites } from '@/api/favorites';
-import { fetchSearch } from '@/api/search';
+import { fetchSearch, fetchSearchV2 } from '@/api/search';
+import { parseSearchContextRef, searchMediaType } from '@/lib/search-source';
 import { fetchUploads } from '@/api/uploads';
 import { fetchWaveWindow } from '@/api/wave';
 import { snapshotKey } from '@/lib/playback-engine';
@@ -86,9 +87,23 @@ export async function fetchContextPage(req: ContextRequest, page: number): Promi
     }
     case 'search': {
       if (!req.contextRef) return { items: [], hasMore: false };
-      const payload = await fetchSearch({ q: req.contextRef, limit: CONTEXT_PAGE_LIMIT, page });
-      const section = req.currentType === 'video' ? payload.videos : payload.tracks;
-      return { items: section.items, hasMore: section.items.length > 0 };
+      const parsed = parseSearchContextRef(req.contextRef);
+      if (!parsed) {
+        const payload = await fetchSearch({ q: req.contextRef, limit: CONTEXT_PAGE_LIMIT, page });
+        const section = req.currentType === 'video' ? payload.videos : payload.tracks;
+        return { items: section.items, hasMore: section.items.length > 0 };
+      }
+      const payload = await fetchSearchV2({
+        q: parsed.query,
+        resource: parsed.resource,
+        type: searchMediaType(parsed.resource),
+        ...(parsed.section ? { section: parsed.section } : {}),
+        limit: CONTEXT_PAGE_LIMIT,
+        page,
+      });
+      const key = parsed.section ?? (req.currentType === 'video' ? 'videos' : 'tracks');
+      const items = payload.sections[key]?.items ?? [];
+      return { items, hasMore: items.length > 0 };
     }
     case 'playlist': {
       const ref = parsePlaylistContextRef(req.contextRef);

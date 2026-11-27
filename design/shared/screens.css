@@ -15,6 +15,7 @@ body.screen-page {
   margin-bottom: 10px;
 }
 .page-head .back:hover { color: var(--color-accent); }
+.page-head .sec-note a { color: var(--color-accent); text-decoration: none; }
 
 .gallery {
   display: flex;
@@ -215,3 +216,148 @@ body.screen-page {
 .phone.screen .chip { padding: 6px 11px; font-size: 12px; }
 .phone.screen .sec-label { margin: 12px 2px 6px; }
 .phone.screen .h-scroll .media-card { width: 92px; }
+
+/* Поиск v2: источник над строкой, секции — только если их несколько. */
+.phone.screen .res-row { margin: 2px 0 8px; }
+.phone.screen .res-row .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px 6px 8px;
+}
+.phone.screen .res-row .chip svg { width: 14px; height: 14px; flex-shrink: 0; }
+.phone.screen .sec-row { margin: 0 0 10px; gap: 3px; }
+.phone.screen .sec-row .chip { padding: 5px 6px; font-size: 11px; }
+
+/* Варианты ряда ресурсов. Секции под ними — прежние пилюли. */
+.phone.screen .src-tabs {
+  display: flex;
+  margin: 0 0 8px;
+}
+.phone.screen .src-tab {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 0 7px;
+  color: var(--color-text-secondary);
+  position: relative;
+}
+.phone.screen .src-tab svg { width: 16px; height: 16px; }
+.phone.screen .src-tab span {
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+}
+.phone.screen .src-tab.on { color: var(--color-text-primary); }
+.phone.screen .src-tab.on svg { color: var(--color-accent); }
+.phone.screen .src-tab.on::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--color-accent);
+  transform: translateX(-50%);
+}
+
+.phone.screen .src-rail {
+  display: flex;
+  justify-content: space-between;
+  margin: 0 0 8px;
+}
+.phone.screen .src-ico {
+  width: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-text-secondary);
+}
+.phone.screen .src-ico .bubble {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-surface-2);
+  display: grid;
+  place-items: center;
+}
+.phone.screen .src-ico svg { width: 16px; height: 16px; }
+.phone.screen .src-ico .nm {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.phone.screen .src-ico.on { color: var(--color-accent-ink); }
+.phone.screen .src-ico.on .bubble { background: var(--color-accent); }
+.phone.screen .src-ico.on .nm { color: var(--color-accent); font-weight: 600; }
+
+.phone.screen .src-seg {
+  display: flex;
+  background: var(--color-surface-2);
+  border-radius: 14px;
+  padding: 3px;
+  margin: 2px 4px 10px;
+  gap: 2px;
+}
+.phone.screen .src-seg i {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 40px;
+  border-radius: 11px;
+  color: var(--color-text-secondary);
+  font-size: 9px;
+  font-weight: 600;
+  font-style: normal;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.phone.screen .src-seg svg { width: 13px; height: 13px; }
+.phone.screen .src-seg i.on {
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+}
+
+.phone.screen .src-tiles {
+  display: flex;
+  gap: 6px;
+  margin: 2px 2px 10px;
+}
+.phone.screen .src-tile {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 1px 6px;
+  border-radius: 12px;
+  background: var(--color-surface-2);
+  color: var(--color-text-secondary);
+}
+.phone.screen .src-tile svg { width: 16px; height: 16px; }
+.phone.screen .src-tile span {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  white-space: nowrap;
+}
+.phone.screen .src-tile.on {
+  background: rgba(30, 215, 96, 0.14);
+  color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}

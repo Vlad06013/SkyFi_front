@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { http } from '@/api/http';
-import { fetchSearch } from '@/api/search';
+import { fetchSearch, fetchSearchV2 } from '@/api/search';
 
 vi.mock('@/api/http', () => ({
   http: {
@@ -25,5 +25,13 @@ describe('api/search', () => {
     getMock.mockResolvedValue(null as never);
     await fetchSearch({ q: 'би-2' });
     expect(getMock).toHaveBeenCalledWith('search', { params: { q: 'би-2' } });
+  });
+
+  it('v2 шлёт resource, type и section на /search/v2', async () => {
+    getMock.mockResolvedValue(null as never);
+    await fetchSearchV2({ q: 'sum 41', resource: 'youtube', type: 'video', section: 'videos', page: 1, limit: 20 });
+    expect(getMock).toHaveBeenCalledWith('search/v2', {
+      params: { q: 'sum 41', resource: 'youtube', type: 'video', section: 'videos', page: 1, limit: 20 },
+    });
   });
 });

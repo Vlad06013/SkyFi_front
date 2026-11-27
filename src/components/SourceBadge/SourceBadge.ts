@@ -6,9 +6,11 @@ export default defineComponent({
   name: 'SourceBadge',
   props: {
     source: { type: String as PropType<SnapshotSource>, required: true },
+    /** Подпись поверх sourceTitle: в ряду поиска у файла написано «Загрузки». */
+    caption: { type: String, default: '' },
   },
   setup(props) {
-    const label = computed(() => sourceTitle(props.source));
+    const label = computed(() => props.caption || sourceTitle(props.source));
 
     return { label };
   },

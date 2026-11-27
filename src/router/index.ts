@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useAppStore } from '@/stores/app';
 import TabsLayout from '@/layouts/TabsLayout/TabsLayout.vue';
 import Home from '@/pages/Home/Home.vue';
-import Search from '@/pages/Search/Search.vue';
+import SearchV2 from '@/pages/SearchV2/SearchV2.vue';
 import Library from '@/pages/Library/Library.vue';
 import Friends from '@/pages/Friends/Friends.vue';
 import Friend from '@/pages/Friend/Friend.vue';
@@ -35,7 +35,7 @@ const routes: RouteRecordRaw[] = [
     children: [
       { path: '', redirect: '/home' },
       { path: 'home', name: 'home', component: Home },
-      { path: 'search', name: 'search', component: Search },
+      { path: 'search', name: 'search', component: SearchV2 },
       { path: 'library', name: 'library', component: Library },
       { path: 'friends', name: 'friends', component: Friends },
       { path: 'friends/:id', name: 'friend', component: Friend },

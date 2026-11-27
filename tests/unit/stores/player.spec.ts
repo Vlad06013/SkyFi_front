@@ -20,6 +20,7 @@ vi.mock('@/api/queue', () => ({
 
 vi.mock('@/api/search', () => ({
   fetchSearch: vi.fn(),
+  fetchSearchV2: vi.fn(),
 }));
 
 vi.mock('@/api/player', () => ({
