@@ -6,6 +6,7 @@ import { computed, ref, watch } from 'vue';
 import { fetchAppUpdate } from '@/api/app-updates';
 import { isOfflineError } from '@/api/http';
 import { BUNDLE_VERSION, shellSemver } from '@/lib/bundle-version';
+import { openExternalUrl } from '@/lib/external-url';
 import { useAuthStore } from '@/stores/auth';
 import { useOnlineStore } from '@/stores/online';
 import { useToastStore } from '@/stores/toast';
@@ -45,14 +46,21 @@ export const useAppUpdateStore = defineStore('app-update', () => {
 
   const idle = computed(() => {
     if (downloading.value) return `загрузка ${Math.round(progress.value)}%`;
-    if (pending.value) return pending.value.version;
+    if (pending.value) {
+      return pending.value.kind === 'apk' ? `APK ${pending.value.version}` : pending.value.version;
+    }
     return BUNDLE_VERSION;
   });
 
   const promptTitle = computed(() => {
-    const version = pending.value?.version;
-    if (!version) return 'Обновление';
-    return mandatory.value ? `Нужно обновление ${version}` : `Обновить до ${version}?`;
+    const update = pending.value;
+    if (!update) return 'Обновление';
+    if (update.kind === 'apk') {
+      return update.mandatory
+        ? `Нужно обновление приложения ${update.version}`
+        : `Обновить приложение до ${update.version}?`;
+    }
+    return update.mandatory ? `Нужно обновление ${update.version}` : `Обновить до ${update.version}?`;
   });
 
   const promptMessage = computed(() => {
@@ -141,9 +149,23 @@ export const useAppUpdateStore = defineStore('app-update', () => {
     }
   }
 
+  /** APK ставит система: ссылку забирает браузер, дальше штатный
+   *  установщик. Подпись пакета сверяет сам Android, поэтому sha256
+   *  здесь не проверяем. Факт установки не отслеживаем — если оболочка
+   *  осталась старой, оффер повторится при следующей проверке. */
+  function installApk(update: AppUpdatePayload) {
+    openExternalUrl(update.url);
+    promptOpen.value = false;
+    useToastStore().show('Скачивание APK', 'После загрузки открой файл и подтверди обновление');
+  }
+
   async function accept() {
     const update = pending.value;
     if (!update || downloading.value) return;
+    if (update.kind === 'apk') {
+      installApk(update);
+      return;
+    }
     if (!bundleId.value) {
       const ok = await download(update);
       if (!ok) return;

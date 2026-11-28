@@ -1,14 +1,21 @@
-/** data ответа GET /app-updates/check; null — обновления нет
- *  (клиент актуален или оболочка старше shell_min_version). */
+/** Вид обновления: веб-бандл (OTA) или нативная оболочка (APK). */
+export type AppUpdateKind = 'bundle' | 'apk';
+
+/** data ответа GET /app-updates/check; null — обновления нет.
+ * kind: apk — новая нативная оболочка (клиент открывает url вне
+ * WebView, APK качает браузер, ставит системный установщик);
+ * bundle — OTA-бандл веб-части (@capgo/capacitor-updater). */
 export interface AppUpdatePayload {
-  /** Версия бандла semver. */
+  /** Вид оффера: оболочка (APK) или OTA-бандл веб-части. */
+  kind: AppUpdateKind;
+  /** Версия релиза semver (оболочки или бандла — по kind). */
   version: string;
-  /** Подписанная ссылка на ZIP (без токена, живёт 60 мин). */
+  /** Подписанная ссылка на скачивание (без токена, живёт 60 мин). */
   url: string;
-  /** SHA-256 архива (hex) — сверяет плагин после скачивания. */
+  /** SHA-256 файла (hex) — бандл сверяет плагин после скачивания. */
   sha256: string;
   size_bytes: number;
-  /** Обязательное: клиент блокирует работу до установки. */
+  /** Обязательное: бандл блокирует работу до установки; APK — диалог без «Позже». */
   mandatory: boolean;
   notes: string | null;
 }

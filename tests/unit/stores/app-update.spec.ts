@@ -32,13 +32,28 @@ vi.mock('@/api/app-updates', () => ({
   fetchAppUpdate: vi.fn(),
 }));
 
+const external = vi.hoisted(() => ({
+  openExternalUrl: vi.fn(),
+}));
+
+vi.mock('@/lib/external-url', () => ({
+  openExternalUrl: external.openExternalUrl,
+}));
+
 const update = (mandatory: boolean): AppUpdatePayload => ({
+  kind: 'bundle',
   version: '1.1.0',
   url: 'https://example.test/app-updates/download/1?signature=x',
   sha256: 'abc',
   size_bytes: 1000,
   mandatory,
   notes: 'починили плеер',
+});
+
+const apkUpdate = (mandatory: boolean): AppUpdatePayload => ({
+  ...update(mandatory),
+  kind: 'apk',
+  version: '1.2.0',
 });
 
 describe('app update', () => {
@@ -52,6 +67,7 @@ describe('app update', () => {
     nativeApp.getInfo.mockReset();
     nativeApp.getInfo.mockImplementation(async () => ({ version: '1.0' }));
     vi.mocked(fetchAppUpdate).mockReset();
+    external.openExternalUrl.mockReset();
   });
 
   it('шлёт версию бандла и оболочку X.Y.Z', async () => {
@@ -112,5 +128,44 @@ describe('app update', () => {
     await pending;
     expect(fetchAppUpdate).toHaveBeenCalledWith(BUNDLE_VERSION, '1.0.0');
     vi.useRealTimers();
+  });
+
+  it('оффер без kind считается бандлом (старый бэк)', async () => {
+    updater.download.mockResolvedValue({ id: 'bundle-3' });
+    // Бэк до контракта kind не слал; тип уже новый, поэтому ответ собираем без поля.
+    const { kind: _dropped, ...legacy } = update(false);
+    vi.mocked(fetchAppUpdate).mockResolvedValue(legacy as AppUpdatePayload);
+    const store = useAppUpdateStore();
+    await store.check();
+    await store.accept();
+    expect(updater.download).toHaveBeenCalled();
+    expect(external.openExternalUrl).not.toHaveBeenCalled();
+  });
+
+  it('оффер оболочки уходит в браузер и не трогает updater', async () => {
+    vi.mocked(fetchAppUpdate).mockResolvedValue(apkUpdate(false));
+    const store = useAppUpdateStore();
+    await store.check();
+    expect(store.promptOpen).toBe(true);
+    expect(store.promptTitle).toBe('Обновить приложение до 1.2.0?');
+    expect(store.idle).toBe('APK 1.2.0');
+    await store.accept();
+    expect(external.openExternalUrl).toHaveBeenCalledWith(apkUpdate(false).url);
+    expect(updater.download).not.toHaveBeenCalled();
+    expect(updater.set).not.toHaveBeenCalled();
+    expect(store.promptOpen).toBe(false);
+    expect(useToastStore().toast?.title).toBe('Скачивание APK');
+  });
+
+  it('обязательную оболочку нельзя закрыть, «Обновить» уводит в браузер', async () => {
+    vi.mocked(fetchAppUpdate).mockResolvedValue(apkUpdate(true));
+    const store = useAppUpdateStore();
+    await store.check();
+    expect(store.promptTitle).toBe('Нужно обновление приложения 1.2.0');
+    store.dismiss();
+    expect(store.promptOpen).toBe(true);
+    await store.accept();
+    expect(external.openExternalUrl).toHaveBeenCalled();
+    expect(store.promptOpen).toBe(false);
   });
 });
