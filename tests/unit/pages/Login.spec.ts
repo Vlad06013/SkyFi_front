@@ -80,6 +80,18 @@ describe('pages/Login', () => {
     routerMocks.query = {};
   });
 
+  it('глазик переключает видимость пароля', async () => {
+    const wrapper = mountLogin();
+    const input = wrapper.find('input[autocomplete="current-password"]');
+    expect(input.attributes('type')).toBe('password');
+
+    await wrapper.find('.field-eye').trigger('click');
+    expect(wrapper.find('input[autocomplete="current-password"]').attributes('type')).toBe('text');
+
+    await wrapper.find('.field-eye').trigger('click');
+    expect(wrapper.find('input[autocomplete="current-password"]').attributes('type')).toBe('password');
+  });
+
   it('вход: шлёт поля формы и редиректит на /home', async () => {
     loginMock.mockResolvedValue(payload);
     const wrapper = mountLogin();

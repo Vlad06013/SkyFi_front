@@ -801,7 +801,27 @@ export const usePlayerStore = defineStore('player', () => {
       state.value.play_source === playbackSource;
     if (!sameTrack) finishWaveListen();
     cancelPendingSeek();
+    // Хвост очереди: бэк двигает статусы (pending → playing_now, прежний →
+    // played) только между элементами очереди. Уход в другой источник
+    // оставлял последний элемент playing_now навсегда — дочищаем сами.
+    const consumedQueueId = (() => {
+      const id = snapshotId(snapshot);
+      return id ? (queue.value.find((item) => item.snapshot?.source_id === id)?.id ?? null) : null;
+    })();
     dropFromQueue(snapshotId(snapshot));
+    if (playbackSource === 'queue') {
+      // Локальные офлайн-добавки (id < 0) на сервере не живут — их не чистим.
+      if (consumedQueueId != null && consumedQueueId > 0) lastQueuePlayId = consumedQueueId;
+    } else if (lastQueuePlayId != null) {
+      const staleId = lastQueuePlayId;
+      lastQueuePlayId = null;
+      void queueApi
+        .removeFromQueue(staleId)
+        .then((items) => {
+          queue.value = sortQueue(items);
+        })
+        .catch(() => undefined);
+    }
     const contextRef = playContextRef(playbackSource, opts.contextRef);
     if (opts.contextItems) {
       contextItems.value = opts.contextItems;
@@ -1473,6 +1493,10 @@ export const usePlayerStore = defineStore('player', () => {
   const offlineQueueAdds: AnySnapshot[] = [];
   let nextOfflineQueueId = -1;
 
+  /** Серверный id очередного элемента, играющего сейчас (playing_now): при уходе
+   *  из очереди в другой источник его надо дочистить (см. playSnapshot). */
+  let lastQueuePlayId: number | null = null;
+
   function dropOfflineQueueAdd(snapshot: AnySnapshot | null | undefined) {
     if (!snapshot) return;
     const index = offlineQueueAdds.findIndex((item) => snapshotKey(item) === snapshotKey(snapshot));
@@ -1954,6 +1978,7 @@ export const usePlayerStore = defineStore('player', () => {
     queue.value = [];
     queueLoaded.value = false;
     offlineQueueAdds.length = 0;
+    lastQueuePlayId = null;
     contextItems.value = [];
     contextKeyLoaded = null;
     contextHasMore = false;

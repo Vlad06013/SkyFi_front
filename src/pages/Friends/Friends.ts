@@ -44,11 +44,21 @@ export default defineComponent({
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
     /**
-     * Вид строки выдачи. Направление PENDING-заявки бэк не кодирует —
-     * берём из загруженных списков стора: без них безопасный фолбэк —
-     * «исходящая» (отмена), а не «Добавить» с гарантированным 422.
+     * Вид строки выдачи. Выдача — снапшот на момент поиска: заявку могли
+     * принять/отменить уже после (сокет правит списки стора), поэтому живой
+     * стор важнее сохранённого статуса — иначе строка вечно висела
+     * «заявка отправлена» до перезагрузки страницы. Направление PENDING-заявки
+     * бэк не кодирует: без списков стора безопасный фолбэк — «исходящая»
+     * (отмена), а не «Добавить» с гарантированным 422.
      */
     function statusKind(item: UserSearchItem): FoundKind {
+      // Живой стор (сокет двигает списки) приоритетнее снапшота выдачи:
+      // принятую после поиска заявку строка иначе вечно рисовала
+      // «заявка отправлена» до перезагрузки страницы. Вне списков стора
+      // верим выдаче — она могла быть свежее обзора.
+      if (friendsStore.friends.some((entry) => entry.user.id === item.user_id)) return 'friends';
+      if (friendsStore.incoming.some((entry) => entry.user.id === item.user_id)) return 'incoming';
+      if (friendsStore.outgoing.some((entry) => entry.user.id === item.user_id)) return 'outgoing';
       const kind = baseKind(item);
       if (kind !== 'pending') return kind;
       return friendsStore.incoming.some((entry) => entry.user.id === item.user_id) ? 'incoming' : 'outgoing';

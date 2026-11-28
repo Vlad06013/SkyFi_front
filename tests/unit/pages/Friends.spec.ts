@@ -196,4 +196,17 @@ describe('pages/Friends', () => {
     expect(katya.text()).toContain('заявка отправлена');
     expect(katya.find('.btn').text()).toBe('Отменить');
   });
+
+  it('заявку приняли по сокету: строка поиска сама становится «Друзья», без перезагрузки', async () => {
+    const wrapper = await typeAndSearch('а');
+    expect(rowByName(wrapper, 'Катя').text()).toContain('заявка отправлена');
+
+    // Сокет friendship.request.accepted: стор переносит outgoing → friends.
+    useFriendsStore().applyRequestAccepted(makeFriendship(10, 1, 2));
+    await flushPromises();
+
+    const katya = rowByName(wrapper, 'Катя');
+    expect(katya.text()).toContain('Друзья');
+    expect(katya.text()).not.toContain('заявка отправлена');
+  });
 });

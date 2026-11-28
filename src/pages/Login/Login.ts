@@ -26,6 +26,9 @@ export default defineComponent({
     const email = ref('');
     const password = ref('');
     const passwordConfirmation = ref('');
+    /** «Глазик» — показ пароля в полях ввода. */
+    const showPassword = ref(false);
+    const showPasswordConfirmation = ref(false);
     const code = ref('');
     /** Email, на который ушёл код сброса — нужен в теле reset-password. */
     const resetEmail = ref('');
@@ -155,6 +158,8 @@ export default defineComponent({
       email,
       password,
       passwordConfirmation,
+      showPassword,
+      showPasswordConfirmation,
       code,
       resetEmail,
       pending,

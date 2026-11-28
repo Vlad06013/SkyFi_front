@@ -181,6 +181,25 @@
   color: var(--color-text-primary);
 }
 
+/* «Глазик» показа пароля (логин/регистрация/сброс). */
+.field-eye {
+  display: flex;
+  flex-shrink: 0;
+  padding: 2px;
+  margin-right: -4px;
+  border-radius: 50%;
+  color: var(--color-text-faint);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .field-eye:hover {
+    color: var(--color-text-primary);
+  }
+}
+
 /* Chrome/Android вебвью красят автофилл своим фоном поверх страницы —
    перебиваем цветом поля (inset-тень рисуется поверх их подсветки). */
 .field input:-webkit-autofill,

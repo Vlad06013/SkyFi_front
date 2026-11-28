@@ -10,7 +10,19 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 
 const CHANNEL_ID = 'skyfi-social';
 let permissionAsked = false;
-let nextNotificationId = 1;
+let idSeq = 0;
+
+/**
+ * id обязан быть уникальным МЕЖДУ запусками процесса: счётчик с нуля
+ * повторял id ещё висящего в шторке уведомления, и Android молча заменял
+ * его без звука и баннера — «пришло ровно один раз». Отметка времени
+ * (в пределах Int32) + короткий счётчик на случай двух событий в одну
+ * миллисекунду.
+ */
+function freshNotificationId(): number {
+  idSeq = (idSeq + 1) % 100;
+  return (Date.now() + idSeq) % 2_147_483_000;
+}
 
 /** Разовая настройка на нативе: канал со звуком + запрос разрешения (Android 13+). */
 export function initSocialNotifications(): void {
@@ -44,7 +56,7 @@ function inBackground(): boolean {
 export function notifySocial(title: string, body: string): void {
   if (Capacitor.isNativePlatform() && inBackground()) {
     void LocalNotifications.schedule({
-      notifications: [{ id: nextNotificationId++, title, body, channelId: CHANNEL_ID }],
+      notifications: [{ id: freshNotificationId(), title, body, channelId: CHANNEL_ID }],
     }).catch(() => undefined);
     return;
   }

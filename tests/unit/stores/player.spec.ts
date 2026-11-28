@@ -2119,3 +2119,84 @@ describe('stores/player: офлайн-очередь (баг 24)', () => {
     expect(addToQueueMock).not.toHaveBeenCalled();
   });
 });
+
+describe('stores/player: хвост очереди при уходе в контекст', () => {
+  const me: PlayerDevice = {
+    device_uuid: 'uuid-1',
+    name: 'Мой телефон',
+    type: 'phone',
+    last_seen_at: null,
+  };
+  const trackB: TrackSnapshot = { ...track, source_id: 't2', title: 'очередной' };
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    const auth = useAuthStore();
+    auth.user = { id: 1 } as never;
+    auth.token = 't';
+    useOnlineStore().isOnline = true;
+    useDevicesStore().myDeviceUuid = 'uuid-1';
+    fetchQueueMock.mockResolvedValue([] as never);
+    playSnapshotMock.mockResolvedValue({ state: null, queue: [] } as never);
+    removeFromQueueMock.mockResolvedValue([] as never);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('последний playing_now удаляется с сервера, когда игра переходит на контекстный трек', async () => {
+    const player = usePlayerStore();
+    player.applyServerState(
+      {
+        state: {
+          ...player.state,
+          current_snapshot: track,
+          is_playing: true,
+          active_device_id: 'uuid-1',
+          devices: [me],
+        },
+        queue: [makeItem(5, 1, trackB)],
+      } as never,
+      { force: true },
+    );
+
+    // Очередной трек играет: локально потреблён, на сервере — playing_now.
+    await player.playSnapshot(trackB, 'queue');
+    expect(player.queue).toHaveLength(0);
+    expect(removeFromQueueMock).not.toHaveBeenCalled();
+
+    // Ушли из очереди в контекст: хвост дочищаем сами.
+    await player.playSnapshot(track, 'favorites');
+    expect(removeFromQueueMock).toHaveBeenCalledTimes(1);
+    expect(removeFromQueueMock).toHaveBeenCalledWith(5);
+  });
+
+  it('переход между элементами очереди серверные статусы не трогает', async () => {
+    const trackC: TrackSnapshot = { ...track, source_id: 't3', title: 'второй очередной' };
+    const player = usePlayerStore();
+    player.applyServerState(
+      {
+        state: {
+          ...player.state,
+          current_snapshot: track,
+          is_playing: true,
+          active_device_id: 'uuid-1',
+          devices: [me],
+        },
+        queue: [makeItem(5, 1, trackB), makeItem(6, 2, trackC)],
+      } as never,
+      { force: true },
+    );
+
+    await player.playSnapshot(trackB, 'queue');
+    await player.playSnapshot(trackC, 'queue');
+    expect(removeFromQueueMock).not.toHaveBeenCalled();
+
+    // А вот уход из очереди чистит последний (id 6).
+    await player.playSnapshot(track, 'favorites');
+    expect(removeFromQueueMock).toHaveBeenCalledTimes(1);
+    expect(removeFromQueueMock).toHaveBeenCalledWith(6);
+  });
+});

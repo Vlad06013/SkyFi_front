@@ -31,7 +31,23 @@
         <div v-if="fieldMessage('email')" class="field-err">{{ fieldMessage('email') }}</div>
         <label>Пароль</label>
         <div class="field" :class="{ 'is-error': fieldMessage('password') }">
-          <input v-model="password" type="password" autocomplete="current-password" placeholder="••••••••" />
+          <input v-model="password" :type="showPassword ? 'text' : 'password'" autocomplete="current-password" placeholder="••••••••" />
+          <button
+            class="field-eye"
+            type="button"
+            :aria-label="showPassword ? 'скрыть пароль' : 'показать пароль'"
+            @click="showPassword = !showPassword"
+          >
+            <template v-if="!showPassword"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg></template>
+            <template v-else><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 4l16 16" />
+              <path d="M9.9 5.9A9.4 9.4 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-3.1 3.9M6.1 8.1A16 16 0 0 0 2.5 12S6 18.5 12 18.5a9.3 9.3 0 0 0 3.9-.9" />
+              <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+            </svg></template>
+          </button>
         </div>
         <div v-if="fieldMessage('password')" class="field-err">{{ fieldMessage('password') }}</div>
         <button class="btn btn-primary" type="submit" :disabled="pending || isOffline" style="width:100%;justify-content:center;margin-top:8px">
@@ -65,12 +81,44 @@
         <div v-if="fieldMessage('email')" class="field-err">{{ fieldMessage('email') }}</div>
         <label>Пароль</label>
         <div class="field" :class="{ 'is-error': fieldMessage('password') }">
-          <input v-model="password" type="password" autocomplete="new-password" placeholder="минимум 8" />
+          <input v-model="password" :type="showPassword ? 'text' : 'password'" autocomplete="new-password" placeholder="минимум 8" />
+          <button
+            class="field-eye"
+            type="button"
+            :aria-label="showPassword ? 'скрыть пароль' : 'показать пароль'"
+            @click="showPassword = !showPassword"
+          >
+            <template v-if="!showPassword"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg></template>
+            <template v-else><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 4l16 16" />
+              <path d="M9.9 5.9A9.4 9.4 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-3.1 3.9M6.1 8.1A16 16 0 0 0 2.5 12S6 18.5 12 18.5a9.3 9.3 0 0 0 3.9-.9" />
+              <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+            </svg></template>
+          </button>
         </div>
         <div v-if="fieldMessage('password')" class="field-err">{{ fieldMessage('password') }}</div>
         <label>Ещё раз</label>
         <div class="field" :class="{ 'is-error': fieldMessage('password_confirmation') }">
-          <input v-model="passwordConfirmation" type="password" autocomplete="new-password" placeholder="••••••••" />
+          <input v-model="passwordConfirmation" :type="showPasswordConfirmation ? 'text' : 'password'" autocomplete="new-password" placeholder="••••••••" />
+          <button
+            class="field-eye"
+            type="button"
+            :aria-label="showPasswordConfirmation ? 'скрыть пароль' : 'показать пароль'"
+            @click="showPasswordConfirmation = !showPasswordConfirmation"
+          >
+            <template v-if="!showPasswordConfirmation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg></template>
+            <template v-else><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 4l16 16" />
+              <path d="M9.9 5.9A9.4 9.4 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-3.1 3.9M6.1 8.1A16 16 0 0 0 2.5 12S6 18.5 12 18.5a9.3 9.3 0 0 0 3.9-.9" />
+              <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+            </svg></template>
+          </button>
         </div>
         <div v-if="fieldMessage('password_confirmation')" class="field-err">{{ fieldMessage('password_confirmation') }}</div>
         <button class="btn btn-primary" type="submit" :disabled="pending || isOffline" style="width:100%;justify-content:center;margin-top:8px">
@@ -104,12 +152,44 @@
         <div v-if="fieldMessage('code')" class="field-err">{{ fieldMessage('code') }}</div>
         <label>Новый пароль</label>
         <div class="field" :class="{ 'is-error': fieldMessage('password') }">
-          <input v-model="password" type="password" autocomplete="new-password" placeholder="минимум 8" />
+          <input v-model="password" :type="showPassword ? 'text' : 'password'" autocomplete="new-password" placeholder="минимум 8" />
+          <button
+            class="field-eye"
+            type="button"
+            :aria-label="showPassword ? 'скрыть пароль' : 'показать пароль'"
+            @click="showPassword = !showPassword"
+          >
+            <template v-if="!showPassword"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg></template>
+            <template v-else><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 4l16 16" />
+              <path d="M9.9 5.9A9.4 9.4 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-3.1 3.9M6.1 8.1A16 16 0 0 0 2.5 12S6 18.5 12 18.5a9.3 9.3 0 0 0 3.9-.9" />
+              <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+            </svg></template>
+          </button>
         </div>
         <div v-if="fieldMessage('password')" class="field-err">{{ fieldMessage('password') }}</div>
         <label>Ещё раз</label>
         <div class="field" :class="{ 'is-error': fieldMessage('password_confirmation') }">
-          <input v-model="passwordConfirmation" type="password" autocomplete="new-password" placeholder="••••••••" />
+          <input v-model="passwordConfirmation" :type="showPasswordConfirmation ? 'text' : 'password'" autocomplete="new-password" placeholder="••••••••" />
+          <button
+            class="field-eye"
+            type="button"
+            :aria-label="showPasswordConfirmation ? 'скрыть пароль' : 'показать пароль'"
+            @click="showPasswordConfirmation = !showPasswordConfirmation"
+          >
+            <template v-if="!showPasswordConfirmation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg></template>
+            <template v-else><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 4l16 16" />
+              <path d="M9.9 5.9A9.4 9.4 0 0 1 12 5.5c6 0 9.5 6.5 9.5 6.5a17 17 0 0 1-3.1 3.9M6.1 8.1A16 16 0 0 0 2.5 12S6 18.5 12 18.5a9.3 9.3 0 0 0 3.9-.9" />
+              <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+            </svg></template>
+          </button>
         </div>
         <div v-if="fieldMessage('password_confirmation')" class="field-err">{{ fieldMessage('password_confirmation') }}</div>
         <button class="btn btn-primary" type="submit" :disabled="pending || isOffline" style="width:100%;justify-content:center;margin-top:8px">
