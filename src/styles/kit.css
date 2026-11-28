@@ -33,6 +33,8 @@
   border: 1px solid var(--color-border); cursor: pointer;
 }
 .icon-btn:hover { background: var(--color-surface-3); }
+.icon-btn:disabled { opacity: .38; cursor: default; }
+.icon-btn:disabled:hover { background: transparent; }
 .icon-btn.liked { color: var(--color-like); }
 .icon-btn.ok { color: var(--color-accent); }
 .icon-btn.bad { color: var(--color-danger); }
@@ -213,11 +215,15 @@
   background: none; border: 0; color: var(--color-text-secondary); cursor: pointer; padding: 6px;
   display: inline-flex; transition: color .12s ease, transform .12s ease;
 }
-.p-controls .plain:hover { color: var(--color-text-primary); }
+/* :hover только для мыши: на тачах он залипает после тапа, и кнопки
+   next/prev оставались зелёными до следующего касания (баг 23). */
+@media (hover: hover) {
+  .p-controls .plain:hover { color: var(--color-text-primary); }
+  .p-controls > .plain:hover { color: var(--color-accent-strong); }
+}
 .p-controls .plain:active { transform: scale(0.9); }
 .p-controls .plain.is-on { color: var(--color-accent); }
 .p-controls > .plain { color: var(--color-text-primary); }
-.p-controls > .plain:hover { color: var(--color-accent-strong); }
 .p-controls > .plain:active { color: var(--color-accent); }
 .p-controls > .plain svg { width: 30px; height: 30px; display: block; }
 .ctrl { width: 24px; height: 24px; color: var(--color-text-secondary); }
@@ -419,6 +425,7 @@
   flex-shrink: 0;
 }
 .pic-plus.sm { width: 52px; height: 52px; }
+.pic-plus.is-disabled { opacity: .38; }
 .pic-plus .pic,
 .pic-plus > .avatar {
   width: 100%; height: 100%;
@@ -844,6 +851,7 @@
   border-bottom: 1px solid var(--color-border);
 }
 .set-row:last-child { border-bottom: 0; }
+.set-row.is-disabled { opacity: .38; }
 .set-row .ico, .vol-row .ico {
   width: 36px; height: 36px; border-radius: 10px;
   background: var(--color-surface-2); color: var(--color-text-primary);

@@ -217,6 +217,14 @@ export const usePlayerStore = defineStore('player', () => {
     toast.show('Нет соединения с сервером', 'команда не выполнена — повторите', true);
   }
 
+  /** Бэк недостижим (обрыв/таймаут/5xx) — не путать с отказом (4xx): скачанное переживает это локально. */
+  function isServerUnreachable(cause: unknown): boolean {
+    return (
+      cause instanceof ApiError &&
+      (cause.kind === 'network' || cause.kind === 'offline' || cause.kind === 'server')
+    );
+  }
+
   async function resync() {
     if (offlinePlayback()) return;
     try {
@@ -297,10 +305,15 @@ export const usePlayerStore = defineStore('player', () => {
       }
       // Само-реактивация посреди воспроизведения: серверная позиция в ответе
       // — последний репорт (до 10 с отстаёт), force-подмена отматывала бы
-      // играющий элемент. Факт воспроизведения остаётся локальным.
+      // играющий элемент. Факт воспроизведения остаётся локальным. То же для
+      // офлайн-сессии: старт скачанного мог ещё не заиграть (audioPlaying
+      // false), но локальный трек уже выбран и подменять его нельзя (баг 14).
       const mine = useDevicesStore().myDeviceUuid;
-      if (mine != null && deviceUuid === mine && audioPlaying.value) applyServerStateMerged(payload);
-      else applyServerState(payload, { force: true });
+      if (mine != null && deviceUuid === mine && (audioPlaying.value || offlineSession)) {
+        applyServerStateMerged(payload);
+      } else {
+        applyServerState(payload, { force: true });
+      }
       return true;
     } catch (cause) {
       applyActiveDevice(prevActive);
@@ -815,16 +828,15 @@ export const usePlayerStore = defineStore('player', () => {
     playAbort?.abort();
     const controller = new AbortController();
     playAbort = controller;
-    // «Играть будет это устройство»: без онлайн-активного активируемся сами.
-    if (!isActiveDevice.value) {
-      await ensureActiveForPlayback();
-      if (token !== playToken) return;
-    }
+    // Скачанный трек звучит из локального файла: старт не ждёт сервер,
+    // а обрыв сети его не откатывает (баг 14) — координацию догоняем ниже.
+    const localSound = offlinePlayable(snapshot);
     // Оптимистичный старт: на LTE ответ /play едет секунды, а тап уже выбрал
     // трек. Применяем его сразу (движки параллельно идут за потоком — звук
     // стартует раньше), при ошибке откатываемся. Пульт не оптимизируем: его
-    // resync/активация выше переписали бы стейт до ответа дважды.
-    const optimistic = isActiveDevice.value;
+    // resync/активация ниже переписали бы стейт до ответа дважды. Скачанное
+    // стартует всегда и ДО активации: ждать мёртвый бэк нельзя.
+    const optimistic = isActiveDevice.value || localSound;
     const prevState = state.value;
     if (optimistic) {
       state.value = {
@@ -835,6 +847,15 @@ export const usePlayerStore = defineStore('player', () => {
         play_source: playbackSource,
       };
       anchorPosition();
+    }
+    // Пока синхронизация скачанного летит, локальный транспорт — правда:
+    // resync/само-активация сливают стейт по владению, а не подменяют его
+    // серверным (механика бага 10), иначе force-подмена вернула бы старый трек.
+    if (localSound) offlineSession = true;
+    // «Играть будет это устройство»: без онлайн-активного активируемся сами.
+    if (!isActiveDevice.value) {
+      await ensureActiveForPlayback();
+      if (token !== playToken) return;
     }
     // /play стартует трек с 0 и на сервере: housekeeping-broadcast'ы будут
     // нести 0 — позиция наша, слияние по владению, не подмена.
@@ -851,6 +872,9 @@ export const usePlayerStore = defineStore('player', () => {
       if (token !== playToken) return;
       if (!payload) {
         lastPositionPushSeconds = prevPush;
+        // Скачанное уже звучит из файла: незарегистрированное устройство
+        // (та же мёртвая сеть) — не повод откатывать трек и тостить.
+        if (localSound) return;
         if (optimistic) {
           state.value = prevState;
           anchorPosition();
@@ -858,11 +882,22 @@ export const usePlayerStore = defineStore('player', () => {
         toastUnregistered();
         return;
       }
+      // Скачанное: транспорт уже локальный и позиция ушла вперёд от нуля —
+      // ответ сливаем по владению (координация с сервера), не подменяем.
+      // Сервер команду принял — офлайн-сессии больше нет.
+      if (localSound) {
+        offlineSession = false;
+        applyServerStateMerged(payload);
+        return;
+      }
       applyServerState(payload, { force: true });
     } catch (cause) {
       // Отменён следующим тапом или уже неактуален — не ошибка, молча выходим.
       if (token !== playToken || controller.signal.aborted) return;
       lastPositionPushSeconds = prevPush;
+      // Мёртвый бэк не откатывает скачанный трек: он играет из файла,
+      // а офлайн-сессия сохранит его при reconnect-resync (баги 10/14).
+      if (localSound && isServerUnreachable(cause)) return;
       if (optimistic) {
         state.value = prevState;
         anchorPosition();
@@ -1018,6 +1053,11 @@ export const usePlayerStore = defineStore('player', () => {
       );
       if (!payload) {
         lastPositionPushSeconds = prevPush;
+        // Скачанное переживает мёртвый бэк локально (та же логика, что в playSnapshot).
+        if (state.value.current_snapshot && offlinePlayable(state.value.current_snapshot)) {
+          offlineSession = true;
+          return;
+        }
         state.value = {
           ...state.value,
           is_playing: wasPlaying,
@@ -1029,6 +1069,14 @@ export const usePlayerStore = defineStore('player', () => {
       applyServerState(payload, { force: true });
     } catch (cause) {
       lastPositionPushSeconds = prevPush;
+      if (
+        state.value.current_snapshot &&
+        offlinePlayable(state.value.current_snapshot) &&
+        isServerUnreachable(cause)
+      ) {
+        offlineSession = true;
+        return;
+      }
       state.value = {
         ...state.value,
         is_playing: wasPlaying,
@@ -1355,8 +1403,27 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
-  /** Добавление в конец очереди. true — сервер принял. */
+  /** Добавление в конец очереди. true — принято (сервером или локально в офлайне). */
   async function enqueueSnapshot(snapshot: AnySnapshot): Promise<boolean> {
+    // Офлайн (баг 24): пункт «В очередь» доступен для скачанного — кладём
+    // локальный pending-элемент (offlineNext берёт очередь первой), на
+    // коннекте дошлём на сервер (syncQueueAfterConnect).
+    if (offlinePlayback()) {
+      const position = queue.value.reduce((max, item) => Math.max(max, item.position), 0) + 1;
+      queue.value = sortQueue([
+        ...queue.value,
+        {
+          id: nextOfflineQueueId--,
+          player_state_id: state.value.id,
+          added_by_user_id: null,
+          position,
+          status: 'pending',
+          snapshot,
+        },
+      ]);
+      offlineQueueAdds.push(snapshot);
+      return true;
+    }
     try {
       queue.value = sortQueue(await queueApi.addToQueue(snapshot));
       return true;
@@ -1367,6 +1434,14 @@ export const usePlayerStore = defineStore('player', () => {
   }
 
   async function removeQueueItem(id: number) {
+    // Офлайн: локальные добавки убираем локально (серверные в офлайне не трогаем).
+    if (offlinePlayback()) {
+      const item = queue.value.find((entry) => entry.id === id);
+      if (!item || item.id > 0) return;
+      queue.value = queue.value.filter((entry) => entry.id !== id);
+      dropOfflineQueueAdd(item.snapshot);
+      return;
+    }
     try {
       queue.value = sortQueue(await queueApi.removeFromQueue(id));
     } catch (cause) {
@@ -1390,8 +1465,43 @@ export const usePlayerStore = defineStore('player', () => {
     return snapshot && 'source_id' in snapshot ? snapshot.source_id : null;
   }
 
+  /**
+   * Офлайн-добавки в очередь (баг 24): снапшоты локальных pending-элементов
+   * (отрицательные id), ждущие досыла на сервер. Играть офлайн их можно и
+   * так — offlineNext берёт очередь первой; буфер нужен только для синка.
+   */
+  const offlineQueueAdds: AnySnapshot[] = [];
+  let nextOfflineQueueId = -1;
+
+  function dropOfflineQueueAdd(snapshot: AnySnapshot | null | undefined) {
+    if (!snapshot) return;
+    const index = offlineQueueAdds.findIndex((item) => snapshotKey(item) === snapshotKey(snapshot));
+    if (index !== -1) offlineQueueAdds.splice(index, 1);
+  }
+
+  /**
+   * Очередь после коннекта: дошиваем офлайн-добавки, потом рефетч.
+   * Сыгранные/убранные офлайн из буфера уже выпали (dropFromQueue),
+   * на сервер они не возвращаются.
+   */
+  async function syncQueueAfterConnect() {
+    const pending = offlineQueueAdds.splice(0);
+    for (const snapshot of pending) {
+      try {
+        await queueApi.addToQueue(snapshot);
+      } catch {
+        /* недошедшая добавка не критична — очередь всё равно рефетчится */
+      }
+    }
+    await refreshQueue();
+  }
+
   function dropFromQueue(sourceId: string | null) {
     if (!sourceId) return;
+    // Сыгранный/выбранный трек выпадает и из буфера офлайн-добавок:
+    // на сервер уходят только ещё ждущие в очереди.
+    const buffered = offlineQueueAdds.findIndex((item) => item.source_id === sourceId);
+    if (buffered !== -1) offlineQueueAdds.splice(buffered, 1);
     if (queue.value.some((item) => item.snapshot?.source_id === sourceId)) {
       queue.value = queue.value.filter((item) => item.snapshot?.source_id !== sourceId);
     }
@@ -1595,6 +1705,11 @@ export const usePlayerStore = defineStore('player', () => {
       // Позиция на бэк не доехала: метка «наша позиция у сервера» неверна,
       // иначе следующий housekeeping-ивент снялся бы как чужой seek.
       lastPositionPushSeconds = prevPush;
+      // Скачанное мотается локально и без бэка: офлайн-сессия, без тоста (баг 14).
+      if (state.value.current_snapshot && offlinePlayable(state.value.current_snapshot) && isServerUnreachable(cause)) {
+        offlineSession = true;
+        return;
+      }
       toastError(cause, 'Не удалось перемотать');
     });
   }
@@ -1838,6 +1953,7 @@ export const usePlayerStore = defineStore('player', () => {
     anchorPosition();
     queue.value = [];
     queueLoaded.value = false;
+    offlineQueueAdds.length = 0;
     contextItems.value = [];
     contextKeyLoaded = null;
     contextHasMore = false;
@@ -1906,7 +2022,7 @@ export const usePlayerStore = defineStore('player', () => {
         if (authed) {
           startPositionTicker();
           unbindReconnect ??= onRealtimeReconnect(() => {
-            void refreshQueue();
+            void syncQueueAfterConnect();
             void resync();
           });
           const userId = auth.user?.id;
@@ -1915,7 +2031,7 @@ export const usePlayerStore = defineStore('player', () => {
             if (!useAuthStore().isAuthed) return;
             persistReady = true;
             if (online !== true) return;
-            void refreshQueue();
+            void syncQueueAfterConnect();
             void resync();
           })();
         } else {

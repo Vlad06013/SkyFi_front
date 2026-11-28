@@ -13,6 +13,7 @@ import { clipBuffering, clipFrameReady, clipSurface, getClipVideoElement, setCli
 import { useSnapshotLike } from '@/composables/useSnapshotLike';
 import { aheadRanges } from '@/lib/buffer-ranges';
 import { coverVar, artistsLine, trackCover } from '@/lib/cover';
+import { isLocalPlaybackUrl } from '@/lib/download-files';
 import { resolveUrl } from '@/lib/endpoints';
 import { sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
 import { entityFromSnapshot } from '@/lib/media-menu';
@@ -261,6 +262,15 @@ export default defineComponent({
     let bufferedTimer: ReturnType<typeof setInterval> | null = null;
     function pollBuffered() {
       const el = clipActive.value ? getClipVideoElement() : getAudioElement();
+      // Локальный файл (скачанное) буферизуется с диска мгновенно: полоса
+      // буфера на нём — шум, «подгрузка» ни о чём не говорит (баг 22).
+      if (!clipActive.value && el && isLocalPlaybackUrl(el.src)) {
+        if (bufferedKey) {
+          bufferedKey = '';
+          bufferedRanges.value = [];
+        }
+        return;
+      }
       const duration = el && Number.isFinite(el.duration) && el.duration > 0 ? el.duration : 0;
       if (!el || !duration) {
         if (bufferedKey) {

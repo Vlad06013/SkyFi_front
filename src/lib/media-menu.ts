@@ -140,9 +140,11 @@ function toMenuItem(id: MenuAtomId, state: MenuItemState): MenuItem {
 
 /**
  * Собрать пункты меню для контекста. В офлайне (offline=true) активны
- * только «сердечко» (отмена буферного удаления — на избранном) и
- * «удалить скачанное»; всё остальное disabled. Правило — «разрешены
- * существующие», новых атомов не добавляем.
+ * «сердечко» (отмена буферного удаления — на избранном), «удалить
+ * скачанное» и «В очередь» для скачанного (локальная очередь играется
+ * и без сети, добавки дошлются на сервер при коннекте — баг 24);
+ * всё остальное disabled. Правило — «разрешены существующие», новых
+ * атомов не добавляем.
  */
 export function buildMenuItems(context: MenuContext, entity: MenuEntity, state: MenuItemState, offline = false): MenuItem[] {
   return menuMatrix[context]
@@ -152,6 +154,7 @@ export function buildMenuItems(context: MenuContext, entity: MenuEntity, state: 
       if (!offline) return item;
       if (item.id === 'like') return { ...item, disabled: !state.liked };
       if (item.id === 'download') return { ...item, disabled: !state.downloaded };
+      if (item.id === 'queue') return { ...item, disabled: !state.downloaded };
       return { ...item, disabled: true };
     });
 }

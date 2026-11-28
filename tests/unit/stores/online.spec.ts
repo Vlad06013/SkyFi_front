@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { useOnlineStore } from '@/stores/online';
 
@@ -12,6 +12,7 @@ const hoisted = vi.hoisted(() => {
 
 vi.mock('@/lib/endpoints', () => ({
   resolveEndpoint: hoisted.resolveEndpointMock,
+  activeOrigin: () => 'http://backend.test',
 }));
 
 // Подменяем регистрацию хендлера исходов: оригинал отрабатывает (стор
@@ -176,5 +177,68 @@ describe('stores/online — детект на сокете', () => {
     online.noteSocketConnected();
     online.noteSocketConnected(); // повторный connect — перехода нет
     expect(calls).toEqual(['online']);
+  });
+});
+
+describe('stores/online — стартовый зонд (баг 14)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    clearNetLog();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('бэк не ответил: офлайн сразу, без грейса; сокет потом переведёт в онлайн', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Promise.reject(new Error('network'))));
+    const online = useOnlineStore();
+
+    await online.probeAtStartup();
+    expect(online.isOnline).toBe(false);
+    expect(netLog.value.at(-1)).toMatchObject({ event: 'probe', transition: 'offline' });
+
+    online.noteSocketConnected();
+    expect(online.isOnline).toBe(true);
+  });
+
+  it('бэк ответил (любой HTTP): флаг не трогаем — онлайн подтвердит сокет', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 404 })));
+    const online = useOnlineStore();
+
+    await online.probeAtStartup();
+    expect(online.isOnline).toBeNull();
+    expect(netLog.value).toHaveLength(0);
+  });
+
+  it('бэк молчит дольше таймаута: офлайн по abort', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        (_url: string, init?: RequestInit) =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () => reject(new Error('aborted')));
+          }),
+      ),
+    );
+    const online = useOnlineStore();
+
+    const probe = online.probeAtStartup();
+    await vi.advanceTimersByTimeAsync(2_500);
+    await probe;
+    expect(online.isOnline).toBe(false);
+  });
+
+  it('navigator.onLine = false: офлайн сразу, без запроса', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(window.navigator, 'onLine', 'get').mockReturnValue(false);
+    const online = useOnlineStore();
+
+    await online.probeAtStartup();
+    expect(online.isOnline).toBe(false);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

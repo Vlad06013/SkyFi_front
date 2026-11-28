@@ -216,6 +216,37 @@ describe('stores/favorites', () => {
     expect(addMock).not.toHaveBeenCalled();
   });
 
+  it('офлайн-сортировка: перенос локальный и в буфер, при коннекте уходит PATCH-ами (баг 21)', async () => {
+    // Сервер применяет «один перенос» к своему порядку.
+    const server = { ...PAYLOAD, tracks: [makeTrack('t1'), makeTrack('t2')] };
+    fetchMock.mockResolvedValue(server);
+    moveMock.mockImplementation(async (_type, snapshot, to) => {
+      const index = server.tracks.findIndex((track) => track.source_id === snapshot.source_id);
+      const [moved] = server.tracks.splice(index, 1);
+      if (moved) server.tracks.splice(to, 0, moved);
+      return { updated: 1 };
+    });
+
+    loginAsUser();
+    useOnlineStore().isOnline = true;
+    const favorites = useFavoritesStore();
+    await flushPromises();
+
+    useOnlineStore().isOnline = false;
+    favorites.reorder(0, 1);
+    expect(favorites.tracks.map((t) => t.source_id)).toEqual(['t2', 't1']);
+    expect(moveMock).not.toHaveBeenCalled();
+    await flushPromises();
+
+    // Сеть вернулась: буфер уходит переносом, порядок сходится с сервером.
+    useOnlineStore().noteSocketConnected();
+    await flushPromises();
+    await flushPromises();
+
+    expect(moveMock).toHaveBeenCalledWith('track', { source_type: 'yandex_music', source_id: 't1' }, 1);
+    expect(favorites.tracks.map((t) => t.source_id)).toEqual(['t2', 't1']);
+  });
+
   it('коннект: буфер уходит DELETE-ами, список сходится с сервером', async () => {
     // Сервер-side состояние: DELETE реально убирает трек из выдачи.
     const server = { ...PAYLOAD, tracks: [makeTrack('t1'), makeTrack('t2')] };

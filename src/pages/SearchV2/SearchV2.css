@@ -66,6 +66,12 @@
   font-weight: 600;
 }
 
+/* Офлайн: видео-источники (YouTube, Дзен) недоступны — поиск идёт по скачанному. */
+.src-ico:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
 .sec-row {
   margin-top: 0;
 }

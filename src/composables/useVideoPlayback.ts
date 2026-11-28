@@ -12,6 +12,7 @@ import { afterMediaUnlock, isAutoplayBlocked, markAutoplayBlocked } from '@/lib/
 import { snapshotKey } from '@/lib/playback-engine';
 import { cacheVideoStreams, getCachedStream, invalidateStream } from '@/lib/stream-url-cache';
 import { useOnlineStore } from '@/stores/online';
+import { useLayoutStore } from '@/stores/layout';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
 import { useYoutubeStore } from '@/stores/youtube';
@@ -513,7 +514,13 @@ function hostVisible(host: HTMLElement | null): host is HTMLElement {
 function visibleHost(): HTMLElement | null {
   if (hostVisible(clipHost.value)) return clipHost.value;
   if (hostVisible(homeClipHost.value)) return homeClipHost.value;
-  if (hostVisible(miniClipHost.value)) return miniClipHost.value;
+  // ТВ (баг 27): видео в нижний плеер не сажаем. Композитинг ролика в баре
+  // на слабом GPU приставки давал лютые тормоза всего приложения после
+  // закрытия развёртки клипа (на телефонной вёрстке — без проблем).
+  // Звук продолжает идти с припаркованного элемента, в баре — обложка.
+  if (document.documentElement.dataset.layout !== 'tv' && hostVisible(miniClipHost.value)) {
+    return miniClipHost.value;
+  }
   return null;
 }
 
@@ -586,6 +593,13 @@ async function refreshStreams(snapshot: VideoSnapshot) {
 export function useVideoPlayback() {
   const player = usePlayerStore();
   const toast = useToastStore();
+
+  // Смена профиля раскладки пересаживает видео: на ТВ мини-хост запрещён (баг 27).
+  const layout = useLayoutStore();
+  watch(
+    () => layout.profile,
+    () => syncAttachment(),
+  );
 
   async function loadVideo(snapshot: VideoSnapshot | null) {
     const el = ensureVideo();

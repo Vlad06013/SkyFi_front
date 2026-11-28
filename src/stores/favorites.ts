@@ -34,10 +34,26 @@ interface BufferedRemoval {
   index: number;
 }
 
+/**
+ * Буфер офлайн-сортировки (баг 21): переносы драгом в офлайне применяются
+ * локально и складываются сюда; при коннекте уходят на сервер по одному
+ * PATCH /favorites/sort в исходном порядке — финальный порядок сервера
+ * сходится с локальным.
+ */
+interface BufferedSortMove {
+  source_type: AnySnapshot['source_type'];
+  source_id: string;
+  to: number;
+}
+
 const MAX_BUFFERED = 300;
 
 function bufferStorageKey(userId: number) {
   return `skyfi.fav-removals.${userId}`;
+}
+
+function sortStorageKey(userId: number) {
+  return `skyfi.fav-sort.${userId}`;
 }
 
 export const useFavoritesStore = defineStore('favorites', () => {
@@ -53,6 +69,7 @@ export const useFavoritesStore = defineStore('favorites', () => {
   const loaded = ref(false);
 
   const removalBuffer = ref<BufferedRemoval[]>([]);
+  const sortBuffer = ref<BufferedSortMove[]>([]);
   let bufferUserId: number | null = null;
   let bufferSaveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -64,21 +81,35 @@ export const useFavoritesStore = defineStore('favorites', () => {
       void Preferences.set({ key: bufferStorageKey(bufferUserId), value: JSON.stringify(removalBuffer.value) }).catch(
         () => undefined,
       );
+      void Preferences.set({ key: sortStorageKey(bufferUserId), value: JSON.stringify(sortBuffer.value) }).catch(
+        () => undefined,
+      );
     }, 500);
   }
 
-  /** Хвост прошлой сессии: офлайн-удаления переживают перезапуск. */
+  /** Хвост прошлой сессии: офлайн-правки переживают перезапуск. */
   async function loadBuffer(userId: number) {
     try {
       const { value } = await Preferences.get({ key: bufferStorageKey(userId) });
-      if (!value || bufferUserId !== userId) return;
-      const parsed = JSON.parse(value) as BufferedRemoval[];
-      if (!Array.isArray(parsed)) return;
-      const known = new Set(removalBuffer.value.map((entry) => `${entry.snapshot.type}:${entry.snapshot.source_type}:${entry.snapshot.source_id}`));
-      const fresh = parsed.filter(
-        (entry) => !known.has(`${entry.snapshot.type}:${entry.snapshot.source_type}:${entry.snapshot.source_id}`),
-      );
-      removalBuffer.value = [...removalBuffer.value, ...fresh].slice(-MAX_BUFFERED);
+      if (value && bufferUserId === userId) {
+        const parsed = JSON.parse(value) as BufferedRemoval[];
+        if (Array.isArray(parsed)) {
+          const known = new Set(removalBuffer.value.map((entry) => `${entry.snapshot.type}:${entry.snapshot.source_type}:${entry.snapshot.source_id}`));
+          const fresh = parsed.filter(
+            (entry) => !known.has(`${entry.snapshot.type}:${entry.snapshot.source_type}:${entry.snapshot.source_id}`),
+          );
+          removalBuffer.value = [...removalBuffer.value, ...fresh].slice(-MAX_BUFFERED);
+        }
+      }
+    } catch {
+      /* битый кеш — не страшно, буфер best-effort */
+    }
+    try {
+      const { value } = await Preferences.get({ key: sortStorageKey(userId) });
+      if (value && bufferUserId === userId) {
+        const parsed = JSON.parse(value) as BufferedSortMove[];
+        if (Array.isArray(parsed)) sortBuffer.value = [...sortBuffer.value, ...parsed].slice(-MAX_BUFFERED);
+      }
     } catch {
       /* битый кеш — не страшно, буфер best-effort */
     }
@@ -113,9 +144,9 @@ export const useFavoritesStore = defineStore('favorites', () => {
     return true;
   }
 
-  /** Коннект: буфер уходит на сервер; неотправленное остаётся до следующего раза. */
-  async function flushBufferedRemovals() {
-    if (!removalBuffer.value.length || useOnlineStore().isOnline !== true) return;
+  /** Коннект: буфер удалений уходит на сервер; неотправленное остаётся до следующего раза. */
+  async function flushBufferedRemovals(): Promise<boolean> {
+    if (!removalBuffer.value.length || useOnlineStore().isOnline !== true) return false;
     let flushedAny = false;
     for (const entry of [...removalBuffer.value]) {
       try {
@@ -127,8 +158,28 @@ export const useFavoritesStore = defineStore('favorites', () => {
       }
     }
     persistBuffer();
-    // Конвергенция: сервер уже без записей, локальные правки не теряем.
-    if (flushedAny) await fetchAll().catch(() => undefined);
+    return flushedAny;
+  }
+
+  /**
+   * Коннект: буфер сортировки уходит на сервер по одному переносу.
+   * Порядок важен (каждый следующий считается от предыдущего): первая
+   * ошибка обрывает прогон, остаток ждёт следующего коннекта.
+   */
+  async function flushBufferedSort(): Promise<boolean> {
+    if (!sortBuffer.value.length || useOnlineStore().isOnline !== true) return false;
+    let flushedAny = false;
+    for (const move of [...sortBuffer.value]) {
+      try {
+        await moveFavorite('track', { source_type: move.source_type, source_id: move.source_id }, move.to);
+        sortBuffer.value = sortBuffer.value.filter((item) => item !== move);
+        flushedAny = true;
+      } catch {
+        break;
+      }
+    }
+    persistBuffer();
+    return flushedAny;
   }
 
   const tracks = computed(() => sections.track.value as TrackSnapshot[]);
@@ -260,7 +311,8 @@ export const useFavoritesStore = defineStore('favorites', () => {
   /**
    * Drag&drop вкладки «Треки»: локально + PATCH /favorites/sort в форме
    * «один перенос» (api.md §10): бэк сдвигает только затронутый диапазон.
-   * Ошибка синка тихая — при следующей загрузке встанет серверный порядок.
+   * Офлайн перенос кладётся в буфер и уходит при коннекте (баг 21).
+   * Ошибка онлайн-синка тихая — при следующей загрузке встанет серверный порядок.
    */
   function reorder(from: number, to: number) {
     if (from === to) return;
@@ -272,6 +324,14 @@ export const useFavoritesStore = defineStore('favorites', () => {
     next.splice(to, 0, moved);
     section.value = next;
     persist();
+    if (useOnlineStore().isOnline === false) {
+      sortBuffer.value = [
+        ...sortBuffer.value,
+        { source_type: moved.source_type, source_id: moved.source_id, to },
+      ].slice(-MAX_BUFFERED);
+      persistBuffer();
+      return;
+    }
     void moveFavorite('track', { source_type: moved.source_type, source_id: moved.source_id }, to).catch(
       () => undefined,
     );
@@ -309,17 +369,24 @@ export const useFavoritesStore = defineStore('favorites', () => {
       if (!authed && (loaded.value || hasAny())) {
         clearAll();
       }
-      if (!authed && (removalBuffer.value.length || bufferUserId !== null)) {
+      if (!authed && (removalBuffer.value.length || sortBuffer.value.length || bufferUserId !== null)) {
         removalBuffer.value = [];
+        sortBuffer.value = [];
         bufferUserId = null;
       }
     },
     { immediate: true },
   );
 
-  // Коннект: офлайн-удаления уходят на сервер.
+  // Коннект: буферы офлайн-правок уходят на сервер (сортировка — первой,
+  // её переносы считаются от порядка, который видел пользователь), затем
+  // одна конвергенция: серверное состояние перечитывается целиком.
   useOnlineStore().onOnline(() => {
-    void flushBufferedRemovals();
+    void (async () => {
+      const sorted = await flushBufferedSort();
+      const removed = await flushBufferedRemovals();
+      if (sorted || removed) await fetchAll().catch(() => undefined);
+    })();
   });
 
   return {

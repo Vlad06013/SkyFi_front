@@ -2,7 +2,16 @@
   <div>
     <AppBar title="Настройки" />
     <div v-if="user" class="friend-row" style="padding:12px 2px 16px">
-      <div class="pic-plus round sm" role="button" tabindex="0" aria-label="загрузить фото" @click="pickAvatar" @keydown.enter.prevent="pickAvatar">
+      <div
+        class="pic-plus round sm"
+        :class="{ 'is-disabled': isOffline }"
+        role="button"
+        tabindex="0"
+        aria-label="загрузить фото"
+        :aria-disabled="isOffline"
+        @click="pickAvatar"
+        @keydown.enter.prevent="pickAvatar"
+      >
         <div class="avatar ini">
           <img v-if="user.avatar_url" :src="resolveUrl(user.avatar_url)" alt="">
           <template v-else>{{ user.name.slice(0, 1) }}</template>
@@ -18,7 +27,7 @@
         <div class="track-title" style="font-size:16px">{{ user.name }}</div>
         <div class="idle">{{ user.email }}</div>
       </div>
-      <button class="icon-btn ghost" type="button" aria-label="изменить имя" @click.stop="openName">
+      <button class="icon-btn ghost" type="button" aria-label="изменить имя" :disabled="isOffline" @click.stop="openName">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 20h9" />
           <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z" />
@@ -61,7 +70,7 @@
     </div>
 
     <div class="sec-label">Приложение</div>
-    <SettingRow title="Сканировать QR" idle="вход на ТВ или магнитолу" clickable @open="scanOpen = true">
+    <SettingRow title="Сканировать QR" idle="вход на ТВ или магнитолу" :class="{ 'is-disabled': isOffline }" clickable @open="openScanner">
       <template #icon>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -83,7 +92,7 @@
           <path d="M20 4v5h-5" />
         </svg>
       </template>
-      <button class="btn btn-ghost sm" type="button" :disabled="updateBusy" @click="checkUpdate">
+      <button class="btn btn-ghost sm" type="button" :disabled="updateBusy || isOffline" @click="checkUpdate">
         {{ updateReady ? 'Обновить' : 'Проверить обновления' }}
       </button>
     </SettingRow>

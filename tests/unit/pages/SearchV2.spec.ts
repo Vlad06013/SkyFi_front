@@ -350,6 +350,34 @@ describe('pages/SearchV2', () => {
     expect(wrapper.text()).toContain('Лучшего совпадения нет');
   });
 
+  it('офлайн дизейблит YouTube и Дзен, тап по ним не переключает (баг 18)', async () => {
+    const wrapper = mountPage();
+    useOnlineStore().isOnline = false;
+    await flushPromises();
+
+    const byLabel = (label: string) =>
+      wrapper.findAll('.src-ico').find((button) => button.text().includes(label));
+    expect(byLabel('YouTube')?.attributes('disabled')).toBeDefined();
+    expect(byLabel('Дзен')?.attributes('disabled')).toBeDefined();
+    expect(byLabel('Яндекс')?.attributes('disabled')).toBeUndefined();
+
+    await byLabel('YouTube')?.trigger('click');
+    expect(byLabel('Яндекс')?.classes()).toContain('on');
+  });
+
+  it('пропажа сети на видео-источнике уводит поиск на Яндекс (баг 18)', async () => {
+    const wrapper = mountPage();
+    const byLabel = (label: string) =>
+      wrapper.findAll('.src-ico').find((button) => button.text().includes(label));
+
+    await byLabel('YouTube')?.trigger('click');
+    expect(byLabel('YouTube')?.classes()).toContain('on');
+
+    useOnlineStore().isOnline = false;
+    await flushPromises();
+    expect(byLabel('Яндекс')?.classes()).toContain('on');
+  });
+
   it('клик по альбому ведёт на страницу альбома', async () => {
     fetchMock.mockResolvedValue(
       makePayload({

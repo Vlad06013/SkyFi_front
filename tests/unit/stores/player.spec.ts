@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { nextTick } from 'vue';
 import { flushPromises } from '@vue/test-utils';
+import { ApiError } from '@/api/http';
 import * as devicesApi from '@/api/devices';
 import * as playerApi from '@/api/player';
 import * as queueApi from '@/api/queue';
@@ -1947,5 +1948,174 @@ describe('stores/player: восстановление соединения по�
     expect(player.state.current_snapshot?.source_id).toBe('t2');
     expect(player.state.is_playing).toBe(false);
     expect(player.state.position_seconds).toBe(7);
+  });
+});
+
+describe('stores/player: скачанный трек при мёртвом бэке (баг 14)', () => {
+  const me: PlayerDevice = {
+    device_uuid: 'uuid-1',
+    name: 'Мой телефон',
+    type: 'phone',
+    last_seen_at: null,
+  };
+  const trackB: TrackSnapshot = { ...track, source_id: 't2', title: 'скачанный' };
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    const auth = useAuthStore();
+    auth.user = { id: 1 } as never;
+    auth.token = 't';
+    // Мёртвое окно: флаг ещё «онлайн», а бэк уже не отвечает.
+    useOnlineStore().isOnline = true;
+    useDevicesStore().myDeviceUuid = 'uuid-1';
+    vi.spyOn(useDownloadsStore(), 'isDownloaded').mockImplementation(
+      (snapshot) => snapshot.source_id === 't2',
+    );
+    fetchQueueMock.mockResolvedValue([] as never);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function applyActiveState(player: ReturnType<typeof usePlayerStore>, snapshot: TrackSnapshot = track) {
+    player.applyServerState(
+      {
+        state: {
+          ...player.state,
+          current_snapshot: snapshot,
+          is_playing: true,
+          position_seconds: 100,
+          active_device_id: 'uuid-1',
+          devices: [me],
+        },
+        queue: [],
+      } as never,
+      { force: true },
+    );
+  }
+
+  it('тап по скачанному: старт мгновенный, сетевой фейл /play не откатывает трек и не тостит', async () => {
+    const player = usePlayerStore();
+    applyActiveState(player);
+    playSnapshotMock.mockRejectedValue(new ApiError(null, 'network', 'Нет соединения.'));
+
+    await player.playSnapshot(trackB, 'single');
+
+    expect(player.state.current_snapshot?.source_id).toBe('t2');
+    expect(player.state.is_playing).toBe(true);
+    expect(useToastStore().toast).toBeNull();
+  });
+
+  it('после сетевого фейла /play reconnect-resync сливает стейт, не воскрешая старый трек', async () => {
+    const player = usePlayerStore();
+    applyActiveState(player);
+    player.bindServerPlayback();
+    playSnapshotMock.mockRejectedValue(new ApiError(null, 'network', 'Нет соединения.'));
+
+    await player.playSnapshot(trackB, 'single');
+    expect(player.state.current_snapshot?.source_id).toBe('t2');
+
+    // Reconnect: сервер помнит доофлайновый трек A — офлайн-сессия его не воскрешает.
+    fetchPlayerStateMock.mockResolvedValue({
+      state: {
+        ...player.state,
+        current_snapshot: track,
+        is_playing: true,
+        position_seconds: 100,
+        active_device_id: null,
+        version: player.state.version + 5,
+      },
+      queue: [],
+    } as never);
+    useOnlineStore().isOnline = false;
+    useOnlineStore().isOnline = true;
+    await flushPromises();
+
+    expect(player.state.current_snapshot?.source_id).toBe('t2');
+    expect(player.state.is_playing).toBe(true);
+  });
+
+  it('отказ бэка (4xx) откатывает скачанный трек как раньше', async () => {
+    const player = usePlayerStore();
+    applyActiveState(player);
+    playSnapshotMock.mockRejectedValue(new ApiError(422, 'validation', 'Не найдено.'));
+
+    await player.playSnapshot(trackB, 'single');
+
+    expect(player.state.current_snapshot?.source_id).toBe('t1');
+  });
+
+  it('пауза скачанного при мёртвом бэке не откатывается и не тостит', async () => {
+    const player = usePlayerStore();
+    applyActiveState(player, trackB);
+    player.setAudioPlaying(true);
+    pausePlaybackMock.mockRejectedValue(new ApiError(null, 'network', 'Нет соединения.'));
+
+    await player.togglePlay();
+
+    expect(player.state.is_playing).toBe(false);
+    expect(useToastStore().toast).toBeNull();
+  });
+});
+
+describe('stores/player: офлайн-очередь (баг 24)', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.clearAllMocks();
+    const auth = useAuthStore();
+    auth.user = { id: 1 } as never;
+    auth.token = 't';
+    useOnlineStore().isOnline = true;
+    useDevicesStore().myDeviceUuid = 'uuid-1';
+    fetchQueueMock.mockResolvedValue([] as never);
+    fetchPlayerStateMock.mockResolvedValue({ state: null, queue: [] } as never);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('«В очередь» офлайн кладёт локальный pending без сети, при коннекте дошлёт на сервер', async () => {
+    const player = usePlayerStore();
+    player.bindServerPlayback();
+    await flushPromises();
+
+    useOnlineStore().isOnline = false;
+    await expect(player.enqueueSnapshot(track)).resolves.toBe(true);
+
+    expect(addToQueueMock).not.toHaveBeenCalled();
+    expect(player.queue).toHaveLength(1);
+    expect(player.queue[0].id).toBeLessThan(0);
+    expect(player.queue[0].status).toBe('pending');
+    expect(player.queue[0].snapshot?.source_id).toBe('t1');
+
+    // Коннект: добавка уходит на сервер, очередь перечитывается.
+    addToQueueMock.mockResolvedValue([makeItem(5, 1)] as never);
+    fetchQueueMock.mockResolvedValue([makeItem(5, 1)] as never);
+    useOnlineStore().isOnline = true;
+    await flushPromises();
+
+    expect(addToQueueMock).toHaveBeenCalledTimes(1);
+    expect(player.queue.map((item) => item.id)).toEqual([5]);
+  });
+
+  it('сыгранная офлайн добавка из буфера выпадает — на сервер не уходит', async () => {
+    const player = usePlayerStore();
+    player.bindServerPlayback();
+    await flushPromises();
+
+    useOnlineStore().isOnline = false;
+    await player.enqueueSnapshot(track);
+    // Офлайн-переход по очереди: трек играет, из очереди выпал.
+    vi.spyOn(useDownloadsStore(), 'isDownloaded').mockReturnValue(true);
+    await player.playSnapshot(track, 'queue');
+
+    addToQueueMock.mockResolvedValue([] as never);
+    useOnlineStore().isOnline = true;
+    await flushPromises();
+
+    expect(addToQueueMock).not.toHaveBeenCalled();
   });
 });

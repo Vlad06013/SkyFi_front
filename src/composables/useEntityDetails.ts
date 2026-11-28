@@ -15,6 +15,7 @@ import type {
 
 const DETAILS_LIMIT = 50;
 const loadFailedTitle = 'Не удалось загрузить';
+const offlineTitle = 'Нет соединения с сервером';
 
 /**
  * Детали album/artist/playlist по роуту `/…/:source/:id`
@@ -90,8 +91,14 @@ export function useEntityDetails(type: DetailsEntityType) {
       albums.value = payload.albums.items;
       hasMore.value = payload.tracks.has_more;
     } catch (cause) {
-      if (isOfflineError(cause)) return;
       if (gen !== generation) return;
+      // Офлайн без сохранённой копии: тост не шлём, но и молча выходить
+      // нельзя — пустой стейт рисовал чёрный экран (баг 16). Инлайн-ошибка
+      // с «Повторить», как на странице друга.
+      if (isOfflineError(cause)) {
+        error.value = offlineTitle;
+        return;
+      }
       toast.show(loadFailedTitle, '', true);
       error.value = loadFailedTitle;
     } finally {

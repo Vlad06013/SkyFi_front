@@ -55,7 +55,7 @@
     <div v-if="tab === 'uploads'" class="dl-all-bar">
       <span class="dl-count">{{ counts.uploads }}</span>
       <div class="dl-bar-side">
-        <button class="icon-btn ghost" type="button" aria-label="загрузить трек" @click="openUpload">
+        <button class="icon-btn ghost" type="button" aria-label="загрузить трек" :disabled="isOffline" @click="openUpload">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
             <path d="M12 5v14M5 12h14" />
           </svg>
@@ -70,7 +70,7 @@
     <div v-if="showDownloadAll" class="dl-all-bar">
       <span class="dl-count" :class="{ 'is-live': dlAllActive }">{{ dlAllStatusText }}</span>
       <div v-if="tab === 'tracks' || tab === 'playlists' || tab === 'albums'" class="dl-bar-side">
-        <button v-if="tab === 'playlists'" class="icon-btn ghost" type="button" aria-label="новый плейлист" @click="openCreate">
+        <button v-if="tab === 'playlists'" class="icon-btn ghost" type="button" aria-label="новый плейлист" :disabled="isOffline" @click="openCreate">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
             <path d="M12 5v14M5 12h14" />
           </svg>
@@ -114,7 +114,7 @@
         :playing="isPlaying(track)"
         :downloaded="isDownloaded(track)"
         :duration-ms="track.duration_ms"
-        sortable
+        :sortable="sortEnabled"
         :dragging="sortDrag?.from === index"
         :drag-style="sortRowStyle(index, sortDrag)"
         @open="player.playOrToggle(track, playSourceFavorites, { contextItems: tracks })"

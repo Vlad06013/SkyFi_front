@@ -303,9 +303,16 @@ export default defineComponent({
 
     function selectResource(id: SnapshotSource) {
       if (resource.value === id) return;
+      // В офлайне видео-источники задизейблены: скачанного видео нет (баг 18).
+      if (resourceDisabled(id)) return;
       resource.value = id;
       section.value = defaultPill(id);
       kick(true);
+    }
+
+    /** YouTube и Дзен ищут только онлайн: офлайн-поиск — по скачанному аудио. */
+    function resourceDisabled(id: SnapshotSource) {
+      return offline.value && searchMediaType(id) === 'video';
     }
 
     function selectSection(id: SearchPill) {
@@ -320,6 +327,12 @@ export default defineComponent({
       () => online.isOnline,
       (isOnline) => {
         if (isOnline === false) {
+          // Сеть пропала на видео-источнике: он офлайн не ищет — уводим на
+          // Яндекс (selectResource сам перезапустит поиск по скачанному).
+          if (searchMediaType(resource.value) === 'video') {
+            selectResource('yandex_music');
+            return;
+          }
           if (q.value.length >= SEARCH_MIN_LENGTH) applyDownloadedSearch();
           return;
         }
@@ -471,6 +484,7 @@ export default defineComponent({
       retry,
       selectResource,
       selectSection,
+      resourceDisabled,
       useHistory,
       openSnapshotMenu,
       open,

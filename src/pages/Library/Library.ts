@@ -361,7 +361,13 @@ export default defineComponent({
       player.playSnapshot(tracks.value[0], PLAY_SOURCE_FAVORITES, { contextItems: tracks.value });
     }
 
+    /** Сортировка драгом — только по полному списку: индексы строк
+     *  отфильтрованного поиском списка указывают не на те треки полного,
+     *  и reorder перемешивал избранное (баг 19). */
+    const sortEnabled = computed(() => needle.value.length === 0);
+
     function onSort(event: PointerEvent, index: number) {
+      if (!sortEnabled.value) return;
       const container = (event.currentTarget as HTMLElement).closest('.list-sort');
       if (!(container instanceof HTMLElement)) return;
       startListSort(event, index, {
@@ -521,6 +527,7 @@ export default defineComponent({
       listEmpty,
       listSentinel,
       sortDrag,
+      sortEnabled,
       player,
       favorites,
       playSourceFavorites: PLAY_SOURCE_FAVORITES,

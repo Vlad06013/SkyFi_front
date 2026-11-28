@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { flushPromises, mount } from '@vue/test-utils';
+import { ApiError } from '@/api/http';
 import * as detailsApi from '@/api/details';
 import * as favoritesApi from '@/api/favorites';
 import Playlist from '@/pages/Playlist/Playlist.vue';
@@ -119,5 +120,21 @@ describe('pages/Playlist', () => {
 
     expect(wrapper.findAll('.track-row')).toHaveLength(0);
     expect(wrapper.text()).toContain('Пусто');
+  });
+
+  it('офлайн без сохранённой копии: инлайн-ошибка с «Повторить», не чёрный экран (баг 16)', async () => {
+    fetchMock.mockRejectedValue(new ApiError(null, 'offline', 'Нет соединения.'));
+    const wrapper = mountPage();
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('Нет соединения с сервером');
+    const retryButton = wrapper.find('.empty .btn');
+    expect(retryButton.exists()).toBe(true);
+
+    // «Повторить» с живой сетью загружает плейлист.
+    fetchMock.mockResolvedValue(makeDetails());
+    await retryButton.trigger('click');
+    await flushPromises();
+    expect(wrapper.find('.hero-name').text()).toBe('Лучшее: FFDP');
   });
 });

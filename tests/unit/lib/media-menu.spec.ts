@@ -35,14 +35,14 @@ describe('lib/media-menu — офлайн-гейт', () => {
     expect(items.every((item) => !item.disabled)).toBe(true);
   });
 
-  it('офлайн: активны только лайк на избранном и удаление скачанного', () => {
+  it('офлайн: активны лайк на избранном, удаление скачанного и «В очередь» для скачанного', () => {
     const state = { liked: true, downloaded: true };
     const items = buildMenuItems('my-tracks', entity, state, true);
     const active = items.filter((item) => !item.disabled).map((item) => item.id);
-    expect(active).toEqual(['like', 'download']);
+    expect(active).toEqual(['queue', 'like', 'download']);
   });
 
-  it('офлайн: не-лайкнутое сердечко и «скачать» выключены', () => {
+  it('офлайн: не-лайкнутое сердечко, «скачать» и «В очередь» нескачанного выключены', () => {
     const items = buildMenuItems('my-tracks', entity, { liked: false, downloaded: false }, true);
     const like = items.find((item) => item.id === 'like');
     const download = items.find((item) => item.id === 'download');

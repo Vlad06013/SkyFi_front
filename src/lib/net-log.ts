@@ -16,6 +16,8 @@ export type NetEvent =
   | 'offline'
   /** Серия сетевых/5xx фейлов при живом сокете — принудительный офлайн. */
   | 'force-offline'
+  /** Стартовый зонд живости бэка (один на запуск приложения). */
+  | 'probe'
   /** Presence устройства: подписка/отписка device.{uuid}, device.disconnected. */
   | 'presence'
   /** Смена active_device_id в стейте плеера (кто активный — видно по деталям). */
@@ -96,6 +98,7 @@ const EVENT_LABELS: Record<NetEvent, string> = {
   online: 'онлайн',
   offline: 'офлайн',
   'force-offline': 'офлайн (фейлы запросов)',
+  probe: 'стартовый зонд',
   presence: 'presence',
   'active-device': 'активное устройство',
 };

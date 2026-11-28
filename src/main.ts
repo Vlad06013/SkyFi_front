@@ -18,6 +18,7 @@ import { useAppStore } from '@/stores/app';
 import { useDevicesStore } from '@/stores/devices';
 import { useOnlineStore } from '@/stores/online';
 import { bindImageRetry } from '@/lib/image-retry';
+import { initSocialNotifications } from '@/lib/notify';
 import { endpointReady } from '@/lib/endpoints';
 import { hydrateStreamCache } from '@/lib/stream-url-cache';
 import { useDownloadsStore } from '@/stores/downloads';
@@ -73,11 +74,13 @@ void useLayoutStore(pinia)
     // До первого запроса: домашний Wi‑Fi не открывает внешний адрес бэка.
     // Гвард роутера ждёт ту же promise (endpointReady) — двойного ipify нет.
     void endpointReady().finally(() => {
+      const online = useOnlineStore(pinia);
+      // Мёртвый бэк: офлайн сразу по зонду, не ждём ~15 с таймаутов сокета (баг 14).
+      void online.probeAtStartup();
       void appStore.bootstrap().finally(async () => {
         // Session-scoped сервисы: presence устройства + сокеты (сокет же — источник онлайн-стейта).
         useDevicesStore(pinia).bindPresence();
         bindSessionRealtime();
-        const online = useOnlineStore(pinia);
         online.setReconnectHandler(restartRealtime);
         // Свежесть сессии проверяем первым коннектом сокета (здоровье бэка не зондируем).
         let sessionRefreshed = false;
@@ -100,6 +103,8 @@ void useLayoutStore(pinia)
         useStreamPrefetch();
         // Картинки, упавшие в офлайне, догружаем на возврате сети.
         bindImageRetry();
+        // Соц-уведомления: канал и разрешение на нативе (баг 26).
+        initSocialNotifications();
         // DEV-диагностика: доступ из консоли (window.__player/__devices/__clipVideo).
         if (import.meta.env.DEV) {
           (window as unknown as { __player: ReturnType<typeof usePlayerStore> }).__player = usePlayerStore(pinia);

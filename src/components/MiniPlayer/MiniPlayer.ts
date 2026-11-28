@@ -120,6 +120,8 @@ export default defineComponent({
     }
 
     function onSettled() {
+      // Страховка для скроллов мимо пальца: свайп коммитится в pointerup,
+      // здесь только возвращаем ленту в центр/дожимаем край.
       if (dragging.value) return;
       const el = trackEl.value;
       if (!el) return;
@@ -162,8 +164,12 @@ export default defineComponent({
             setTimeout(() => openExpanded(), 0);
             return;
           }
-          if (lastDx <= -swipeThreshold) scrollToSlot(2);
-          else if (lastDx >= swipeThreshold) scrollToSlot(0);
+          // Коммит — сразу по пальцу, не по остановке smooth-скролла (баг 15):
+          // дебаунс settle схлопывал быстрые свайпы в один, терял коммит,
+          // начатый во время нового драга, а лента, уже стоящая на краю,
+          // не слала scroll-событий — свайп «не давал» переключить вовсе.
+          if (lastDx <= -swipeThreshold) commitNext();
+          else if (lastDx >= swipeThreshold) commitPrev();
           else scrollToSlot(1);
         },
         cancel: () => {

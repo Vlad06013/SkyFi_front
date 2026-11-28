@@ -82,7 +82,10 @@ function tryPlay(el: HTMLAudioElement) {
   if (!el.paused && !el.ended) return;
   if (isAutoplayBlocked()) return;
   const attempt = ++playAttempt;
-  player.setStreamWarming(true);
+  // Локальный файл (скачанное) стартует мгновенно: прогрев-спиннер на нём —
+  // миллисекундная вспышка, не отражающая никакой загрузки (баг 17).
+  const localFile = isLocalPlaybackUrl(el.src);
+  if (!localFile) player.setStreamWarming(true);
   afterMediaUnlock(() => {
     const store = usePlayerStore();
     const stale = () => attempt !== playAttempt;

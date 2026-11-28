@@ -19,6 +19,7 @@ import { useLayoutStore } from '@/stores/layout';
 import type { LayoutProfile } from '@/lib/layout-profile';
 import { resolveUrl } from '@/lib/endpoints';
 import { useDownloadsStore } from '@/stores/downloads';
+import { useOnlineStore } from '@/stores/online';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
 import { clearNetLog, formatNetLog, netEventLabel, netLog, type NetLogEntry } from '@/lib/net-log';
@@ -66,6 +67,11 @@ export default defineComponent({
       await layout.setProfile(next);
     }
 
+    // Офлайн (баг 25): правки профиля, сканнер и проверка обновлений
+    // требуют сети — кнопки гасим, обработчики страхуют гардом.
+    const online = useOnlineStore();
+    const isOffline = computed(() => online.isOnline === false);
+
     const downloads = useDownloadsStore();
     const { items: downloadedItems, downloadedBytes } = storeToRefs(downloads);
     const hasDownloads = computed(() => downloadedItems.value.length > 0);
@@ -74,12 +80,13 @@ export default defineComponent({
       { id: 'apk', title: 'Android · APK', idle: 'телефон, ТВ, магнитола' },
     ] as const;
     function openName() {
+      if (isOffline.value) return;
       draft.value = user.value?.name ?? '';
       sheet.value = 'name';
     }
 
     function pickAvatar() {
-      if (avatarBusy.value) return;
+      if (avatarBusy.value || isOffline.value) return;
       avatarInput.value?.click();
     }
 
@@ -146,6 +153,11 @@ export default defineComponent({
       void router.push({ path: '/qr-confirm', query: { code } });
     }
 
+    function openScanner() {
+      if (isOffline.value) return;
+      scanOpen.value = true;
+    }
+
     // Журнал сетевых событий (коннекты/разрывы сокета, переходы
     // онлайн-стейта) — новые сверху: флап ловим на устройстве,
     // консоль WebView недоступна.
@@ -195,6 +207,8 @@ export default defineComponent({
       builds,
       openName,
       pickAvatar,
+      openScanner,
+      isOffline,
       onAvatarPicked,
       saveName,
       downloadBuild,

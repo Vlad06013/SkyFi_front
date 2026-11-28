@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import { resolveEndpoint } from '@/lib/endpoints';
+import { activeOrigin, resolveEndpoint } from '@/lib/endpoints';
 import { setNetworkOutcomeHandler, setOfflineGate } from '@/api/http';
 import { recordNetEvent } from '@/lib/net-log';
 
@@ -8,11 +8,12 @@ import { recordNetEvent } from '@/lib/net-log';
  * Онлайн-детект на сокете (optimizations.md «Онлайн-детект на сокете»):
  * `connected` → онлайн мгновенно; разрыв (`disconnected`/`unavailable`/
  * `failed`) → офлайн с грейс-периодом против краткого флапа WiFi и
- * ретраев сокета. HTTP-зонд не используется. Единственный источник
- * флага — события Echo-соединения (realtime/index.ts шлёт сюда
- * noteSocket*). Дополнительно: серия сетевых/5xx фейлов при живом
- * сокете («сокет онлайн, а HTTP бэка умер») → принудительный офлайн и
- * рестарт сокета.
+ * ретраев сокета. Единственный источник флага в установившейся сессии —
+ * события Echo-соединения (realtime/index.ts шлёт сюда noteSocket*).
+ * Дополнительно: серия сетевых/5xx фейлов при живом сокете («сокет
+ * онлайн, а HTTP бэка умер») → принудительный офлайн и рестарт сокета.
+ * Единственный HTTP-зонд — стартовый, один на запуск (probeAtStartup):
+ * без него мёртвый бэк обнаруживался только таймаутами сокета.
  */
 
 /** Разрыв → офлайн с задержкой: краткий флап WiFi не дёргает плеер. */
@@ -21,6 +22,8 @@ const OFFLINE_GRACE_MS = 3_000;
 const RESOLVE_COOLDOWN_MS = 60_000;
 /** Столько сетевых/5xx фейлов подряд при живом сокете = принудительный офлайн. */
 const FAILS_TO_FORCE_OFFLINE = 3;
+/** Стартовый зонд ждёт бэк столько, потом — офлайн сразу (баг 14). */
+const STARTUP_PROBE_TIMEOUT_MS = 2_500;
 
 export const useOnlineStore = defineStore('online', () => {
   /** null — первого коннекта сокета ещё не было (сплэш не решился). */
@@ -42,6 +45,30 @@ export const useOnlineStore = defineStore('online', () => {
     isOnline.value = value;
     recordNetEvent(event, detail, value ? 'online' : 'offline');
     if (value) onlineHandlers.forEach((handler) => handler());
+  }
+
+  /**
+   * Стартовый зонд живости бэка (баг 14): без него мёртвый сервер при
+   * запуске обнаруживался только таймаутами сокета — секунд 15 «думания»,
+   * в которые скачанный трек успевал откатиться. Один fetch no-cors на
+   * выбранный endpoint: любой HTTP-ответ = бэк жив (онлайн подтвердит
+   * сокет), обрыв/таймаут — офлайн немедленно, сокет догонит и переведёт
+   * в онлайн. Это не возврат health-поллера: зонд один на запуск.
+   */
+  async function probeAtStartup() {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      setOnline(false, 'probe', 'нет сети (navigator.onLine)');
+      return;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), STARTUP_PROBE_TIMEOUT_MS);
+    try {
+      await fetch(activeOrigin(), { mode: 'no-cors', cache: 'no-store', signal: controller.signal });
+    } catch {
+      setOnline(false, 'probe', 'бэк не ответил на стартовый зонд');
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /** Сокет соединился (realtime). */
@@ -137,6 +164,7 @@ export const useOnlineStore = defineStore('online', () => {
 
   return {
     isOnline,
+    probeAtStartup,
     noteSocketConnected,
     noteSocketDisconnected,
     noteSessionEnded,

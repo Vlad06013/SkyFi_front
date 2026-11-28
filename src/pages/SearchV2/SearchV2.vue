@@ -9,6 +9,7 @@
         class="src-ico"
         :class="{ on: resource === item.id }"
         :aria-pressed="resource === item.id"
+        :disabled="resourceDisabled(item.id)"
         @click="selectResource(item.id)"
       >
         <span class="bubble"><SourceBadge :source="item.id" :caption="item.label" /></span>

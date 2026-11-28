@@ -4,6 +4,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import type { Pinia } from 'pinia';
 import * as authApi from '@/api/auth';
 import { useAuthStore } from '@/stores/auth';
+import { useOnlineStore } from '@/stores/online';
 import Settings from '@/pages/Settings/Settings.vue';
 import QrScannerSheet from '@/components/QrScannerSheet/QrScannerSheet.vue';
 import SettingRow from '@/components/SettingRow/SettingRow.vue';
@@ -170,5 +171,38 @@ describe('pages/Settings', () => {
     await auto!.trigger('click');
     await flushPromises();
     expect(document.documentElement.dataset.layout).toBeUndefined();
+  });
+
+  it('офлайн: карандаш, аватар и сканнер задизейблены (баг 25)', async () => {
+    useOnlineStore().isOnline = false;
+    const wrapper = mount(Settings, {
+      global: {
+        plugins: [pinia],
+        stubs: {
+          AppBar: true,
+          AppSheet: { template: '<div><slot /></div>' },
+          SeekBar: true,
+          YandexCard: true,
+          QrScannerSheet: { props: ['open'], template: '<div class="qr-scanner-stub" />' },
+        },
+      },
+    });
+
+    expect(wrapper.find('button[aria-label="изменить имя"]').attributes('disabled')).toBeDefined();
+    expect(wrapper.find('.pic-plus').classes()).toContain('is-disabled');
+
+    // Тап по аватару не открывает выбор файла.
+    const input = wrapper.find('input[type="file"]');
+    const clickSpy = vi.spyOn(input.element, 'click');
+    await wrapper.find('.pic-plus').trigger('click');
+    expect(clickSpy).not.toHaveBeenCalled();
+
+    // Строка сканнера гашена, тап не открывает сканер.
+    const qrRow = wrapper
+      .findAllComponents(SettingRow)
+      .find((row) => row.props('title') === 'Сканировать QR');
+    expect(qrRow!.classes()).toContain('is-disabled');
+    await qrRow!.trigger('click');
+    expect(wrapper.findComponent(QrScannerSheet).props('open')).toBe(false);
   });
 });
