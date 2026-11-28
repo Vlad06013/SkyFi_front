@@ -12,17 +12,19 @@ import SettingRow from '@/components/SettingRow/SettingRow.vue';
 import YandexCard from '@/components/YandexCard/YandexCard.vue';
 import YoutubeCard from '@/components/YoutubeCard/YoutubeCard.vue';
 import QrScannerSheet from '@/components/QrScannerSheet/QrScannerSheet.vue';
-import { useApkBuildStore } from '@/stores/apk-build';
+import { fetchLatestApk } from '@/api/app-updates';
 import { useAppUpdateStore } from '@/stores/app-update';
 import { useAuthStore } from '@/stores/auth';
 import { useLayoutStore } from '@/stores/layout';
 import type { LayoutProfile } from '@/lib/layout-profile';
 import { resolveUrl } from '@/lib/endpoints';
+import { openExternalUrl } from '@/lib/external-url';
 import { useDownloadsStore } from '@/stores/downloads';
 import { useOnlineStore } from '@/stores/online';
 import { usePlayerStore } from '@/stores/player';
 import { useToastStore } from '@/stores/toast';
 import { clearNetLog, formatNetLog, netEventLabel, netLog, type NetLogEntry } from '@/lib/net-log';
+import type { AppUpdatePayload } from '@/types/app-update';
 
 export default defineComponent({
   name: 'SettingsPage',
@@ -54,7 +56,6 @@ export default defineComponent({
       ]),
     );
 
-    const apk = useApkBuildStore();
     const updates = useAppUpdateStore();
     const { idle: updateIdle, ready: updateReady, checking: updateChecking, downloading: updateDownloading } = storeToRefs(updates);
     // Вкладка живёт в keep-alive: onActivated — каждый заход, не только первый.
@@ -76,9 +77,28 @@ export default defineComponent({
     const { items: downloadedItems, downloadedBytes } = storeToRefs(downloads);
     const hasDownloads = computed(() => downloadedItems.value.length > 0);
     const downloadedSize = computed(() => formatBytes(downloadedBytes.value));
-    const builds = [
-      { id: 'apk', title: 'Android · APK', idle: 'телефон, ТВ, магнитола' },
-    ] as const;
+    // Скачивание APK в браузере: последний опубликованный на бэке релиз
+    // оболочки. Версию подтягиваем при открытии шторки — видно, что качается.
+    const latestApk = ref<AppUpdatePayload | null>(null);
+    const builds = computed(() => [
+      {
+        id: 'apk',
+        title: 'Android · APK',
+        idle: latestApk.value ? `версия ${latestApk.value.version}` : 'телефон, ТВ, магнитола',
+      },
+    ]);
+    async function refreshLatestApk() {
+      try {
+        latestApk.value = await fetchLatestApk();
+      } catch {
+        latestApk.value = null; // подпись останется общей, клик переспросит
+      }
+    }
+    function openDownloadSheet() {
+      if (isOffline.value) return;
+      sheet.value = 'download';
+      void refreshLatestApk();
+    }
     function openName() {
       if (isOffline.value) return;
       draft.value = user.value?.name ?? '';
@@ -116,9 +136,30 @@ export default defineComponent({
       }
     }
 
-    function downloadBuild() {
+    function openBrowserApk(url: string) {
+      // Строка есть только в обычном браузере: новая вкладка качает файл
+      // и оставляет SkyFi на месте. Если вкладку запретили — уходим
+      // по ссылке в этой (attachment, страница не сменится).
+      const opened = window.open(url, '_blank', 'noopener');
+      if (!opened) openExternalUrl(url);
+    }
+
+    async function downloadBuild() {
+      if (isOffline.value) return;
       sheet.value = null;
-      apk.downloadApk();
+      try {
+        // Ссылка подписанная и живёт 60 минут — всегда берём свежую.
+        const offer = await fetchLatestApk();
+        latestApk.value = offer;
+        if (!offer) {
+          toast.show('APK пока не опубликован', '', true);
+          return;
+        }
+        openBrowserApk(offer.url);
+        toast.show('Скачивание APK', `версия ${offer.version}`);
+      } catch (error) {
+        toast.show(error instanceof Error ? error.message : 'Не удалось получить ссылку на APK', '', true);
+      }
     }
 
     function formatBytes(bytes: number): string {
@@ -211,6 +252,7 @@ export default defineComponent({
       isOffline,
       onAvatarPicked,
       saveName,
+      openDownloadSheet,
       downloadBuild,
       askClearDownloads,
       clearDownloads,

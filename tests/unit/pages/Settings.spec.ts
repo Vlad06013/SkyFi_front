@@ -5,6 +5,7 @@ import type { Pinia } from 'pinia';
 import * as authApi from '@/api/auth';
 import { useAuthStore } from '@/stores/auth';
 import { useOnlineStore } from '@/stores/online';
+import { useToastStore } from '@/stores/toast';
 import Settings from '@/pages/Settings/Settings.vue';
 import QrScannerSheet from '@/components/QrScannerSheet/QrScannerSheet.vue';
 import SettingRow from '@/components/SettingRow/SettingRow.vue';
@@ -40,6 +41,23 @@ vi.mock('@/lib/session', () => ({
   clearSession: vi.fn(),
 }));
 
+const appUpdatesMocks = vi.hoisted(() => ({
+  fetchLatestApk: vi.fn(),
+}));
+
+vi.mock('@/api/app-updates', () => ({
+  fetchAppUpdate: vi.fn(async () => null),
+  fetchLatestApk: appUpdatesMocks.fetchLatestApk,
+}));
+
+const externalMocks = vi.hoisted(() => ({
+  openExternalUrl: vi.fn(),
+}));
+
+vi.mock('@/lib/external-url', () => ({
+  openExternalUrl: externalMocks.openExternalUrl,
+}));
+
 const updateProfileMock = vi.mocked(authApi.updateProfile);
 const uploadAvatarMock = vi.mocked(authApi.uploadAvatar);
 const logoutMock = vi.mocked(authApi.logout);
@@ -70,6 +88,8 @@ describe('pages/Settings', () => {
     const auth = useAuthStore();
     auth.user = user;
     auth.token = 't1';
+    appUpdatesMocks.fetchLatestApk.mockReset();
+    externalMocks.openExternalUrl.mockReset();
   });
 
   it('сохранение имени шлёт PATCH через стор', async () => {
@@ -135,7 +155,49 @@ describe('pages/Settings', () => {
     expect(wrapper.findComponent(QrScannerSheet).props('open')).toBe(true);
   });
 
-  it('Android · APK скачивается файлом из ветки dev_v2', async () => {
+  it('браузер качает опубликованный APK по подписанной ссылке', async () => {
+    const offer = {
+      kind: 'apk' as const,
+      version: '1.2.0',
+      url: 'https://api.example/api/download-apk/7?signature=abc',
+      sha256: 'aa',
+      size_bytes: 10,
+      mandatory: false,
+      notes: null,
+    };
+    appUpdatesMocks.fetchLatestApk.mockResolvedValue(offer);
+    const open = vi.spyOn(window, 'open').mockImplementation(() => ({}) as Window);
+    const wrapper = mount(Settings, {
+      global: {
+        plugins: [pinia],
+        stubs: {
+          AppBar: true,
+          AppSheet: { template: '<div><slot /></div>' },
+          SeekBar: true,
+          YandexCard: true,
+        },
+      },
+    });
+
+    const entry = wrapper
+      .findAllComponents(SettingRow)
+      .find((row) => row.props('title') === 'Скачать приложение');
+    await entry!.trigger('click');
+    await flushPromises();
+
+    const apkRow = wrapper
+      .findAllComponents(SettingRow)
+      .find((row) => row.props('title') === 'Android · APK');
+    expect(apkRow!.props('idle')).toBe('версия 1.2.0');
+    await apkRow!.trigger('click');
+    await flushPromises();
+
+    expect(open).toHaveBeenCalledWith(offer.url, '_blank', 'noopener');
+    expect(externalMocks.openExternalUrl).not.toHaveBeenCalled();
+  });
+
+  it('без опубликованного APK ссылка не открывается', async () => {
+    appUpdatesMocks.fetchLatestApk.mockResolvedValue(null);
     const open = vi.spyOn(window, 'open').mockImplementation(() => null);
     const wrapper = mount(Settings, {
       global: {
@@ -149,15 +211,15 @@ describe('pages/Settings', () => {
       },
     });
 
-    const apkRow = wrapper.findAllComponents(SettingRow).find((row) => row.props('title') === 'Android · APK');
-    expect(apkRow).toBeDefined();
+    const apkRow = wrapper
+      .findAllComponents(SettingRow)
+      .find((row) => row.props('title') === 'Android · APK');
     await apkRow!.trigger('click');
+    await flushPromises();
 
-    expect(open).toHaveBeenCalledWith(
-      'https://github.com/Vlad06013/SkyFi_front/raw/dev_v2/skyFy.apk',
-      '_blank',
-      'noopener',
-    );
+    expect(open).not.toHaveBeenCalled();
+    expect(externalMocks.openExternalUrl).not.toHaveBeenCalled();
+    expect(useToastStore().toast?.title).toBe('APK пока не опубликован');
   });
 
   it('интерфейс: автомагнитола ставит data-layout, «Как сейчас» снимает', async () => {

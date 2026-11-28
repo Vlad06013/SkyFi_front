@@ -96,7 +96,7 @@
         {{ updateReady ? 'Обновить' : 'Проверить обновления' }}
       </button>
     </SettingRow>
-    <SettingRow v-else title="Скачать приложение" idle="APK" clickable @open="sheet = 'download'">
+    <SettingRow v-else title="Скачать приложение" idle="APK" clickable :class="{ 'is-disabled': isOffline }" @open="openDownloadSheet">
       <template #icon>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 4v11" />
@@ -177,6 +177,7 @@
           :title="build.title"
           :idle="build.idle"
           clickable
+          :class="{ 'is-disabled': isOffline }"
           @open="downloadBuild"
         >
           <template #icon>
