@@ -40,6 +40,8 @@ export const useAppUpdateStore = defineStore('app-update', () => {
   const promptOpen = ref(false);
   const pending = ref<AppUpdatePayload | null>(null);
   const bundleId = ref<string | null>(null);
+  /** Версия оболочки (APK) из нативного слоя; до ответа — null. */
+  const shell = ref<string | null>(null);
 
   const ready = computed(() => bundleId.value != null && pending.value != null);
   const mandatory = computed(() => pending.value?.mandatory === true);
@@ -47,9 +49,10 @@ export const useAppUpdateStore = defineStore('app-update', () => {
   const idle = computed(() => {
     if (downloading.value) return `загрузка ${Math.round(progress.value)}%`;
     if (pending.value) {
-      return pending.value.kind === 'apk' ? `APK ${pending.value.version}` : pending.value.version;
+      return pending.value.kind === 'apk' ? `APK ${pending.value.version}` : `бандл ${pending.value.version}`;
     }
-    return BUNDLE_VERSION;
+    // Две версии рядом: обновление оболочки не двигает версию бандла.
+    return shell.value ? `бандл ${BUNDLE_VERSION} · APK ${shell.value}` : `бандл ${BUNDLE_VERSION}`;
   });
 
   const promptTitle = computed(() => {
@@ -131,12 +134,14 @@ export const useAppUpdateStore = defineStore('app-update', () => {
     if (!manual && useOnlineStore().isOnline === false) return;
     checking.value = true;
     try {
-      const update = await fetchAppUpdate(BUNDLE_VERSION, await shellVersion());
+      const currentShell = await shellVersion();
+      shell.value = currentShell;
+      const update = await fetchAppUpdate(BUNDLE_VERSION, currentShell);
       if (!update) {
         pending.value = null;
         bundleId.value = null;
         promptOpen.value = false;
-        if (manual) useToastStore().show('Обновлений нет', BUNDLE_VERSION);
+        if (manual) useToastStore().show('Обновлений нет', `бандл ${BUNDLE_VERSION} · APK ${currentShell}`);
         return;
       }
       if (pending.value?.version !== update.version) bundleId.value = null;
@@ -188,6 +193,10 @@ export const useAppUpdateStore = defineStore('app-update', () => {
   /** После входа и возврата сети. До сессии запрос не уходит (эндпоинт с токеном). */
   function bind() {
     if (!inApk) return;
+    // Версия оболочки — локальный нативный вызов, сети не надо: показываем сразу.
+    void shellVersion().then((version) => {
+      shell.value = version;
+    });
     const auth = useAuthStore();
     const online = useOnlineStore();
     watch(

@@ -72,9 +72,12 @@ describe('app update', () => {
 
   it('шлёт версию бандла и оболочку X.Y.Z', async () => {
     vi.mocked(fetchAppUpdate).mockResolvedValue(null);
-    await useAppUpdateStore().check(true);
+    const store = useAppUpdateStore();
+    await store.check(true);
     expect(fetchAppUpdate).toHaveBeenCalledWith(BUNDLE_VERSION, '1.0.0');
     expect(useToastStore().toast?.title).toBe('Обновлений нет');
+    expect(useToastStore().toast?.who).toBe(`бандл ${BUNDLE_VERSION} · APK 1.0.0`);
+    expect(store.idle).toBe(`бандл ${BUNDLE_VERSION} · APK 1.0.0`);
   });
 
   it('сначала предлагает обновиться и не качает, пока не подтвердили', async () => {
@@ -84,6 +87,7 @@ describe('app update', () => {
     await store.check();
     expect(store.promptOpen).toBe(true);
     expect(store.promptMessage).toBe('починили плеер');
+    expect(store.idle).toBe('бандл 1.1.0');
     expect(updater.download).not.toHaveBeenCalled();
     store.dismiss();
     expect(store.promptOpen).toBe(false);
