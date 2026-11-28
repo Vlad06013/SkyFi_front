@@ -35,33 +35,48 @@ export default defineComponent({
     const query = ref('');
     const focused = ref(false);
     const friendsStore = useFriendsStore();
-    usePageRefresh(() => friendsStore.fetchAll());
     const { friends, incoming, outgoing, loaded } = storeToRefs(friendsStore);
 
     const foundUsers = ref<UserSearchItem[]>([]);
     const searchingUsers = ref(false);
+    /** Какой обзор был актуален, когда пришла выдача. */
+    const foundTick = ref(0);
     let generation = 0;
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
     /**
-     * Вид строки выдачи. Выдача — снапшот на момент поиска: заявку могли
-     * принять/отменить уже после (сокет правит списки стора), поэтому живой
-     * стор важнее сохранённого статуса — иначе строка вечно висела
-     * «заявка отправлена» до перезагрузки страницы. Направление PENDING-заявки
-     * бэк не кодирует: без списков стора безопасный фолбэк — «исходящая»
-     * (отмена), а не «Добавить» с гарантированным 422.
+     * Вид строки выдачи. Выдача — снапшот на момент поиска. Сокеты есть
+     * только на sent/accepted (api.md §17): отмена и отклонение списки
+     * сами не двигают, их привозит обзор. Живой стор важнее снимка.
+     * Если обзор свежее выдачи и человека нет ни в одной секции — связи
+     * больше нет, старый PENDING не оставляем «заявка отправлена».
+     * Пока выдача новее обзора (или обзор ещё не грузили), PENDING
+     * показываем как исходящую: «Добавить» на живую заявку даёт 422.
      */
     function statusKind(item: UserSearchItem): FoundKind {
-      // Живой стор (сокет двигает списки) приоритетнее снапшота выдачи:
-      // принятую после поиска заявку строка иначе вечно рисовала
-      // «заявка отправлена» до перезагрузки страницы. Вне списков стора
-      // верим выдаче — она могла быть свежее обзора.
       if (friendsStore.friends.some((entry) => entry.user.id === item.user_id)) return 'friends';
       if (friendsStore.incoming.some((entry) => entry.user.id === item.user_id)) return 'incoming';
       if (friendsStore.outgoing.some((entry) => entry.user.id === item.user_id)) return 'outgoing';
+      if (friendsStore.loaded && foundTick.value < friendsStore.overviewTick) return 'none';
       const kind = baseKind(item);
       if (kind !== 'pending') return kind;
-      return friendsStore.incoming.some((entry) => entry.user.id === item.user_id) ? 'incoming' : 'outgoing';
+      return 'outgoing';
+    }
+
+    function searchNow(q: string) {
+      const gen = ++generation;
+      const tick = friendsStore.overviewTick;
+      searchingUsers.value = true;
+      searchUsers(q)
+        .then((items) => {
+          if (gen !== generation) return;
+          foundUsers.value = items;
+          foundTick.value = tick;
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          if (gen === generation) searchingUsers.value = false;
+        });
     }
 
     watch(query, () => {
@@ -71,18 +86,15 @@ export default defineComponent({
         foundUsers.value = [];
         return;
       }
-      debounceTimer = setTimeout(() => {
-        const gen = ++generation;
-        searchingUsers.value = true;
-        searchUsers(q)
-          .then((items) => {
-            if (gen === generation) foundUsers.value = items;
-          })
-          .catch(() => undefined)
-          .finally(() => {
-            if (gen === generation) searchingUsers.value = false;
-          });
-      }, SEARCH_DEBOUNCE_MS);
+      debounceTimer = setTimeout(() => searchNow(q), SEARCH_DEBOUNCE_MS);
+    });
+
+    usePageRefresh(async () => {
+      await friendsStore.fetchAll();
+      const q = query.value.trim();
+      if (!q) return;
+      if (debounceTimer) clearTimeout(debounceTimer);
+      searchNow(q);
     });
 
     /** Заявки из выдачи (отправленные и полученные) — сверху, отдельно от общего списка. */

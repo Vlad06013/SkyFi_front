@@ -42,6 +42,13 @@ function freshNotificationId(): number {
 /** Разовая настройка на нативе: канал со звуком + запрос разрешения (Android 13+). */
 export function initSocialNotifications(router: Router): void {
   if (!Capacitor.isNativePlatform()) return;
+  const host = window as Window & { __skyfiNotifyOpen?: (raw: unknown) => void };
+  // Нативный сокет сервиса (активити уже нет) кладёт цель сюда по тапу.
+  host.__skyfiNotifyOpen = (raw: unknown) => {
+    const target = readTarget(raw);
+    if (!target) return;
+    void router.isReady().then(() => openSocialTarget(router, target));
+  };
   listenForTaps(router);
   void (async () => {
     try {

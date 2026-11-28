@@ -82,6 +82,18 @@ describe('stores/friends', () => {
     expect(store.incoming.map((entry) => entry.user.id)).toEqual([2]);
     expect(store.outgoing.map((entry) => entry.user.id)).toEqual([4]);
     expect(store.loaded).toBe(true);
+    expect(store.overviewTick).toBe(1);
+  });
+
+  it('секция null не роняет обзор: списки пустые, тик растёт', async () => {
+    overviewMock.mockResolvedValue({ friends: null, incoming: [], outgoing: [] } as never);
+    authAsMe();
+    const store = useFriendsStore();
+    await flushPromises();
+
+    expect(store.friends).toEqual([]);
+    expect(store.loaded).toBe(true);
+    expect(store.overviewTick).toBe(1);
   });
 
   it('live-строка из current_snapshot собеседника (видео — «· клип»)', () => {

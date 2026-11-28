@@ -3,6 +3,7 @@ import Echo from 'laravel-echo';
 import { endpointKind } from '@/lib/endpoints';
 import { recordNetEvent } from '@/lib/net-log';
 import { createEcho } from '@/realtime/echo';
+import { clearRealtimeHandoff, publishRealtimeHandoff } from '@/realtime/handoff';
 import { createRouter } from '@/realtime/router';
 import {
   handleDeviceChanged,
@@ -136,6 +137,7 @@ export function startRealtime(userId: number) {
   connection.bind('connected', () => {
     if (!alive()) return;
     console.info(`[realtime] соединение установлено (user ${userId})`);
+    publishRealtimeHandoff(userId);
     if (!wasConnected) subscribeOwnChannel(userId);
     subscribeDeviceChannel();
     if (wasConnected || resyncOnConnect) reconnectHandlers.forEach((handler) => handler());
@@ -204,6 +206,7 @@ export function bindSessionRealtime() {
       if (authed && userId != null) startRealtime(userId);
       else {
         stopRealtime();
+        clearRealtimeHandoff();
         // Намеренный стоп — не обрыв: иначе логин остаётся в офлайне.
         useOnlineStore().noteSessionEnded();
       }

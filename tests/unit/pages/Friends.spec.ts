@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { flushPromises, mount } from '@vue/test-utils';
 import * as friendsApi from '@/api/friends';
 import Friends from '@/pages/Friends/Friends.vue';
+import { refreshActivePage } from '@/composables/usePageRefresh';
 import { useAuthStore } from '@/stores/auth';
 import { useFriendsStore } from '@/stores/friends';
 import type { FriendshipPayload, UserSearchItem } from '@/types';
@@ -208,5 +209,32 @@ describe('pages/Friends', () => {
     const katya = rowByName(wrapper, 'Катя');
     expect(katya.text()).toContain('Друзья');
     expect(katya.text()).not.toContain('заявка отправлена');
+  });
+
+  it('заявку сняли без сокета: свежий обзор без человека убирает «заявка отправлена»', async () => {
+    const wrapper = await typeAndSearch('а');
+    expect(rowByName(wrapper, 'Катя').text()).toContain('заявка отправлена');
+
+    overviewMock.mockResolvedValue({ friends: [], incoming: [], outgoing: [] });
+    await useFriendsStore().fetchAll();
+    await flushPromises();
+
+    const katya = rowByName(wrapper, 'Катя');
+    expect(katya.text()).not.toContain('заявка отправлена');
+    expect(katya.find('.btn').text()).toBe('Добавить');
+  });
+
+  it('свайп перечитывает поиск и ставит статус из свежей выдачи', async () => {
+    const wrapper = await typeAndSearch('а');
+    overviewMock.mockResolvedValue({ friends: [], incoming: [], outgoing: [] });
+    searchUsersMock.mockResolvedValue(
+      FOUND.map((item) => (item.user_id === 2 ? { ...item, friendship_status: null } : item)) as never,
+    );
+
+    await refreshActivePage('friends');
+    await flushPromises();
+
+    expect(searchUsersMock).toHaveBeenCalledWith('а');
+    expect(rowByName(wrapper, 'Катя').find('.btn').text()).toBe('Добавить');
   });
 });

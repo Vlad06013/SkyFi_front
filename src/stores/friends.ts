@@ -50,13 +50,20 @@ export const useFriendsStore = defineStore('friends', () => {
   const incoming = ref<FriendEntry[]>([]);
   const outgoing = ref<FriendEntry[]>([]);
   const loaded = ref(false);
+  /** Растёт на каждый успешный обзор. Поиск друзей сравнивает с ним свежесть. */
+  const overviewTick = ref(0);
 
-  function applyOverview(payload: FriendshipOverviewPayload) {
+  function asList(items: FriendshipPayload[] | null | undefined): FriendshipPayload[] {
+    return Array.isArray(items) ? items : [];
+  }
+
+  function applyOverview(payload: FriendshipOverviewPayload | null | undefined) {
     const id = auth.user?.id;
-    friends.value = payload.friends.map((item) => toEntry(item, id));
-    incoming.value = payload.incoming.map((item) => toEntry(item, id));
-    outgoing.value = payload.outgoing.map((item) => toEntry(item, id));
+    friends.value = asList(payload?.friends).map((item) => toEntry(item, id));
+    incoming.value = asList(payload?.incoming).map((item) => toEntry(item, id));
+    outgoing.value = asList(payload?.outgoing).map((item) => toEntry(item, id));
     loaded.value = true;
+    overviewTick.value += 1;
   }
 
   /** Первичная загрузка; неудача не поднимается — флажок не ставим, можно повторить. */
@@ -165,6 +172,7 @@ export const useFriendsStore = defineStore('friends', () => {
     incoming,
     outgoing,
     loaded,
+    overviewTick,
     ensure,
     fetchAll,
     accept,

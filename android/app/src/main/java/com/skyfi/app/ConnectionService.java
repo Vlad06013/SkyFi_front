@@ -21,6 +21,14 @@ public class ConnectionService extends Service {
     static final String CHANNEL_ID = "skyfi-connection";
     static final int NOTIFICATION_ID = 42;
 
+    private SocialRelay relay;
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        relay = new SocialRelay(this);
+    }
+
     @Override
     public IBinder onBind(Intent intent) {
         return null;
@@ -34,7 +42,25 @@ public class ConnectionService extends Service {
         } else {
             startForeground(NOTIFICATION_ID, notification);
         }
+        if (intent != null && SocialRelay.ACTION_HEADLESS.equals(intent.getAction())) {
+            relay.start();
+        }
         return START_NOT_STICKY;
+    }
+
+    /**
+     * Смахнули из недавних. onDestroy активити на части прошивок не
+     * доходит — сокет всё равно забираем здесь. Повторный start() пустой.
+     */
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        relay.start();
+    }
+
+    @Override
+    public void onDestroy() {
+        relay.stop();
+        super.onDestroy();
     }
 
     private Notification buildNotification() {

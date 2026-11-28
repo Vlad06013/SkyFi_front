@@ -8,6 +8,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
 
+import org.json.JSONObject;
+
 import androidx.core.content.ContextCompat;
 
 import androidx.core.graphics.Insets;
@@ -19,14 +21,19 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    /** Живые активити. Ноль — WebView нет, сокет можно забрать сервису. */
+    static int liveActivities;
+
     private int topCss;
     private int bottomCss;
     private int leftCss;
     private int rightCss;
+    private int openAttempt;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        liveActivities += 1;
         // Android 15+ рисует вебвью под системными барами, а env(safe-area-inset-*)
         // в WebView остаётся 0. Реальные отступы кладём в CSS-переменные.
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
@@ -48,6 +55,61 @@ public class MainActivity extends BridgeActivity {
         content.postDelayed(this::publishSafeArea, 400);
         content.postDelayed(this::publishSafeArea, 1500);
         askNotificationPermission();
+        deliverOpenTarget(getIntent());
+    }
+
+    @Override
+    public void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        deliverOpenTarget(intent);
+    }
+
+    /** Закрытие (не сворачивание): WebView умрёт, сокет переезжает в сервис. */
+    @Override
+    public void onDestroy() {
+        liveActivities = Math.max(0, liveActivities - 1);
+        if (liveActivities == 0) {
+            Intent intent = new Intent(this, ConnectionService.class);
+            intent.setAction(SocialRelay.ACTION_HEADLESS);
+            try {
+                ContextCompat.startForegroundService(this, intent);
+            } catch (Exception ignored) {
+                /* процесс уже уходит — сервис не поднять */
+            }
+        }
+        super.onDestroy();
+    }
+
+    /** Тап по уведомлению, которое показал сервис без WebView. */
+    private void deliverOpenTarget(Intent intent) {
+        if (intent == null) return;
+        String raw = intent.getStringExtra(SocialRelay.EXTRA_OPEN);
+        if (raw == null || raw.isEmpty()) return;
+        intent.removeExtra(SocialRelay.EXTRA_OPEN);
+        openAttempt = 0;
+        pushOpenTarget(raw);
+    }
+
+    private void pushOpenTarget(String raw) {
+        if (getBridge() == null || getBridge().getWebView() == null) {
+            retryOpen(raw);
+            return;
+        }
+        String js = "(function(){if(!window.__skyfiNotifyOpen)return 'wait';"
+            + "window.__skyfiNotifyOpen(JSON.parse(" + JSONObject.quote(raw) + "));return 'ok';})()";
+        getBridge().getWebView().evaluateJavascript(js, value -> {
+            if (value != null && value.contains("ok")) return;
+            retryOpen(raw);
+        });
+    }
+
+    private void retryOpen(String raw) {
+        if (openAttempt >= 6) return;
+        openAttempt += 1;
+        View content = findViewById(android.R.id.content);
+        if (content == null) return;
+        content.postDelayed(() -> pushOpenTarget(raw), 400L * openAttempt);
     }
 
     /** Уведомление плеера с API 33. Без разрешения сервис жив, шторки нет. */
