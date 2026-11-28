@@ -11,7 +11,8 @@
     "test:e2e": "cypress run",
     "test:unit": "vitest",
     "test:unit:run": "vitest run",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "postinstall": "sh scripts/apply-notification-patch.sh"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",

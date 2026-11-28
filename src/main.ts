@@ -104,7 +104,7 @@ void useLayoutStore(pinia)
         // Картинки, упавшие в офлайне, догружаем на возврате сети.
         bindImageRetry();
         // Соц-уведомления: канал и разрешение на нативе (баг 26).
-        initSocialNotifications();
+        initSocialNotifications(router);
         // DEV-диагностика: доступ из консоли (window.__player/__devices/__clipVideo).
         if (import.meta.env.DEV) {
           (window as unknown as { __player: ReturnType<typeof usePlayerStore> }).__player = usePlayerStore(pinia);

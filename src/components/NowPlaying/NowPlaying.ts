@@ -18,6 +18,7 @@ import { resolveUrl } from '@/lib/endpoints';
 import { sortRowStyle, startListSort, type ListSortState } from '@/lib/list-sort';
 import { entityFromSnapshot } from '@/lib/media-menu';
 import { PLAY_SOURCE_QUEUE } from '@/lib/play-sources';
+import { ackQueueReveal, queueReveal, queueRevealPending } from '@/lib/player-reveal';
 import { pushBackOverlay } from '@/lib/hardware-back';
 import { trackPointer } from '@/lib/pointer-drag';
 import { formatTime } from '@/lib/time';
@@ -483,6 +484,23 @@ export default defineComponent({
       void ensureQueue();
       layer.value = layer.value === 'queue' ? 'now' : 'queue';
     }
+
+    // Тап по системному уведомлению очереди. Ждём гидрацию: на холодном
+    // старте current ещё пуст, и открывать слой рано.
+    watch([queueReveal, current, queueLoaded], () => {
+      if (!queueRevealPending()) return;
+      if (!queueLoaded.value && !current.value) return;
+      if (!current.value) {
+        ackQueueReveal();
+        return;
+      }
+      ackQueueReveal();
+      closeMenu();
+      sheet.value = null;
+      void ensureQueue();
+      expanded.value = true;
+      layer.value = 'queue';
+    }, { immediate: true });
 
     /** Чистое видео: аудио под клипом нет, режим нечем заменить. */
     const clipsLocked = computed(() => current.value?.type === 'video');

@@ -17,6 +17,12 @@ const config: CapacitorConfig = {
       // и он отклоняет ссылку ещё до запроса.
       httpsOnly: false,
     },
+    // Иконка шторки — белый силуэт в res/drawable. Без неё Android
+    // ставит системный «восклицательный» ic_dialog_info.
+    LocalNotifications: {
+      smallIcon: 'ic_stat_skyfi',
+      iconColor: '#1ED760',
+    },
   },
 };
 

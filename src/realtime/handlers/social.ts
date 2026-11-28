@@ -14,7 +14,7 @@ export function handleFriendshipRequestSent(payload: FriendshipEventPayload) {
   if (!payload?.friendship) return;
   useFriendsStore().applyRequestSent(payload.friendship);
   useToastStore().show(payload.friendship.sender.name, 'заявка в друзья');
-  notifySocial(payload.friendship.sender.name, 'заявка в друзья');
+  notifySocial(payload.friendship.sender.name, 'заявка в друзья', { to: 'friends' });
 }
 
 /** friendship.request.accepted (api.md §17): мою заявку приняли — outgoing → friends + тост. */
@@ -22,7 +22,7 @@ export function handleFriendshipRequestAccepted(payload: FriendshipEventPayload)
   if (!payload?.friendship) return;
   useFriendsStore().applyRequestAccepted(payload.friendship);
   useToastStore().show(payload.friendship.receiver.name, 'принял заявку');
-  notifySocial(payload.friendship.receiver.name, 'принял заявку');
+  notifySocial(payload.friendship.receiver.name, 'принял заявку', { to: 'friends' });
 }
 
 /** friend.queue.item.added (api.md §17): друг добавил в мою очередь. */
@@ -30,7 +30,7 @@ export function handleFriendQueueItemAdded(payload: FriendQueueItemAddedPayload)
   if (!payload?.item) return;
   const name = payload.added_by?.name ?? 'Друг';
   useToastStore().show(payload.item.title, `${name} добавил в очередь`);
-  notifySocial(payload.item.title, `${name} добавил в очередь`);
+  notifySocial(payload.item.title, `${name} добавил в очередь`, { to: 'queue' });
   void usePlayerStore().refreshQueue();
 }
 
@@ -44,5 +44,9 @@ export function handleShareSent(payload: ShareSentPayload) {
     snapshot: payload.snapshot,
   });
   useToastStore().show(payload.snapshot.title, `${senderName} поделился`);
-  notifySocial(payload.snapshot.title, `${senderName} поделился`);
+  notifySocial(payload.snapshot.title, `${senderName} поделился`, {
+    to: 'share',
+    shareId: payload.share_id,
+    snapshot: payload.snapshot,
+  });
 }

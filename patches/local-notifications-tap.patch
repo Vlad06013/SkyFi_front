@@ -1,0 +1,14 @@
+--- a/node_modules/@capacitor/local-notifications/android/src/main/kotlin/com/capacitorjs/plugins/localnotifications/LocalNotificationManager.kt
++++ b/node_modules/@capacitor/local-notifications/android/src/main/kotlin/com/capacitorjs/plugins/localnotifications/LocalNotificationManager.kt
+@@ -292,7 +292,10 @@
+         }
+         intent.action = Intent.ACTION_MAIN
+         intent.addCategory(Intent.CATEGORY_LAUNCHER)
+-        intent.flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
++        // Без NEW_TASK тап по уведомлению, пока активити свёрнута
++        // (процесс держит foreground-service), шторку закрывает и
++        // активити не поднимает. singleTask это не лечит.
++        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+         intent.putExtra(NOTIFICATION_INTENT_KEY, localNotification.id)
+         intent.putExtra(ACTION_INTENT_KEY, action)
+         intent.putExtra(NOTIFICATION_OBJ_INTENT_KEY, localNotification.source)

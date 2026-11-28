@@ -3,7 +3,12 @@
     android:height="24dp"
     android:viewportWidth="24"
     android:viewportHeight="24">
+    <!-- Силуэт логотипа: дуга и треугольник play. В шторке Android
+         берёт только альфу и красит её в цвет уведомления. -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M12,2a10,10 0,1 0,0 20a10,10 0,1 0,0 -20z" />
+        android:pathData="M4,11.2 A8,8 0 0 1 20,11.2 L17.7,11.2 A5.7,5.7 0 0 0 6.3,11.2 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M9.2,12.6 L16.4,16.3 L9.2,20.2 Z" />
 </vector>
